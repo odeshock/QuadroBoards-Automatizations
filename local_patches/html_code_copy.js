@@ -1,110 +1,174 @@
 (function () {
-  // ——— утилиты ———
-  function ensureButton(box){
-    const lg = box.querySelector('.legend') || box.insertBefore(document.createElement('strong'), box.firstChild);
-    lg.classList.add('legend');
-    if(!lg.querySelector('.code-copy')){
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'code-copy';
-      btn.textContent = (lg.textContent||'').trim() || 'Скопировать код';
-      lg.textContent = '';
-      lg.appendChild(btn);
-    }
-  }
+  // -------- утилиты --------
+  function $(sel, root) { return (root||document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+
   function selectNodeContents(el){
     try{
-      const r = document.createRange();
+      var r=document.createRange();
       r.selectNodeContents(el);
-      const s = window.getSelection();
+      var s=window.getSelection();
       s.removeAllRanges();
       s.addRange(r);
     }catch(e){}
   }
-  async function copy(text){
-    try{
-      if(navigator.clipboard && window.isSecureContext){
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    }catch(e){}
+
+  function getText(pre){
+    return (pre && (pre.innerText || pre.textContent) || '').replace(/\s+$/,'');
+  }
+
+  function copyFromSelection(){
     try{ return document.execCommand && document.execCommand('copy'); }
     catch(e){ return false; }
   }
 
-  // ——— логика «скопировать» + авто-сброс выделения ———
-  function arm(box){
-    if(box.__armed) return;
-    box.__armed = true;
+  async function copyTextPreferClipboard(text){
+    if(navigator.clipboard && window.isSecureContext){
+      try{ await navigator.clipboard.writeText(text); return true; }catch(e){}
+    }
+    return copyFromSelection();
+  }
+
+  // -------- управление выделением после копирования --------
+  let activePre = null;
+
+  function setActivePre(pre){
+    activePre = pre || null;
+  }
+
+  function hardClearSelection() {
+    try {
+      const sel = window.getSelection && window.getSelection();
+      if (sel && sel.removeAllRanges) sel.removeAllRanges();
+      if (document.selection && document.selection.empty) document.selection.empty(); // старый IE
+    } catch(e) {}
+
+    try {
+      if (document.activeElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+      }
+    } catch(e) {}
+
+    const b = document.body;
+    const prevUS = b.style.userSelect;
+    const prevWk = b.style.webkitUserSelect;
+    b.style.userSelect = 'none';
+    b.style.webkitUserSelect = 'none';
+    void b.offsetHeight; // форсим рефлоу
+    b.style.userSelect = prevUS;
+    b.style.webkitUserSelect = prevWk;
+  }
+
+  function needClearByTarget(t) {
+    if (!activePre) return false;
+    return !activePre.contains(t);
+  }
+
+  function globalDown(e) {
+    const t = e.target || e.srcElement;
+    if (needClearByTarget(t)) {
+      activePre = null;
+      hardClearSelection();
+    }
+  }
+
+  function onSelectionChange() {
+    if (!activePre) return;
+    const sel = window.getSelection && window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) {
+      activePre = null;
+      return;
+    }
+    const n = sel.anchorNode;
+    if (n && !activePre.contains(n)) {
+      activePre = null;
+      hardClearSelection();
+    }
+  }
+
+  // -------- инициализация коробок --------
+  function ensureButton(box){
+    // ищем/создаём .legend
+    let lg = box.querySelector('.legend');
+    if (!lg) {
+      lg = document.createElement('strong');
+      lg.className = 'legend';
+      box.insertBefore(lg, box.firstChild);
+    }
+    if (lg.dataset.copyReady) return;
+
+    // если внутри нет кнопки — вставляем
+    if (!lg.querySelector('.code-copy')) {
+      let label = (lg.textContent || '').trim();
+      if (!label || /^код:?\s*$/i.test(label)) label = 'Скопировать код';
+      lg.textContent = '';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'code-copy';
+      btn.textContent = label;
+      lg.appendChild(btn);
+    }
+    lg.dataset.copyReady = '1';
+  }
+
+  function armBox(box){
     ensureButton(box);
+    if (box.__armed) return;
+    box.__armed = true;
 
-    box.addEventListener('click', async (e)=>{
-      const isBtn = e.target.closest && e.target.closest('.code-copy, .legend');
-      if(!isBtn) return;
+    // обработчик клика по кнопке (и по самой legend)
+    box.addEventListener('click', async function(e){
+      const target = (e.target.closest && e.target.closest('.code-copy, .legend')) || null;
+      if (!target) return;
 
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
 
       const pre = box.querySelector('pre');
-      if(!pre) return;
+      if (!pre) return;
 
-      // 1) выделяем текст и копируем
+      // выделяем и копируем
       selectNodeContents(pre);
-      const text = (pre.innerText || pre.textContent || '').replace(/\s+$/,'');
-      await copy(text);
-
-      // 2) оставляем подсветку, но очищаем её,
-      //    как только пользователь начнёт выделять/кликать в другом месте
-      const s = window.getSelection();
-      let active = true;
-
-      function clear(){
-        if(!active) return;
-        active = false;
-        try{ s.removeAllRanges(); }catch(e){}
-        off();
-      }
-      function onEsc(ev){ if(ev.key === 'Escape') clear(); }
-      function onDown(ev){ if(!box.contains(ev.target)) clear(); }
-      function onSelChange(){
-        const sel = window.getSelection();
-        if(!sel.rangeCount || sel.isCollapsed) return clear();
-        const n = sel.anchorNode;
-        // если выделение ушло из текущего <pre> — очищаем старую подсветку
-        if(!pre.contains(n)) clear();
-      }
-      function off(){
-        document.removeEventListener('keydown', onEsc, true);
-        document.removeEventListener('mousedown', onDown, true);
-        document.removeEventListener('selectionchange', onSelChange, true);
-      }
-      document.addEventListener('keydown', onEsc, true);
-      document.addEventListener('mousedown', onDown, true);
-      document.addEventListener('selectionchange', onSelChange, true);
+      setActivePre(pre);
+      await copyTextPreferClipboard(getText(pre));
     }, true);
   }
 
   function init(ctx){
-    (ctx||document).querySelectorAll('.code-box').forEach(arm);
+    $all('.code-box', ctx).forEach(armBox);
   }
 
   // первичная инициализация
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', ()=>init());
-  } else {
-    init();
-  }
+  init();
 
-  // если форум дорисовывает контент событием — подхватим
-  document.addEventListener('pun_main_ready', ()=>init());
+  // если движок форума шлёт это событие — доинициализируем
+  document.addEventListener('pun_main_ready', function(){ init(); });
 
-  // инициализация для динамически добавленных блоков
-  new MutationObserver(muts=>{
-    muts.forEach(m=>{
-      (m.addedNodes||[]).forEach(n=>{
-        if(n.nodeType!==1) return;
-        if(n.matches && n.matches('.code-box')) arm(n);
-        n.querySelectorAll && n.querySelectorAll('.code-box').forEach(arm);
+  // MutationObserver — подхватываем динамически появляющиеся блоки
+  new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      (m.addedNodes||[]).forEach(function(n){
+        if (n.nodeType !== 1) return;
+        if (n.matches && n.matches('.code-box')) armBox(n);
+        n.querySelectorAll && n.querySelectorAll('.code-box').forEach(armBox);
       });
     });
   }).observe(document.body, {childList:true, subtree:true});
+
+  // глобальные «крючки» для гарантированного снятия выделения
+  window.addEventListener('pointerdown', globalDown, true);
+  document.addEventListener('mousedown', globalDown, true);
+  document.addEventListener('click', globalDown, true);
+  document.addEventListener('touchstart', globalDown, true);
+  document.addEventListener('focusin', globalDown, true);
+  document.addEventListener('scroll', function () {
+    if (activePre) { activePre = null; hardClearSelection(); }
+  }, true);
+  document.addEventListener('selectionchange', onSelectionChange, true);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { activePre = null; hardClearSelection(); }
+  }, true);
+  window.addEventListener('blur', function () {
+    if (activePre) { activePre = null; hardClearSelection(); }
+  }, true);
 })();

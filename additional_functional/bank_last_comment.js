@@ -10,7 +10,7 @@
   var $ = jQuery;
 
   var TOPIC_TITLE = "банк";
-  var FORUM_IDS = [8, 19];
+  var FORUM_IDS = [];
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
   var REQUEST_TIMEOUT_MS = 6000;
 

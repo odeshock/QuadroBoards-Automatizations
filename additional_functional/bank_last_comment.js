@@ -1,3 +1,14 @@
+// ==UserScript==
+// @name         BANK DEBUG PING
+// @match        https://followmyvoice.rusff.me/*
+// @match        http://followmyvoice.rusff.me/*
+// @match        https://*/profile.php*
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+console.log("[bank-link] PING: userscript loaded on", location.href);
+
+
 (function () {
   const LOG = (...a) => console.log("[bank-link]", ...a);
   const ERR = (...a) => console.error("[bank-link]", ...a);

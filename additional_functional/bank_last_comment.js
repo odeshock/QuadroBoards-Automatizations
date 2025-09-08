@@ -44,7 +44,7 @@
     $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
   }
   function setLink($a, href) {
-    $a.removeClass("is-empty").text("Последняя банковская операция");
+    $a.removeClass("is-empty").attr({ href }).text("Последняя банковская операция");
   }
   function resolveUserName() {
     var name = $("#profile-name > strong").first().text().trim();

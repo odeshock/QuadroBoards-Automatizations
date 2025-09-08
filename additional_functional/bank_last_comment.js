@@ -9,8 +9,8 @@
   if (!window.jQuery) { console.log("[bank-link] jQuery not found"); return; }
   var $ = jQuery;
 
-  var TOPIC_TITLE = "Шрифты";
-  var FORUM_IDS = [];
+  var TOPIC_TITLE = "Шрифты";          // <- твой заголовок
+  var FORUM_IDS = [];                  // <- пусто = искать по всем разделам
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
   var REQUEST_TIMEOUT_MS = 6000;
 
@@ -27,11 +27,10 @@
     if (!$right.length) return null;
     var $li = $(`
       <li id="pa-bank-link">
-        <span>Последний пост в «${TOPIC_TITLE}» (разделы 8/19):</span>
+        <span>Последний пост в «${TOPIC_TITLE}» (разделы ${FORUM_IDS.length?FORUM_IDS.join(","):"все"}):</span>
         <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
       </li>
     `);
-    // prepend → в начале; если хочешь внизу — замени на append
     $right.prepend($li);
     log("вставили слот в профиль");
     return $li.find("a");
@@ -47,10 +46,8 @@
   }
 
   function resolveUserName() {
-    // приоритет — <li id="profile-name"><strong>НИК</strong></li>
     var name = $("#profile-name > strong").first().text().trim();
     if (name) { log("ник из #profile-name:", name); return name; }
-    // запасные места
     var cands = [
       $("#viewprofile h1 span").text(),
       $("#viewprofile h1").text(),
@@ -75,18 +72,35 @@
     return s.includes("по вашему запросу ничего не найдено") ||
            !/<div[^>]+class="post\b/i.test(html||"");
   }
-  function findFirstBankPostLink($doc) {
+
+  // LOG: собираем и печатаем все темы, найденные на странице поиска;
+  // возвращаем ссылку на первый пост в теме с нужным названием
+  function findFirstBankPostLinkAndLog($doc) {
     var tt = TOPIC_TITLE.toLowerCase();
+    var allTopics = [];
     var link = null;
+
     $doc.find("div.post").each(function () {
       var $p = $(this);
-      // в h3 обычно: раздел → тема → дата; берём ссылку на тему (последняя с id=)
       var $topic = $p.find("h3 a[href*='viewtopic.php?id=']").last();
-      if ($topic.length && $topic.text().trim().toLowerCase() === tt) {
-        var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
-        if ($msg.length) { link = $msg.attr("href"); return false; }
+      if ($topic.length) {
+        var title = $topic.text().trim();
+        allTopics.push(title);
+        if (!link && title.toLowerCase() === tt) {
+          var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
+          if ($msg.length) {
+            link = $msg.attr("href");
+            // LOG: нашли совпадение — показываем тему и ссылку
+            log('нашли тему совпадающую с "', TOPIC_TITLE, '":', title, "→", link);
+          }
+        }
       }
     });
+
+    // LOG: выведем уникальные заголовки тем, встреченных в выдаче
+    var uniq = Array.from(new Set(allTopics));
+    log("темы в выдаче поиска:", uniq);
+
     return link;
   }
 
@@ -103,7 +117,7 @@
     var url = "/search.php?action=search"
             + "&keywords="
             + "&author=" + encodeURIComponent(userName)
-            + "&forum=" + encodeURIComponent(FORUM_IDS.join(","))
+            + (FORUM_IDS.length ? "&forum=" + encodeURIComponent(FORUM_IDS.join(",")) : "")
             + "&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts";
 
     log("формируем запрос:", url);
@@ -124,9 +138,9 @@
 
       try {
         var $doc = $(html);
-        var href = findFirstBankPostLink($doc);
+        var href = findFirstBankPostLinkAndLog($doc); // LOG: здесь и печатаем
         if (href) finishOnce(function () { setLink($slot, href); });
-        else      finishOnce(function () { setEmpty($slot, "нет постов в теме «банк»"); });
+        else      finishOnce(function () { setEmpty($slot, 'нет постов в теме "'+TOPIC_TITLE+'"'); });
       } catch (e) {
         console.log("[bank-link] ошибка разбора:", e);
         finishOnce(function () { setEmpty($slot, "ошибка разбора результата"); });

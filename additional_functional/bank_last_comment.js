@@ -32,19 +32,19 @@
     var scope = FORUM_IDS.length ? ` (разделы ${FORUM_IDS.join(",")})` : "";
     var $li = $(`
       <li id="pa-bank-link">
-        <span>Полезные ссылки (последнее ...)</span>
-        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
+        <span>Полезные ссылки</span>
+        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">Загрузка…</a></strong>
       </li>
     `);
     $right.prepend($li);
     return $li.find("a");
   }
   function setEmpty($a, reason) {
-    var text = "Обращение в банк не найдено";
+    var text = "Последняя банковская операция не найдена";
     $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
   }
   function setLink($a, href) {
-    $a.removeClass("is-empty").attr({ href, title:"Обращение в банке" }).text("Перейти к сообщению");
+    $a.removeClass("is-empty").text("Последняя банковская операция");
   }
   function resolveUserName() {
     var name = $("#profile-name > strong").first().text().trim();

@@ -1,11 +1,14 @@
 // ==UserScript==
-// @name         Profile → "Последний пост:" (debug; форумы 3,6; посты vs темы; дата + TZ)
+// @name         Profile → "Последний пост:" (форумы 3,6; сравнение по ключам; логи; дата + TZ)
 // @match        *://*/profile.php*
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==
 (function () {
   if (!window.jQuery) return;
+  if (window.__POST_LAST_GUARD__) return; // защита от двойного запуска
+  window.__POST_LAST_GUARD__ = true;
+
   var $ = jQuery;
 
   // === настройки ===
@@ -13,11 +16,6 @@
   var REQUEST_TIMEOUT_MS = 8000;
   var MAX_PAGES = 20; // на поток
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
-  var DEBUG = true;
-
-  function dbg(){ if (!DEBUG) return; try { console.log.apply(console, arguments); } catch(e){} }
-  function gstart(label){ if(DEBUG) try{ console.groupCollapsed(label); }catch(e){} }
-  function gend(){ if(DEBUG) try{ console.groupEnd(); }catch(e){} }
 
   // запуск строго на /profile.php?id=...
   if (!/\/profile\.php$/i.test(location.pathname)) return;
@@ -34,9 +32,10 @@
 
   // слот
   function insertSlot() {
-    if (document.getElementById('pa-lastpost-link')) return $('#pa-lastpost-link');
     var $right = $(PROFILE_RIGHT_SEL);
     if (!$right.length) return null;
+    if ($right.find('#pa-lastpost-link').length) return $right.find('#pa-lastpost-link'); // если уже есть — не дублируем
+
     var $li = $(`
       <li id="pa-lastpost-link">
         <span>Последний пост:</span>
@@ -46,21 +45,19 @@
       </li>
     `);
     var $after = $right.find('#pa-last-visit');
-    if ($after.length) {
-      $li.insertAfter($after);
-    } else {
-      $right.append($li);
-    }
+    if ($after.length) $li.insertAfter($after);
+    else $right.append($li);
     return $li;
   }
   function setEmpty($slot, reason) {
     var text = "Не найден";
     $slot.find("a").addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
-    dbg('❌ Итог: не найден. Причина:', reason || text);
+    console.info('[Последний пост] Завершено: ' + (reason || text));
   }
   function setLink($slot, href, ts) {
-    $slot.find("a").removeClass("is-empty").attr({ href }).text(formatUnix(ts));
-    dbg('✅ Итог: выбран пост', { href, ts, when: formatUnix(ts) });
+    var label = ts ? formatUnix(ts) : 'Открыть пост';
+    $slot.find("a").removeClass("is-empty").attr({ href }).text(label);
+    console.info('[Последний пост] Результат:', href, ts ? '('+label+')' : '');
   }
 
   // ник
@@ -139,15 +136,46 @@
            !/<tbody[^>]*class="hasicon"/i.test(html||"");
   }
 
-  // парсеры (оба возвращают массив объектов с unix и ссылкой)
+  // нормализация ключей
+  function extractParam(href, name) {
+    var m = href.match(new RegExp('[?&]'+name+'=(\\d+)'));
+    return m ? m[1] : null;
+  }
+  function extractPidFromHash(href) {
+    var m = href.match(/#p(\d+)/);
+    return m ? m[1] : null;
+  }
+  // Посты (R1): нужно получить topic id (из H3 ссылки) и pid (из .post-links)
+  function normalizeKeyFromPost($p) {
+    var $topic = $p.find("h3 a[href*='viewtopic.php?id=']").last();
+    var topicId = $topic.length ? extractParam($topic.attr("href"), "id") : null;
+    var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
+    var pid = $msg.length ? (extractParam($msg.attr("href"), "pid") || extractPidFromHash($msg.attr("href"))) : null;
+    if (topicId && pid) return "id="+topicId+"#p"+pid;
+    return null;
+  }
+  // Темы (R2): берём из tcr <a> — там уже есть id и #pNN; игнорируем &p=
+  function normalizeKeyFromTopicRow($tr) {
+    var $a = $tr.find("td.tcr a[href*='viewtopic.php']");
+    if (!$a.length) return null;
+    var href = $a.attr("href");
+    var topicId = extractParam(href, "id");
+    var pid = extractPidFromHash(href);
+    if (topicId && pid) return "id="+topicId+"#p"+pid;
+    return null;
+  }
+
+  // парсеры
   function parsePosts(html) {
     var $doc = $(html);
     var out = [];
     $doc.find("div.post").each(function(){
       var $p = $(this);
-      var ts = parseInt($p.attr("data-posted"),10);
+      var ts = parseInt($p.attr("data-posted"),10) || null; // только для вывода
+      var key = normalizeKeyFromPost($p);
       var $lnk = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
-      if (ts && $lnk.length) out.push({ ts, href: $lnk.attr("href") });
+      var href = $lnk.length ? $lnk.attr("href") : null;
+      if (key && href) out.push({ key, href, ts });
     });
     return out;
   }
@@ -156,33 +184,15 @@
     var out = [];
     $doc.find("tbody.hasicon tr").each(function(){
       var $tr = $(this);
-      // разные попытки выудить unix
-      var ts = NaN, href = null;
-
-      // 1) data-атрибуты на строке/ячейке/ссылке
-      ts = ts || parseInt($tr.attr("data-posted"),10);
-      var $tcr = $tr.find("td.tcr");
-      ts = ts || parseInt($tcr.attr("data-posted"),10);
-      var $alast = $tcr.find("a[href*='#p']").first();
-      href = $alast.attr('href') || null;
-      ts = ts || parseInt($alast.attr("data-posted"),10) || parseInt($alast.attr("data-unix"),10) || parseInt($alast.data("posted"),10) || parseInt($alast.data("unix"),10);
-
-      // 2) иногда unix кладут в скрытый span
-      if (!isFinite(ts)) {
-        var $hiddenTs = $tcr.find("[data-unix],[data-posted]").first();
-        ts = parseInt($hiddenTs.attr("data-unix"),10) || parseInt($hiddenTs.attr("data-posted"),10);
-      }
-
-      // 3) fallback — попробовать распарсить видимую дату (ISO-like)
-      if (!isFinite(ts) && $alast.length) {
-        var txt = ($alast.text()||"").trim();
-        var m = txt.match(/(\d{4})[.\-](\d{2})[.\-](\d{2})\s+(\d{2})[:.](\d{2})[:.](\d{2})/);
-        if (m) ts = Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]) / 1000;
-      }
-      out.push({ ts, href });
+      var $a = $tr.find("td.tcr a[href*='viewtopic.php']");
+      if (!$a.length) return;
+      var href = $a.attr("href");
+      var key = normalizeKeyFromTopicRow($tr);
+      if (key && href) out.push({ key, href });
     });
     return out;
   }
+
   function getNextPageUrlPosts($doc) {
     var $next = $doc.find("#pun-searchposts .pagelink a.next").first();
     return $next.length ? $next.attr("href") : null;
@@ -217,65 +227,57 @@
     if (!$slot) return;
 
     var userName = resolveUserName();
-    dbg('👤 Пользователь:', userName);
-    dbg('🕒 TZ:', TZ);
     if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
+
+    console.group('[Последний пост] Отладка');
+    console.log('Форумы:', FORUM_IDS.join(','), 'Пользователь:', userName);
 
     var done = false;
     var timer = setTimeout(function () {
       if (done) return;
       done = true;
       setEmpty($slot, "таймаут");
+      console.groupEnd();
     }, REQUEST_TIMEOUT_MS);
 
     var pPage=1, tPage=1, pBuf=[], tBuf=[], pEnd=false, tEnd=false;
 
-    function logBufs(place){
-      if (!DEBUG) return;
-      gstart('📦 Буферы ('+place+')');
-      dbg('R1 posts pPage=', pPage- (pEnd?0:1), 'end=', pEnd, pBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
-      dbg('R2 topics tPage=', tPage- (tEnd?0:1), 'end=', tEnd, tBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
-      gend();
-    }
-
     function refill(which, cb) {
       if (done) return;
       var url = which==="posts" ? buildPostsURL(userName, pPage) : buildTopicsURL(userName, tPage);
-      gstart('🔎 Загрузка '+(which==='posts'?'R1/posts':'R2/topics')+' страница '+(which==='posts'?pPage:tPage));
-      dbg('GET', url);
+      console.log('Загрузка '+(which==='posts'?'R1(посты)':'R2(темы)')+' страница', (which==='posts'?pPage:tPage), url);
       $.get(url, function(html){
         if (done) return;
         clearTimeout(timer);
-        timer = setTimeout(function(){ if(!done){ done=true; setEmpty($slot,"таймаут"); } }, REQUEST_TIMEOUT_MS);
+        timer = setTimeout(function(){ if(!done){ done=true; setEmpty($slot,"таймаут"); console.groupEnd(); } }, REQUEST_TIMEOUT_MS);
 
-        if (isAccessDenied(html)) { done=true; clearTimeout(timer); setEmpty($slot, "доступ закрыт"); gend(); return; }
-        if (which==="posts" ? isEmptySearchPosts(html) : isEmptySearchTopics(html)) {
+        if (isAccessDenied(html)) { done=true; clearTimeout(timer); setEmpty($slot, "доступ закрыт"); console.groupEnd(); return; }
+        var empty = which==="posts" ? isEmptySearchPosts(html) : isEmptySearchTopics(html);
+        var $doc = $(html);
+        if (empty) {
           if (which==="posts") { pBuf=[]; pEnd=true; }
           else { tBuf=[]; tEnd=true; }
-          dbg('Пусто на странице.');
-          gend();
+          console.log((which==='posts'?'R1':'R2')+': пусто');
           cb(); return;
         }
-        var $doc = $(html);
+
         if (which==="posts") {
           pBuf = parsePosts(html);
-          dbg('Парсинг R1/posts →', pBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
-          if (!getNextPageUrlPosts($doc) || pPage>=MAX_PAGES) { pEnd = true; dbg('Нет следующей страницы (posts) или достигнут лимит'); }
-          else { pPage++; dbg('Следующая страница posts будет', pPage); }
+          // лог содержимого
+          console.log('R1 items:', pBuf.map(x=>x.key));
+          if (!getNextPageUrlPosts($doc) || pPage>=MAX_PAGES) pEnd = true; else pPage++;
         } else {
           tBuf = parseTopics(html);
-          dbg('Парсинг R2/topics →', tBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
-          if (!getNextPageUrlTopics($doc) || tPage>=MAX_PAGES) { tEnd = true; dbg('Нет следующей страницы (topics) или достигнут лимит'); }
-          else { tPage++; dbg('Следующая страница topics будет', tPage); }
+          console.log('R2 items:', tBuf.map(x=>x.key));
+          if (!getNextPageUrlTopics($doc) || tPage>=MAX_PAGES) tEnd = true; else tPage++;
         }
-        gend();
         cb();
       }, "html").fail(function(){
         if (done) return;
         clearTimeout(timer);
         done=true;
-        gend();
         setEmpty($slot, "ошибка сети");
+        console.groupEnd();
       });
     }
 
@@ -287,44 +289,39 @@
       if (!tBuf.length && !tEnd) return refill("topics", step);
 
       // если оба пусты — финиш
-      if (!pBuf.length && !tBuf.length) { done=true; clearTimeout(timer); setEmpty($slot); return; }
-
-      logBufs('step');
+      if (!pBuf.length && !tBuf.length) { done=true; clearTimeout(timer); setEmpty($slot); console.groupEnd(); return; }
 
       // если темы пусты — просто берём верхний пост
       if (!tBuf.length) {
-        var pOnly = pBuf.shift();
-        dbg('Темы пусты → берём верхний пост', pOnly);
-        if (pOnly && isFinite(pOnly.ts)) { done=true; clearTimeout(timer); setLink($slot, pOnly.href, pOnly.ts); return; }
+        var p = pBuf.shift();
+        console.log('R2 пусто, берём R1:', p && p.key);
+        if (p) { done=true; clearTimeout(timer); setLink($slot, p.href, p.ts); console.groupEnd(); return; }
         return step();
       }
       // если посты пусты — догружаем посты
       if (!pBuf.length) return refill("posts", step);
 
-      // сравнение верхних элементов
+      // сравнение верхних элементов по «ключу» (id=#pNN), порядок убывающий уже задан сервером
       var p = pBuf[0], t = tBuf[0];
-      if (!isFinite(t.ts)) {
-        dbg('⚠️ В теме нет unix → отбрасываем', t);
-        tBuf.shift(); return step();
+      if (!p || !t) { // на всякий случай
+        if (!p) pBuf.shift();
+        if (!t) tBuf.shift();
+        return step();
       }
-      dbg('Сравнение:', {
-        post: {ts: p.ts, when:isFinite(p.ts)?formatUnix(p.ts):'NaN', href:p.href},
-        topic:{ts: t.ts, when:isFinite(t.ts)?formatUnix(t.ts):'NaN', href:t.href}
-      });
+      console.log('Сравнение:', 'R1=', p.key, 'vs', 'R2=', t.key);
 
-      if (p.ts > t.ts) {
-        dbg('➡️ post.ts > topic.ts → берём этот пост');
+      if (p.key !== t.key) {
+        // ключи различаются → пост из R1 не является «первым постом темы» → он и есть победитель
         pBuf.shift();
         done=true; clearTimeout(timer);
+        console.log('Победа R1: ключи разные');
         setLink($slot, p.href, p.ts);
+        console.groupEnd();
         return;
-      } else if (p.ts === t.ts) {
-        dbg('↔️ post.ts == topic.ts → вероятно первый пост темы → выкидываем оба и идём дальше');
-        pBuf.shift(); tBuf.shift();
-        return step();
       } else {
-        dbg('⬅️ topic.ts > post.ts → наш пост старее последнего в теме → берём следующий пост');
-        pBuf.shift();
+        // ключи совпали → это «первый пост темы», выкидываем оба и идём дальше
+        console.log('Ключи равны, инкремент обоих списков');
+        pBuf.shift(); tBuf.shift();
         return step();
       }
     }

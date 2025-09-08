@@ -1,170 +1,163 @@
-// ==UserScript==
-// @name         Profile: last post in "банк" via search (forums 8 & 19) — logs + robust username
-// @match        *://*/profile.php?id=*
-// @run-at       document-end
-// ==/UserScript==
+<script>
 (function () {
-  if (!window.jQuery) return;
-  var $ = jQuery;
+  const LOG = (...a) => console.log("[bank-link]", ...a);
+  const ERR = (...a) => console.error("[bank-link]", ...a);
 
-  var TOPIC_TITLE = "банк";
-  var FORUM_IDS   = [8, 19];
-  var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
-  var REQUEST_TIMEOUT_MS = 6000;
+  // 0) страховка: ловим ошибки
+  window.addEventListener("error", e => ERR("JS error:", e.message, e.filename+":"+e.lineno));
 
-  $("<style>").text(`
-    #pa-bank-link a.is-empty {
-      color:#999 !important; text-decoration:none !important;
-      pointer-events:none; cursor:default; opacity:.8;
+  // 1) запускаемся строго на страницах profile.php
+  if (!/\/profile\.php\b/i.test(location.pathname)) {
+    LOG("не профиль, выходим:", location.pathname);
+    return;
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    try { main(); } catch (e) { ERR("fatal in main:", e); }
+  });
+
+  async function main() {
+    LOG("boot");
+
+    // 2) вставляем строку в правую колонку профиля
+    const right = document.querySelector("#viewprofile #profile-right");
+    if (!right) { ERR("не найден контейнер #viewprofile #profile-right"); return; }
+
+    const li = document.createElement("li");
+    li.id = "pa-bank-link";
+    li.innerHTML = `
+      <span>Последний пост в «банк» (разделы 8/19):</span>
+      <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
+    `;
+    right.prepend(li);
+
+    const a = li.querySelector("a");
+    addEmptyStyleOnce();
+
+    // 3) определяем ник
+    const user = resolveUserName();
+    LOG("определили имя пользователя:", user || "(пусто)");
+    if (!user) return setEmpty(a, "не удалось определить ник");
+
+    // 4) собираем URL поиска (через имя, только форумы 8 и 19)
+    const url = `/search.php?action=search&keywords=&author=${encodeURIComponent(user)}&forum=8,19&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts`;
+    LOG("формируем запрос:", url);
+
+    // 5) тянем HTML с таймаутом
+    let html;
+    try {
+      html = await fetchWithTimeout(url, { credentials: "same-origin" }, 8000);
+    } catch (e) {
+      ERR("fetch fail:", e);
+      return setEmpty(a, "ошибка загрузки поиска");
     }
-  `).appendTo(document.head || document.documentElement);
+    LOG("получен ответ, длина:", html.length);
 
-  function log(){ console.log("[bank-link]", ...arguments); }
+    // 6) проверки доступа/пустоты
+    if (isAccessDenied(html))        return setEmpty(a, "доступ к поиску закрыт");
+    if (isEmptySearch(html))         return setEmpty(a, "поиск ничего не нашёл");
 
-  // --- username detection (включая #profile-name > strong) ---
+    // 7) парсим и ищем первый пост в теме «банк»
+    const href = findFirstBankPostLink(html, "банк");
+    if (href) {
+      setLink(a, href);
+      LOG("готово →", href);
+    } else {
+      setEmpty(a, "нет постов в теме «банк»");
+    }
+  }
+
+  // ===== helpers =====
+
+  function addEmptyStyleOnce() {
+    if (document.getElementById("bank-link-empty-style")) return;
+    const st = document.createElement("style");
+    st.id = "bank-link-empty-style";
+    st.textContent = `
+      #pa-bank-link a.is-empty{
+        color:#999!important;text-decoration:none!important;
+        pointer-events:none;cursor:default;opacity:.8;
+      }`;
+    (document.head || document.documentElement).appendChild(st);
+  }
+
   function resolveUserName() {
-    return new Promise(function(resolve){
-      var fromProfileName = $('#profile-name > strong').first().text().trim();
-      if (fromProfileName) { log("ник из #profile-name:", fromProfileName); return resolve(fromProfileName); }
+    // приоритет: <li id="profile-name"><strong>Ник</strong></li>
+    const a = document.querySelector("#profile-name > strong");
+    if (a && a.textContent.trim()) { LOG("ник из #profile-name"); return a.textContent.trim(); }
 
-      var candidates = [
-        $("#viewprofile h1 span").text(),
-        $("#viewprofile h1").text(),
-        $('#viewprofile #profile-right .pa-author strong').first().text(),
-        $('#viewprofile #profile-left .pa-author strong').first().text(),
-      ].map(s => (s||"").replace(/^Профиль:\s*/i,"").replace(/[«»]/g,"").trim())
-       .filter(Boolean);
+    const tryText = sel => (document.querySelector(sel)?.textContent || "").trim();
+    const candidates = [
+      tryText("#viewprofile h1 span"),
+      tryText("#viewprofile h1"),
+      tryText("#viewprofile #profile-right .pa-author strong"),
+      tryText("#viewprofile #profile-left .pa-author strong"),
+      (document.title || "").trim()
+    ].map(s => s.replace(/^Профиль:\s*/i, "").replace(/[«»]/g,"").trim()).filter(Boolean);
 
-      if (candidates[0]) { log("ник из DOM (h1/span):", candidates[0]); return resolve(candidates[0]); }
-      if (candidates[1]) { log("ник из DOM (h1):", candidates[1]);     return resolve(candidates[1]); }
-      if (candidates[2]) { log("ник из правой панели:", candidates[2]); return resolve(candidates[2]); }
-      if (candidates[3]) { log("ник из левой панели:", candidates[3]);  return resolve(candidates[3]); }
-
-      var fromTitle = (document.title || "").replace(/^Профиль:\s*/i,"").trim();
-      if (fromTitle) { log("ник из <title>:", fromTitle); return resolve(fromTitle); }
-
-      var m = location.search.match(/[?&]id=(\d+)/), uid = m ? +m[1] : null;
-      if (!uid) { log("uid не найден, имя не извлечь"); return resolve(null); }
-      var url = "/profile.php?id=" + uid + "&nohead=1";
-      log("тянем nohead для ника:", url);
-      $.get(url, function(html){
-        try {
-          var $doc = $(html);
-          var name =
-            $doc.find('#profile-name > strong').first().text().trim() ||
-            $doc.find("#viewprofile h1 span").text().trim() ||
-            $doc.find("#viewprofile h1").text().trim() ||
-            $doc.find('#viewprofile #profile-right .pa-author strong').first().text().trim() ||
-            $doc.find('#viewprofile #profile-left .pa-author strong').first().text().trim() ||
-            null;
-          log("ник из nohead:", name);
-          resolve(name);
-        } catch(e){
-          log("ошибка парсинга nohead:", e);
-          resolve(null);
-        }
-      },"html").fail(function(){
-        log("nohead не загрузился");
-        resolve(null);
-      });
-    });
+    if (candidates.length) {
+      LOG("ник из DOM:", candidates[0]);
+      return candidates[0];
+    }
+    return null;
   }
-  // ------------------------------------------------------------
 
-  function insertSlot() {
-    var $right = $(PROFILE_RIGHT_SEL);
-    if (!$right.length) return null;
-    var $li = $(`
-      <li id="pa-bank-link">
-        <span>Последний пост в «${TOPIC_TITLE}» (разделы 8/19):</span>
-        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
-      </li>
-    `);
-    $right.prepend($li);
-    log("вставили слот в профиль");
-    return $li.find("a");
+  async function fetchWithTimeout(url, opts, ms) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort("timeout"), ms);
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) throw new Error("HTTP "+res.status);
+    return res.text();
   }
-  function setEmpty($a, reason) {
-    var text = "либо войдите как игрок, либо ещё ничего не писал";
-    $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
-    log("результат: пусто →", reason || text);
-  }
-  function setLink($a, href) {
-    $a.removeClass("is-empty").attr({ href, title:"перейти к сообщению" }).text("перейти к сообщению");
-    log("результат: ссылка найдена →", href);
-  }
+
   function isAccessDenied(html) {
-    if (!html || typeof html !== "string") return true;
-    var s = html.toLowerCase();
-    return s.includes('id="pun-login"') ||
-           s.includes("недостаточно прав") ||
-           s.includes("вы не авторизованы") ||
-           s.includes("нет доступа");
+    const s = html.toLowerCase();
+    const hit = s.includes('id="pun-login"') || s.includes("недостаточно прав") ||
+                s.includes("вы не авторизованы") || s.includes("нет доступа");
+    if (hit) LOG("детектирован признак закрытого доступа");
+    return hit;
   }
   function isEmptySearch(html) {
-    if (!html || typeof html !== "string") return false;
-    var s = html.toLowerCase();
-    return s.includes("по вашему запросу ничего не найдено") ||
-           !/<div[^>]+class="post\b/.test(html);
-  }
-  function findFirstBankPostLink($doc) {
-    var tt = TOPIC_TITLE.toLowerCase();
-    var link = null;
-    $doc.find("div.post").each(function () {
-      var $p = $(this);
-      var $topic = $p.find("h3 a[href*='viewtopic.php?id=']").last();
-      if ($topic.length && $topic.text().trim().toLowerCase() === tt) {
-        var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
-        if ($msg.length) { link = $msg.attr("href"); return false; }
-      }
-    });
-    return link;
+    const s = html.toLowerCase();
+    const none = s.includes("по вашему запросу ничего не найдено");
+    const hasPosts = /<div[^>]+class="post\b/i.test(html);
+    const res = none || !hasPosts;
+    if (res) LOG("детектирован пустой результат поиска");
+    return res;
   }
 
-  $(async function () {
-    const $slot = insertSlot();
-    if (!$slot || !$slot.length) { log("нет слота, выходим"); return; }
+  function findFirstBankPostLink(html, topicTitle) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const posts = doc.querySelectorAll("div.post");
+    const tt = topicTitle.toLowerCase();
 
-    const userName = await resolveUserName();
-    log("итоговое имя пользователя:", userName);
-    if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
+    for (const p of posts) {
+      // в заголовке h3 обычно идут: раздел → тема → дата; берём ссылку на тему (последнюю из id=)
+      const topicLinks = p.querySelectorAll("h3 a[href*='viewtopic.php?id=']");
+      const topic = topicLinks[topicLinks.length - 1];
+      if (!topic) continue;
+      if ((topic.textContent || "").trim().toLowerCase() !== tt) continue;
 
-    var url = "/search.php?action=search"
-            + "&keywords="
-            + "&author=" + encodeURIComponent(userName)
-            + "&forum=" + encodeURIComponent(FORUM_IDS.join(","))
-            + "&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts";
+      const msg = p.querySelector(".post-links a[href*='viewtopic.php?pid=']");
+      if (msg && msg.getAttribute("href")) return msg.getAttribute("href");
+    }
+    return null;
+  }
 
-    log("формируем запрос:", url);
-
-    var done = false;
-    var finishOnce = fn => { if (done) return; done = true; fn(); };
-    var timer = setTimeout(() => finishOnce(() => setEmpty($slot, "таймаут запроса к поиску")),
-                           REQUEST_TIMEOUT_MS);
-
-    $.get(url, function (html) {
-      if (done) return;
-      clearTimeout(timer);
-      log("получен ответ от search.php, длина:", html ? html.length : 0);
-
-      if (isAccessDenied(html)) { finishOnce(() => setEmpty($slot, "доступ к поиску закрыт")); return; }
-      if (isEmptySearch(html))  { finishOnce(() => setEmpty($slot, "поиск ничего не нашёл")); return; }
-
-      try {
-        var $doc = $(html);
-        var href = findFirstBankPostLink($doc);
-        if (href) finishOnce(() => setLink($slot, href));
-        else      finishOnce(() => setEmpty($slot, "нет постов в теме «банк»"));
-      } catch (e) {
-        log("ошибка разбора:", e);
-        finishOnce(() => setEmpty($slot, "ошибка разбора результата"));
-      }
-    }, "html").fail(function () {
-      if (done) return;
-      clearTimeout(timer);
-      log("ошибка сети при загрузке search.php");
-      finishOnce(() => setEmpty($slot, "ошибка загрузки поиска"));
-    });
-  });
+  function setEmpty(a, reason) {
+    const text = "либо войдите как игрок, либо ещё ничего не писал";
+    a.classList.add("is-empty");
+    a.setAttribute("href", "#");
+    a.setAttribute("title", reason || text);
+    a.textContent = text;
+    LOG("результат: пусто →", reason || text);
+  }
+  function setLink(a, href) {
+    a.classList.remove("is-empty");
+    a.setAttribute("href", href);
+    a.setAttribute("title", "перейти к сообщению");
+    a.textContent = "перейти к сообщению";
+  }
 })();
-
+</script>

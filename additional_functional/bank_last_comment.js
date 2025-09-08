@@ -9,10 +9,13 @@
   if (!window.jQuery) { console.log("[bank-link] jQuery not found"); return; }
   var $ = jQuery;
 
-  var TOPIC_TITLE = "hideprofile";          // <- твой заголовок
-  var FORUM_IDS = [];                  // <- пусто = искать по всем разделам
+  var TOPIC_TITLE = "Шрифты";          // <- твой заголовок
+  var FORUM_IDS   = [];                // <- пусто = искать везде; иначе [8,19]
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
   var REQUEST_TIMEOUT_MS = 6000;
+
+  // Сколько страниц максимум обходить, если тема не на первой
+  var MAX_PAGES = 10;
 
   $("<style>").text(`
     #pa-bank-link a.is-empty{
@@ -27,7 +30,7 @@
     if (!$right.length) return null;
     var $li = $(`
       <li id="pa-bank-link">
-        <span>Последний пост в «${TOPIC_TITLE}» (разделы ${FORUM_IDS.length?FORUM_IDS.join(","):"все"}):</span>
+        <span>Последний пост в «${TOPIC_TITLE}»${FORUM_IDS.length?` (разделы ${FORUM_IDS.join(",")})`:""}:</span>
         <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
       </li>
     `);
@@ -73,9 +76,8 @@
            !/<div[^>]+class="post\b/i.test(html||"");
   }
 
-  // LOG: собираем и печатаем все темы, найденные на странице поиска;
-  // возвращаем ссылку на первый пост в теме с нужным названием
-  function findFirstBankPostLinkAndLog($doc) {
+  // печатаем темы на странице и возвращаем ссылку на первый пост в нужной теме (если есть)
+  function findFirstMatchAndLog($doc) {
     var tt = TOPIC_TITLE.toLowerCase();
     var allTopics = [];
     var link = null;
@@ -90,18 +92,25 @@
           var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
           if ($msg.length) {
             link = $msg.attr("href");
-            // LOG: нашли совпадение — показываем тему и ссылку
-            log('нашли тему совпадающую с "', TOPIC_TITLE, '":', title, "→", link);
+            log('нашли тему "', TOPIC_TITLE, '":', title, "→", link);
           }
         }
       }
     });
 
-    // LOG: выведем уникальные заголовки тем, встреченных в выдаче
     var uniq = Array.from(new Set(allTopics));
     log("темы в выдаче поиска:", uniq);
-
     return link;
+  }
+
+  // достаём из выдачи ссылку «следующая страница», если она есть
+  function getNextPageUrl($doc) {
+    var $next = $doc.find(".linkst .pagelink a.next").first();
+    if ($next.length) return $next.attr("href");
+    // иногда внизу: .linksb
+    $next = $doc.find(".linksb .pagelink a.next").first();
+    if ($next.length) return $next.attr("href");
+    return null;
   }
 
   $(function () {
@@ -114,42 +123,89 @@
     log("итоговое имя пользователя:", userName || "(пусто)");
     if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
 
-    var url = "/search.php?action=search"
-            + "&keywords="
-            + "&author=" + encodeURIComponent(userName)
-            + (FORUM_IDS.length ? "&forum=" + encodeURIComponent(FORUM_IDS.join(",")) : "")
-            + "&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts";
+    // Базовый URL поиска (без параметров страниц)
+    var base = "/search.php?action=search"
+             + "&keywords="
+             + "&author=" + encodeURIComponent(userName)
+             + "&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts";
 
-    log("формируем запрос:", url);
+    // Если ограничиваем форумами — добавим ДВА варианта параметров для совместимости
+    if (FORUM_IDS.length) {
+      var ids = encodeURIComponent(FORUM_IDS.join(","));
+      base += "&forum=" + ids + "&forums=" + ids;
+    }
+
+    log("база запроса:", base);
 
     var done = false;
-    var finishOnce = function (fn) { if (done) return; done = true; fn(); };
     var timer = setTimeout(function () {
-      finishOnce(function () { setEmpty($slot, "таймаут запроса к поиску"); });
+      if (done) return;
+      done = true;
+      setEmpty($slot, "таймаут запроса к поиску");
     }, REQUEST_TIMEOUT_MS);
 
-    $.get(url, function (html) {
+    // рекурсивный обход страниц поиска
+    var visited = 0;
+    function crawl(url) {
       if (done) return;
-      clearTimeout(timer);
-      log("получен ответ, длина:", html ? html.length : 0);
-
-      if (isAccessDenied(html)) { finishOnce(function () { setEmpty($slot, "доступ к поиску закрыт"); }); return; }
-      if (isEmptySearch(html))  { finishOnce(function () { setEmpty($slot, "поиск ничего не нашёл"); }); return; }
-
-      try {
-        var $doc = $(html);
-        var href = findFirstBankPostLinkAndLog($doc); // LOG: здесь и печатаем
-        if (href) finishOnce(function () { setLink($slot, href); });
-        else      finishOnce(function () { setEmpty($slot, 'нет постов в теме "'+TOPIC_TITLE+'"'); });
-      } catch (e) {
-        console.log("[bank-link] ошибка разбора:", e);
-        finishOnce(function () { setEmpty($slot, "ошибка разбора результата"); });
+      if (++visited > MAX_PAGES) {
+        log("достигли лимита страниц =", MAX_PAGES);
+        done = true;
+        clearTimeout(timer);
+        setEmpty($slot, `не нашли "${TOPIC_TITLE}" на первых ${MAX_PAGES} стр.`);
+        return;
       }
-    }, "html").fail(function () {
-      if (done) return;
-      clearTimeout(timer);
-      console.log("[bank-link] ошибка сети при загрузке search.php");
-      finishOnce(function () { setEmpty($slot, "ошибка загрузки поиска"); });
-    });
+      // если url без &p= — используем base, иначе берём как есть
+      var pageUrl = url || base;
+      log(`сканирую страницу #${visited}:`, pageUrl);
+
+      $.get(pageUrl, function (html) {
+        if (done) return;
+        // сбрасываем таймер на каждую полученную страницу
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          if (done) return;
+          done = true;
+          setEmpty($slot, "таймаут запроса к поиску");
+        }, REQUEST_TIMEOUT_MS);
+
+        log("получен ответ, длина:", html ? html.length : 0);
+        if (isAccessDenied(html)) { done = true; clearTimeout(timer); return setEmpty($slot, "доступ к поиску закрыт"); }
+        if (isEmptySearch(html))  { done = true; clearTimeout(timer); return setEmpty($slot, "поиск ничего не нашёл"); }
+
+        try {
+          var $doc = $(html);
+          var href = findFirstMatchAndLog($doc);
+          if (href) {
+            done = true;
+            clearTimeout(timer);
+            setLink($slot, href);
+            return;
+          }
+          var next = getNextPageUrl($doc);
+          if (next) {
+            crawl(next); // идём дальше
+          } else {
+            done = true;
+            clearTimeout(timer);
+            setEmpty($slot, `нет постов в теме "${TOPIC_TITLE}"`);
+          }
+        } catch (e) {
+          console.log("[bank-link] ошибка разбора:", e);
+          done = true;
+          clearTimeout(timer);
+          setEmpty($slot, "ошибка разбора результата");
+        }
+      }, "html").fail(function () {
+        if (done) return;
+        clearTimeout(timer);
+        console.log("[bank-link] ошибка сети при загрузке search.php");
+        done = true;
+        setEmpty($slot, "ошибка загрузки поиска");
+      });
+    }
+
+    // Стартуем с базовой страницы (1-я). Далее crawl сам перейдёт на &p=2, &p=3 …
+    crawl(null);
   });
 })();

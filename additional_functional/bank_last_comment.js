@@ -32,7 +32,7 @@
     var scope = FORUM_IDS.length ? ` (разделы ${FORUM_IDS.join(",")})` : "";
     var $li = $(`
       <li id="pa-bank-link">
-        <span>Банковские операции</span>
+        <span>Банковские операции:</span>
         <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
       </li>
     `);

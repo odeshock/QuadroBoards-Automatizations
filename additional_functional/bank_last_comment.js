@@ -33,7 +33,7 @@
     var $li = $(`
       <li id="pa-bank-link">
         <span>Полезные ссылки</span>
-        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">Загрузка…</a></strong>
+        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
       </li>
     `);
     $right.prepend($li);

@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Profile → "Последний пост:" (форумы 3,6; посты vs темы; дата + TZ)
+// @name         Profile → "Последний пост:" (debug; форумы 3,6; посты vs темы; дата + TZ)
 // @match        *://*/profile.php*
 // @run-at       document-end
 // @grant        none
@@ -13,6 +13,11 @@
   var REQUEST_TIMEOUT_MS = 8000;
   var MAX_PAGES = 20; // на поток
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
+  var DEBUG = true;
+
+  function dbg(){ if (!DEBUG) return; try { console.log.apply(console, arguments); } catch(e){} }
+  function gstart(label){ if(DEBUG) try{ console.groupCollapsed(label); }catch(e){} }
+  function gend(){ if(DEBUG) try{ console.groupEnd(); }catch(e){} }
 
   // запуск строго на /profile.php?id=...
   if (!/\/profile\.php$/i.test(location.pathname)) return;
@@ -29,11 +34,11 @@
 
   // слот
   function insertSlot() {
+    if (document.getElementById('pa-lastpost-link')) return $('#pa-lastpost-link');
     var $right = $(PROFILE_RIGHT_SEL);
     if (!$right.length) return null;
     var $li = $(`
       <li id="pa-lastpost-link">
-      
         <span>Последний пост:</span>
         <strong>
           <a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a>
@@ -51,9 +56,11 @@
   function setEmpty($slot, reason) {
     var text = "Не найден";
     $slot.find("a").addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
+    dbg('❌ Итог: не найден. Причина:', reason || text);
   }
   function setLink($slot, href, ts) {
     $slot.find("a").removeClass("is-empty").attr({ href }).text(formatUnix(ts));
+    dbg('✅ Итог: выбран пост', { href, ts, when: formatUnix(ts) });
   }
 
   // ник
@@ -72,18 +79,15 @@
 
   // попытка достать часовой пояс из профиля/страницы
   function detectProfileTZ() {
-    // 1) попробуем найти что-то вроде "(UTC+03:00)" / "GMT +3" в видимом профиле
     var txt = $("#viewprofile").text() || "";
     var m = txt.match(/UTC\s*([+\-]\d{1,2})(?::?(\d{2}))?/i) || txt.match(/GMT\s*([+\-]\d{1,2})/i);
     if (m) {
       var hh = parseInt(m[1],10), mm = m[2] ? parseInt(m[2],10) : 0;
       return { type:"offset", minutes: hh*60 + (hh>=0?mm:-mm) };
     }
-    // 2) некоторые сборки кладут offset в cookie (попробуем типовые)
     var ck = document.cookie;
     var m2 = ck.match(/(?:punbb_tz|timezone|tzoffset)=([+\-]?\d{1,3})/i);
     if (m2) return { type:"offset", minutes: parseInt(m2[1],10) };
-    // 3) по умолчанию — системная таймзона браузера
     try {
       var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (tz) return { type:"iana", zone: tz };
@@ -94,12 +98,10 @@
 
   function formatUnix(sec) {
     var d = new Date(sec*1000);
-    // Если нашли явный offset — отформатируем «по-старинке», смещая время вручную.
     if (TZ.type === "offset") {
       var d2 = new Date(d.getTime() + (TZ.minutes - d.getTimezoneOffset())*60000);
       return fmtRu(d2);
     }
-    // Если есть IANA — используем Intl с этой зоной
     try {
       var zone = (TZ.type==="iana") ? TZ.zone : undefined;
       var f = new Intl.DateTimeFormat('ru-RU', {
@@ -107,7 +109,6 @@
         year: 'numeric', month: 'long', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
-      // «18 апреля 2022 г., 18:10:10» → уберём «г.,»
       return f.format(d).replace(/\s*г\.,?\s*/,' ').replace(/\u202F/g,' ');
     } catch(e){
       return fmtRu(d);
@@ -117,7 +118,6 @@
     var months = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
     function pad(n){ return (n<10?"0":"")+n; }
     return dateObj.getDate()+" "+months[dateObj.getMonth()]+" "+dateObj.getFullYear()+" "+pad(dateObj.getHours())+":"+pad(dateObj.getMinutes())+":"+pad(dateObj.getSeconds());
-    // без «г.» как просили
   }
 
   // служебное
@@ -154,22 +154,31 @@
   function parseTopics(html) {
     var $doc = $(html);
     var out = [];
-    // колонка "Последнее сообщение" — ссылка вида ...#pNN; на многих сборках в <a> кликабельно
     $doc.find("tbody.hasicon tr").each(function(){
       var $tr = $(this);
-      var $last = $tr.find("td.tcr a[href*='#p']");
-      if (!$last.length) return;
-      var href = $last.attr("href");
-      // На некоторых темах рядом нет unix — часто он зашит в data-атрибуты в выдаче. Попробуем найти.
-      // В test/русфф выдаче unix кладут в <div class="post" data-posted="..."> на странице "посты";
-      // В "темах" его нет — поэтому ориентируемся на текст даты + сервер: НО пользователь писал, что unix есть в обоих выдачах.
-      // Если на вашей сборке есть data-posted в <tr> — распознайте:
-      var ts = NaN;
-      var m = ($last.text()||"").match(/(\d{4})\-(\d{2})\-(\d{2})\s+(\d{2})[:.](\d{2})[:.](\d{2})/); // ISO-like
-      if (m) {
-        ts = Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]) / 1000;
+      // разные попытки выудить unix
+      var ts = NaN, href = null;
+
+      // 1) data-атрибуты на строке/ячейке/ссылке
+      ts = ts || parseInt($tr.attr("data-posted"),10);
+      var $tcr = $tr.find("td.tcr");
+      ts = ts || parseInt($tcr.attr("data-posted"),10);
+      var $alast = $tcr.find("a[href*='#p']").first();
+      href = $alast.attr('href') || null;
+      ts = ts || parseInt($alast.attr("data-posted"),10) || parseInt($alast.attr("data-unix"),10) || parseInt($alast.data("posted"),10) || parseInt($alast.data("unix"),10);
+
+      // 2) иногда unix кладут в скрытый span
+      if (!isFinite(ts)) {
+        var $hiddenTs = $tcr.find("[data-unix],[data-posted]").first();
+        ts = parseInt($hiddenTs.attr("data-unix"),10) || parseInt($hiddenTs.attr("data-posted"),10);
       }
-      // Если unix не извлекли — ставим NaN; такие записи проиграют сравнение.
+
+      // 3) fallback — попробовать распарсить видимую дату (ISO-like)
+      if (!isFinite(ts) && $alast.length) {
+        var txt = ($alast.text()||"").trim();
+        var m = txt.match(/(\d{4})[.\-](\d{2})[.\-](\d{2})\s+(\d{2})[:.](\d{2})[:.](\d{2})/);
+        if (m) ts = Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]) / 1000;
+      }
       out.push({ ts, href });
     });
     return out;
@@ -208,6 +217,8 @@
     if (!$slot) return;
 
     var userName = resolveUserName();
+    dbg('👤 Пользователь:', userName);
+    dbg('🕒 TZ:', TZ);
     if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
 
     var done = false;
@@ -219,35 +230,51 @@
 
     var pPage=1, tPage=1, pBuf=[], tBuf=[], pEnd=false, tEnd=false;
 
+    function logBufs(place){
+      if (!DEBUG) return;
+      gstart('📦 Буферы ('+place+')');
+      dbg('R1 posts pPage=', pPage- (pEnd?0:1), 'end=', pEnd, pBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
+      dbg('R2 topics tPage=', tPage- (tEnd?0:1), 'end=', tEnd, tBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
+      gend();
+    }
+
     function refill(which, cb) {
       if (done) return;
       var url = which==="posts" ? buildPostsURL(userName, pPage) : buildTopicsURL(userName, tPage);
+      gstart('🔎 Загрузка '+(which==='posts'?'R1/posts':'R2/topics')+' страница '+(which==='posts'?pPage:tPage));
+      dbg('GET', url);
       $.get(url, function(html){
         if (done) return;
         clearTimeout(timer);
         timer = setTimeout(function(){ if(!done){ done=true; setEmpty($slot,"таймаут"); } }, REQUEST_TIMEOUT_MS);
 
-        if (isAccessDenied(html)) { done=true; clearTimeout(timer); setEmpty($slot, "доступ закрыт"); return; }
+        if (isAccessDenied(html)) { done=true; clearTimeout(timer); setEmpty($slot, "доступ закрыт"); gend(); return; }
         if (which==="posts" ? isEmptySearchPosts(html) : isEmptySearchTopics(html)) {
           if (which==="posts") { pBuf=[]; pEnd=true; }
           else { tBuf=[]; tEnd=true; }
+          dbg('Пусто на странице.');
+          gend();
           cb(); return;
         }
         var $doc = $(html);
         if (which==="posts") {
           pBuf = parsePosts(html);
-          if (!getNextPageUrlPosts($doc) || pPage>=MAX_PAGES) pEnd = true;
-          else pPage++;
+          dbg('Парсинг R1/posts →', pBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
+          if (!getNextPageUrlPosts($doc) || pPage>=MAX_PAGES) { pEnd = true; dbg('Нет следующей страницы (posts) или достигнут лимит'); }
+          else { pPage++; dbg('Следующая страница posts будет', pPage); }
         } else {
           tBuf = parseTopics(html);
-          if (!getNextPageUrlTopics($doc) || tPage>=MAX_PAGES) tEnd = true;
-          else tPage++;
+          dbg('Парсинг R2/topics →', tBuf.map(x=>({ts:x.ts, when:isFinite(x.ts)?formatUnix(x.ts):'NaN', href:x.href})));
+          if (!getNextPageUrlTopics($doc) || tPage>=MAX_PAGES) { tEnd = true; dbg('Нет следующей страницы (topics) или достигнут лимит'); }
+          else { tPage++; dbg('Следующая страница topics будет', tPage); }
         }
+        gend();
         cb();
       }, "html").fail(function(){
         if (done) return;
         clearTimeout(timer);
         done=true;
+        gend();
         setEmpty($slot, "ошибка сети");
       });
     }
@@ -262,10 +289,13 @@
       // если оба пусты — финиш
       if (!pBuf.length && !tBuf.length) { done=true; clearTimeout(timer); setEmpty($slot); return; }
 
+      logBufs('step');
+
       // если темы пусты — просто берём верхний пост
       if (!tBuf.length) {
-        var p = pBuf.shift();
-        if (isFinite(p.ts)) { done=true; clearTimeout(timer); setLink($slot, p.href, p.ts); return; }
+        var pOnly = pBuf.shift();
+        dbg('Темы пусты → берём верхний пост', pOnly);
+        if (pOnly && isFinite(pOnly.ts)) { done=true; clearTimeout(timer); setLink($slot, pOnly.href, pOnly.ts); return; }
         return step();
       }
       // если посты пусты — догружаем посты
@@ -273,22 +303,27 @@
 
       // сравнение верхних элементов
       var p = pBuf[0], t = tBuf[0];
-      // если в темах нет unix — отбрасываем такие темы
-      if (!isFinite(t.ts)) { tBuf.shift(); return step(); }
+      if (!isFinite(t.ts)) {
+        dbg('⚠️ В теме нет unix → отбрасываем', t);
+        tBuf.shift(); return step();
+      }
+      dbg('Сравнение:', {
+        post: {ts: p.ts, when:isFinite(p.ts)?formatUnix(p.ts):'NaN', href:p.href},
+        topic:{ts: t.ts, when:isFinite(t.ts)?formatUnix(t.ts):'NaN', href:t.href}
+      });
 
       if (p.ts > t.ts) {
-        // пост позднее последнего сообщения темы → это «не первый пост в теме»
+        dbg('➡️ post.ts > topic.ts → берём этот пост');
         pBuf.shift();
         done=true; clearTimeout(timer);
         setLink($slot, p.href, p.ts);
         return;
       } else if (p.ts === t.ts) {
-        // совпало по времени → это, скорее всего, первый пост в этой теме — выкидываем оба и идём дальше
+        dbg('↔️ post.ts == topic.ts → вероятно первый пост темы → выкидываем оба и идём дальше');
         pBuf.shift(); tBuf.shift();
         return step();
       } else {
-        // последний апдейт темы позже, чем наш пост → наш пост не «последний» относительно темы,
-        // значит, сравниваем со следующим постом
+        dbg('⬅️ topic.ts > post.ts → наш пост старее последнего в теме → берём следующий пост');
         pBuf.shift();
         return step();
       }

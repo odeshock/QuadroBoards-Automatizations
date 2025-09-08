@@ -9,7 +9,7 @@
   if (!window.jQuery) { console.log("[bank-link] jQuery not found"); return; }
   var $ = jQuery;
 
-  var TOPIC_TITLE = "Шрифты";          // <- твой заголовок
+  var TOPIC_TITLE = "hideprofile";          // <- твой заголовок
   var FORUM_IDS = [];                  // <- пусто = искать по всем разделам
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
   var REQUEST_TIMEOUT_MS = 6000;

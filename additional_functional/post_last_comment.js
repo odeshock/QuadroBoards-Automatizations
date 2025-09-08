@@ -40,7 +40,12 @@
         </strong>
       </li>
     `);
-    $right.prepend($li);
+    var $after = $right.find('#pa-last-visit');
+    if ($after.length) {
+      $li.insertAfter($after);
+    } else {
+      $right.append($li);
+    }
     return $li;
   }
   function setEmpty($slot, reason) {

@@ -1,20 +1,17 @@
 // ==UserScript==
-// @name         Profile → "Последний пост:" (форумы 3,6; сравнение по ключам; логи; дата + TZ)
+// @name         Profile → "Последний пост:" (форумы 3,6; show_user_topics; сравнение по unix/теме; дата + TZ)
 // @match        *://*/profile.php*
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==
 (function () {
   if (!window.jQuery) return;
-  if (window.__POST_LAST_GUARD__) return; // защита от двойного запуска
-  window.__POST_LAST_GUARD__ = true;
-
   var $ = jQuery;
 
   // === настройки ===
   var FORUM_IDS = [3, 6];
   var REQUEST_TIMEOUT_MS = 8000;
-  var MAX_PAGES = 20; // на поток
+  var MAX_PAGES = 20; // лимит на поток
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
 
   // запуск строго на /profile.php?id=...
@@ -34,8 +31,6 @@
   function insertSlot() {
     var $right = $(PROFILE_RIGHT_SEL);
     if (!$right.length) return null;
-    if ($right.find('#pa-lastpost-link').length) return $right.find('#pa-lastpost-link'); // если уже есть — не дублируем
-
     var $li = $(`
       <li id="pa-lastpost-link">
         <span>Последний пост:</span>
@@ -45,19 +40,15 @@
       </li>
     `);
     var $after = $right.find('#pa-last-visit');
-    if ($after.length) $li.insertAfter($after);
-    else $right.append($li);
+    if ($after.length) $li.insertAfter($after); else $right.append($li);
     return $li;
   }
   function setEmpty($slot, reason) {
     var text = "Не найден";
     $slot.find("a").addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
-    console.info('[Последний пост] Завершено: ' + (reason || text));
   }
   function setLink($slot, href, ts) {
-    var label = ts ? formatUnix(ts) : 'Открыть пост';
-    $slot.find("a").removeClass("is-empty").attr({ href }).text(label);
-    console.info('[Последний пост] Результат:', href, ts ? '('+label+')' : '');
+    $slot.find("a").removeClass("is-empty").attr({ href }).text(formatUnix(ts));
   }
 
   // ник
@@ -74,7 +65,7 @@
     return cands[0] || null;
   }
 
-  // попытка достать часовой пояс из профиля/страницы
+  // часовой пояс
   function detectProfileTZ() {
     var txt = $("#viewprofile").text() || "";
     var m = txt.match(/UTC\s*([+\-]\d{1,2})(?::?(\d{2}))?/i) || txt.match(/GMT\s*([+\-]\d{1,2})/i);
@@ -117,6 +108,36 @@
     return dateObj.getDate()+" "+months[dateObj.getMonth()]+" "+dateObj.getFullYear()+" "+pad(dateObj.getHours())+":"+pad(dateObj.getMinutes())+":"+pad(dateObj.getSeconds());
   }
 
+  // парсинг «Сегодня/Вчера/дата»
+  function parseRuMoment(text) {
+    text = (text||"").trim().toLowerCase();
+    // варианты: "Сегодня 01:07:11", "Вчера 23:51:19", "18 апреля 2022 18:10:10"
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var t;
+    var m;
+    if (/^сегодня\s+\d{1,2}:\d{2}:\d{2}$/.test(text)) {
+      m = text.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+      t = new Date(today.getFullYear(), today.getMonth(), today.getDate(), +m[1], +m[2], +m[3]);
+      return Math.floor(t.getTime()/1000);
+    }
+    if (/^вчера\s+\d{1,2}:\d{2}:\d{2}$/.test(text)) {
+      m = text.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+      var yest = new Date(today.getTime() - 86400000);
+      t = new Date(yest.getFullYear(), yest.getMonth(), yest.getDate(), +m[1], +m[2], +m[3]);
+      return Math.floor(t.getTime()/1000);
+    }
+    // «18 апреля 2022 18:10:10»
+    var months = {января:0,февраля:1,марта:2,апреля:3,мая:4,июня:5,июля:6,августа:7,сентября:8,октября:9,ноября:10,декабря:11};
+    m = text.match(/^(\d{1,2})\s+([а-я]+)\s+(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/i);
+    if (m && months[m[2]]!=null) {
+      t = new Date(+m[3], months[m[2]], +m[1], +m[4], +m[5], +m[6]);
+      return Math.floor(t.getTime()/1000);
+    }
+    // если формат неизвестен — NaN
+    return NaN;
+  }
+
   // служебное
   function isAccessDenied(html) {
     var s = (html||"").toLowerCase();
@@ -130,79 +151,75 @@
     return s.includes("по вашему запросу ничего не найдено") ||
            !/<div[^>]+class="post\b/i.test(html||"");
   }
-  function isEmptySearchTopics(html) {
+  function isEmptySearchUserTopics(html) {
     var s = (html||"").toLowerCase();
     return s.includes("по вашему запросу ничего не найдено") ||
-           !/<tbody[^>]*class="hasicon"/i.test(html||"");
+           !/<div[^>]+class="forum\b/i.test(html||"");
   }
 
-  // нормализация ключей
-  function extractParam(href, name) {
-    var m = href.match(new RegExp('[?&]'+name+'=(\\d+)'));
-    return m ? m[1] : null;
+  // helpers
+  function getTopicIdFromHref(href) {
+    var m = (href||"").match(/viewtopic\.php\?id=(\d+)/i);
+    return m ? +m[1] : NaN;
   }
-  function extractPidFromHash(href) {
-    var m = href.match(/#p(\d+)/);
-    return m ? m[1] : null;
-  }
-  // Посты (R1): нужно получить topic id (из H3 ссылки) и pid (из .post-links)
-  function normalizeKeyFromPost($p) {
-    var $topic = $p.find("h3 a[href*='viewtopic.php?id=']").last();
-    var topicId = $topic.length ? extractParam($topic.attr("href"), "id") : null;
-    var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
-    var pid = $msg.length ? (extractParam($msg.attr("href"), "pid") || extractPidFromHash($msg.attr("href"))) : null;
-    if (topicId && pid) return "id="+topicId+"#p"+pid;
-    return null;
-  }
-  // Темы (R2): берём из tcr <a> — там уже есть id и #pNN; игнорируем &p=
-  function normalizeKeyFromTopicRow($tr) {
-    var $a = $tr.find("td.tcr a[href*='viewtopic.php']");
-    if (!$a.length) return null;
-    var href = $a.attr("href");
-    var topicId = extractParam(href, "id");
-    var pid = extractPidFromHash(href);
-    if (topicId && pid) return "id="+topicId+"#p"+pid;
-    return null;
+  function getForumIdFromHref(href) {
+    var m = (href||"").match(/viewforum\.php\?id=(\d+)/i);
+    return m ? +m[1] : NaN;
   }
 
-  // парсеры
+  // парсер R1 (посты)
   function parsePosts(html) {
     var $doc = $(html);
     var out = [];
     $doc.find("div.post").each(function(){
       var $p = $(this);
-      var ts = parseInt($p.attr("data-posted"),10) || null; // только для вывода
-      var key = normalizeKeyFromPost($p);
+      var ts = parseInt($p.attr("data-posted"),10);
       var $lnk = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
       var href = $lnk.length ? $lnk.attr("href") : null;
-      if (key && href) out.push({ key, href, ts });
+      var topicId = NaN;
+      // попробуем достать topicId из заголовка поста
+      var $topic = $p.find("h3 a[href*='viewtopic.php?id=']").last();
+      if ($topic.length) topicId = getTopicIdFromHref($topic.attr("href"));
+      if (ts && href) out.push({ ts, href, topicId });
     });
     return out;
   }
-  function parseTopics(html) {
+  // парсер R2 (show_user_topics) — фильтруем по forumId ∈ FORUM_IDS
+  function parseUserTopics(html) {
     var $doc = $(html);
     var out = [];
     $doc.find("tbody.hasicon tr").each(function(){
       var $tr = $(this);
-      var $a = $tr.find("td.tcr a[href*='viewtopic.php']");
-      if (!$a.length) return;
-      var href = $a.attr("href");
-      var key = normalizeKeyFromTopicRow($tr);
-      if (key && href) out.push({ key, href });
+      var $forum = $tr.find("td.tc2 a[href*='viewforum.php?id=']");
+      var forumId = $forum.length ? getForumIdFromHref($forum.attr("href")) : NaN;
+      if (!FORUM_IDS.includes(forumId)) return; // фильтр 3/6
+
+      var $topicA = $tr.find("td.tcl a[href*='viewtopic.php?id=']").first();
+      var topicId = $topicA.length ? getTopicIdFromHref($topicA.attr("href")) : NaN;
+
+      var $last = $tr.find("td.tcr a[href*='#p']");
+      if (!$last.length) return;
+      var href = $last.attr("href"); // ссылка на последнее сообщение темы
+      // unix рядом с аватаркой — берём текст <a> (Сегодня/Вчера/дата) и парсим
+      var whenTxt = ($last.text()||"").trim();
+      var ts = parseRuMoment(whenTxt);
+
+      out.push({ ts, href, topicId, forumId });
     });
     return out;
   }
 
+  // пагинация
   function getNextPageUrlPosts($doc) {
     var $next = $doc.find("#pun-searchposts .pagelink a.next").first();
     return $next.length ? $next.attr("href") : null;
   }
-  function getNextPageUrlTopics($doc) {
+  function getNextPageUrlUserTopics($doc) {
     var $next = $doc.find("#pun-searchtopics .pagelink a.next").first();
     return $next.length ? $next.attr("href") : null;
   }
 
-  // построение URL
+  // URL’ы
   function buildPostsURL(name, page) {
     var ids = FORUM_IDS.join(",");
     return "/search.php?action=search"
@@ -212,13 +229,10 @@
       + "&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts"
       + (page ? "&p="+page : "");
   }
-  function buildTopicsURL(name, page) {
-    var ids = FORUM_IDS.join(",");
-    return "/search.php?action=search"
-      + "&keywords="
+  function buildUserTopicsURL(name, page) {
+    // новый источник результата 2
+    return "/search.php?action=show_user_topics"
       + "&author=" + encodeURIComponent(name)
-      + (ids ? "&forum=" + encodeURIComponent(ids) + "&forums=" + encodeURIComponent(ids) : "")
-      + "&search_in=0&sort_by=0&sort_dir=DESC&show_as=topics"
       + (page ? "&p="+page : "");
   }
 
@@ -229,47 +243,42 @@
     var userName = resolveUserName();
     if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
 
-    console.group('[Последний пост] Отладка');
-    console.log('Форумы:', FORUM_IDS.join(','), 'Пользователь:', userName);
-
     var done = false;
     var timer = setTimeout(function () {
       if (done) return;
       done = true;
       setEmpty($slot, "таймаут");
-      console.groupEnd();
     }, REQUEST_TIMEOUT_MS);
 
-    var pPage=1, tPage=1, pBuf=[], tBuf=[], pEnd=false, tEnd=false;
+    var pPage=1, tPage=1, pBuf=[], tBuf=[], pEnd=false, tEnd=false, pPagesUsed=0, tPagesUsed=0;
 
     function refill(which, cb) {
       if (done) return;
-      var url = which==="posts" ? buildPostsURL(userName, pPage) : buildTopicsURL(userName, tPage);
-      console.log('Загрузка '+(which==='posts'?'R1(посты)':'R2(темы)')+' страница', (which==='posts'?pPage:tPage), url);
+      var url = which==="posts" ? buildPostsURL(userName, pPage) : buildUserTopicsURL(userName, tPage);
       $.get(url, function(html){
         if (done) return;
         clearTimeout(timer);
-        timer = setTimeout(function(){ if(!done){ done=true; setEmpty($slot,"таймаут"); console.groupEnd(); } }, REQUEST_TIMEOUT_MS);
+        timer = setTimeout(function(){ if(!done){ done=true; setEmpty($slot,"таймаут"); } }, REQUEST_TIMEOUT_MS);
 
-        if (isAccessDenied(html)) { done=true; clearTimeout(timer); setEmpty($slot, "доступ закрыт"); console.groupEnd(); return; }
-        var empty = which==="posts" ? isEmptySearchPosts(html) : isEmptySearchTopics(html);
-        var $doc = $(html);
-        if (empty) {
+        if (isAccessDenied(html)) { done=true; clearTimeout(timer); setEmpty($slot, "доступ закрыт"); return; }
+        if (which==="posts" ? isEmptySearchPosts(html) : isEmptySearchUserTopics(html)) {
           if (which==="posts") { pBuf=[]; pEnd=true; }
           else { tBuf=[]; tEnd=true; }
-          console.log((which==='posts'?'R1':'R2')+': пусто');
           cb(); return;
         }
-
+        var $doc = $(html);
         if (which==="posts") {
           pBuf = parsePosts(html);
-          // лог содержимого
-          console.log('R1 items:', pBuf.map(x=>x.key));
-          if (!getNextPageUrlPosts($doc) || pPage>=MAX_PAGES) pEnd = true; else pPage++;
+          var hasNext = !!getNextPageUrlPosts($doc);
+          pPagesUsed++;
+          if (!hasNext || pPagesUsed>=MAX_PAGES) pEnd = true;
+          else pPage++;
         } else {
-          tBuf = parseTopics(html);
-          console.log('R2 items:', tBuf.map(x=>x.key));
-          if (!getNextPageUrlTopics($doc) || tPage>=MAX_PAGES) tEnd = true; else tPage++;
+          tBuf = parseUserTopics(html);
+          var hasNext2 = !!getNextPageUrlUserTopics($doc);
+          tPagesUsed++;
+          if (!hasNext2 || tPagesUsed>=MAX_PAGES) tEnd = true;
+          else tPage++;
         }
         cb();
       }, "html").fail(function(){
@@ -277,51 +286,58 @@
         clearTimeout(timer);
         done=true;
         setEmpty($slot, "ошибка сети");
-        console.groupEnd();
       });
     }
 
     function step() {
       if (done) return;
 
-      // заполняем буферы по необходимости
+      // пополняем буферы при необходимости
       if (!pBuf.length && !pEnd) return refill("posts", step);
       if (!tBuf.length && !tEnd) return refill("topics", step);
 
-      // если оба пусты — финиш
-      if (!pBuf.length && !tBuf.length) { done=true; clearTimeout(timer); setEmpty($slot); console.groupEnd(); return; }
+      // оба пусты — нечего сравнивать
+      if (!pBuf.length && !tBuf.length) { done=true; clearTimeout(timer); setEmpty($slot); return; }
 
-      // если темы пусты — просто берём верхний пост
+      // если тём нет (после фильтра/пусто) — берём верхний пост
       if (!tBuf.length) {
         var p = pBuf.shift();
-        console.log('R2 пусто, берём R1:', p && p.key);
-        if (p) { done=true; clearTimeout(timer); setLink($slot, p.href, p.ts); console.groupEnd(); return; }
+        if (p && isFinite(p.ts)) { done=true; clearTimeout(timer); setLink($slot, p.href, p.ts); return; }
         return step();
       }
-      // если посты пусты — догружаем посты
-      if (!pBuf.length) return refill("posts", step);
+      // если постов нет — догружаем посты (или уже pEnd → значит фейл)
+      if (!pBuf.length) {
+        if (!pEnd) return refill("posts", step);
+        // постов больше нет вовсе → не нашли
+        done=true; clearTimeout(timer); setEmpty($slot); return;
+      }
 
-      // сравнение верхних элементов по «ключу» (id=#pNN), порядок убывающий уже задан сервером
+      // сравнение верхних элементов по новой логике
       var p = pBuf[0], t = tBuf[0];
-      if (!p || !t) { // на всякий случай
-        if (!p) pBuf.shift();
-        if (!t) tBuf.shift();
-        return step();
-      }
-      console.log('Сравнение:', 'R1=', p.key, 'vs', 'R2=', t.key);
 
-      if (p.key !== t.key) {
-        // ключи различаются → пост из R1 не является «первым постом темы» → он и есть победитель
+      // если у R2 нет корректного unix — попробуем просто инкрементнуть R2
+      if (!isFinite(t.ts)) { tBuf.shift(); return step(); }
+
+      if (p.ts > t.ts) {
+        // R1 свежее → победа
         pBuf.shift();
         done=true; clearTimeout(timer);
-        console.log('Победа R1: ключи разные');
         setLink($slot, p.href, p.ts);
-        console.groupEnd();
         return;
+      } else if (p.ts === t.ts) {
+        // равенство по времени → сравниваем темы
+        if (p.topicId && t.topicId && p.topicId === t.topicId) {
+          // это первый пост в этой теме → скипаем оба
+          pBuf.shift(); tBuf.shift();
+          return step();
+        } else {
+          // одинаковое время, разные темы → инкремент только результата 2
+          tBuf.shift();
+          return step();
+        }
       } else {
-        // ключи совпали → это «первый пост темы», выкидываем оба и идём дальше
-        console.log('Ключи равны, инкремент обоих списков');
-        pBuf.shift(); tBuf.shift();
+        // p.ts < t.ts → R2 свежее → инкремент R2
+        tBuf.shift();
         return step();
       }
     }

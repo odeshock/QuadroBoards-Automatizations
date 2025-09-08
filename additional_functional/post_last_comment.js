@@ -33,10 +33,10 @@
     if (!$right.length) return null;
     var $li = $(`
       <li id="pa-lastpost-link">
+      
         <span>Последний пост:</span>
         <strong>
           <a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a>
-          <small class="date"></small>
         </strong>
       </li>
     `);
@@ -46,11 +46,9 @@
   function setEmpty($slot, reason) {
     var text = "Не найден";
     $slot.find("a").addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
-    $slot.find(".date").text("");
   }
   function setLink($slot, href, ts) {
-    $slot.find("a").removeClass("is-empty").attr({ href }).text("Перейти к сообщению");
-    $slot.find(".date").text(formatUnix(ts));
+    $slot.find("a").removeClass("is-empty").attr({ href }).text(formatUnix(ts));
   }
 
   // ник

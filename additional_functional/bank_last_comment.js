@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Profile: last post in "банк" via search (forums 8 & 19) — with logs
+// @name         Profile: last post in "банк" via search (forums 8 & 19) — with logs & robust username
 // @match        *://*/profile.php?id=*
 // @run-at       document-end
 // ==/UserScript==
@@ -19,17 +19,64 @@
     }
   `).appendTo(document.head || document.documentElement);
 
-  function log(...args) {
-    console.log("[bank-link]", ...args);
-  }
+  function log(){ console.log("[bank-link]", ...arguments); }
 
-  function getUserName() {
-    var raw = $("#viewprofile h1 span").text().trim();
-    var name = raw.replace(/^Профиль:\s*/i, "").trim();
-    if (!name) name = $('#viewprofile #profile-left .pa-author strong').first().text().trim();
-    log("определили имя пользователя:", name);
-    return name || null;
+  // --- НОВОЕ: надёжное определение ника (асинхронно) ---
+  function getUserIdFromURL() {
+    var m = location.search.match(/[?&]id=(\d+)/);
+    return m ? +m[1] : null;
   }
+  function cleanNick(s){
+    return (s||"").replace(/^Профиль:\s*/i,"").replace(/[«»]/g,"").trim();
+  }
+  function resolveUserName() {
+    return new Promise(function(resolve){
+      // 1) DOM-варианты на странице профиля
+      var candidates = [
+        $("#viewprofile h1 span").text(),
+        $("#viewprofile h1").text(),
+        $('#viewprofile #profile-right .pa-author strong').first().text(),
+        $('#viewprofile #profile-left .pa-author strong').first().text(),
+      ].map(cleanNick).filter(Boolean);
+
+      if (candidates[0]) { log("ник из DOM (h1/span):", candidates[0]); return resolve(candidates[0]); }
+      if (candidates[1]) { log("ник из DOM (h1):", candidates[1]);     return resolve(candidates[1]); }
+      if (candidates[2]) { log("ник из правой панели:", candidates[2]); return resolve(candidates[2]); }
+      if (candidates[3]) { log("ник из левой панели:", candidates[3]);  return resolve(candidates[3]); }
+
+      // 2) <title>
+      var fromTitle = cleanNick(document.title);
+      if (fromTitle) { log("ник из <title>:", fromTitle); return resolve(fromTitle); }
+
+      // 3) Фолбэк: подтянем эту же страницу без шапки и распарсим
+      var uid = getUserIdFromURL();
+      if (!uid) { log("uid не найден, имя не извлечь"); return resolve(null); }
+      var url = "/profile.php?id=" + uid + "&nohead=1";
+      log("тянем nohead для ника:", url);
+      $.get(url, function(html){
+        try {
+          var $doc = $(html);
+          var tryList = [
+            $doc.find("#viewprofile h1 span").text(),
+            $doc.find("#viewprofile h1").text(),
+            $doc.find('#viewprofile #profile-right .pa-author strong').first().text(),
+            $doc.find('#viewprofile #profile-left .pa-author strong').first().text()
+          ].map(cleanNick).filter(Boolean);
+          var name = tryList[0] || tryList[1] || tryList[2] || tryList[3] || null;
+          log("ник из nohead:", name);
+          resolve(name);
+        } catch(e){
+          log("ошибка парсинга nohead:", e);
+          resolve(null);
+        }
+      },"html").fail(function(){
+        log("nohead не загрузился");
+        resolve(null);
+      });
+    });
+  }
+  // -----------------------------------------------------
+
   function insertSlot() {
     var $right = $(PROFILE_RIGHT_SEL);
     if (!$right.length) return null;
@@ -80,13 +127,13 @@
     return link;
   }
 
-  $(function () {
-    var userName = getUserName();
-    var $slot = insertSlot();
-    if (!userName || !$slot || !$slot.length) {
-      log("не нашли профиль или имя пользователя, выходим");
-      return;
-    }
+  $(async function () {
+    const $slot = insertSlot();
+    if (!$slot || !$slot.length) { log("нет слота, выходим"); return; }
+
+    const userName = await resolveUserName();
+    log("итоговое имя пользователя:", userName);
+    if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
 
     var url = "/search.php?action=search"
             + "&keywords="
@@ -98,7 +145,6 @@
 
     var done = false;
     var finishOnce = function (fn) { if (done) return; done = true; fn(); };
-
     var timer = setTimeout(function () {
       finishOnce(function () { setEmpty($slot, "таймаут запроса к поиску"); });
     }, REQUEST_TIMEOUT_MS);
@@ -106,32 +152,25 @@
     $.get(url, function (html) {
       if (done) return;
       clearTimeout(timer);
+      log("получен ответ от search.php, длина:", html ? html.length : 0);
 
-      log("получен ответ от search.php, длина:", html.length);
-
-      if (isAccessDenied(html)) {
-        finishOnce(function () { setEmpty($slot, "доступ к поиску закрыт"); });
-        return;
-      }
-      if (isEmptySearch(html)) {
-        finishOnce(function () { setEmpty($slot, "поиск ничего не нашёл"); });
-        return;
-      }
+      if (isAccessDenied(html)) { finishOnce(function(){ setEmpty($slot, "доступ к поиску закрыт"); }); return; }
+      if (isEmptySearch(html))  { finishOnce(function(){ setEmpty($slot, "поиск ничего не нашёл"); }); return; }
 
       try {
         var $doc = $(html);
         var href = findFirstBankPostLink($doc);
-        if (href) finishOnce(function () { setLink($slot, href); });
-        else      finishOnce(function () { setEmpty($slot, "нет постов в теме «банк»"); });
+        if (href) finishOnce(function(){ setLink($slot, href); });
+        else      finishOnce(function(){ setEmpty($slot, "нет постов в теме «банк»"); });
       } catch (e) {
-        finishOnce(function () { setEmpty($slot, "ошибка разбора результата"); });
         log("ошибка разбора:", e);
+        finishOnce(function(){ setEmpty($slot, "ошибка разбора результата"); });
       }
     }, "html").fail(function () {
       if (done) return;
       clearTimeout(timer);
-      finishOnce(function () { setEmpty($slot, "ошибка загрузки поиска"); });
       log("ошибка сети при загрузке search.php");
+      finishOnce(function(){ setEmpty($slot, "ошибка загрузки поиска"); });
     });
   });
 })();

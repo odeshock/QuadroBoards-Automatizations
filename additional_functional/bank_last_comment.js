@@ -1,4 +1,3 @@
-<script>
 (function () {
   const LOG = (...a) => console.log("[bank-link]", ...a);
   const ERR = (...a) => console.error("[bank-link]", ...a);
@@ -160,4 +159,3 @@
     a.textContent = "перейти к сообщению";
   }
 })();
-</script>

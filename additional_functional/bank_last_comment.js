@@ -1,172 +1,141 @@
 // ==UserScript==
-// @name         BANK DEBUG PING
+// @name         Profile: last post in "банк" via search (8&19) — jQuery + logs
 // @match        https://followmyvoice.rusff.me/*
 // @match        http://followmyvoice.rusff.me/*
-// @match        https://*/profile.php*
-// @run-at       document-start
+// @run-at       document-end
 // @grant        none
 // ==/UserScript==
-console.log("[bank-link] PING: userscript loaded on", location.href);
-
-
 (function () {
-  const LOG = (...a) => console.log("[bank-link]", ...a);
-  const ERR = (...a) => console.error("[bank-link]", ...a);
+  if (!window.jQuery) { console.log("[bank-link] jQuery not found"); return; }
+  var $ = jQuery;
 
-  // 0) страховка: ловим ошибки
-  window.addEventListener("error", e => ERR("JS error:", e.message, e.filename+":"+e.lineno));
+  var TOPIC_TITLE = "банк";
+  var FORUM_IDS = [8, 19];
+  var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
+  var REQUEST_TIMEOUT_MS = 6000;
 
-  // 1) запускаемся строго на страницах profile.php
-  if (!/\/profile\.php\b/i.test(location.pathname)) {
-    LOG("не профиль, выходим:", location.pathname);
-    return;
+  $("<style>").text(`
+    #pa-bank-link a.is-empty{
+      color:#999!important;text-decoration:none!important;
+      pointer-events:none;cursor:default;opacity:.8;
+    }`).appendTo(document.head || document.documentElement);
+
+  function log(){ console.log("[bank-link]", ...arguments); }
+
+  function insertSlot() {
+    var $right = $(PROFILE_RIGHT_SEL);
+    if (!$right.length) return null;
+    var $li = $(`
+      <li id="pa-bank-link">
+        <span>Последний пост в «${TOPIC_TITLE}» (разделы 8/19):</span>
+        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
+      </li>
+    `);
+    // prepend → в начале; если хочешь внизу — замени на append
+    $right.prepend($li);
+    log("вставили слот в профиль");
+    return $li.find("a");
   }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    try { main(); } catch (e) { ERR("fatal in main:", e); }
-  });
-
-  async function main() {
-    LOG("boot");
-
-    // 2) вставляем строку в правую колонку профиля
-    const right = document.querySelector("#viewprofile #profile-right");
-    if (!right) { ERR("не найден контейнер #viewprofile #profile-right"); return; }
-
-    const li = document.createElement("li");
-    li.id = "pa-bank-link";
-    li.innerHTML = `
-      <span>Последний пост в «банк» (разделы 8/19):</span>
-      <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty" title="идёт поиск">ищу…</a></strong>
-    `;
-    right.prepend(li);
-
-    const a = li.querySelector("a");
-    addEmptyStyleOnce();
-
-    // 3) определяем ник
-    const user = resolveUserName();
-    LOG("определили имя пользователя:", user || "(пусто)");
-    if (!user) return setEmpty(a, "не удалось определить ник");
-
-    // 4) собираем URL поиска (через имя, только форумы 8 и 19)
-    const url = `/search.php?action=search&keywords=&author=${encodeURIComponent(user)}&forum=8,19&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts`;
-    LOG("формируем запрос:", url);
-
-    // 5) тянем HTML с таймаутом
-    let html;
-    try {
-      html = await fetchWithTimeout(url, { credentials: "same-origin" }, 8000);
-    } catch (e) {
-      ERR("fetch fail:", e);
-      return setEmpty(a, "ошибка загрузки поиска");
-    }
-    LOG("получен ответ, длина:", html.length);
-
-    // 6) проверки доступа/пустоты
-    if (isAccessDenied(html))        return setEmpty(a, "доступ к поиску закрыт");
-    if (isEmptySearch(html))         return setEmpty(a, "поиск ничего не нашёл");
-
-    // 7) парсим и ищем первый пост в теме «банк»
-    const href = findFirstBankPostLink(html, "банк");
-    if (href) {
-      setLink(a, href);
-      LOG("готово →", href);
-    } else {
-      setEmpty(a, "нет постов в теме «банк»");
-    }
+  function setEmpty($a, reason) {
+    var text = "либо войдите как игрок, либо ещё ничего не писал";
+    $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
+    log("результат: пусто →", reason || text);
   }
-
-  // ===== helpers =====
-
-  function addEmptyStyleOnce() {
-    if (document.getElementById("bank-link-empty-style")) return;
-    const st = document.createElement("style");
-    st.id = "bank-link-empty-style";
-    st.textContent = `
-      #pa-bank-link a.is-empty{
-        color:#999!important;text-decoration:none!important;
-        pointer-events:none;cursor:default;opacity:.8;
-      }`;
-    (document.head || document.documentElement).appendChild(st);
+  function setLink($a, href) {
+    $a.removeClass("is-empty").attr({ href, title:"перейти к сообщению" }).text("перейти к сообщению");
+    log("результат: ссылка найдена →", href);
   }
 
   function resolveUserName() {
-    // приоритет: <li id="profile-name"><strong>Ник</strong></li>
-    const a = document.querySelector("#profile-name > strong");
-    if (a && a.textContent.trim()) { LOG("ник из #profile-name"); return a.textContent.trim(); }
-
-    const tryText = sel => (document.querySelector(sel)?.textContent || "").trim();
-    const candidates = [
-      tryText("#viewprofile h1 span"),
-      tryText("#viewprofile h1"),
-      tryText("#viewprofile #profile-right .pa-author strong"),
-      tryText("#viewprofile #profile-left .pa-author strong"),
-      (document.title || "").trim()
-    ].map(s => s.replace(/^Профиль:\s*/i, "").replace(/[«»]/g,"").trim()).filter(Boolean);
-
-    if (candidates.length) {
-      LOG("ник из DOM:", candidates[0]);
-      return candidates[0];
-    }
+    // приоритет — <li id="profile-name"><strong>НИК</strong></li>
+    var name = $("#profile-name > strong").first().text().trim();
+    if (name) { log("ник из #profile-name:", name); return name; }
+    // запасные места
+    var cands = [
+      $("#viewprofile h1 span").text(),
+      $("#viewprofile h1").text(),
+      $("#viewprofile #profile-right .pa-author strong").first().text(),
+      $("#viewprofile #profile-left .pa-author strong").first().text(),
+      (document.title || "")
+    ].map(s => (s||"").replace(/^Профиль:\s*/i,"").replace(/[«»]/g,"").trim()).filter(Boolean);
+    if (cands.length) { log("ник из DOM:", cands[0]); return cands[0]; }
+    log("ник не найден");
     return null;
-  }
-
-  async function fetchWithTimeout(url, opts, ms) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort("timeout"), ms);
-    const res = await fetch(url, { ...opts, signal: ctrl.signal });
-    clearTimeout(t);
-    if (!res.ok) throw new Error("HTTP "+res.status);
-    return res.text();
   }
 
   function isAccessDenied(html) {
-    const s = html.toLowerCase();
-    const hit = s.includes('id="pun-login"') || s.includes("недостаточно прав") ||
-                s.includes("вы не авторизованы") || s.includes("нет доступа");
-    if (hit) LOG("детектирован признак закрытого доступа");
-    return hit;
+    var s = (html||"").toLowerCase();
+    return s.includes('id="pun-login"') ||
+           s.includes("недостаточно прав") ||
+           s.includes("вы не авторизованы") ||
+           s.includes("нет доступа");
   }
   function isEmptySearch(html) {
-    const s = html.toLowerCase();
-    const none = s.includes("по вашему запросу ничего не найдено");
-    const hasPosts = /<div[^>]+class="post\b/i.test(html);
-    const res = none || !hasPosts;
-    if (res) LOG("детектирован пустой результат поиска");
-    return res;
+    var s = (html||"").toLowerCase();
+    return s.includes("по вашему запросу ничего не найдено") ||
+           !/<div[^>]+class="post\b/i.test(html||"");
+  }
+  function findFirstBankPostLink($doc) {
+    var tt = TOPIC_TITLE.toLowerCase();
+    var link = null;
+    $doc.find("div.post").each(function () {
+      var $p = $(this);
+      // в h3 обычно: раздел → тема → дата; берём ссылку на тему (последняя с id=)
+      var $topic = $p.find("h3 a[href*='viewtopic.php?id=']").last();
+      if ($topic.length && $topic.text().trim().toLowerCase() === tt) {
+        var $msg = $p.find(".post-links a[href*='viewtopic.php?pid=']").first();
+        if ($msg.length) { link = $msg.attr("href"); return false; }
+      }
+    });
+    return link;
   }
 
-  function findFirstBankPostLink(html, topicTitle) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const posts = doc.querySelectorAll("div.post");
-    const tt = topicTitle.toLowerCase();
+  $(function () {
+    if (!/\/profile\.php\b/i.test(location.pathname)) { log("не профиль — выходим"); return; }
 
-    for (const p of posts) {
-      // в заголовке h3 обычно идут: раздел → тема → дата; берём ссылку на тему (последнюю из id=)
-      const topicLinks = p.querySelectorAll("h3 a[href*='viewtopic.php?id=']");
-      const topic = topicLinks[topicLinks.length - 1];
-      if (!topic) continue;
-      if ((topic.textContent || "").trim().toLowerCase() !== tt) continue;
+    var $slot = insertSlot();
+    if (!$slot || !$slot.length) { log("слот не вставился"); return; }
 
-      const msg = p.querySelector(".post-links a[href*='viewtopic.php?pid=']");
-      if (msg && msg.getAttribute("href")) return msg.getAttribute("href");
-    }
-    return null;
-  }
+    var userName = resolveUserName();
+    log("итоговое имя пользователя:", userName || "(пусто)");
+    if (!userName) { setEmpty($slot, "не удалось определить ник"); return; }
 
-  function setEmpty(a, reason) {
-    const text = "либо войдите как игрок, либо ещё ничего не писал";
-    a.classList.add("is-empty");
-    a.setAttribute("href", "#");
-    a.setAttribute("title", reason || text);
-    a.textContent = text;
-    LOG("результат: пусто →", reason || text);
-  }
-  function setLink(a, href) {
-    a.classList.remove("is-empty");
-    a.setAttribute("href", href);
-    a.setAttribute("title", "перейти к сообщению");
-    a.textContent = "перейти к сообщению";
-  }
+    var url = "/search.php?action=search"
+            + "&keywords="
+            + "&author=" + encodeURIComponent(userName)
+            + "&forum=" + encodeURIComponent(FORUM_IDS.join(","))
+            + "&search_in=1&sort_by=0&sort_dir=DESC&show_as=posts";
+
+    log("формируем запрос:", url);
+
+    var done = false;
+    var finishOnce = function (fn) { if (done) return; done = true; fn(); };
+    var timer = setTimeout(function () {
+      finishOnce(function () { setEmpty($slot, "таймаут запроса к поиску"); });
+    }, REQUEST_TIMEOUT_MS);
+
+    $.get(url, function (html) {
+      if (done) return;
+      clearTimeout(timer);
+      log("получен ответ, длина:", html ? html.length : 0);
+
+      if (isAccessDenied(html)) { finishOnce(function () { setEmpty($slot, "доступ к поиску закрыт"); }); return; }
+      if (isEmptySearch(html))  { finishOnce(function () { setEmpty($slot, "поиск ничего не нашёл"); }); return; }
+
+      try {
+        var $doc = $(html);
+        var href = findFirstBankPostLink($doc);
+        if (href) finishOnce(function () { setLink($slot, href); });
+        else      finishOnce(function () { setEmpty($slot, "нет постов в теме «банк»"); });
+      } catch (e) {
+        console.log("[bank-link] ошибка разбора:", e);
+        finishOnce(function () { setEmpty($slot, "ошибка разбора результата"); });
+      }
+    }, "html").fail(function () {
+      if (done) return;
+      clearTimeout(timer);
+      console.log("[bank-link] ошибка сети при загрузке search.php");
+      finishOnce(function () { setEmpty($slot, "ошибка загрузки поиска"); });
+    });
+  });
 })();

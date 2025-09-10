@@ -93,7 +93,7 @@
 
   document.getElementById('calc').addEventListener('click',calc);
   document.getElementById('reset').addEventListener('click',()=>{
-    document.getElementById('dob').value='';
+    document.getElementById('dob').value='1980-01-01';
     document.getElementById('asof').value='1997-08-01';
     clear();
   });

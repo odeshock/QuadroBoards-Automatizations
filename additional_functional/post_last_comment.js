@@ -9,7 +9,7 @@
   var $ = jQuery;
 
   // === настройки ===
-  var FORUM_IDS = [3, 6];
+  var FORUM_IDS = [11, 12, 13, 20, 21, 23, 24];
   var REQUEST_TIMEOUT_MS = 8000;
   var MAX_PAGES = 20; // лимит на поток
   var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";

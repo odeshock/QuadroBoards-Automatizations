@@ -1,163 +1,197 @@
-/* === FMV: автохронология (кнопка + сборка) ================================ */
+/* ============================================================================
+ *  FMV — Автохронология
+ *  Версия: 2.0 (переписано под конкретный форум)
+ *  Что делает:
+ *    • дорисовывает кнопку "Собрать хронологию" в конце #p82 .post-box
+ *    • по клику собирает данные всех .post на странице
+ *    • заменяет содержимое #p83-content оформленным списком
+ *    • экспортирует window.FMV_buildChronology для ручного запуска из консоли
+ *  Зависимости: нет (vanilla JS)
+ *  Автор: вы + ваш будущий поклонник :) 
+ * ============================================================================ */
+
 (function () {
-  var LOGPFX = '[FMV] ';
-  function log(){try{console.log.apply(console, arguments)}catch(e){}}
-  function $1(s, r){return (r||document).querySelector(s)}
-  function $all(s, r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
-  function on(el, ev, fn){ if(!el) return; el.addEventListener(ev, fn, false) }
+  'use strict';
 
-  // ---------- 1) Реализация сборки ----------
-  function buildChronology(opts){
-    opts = opts || {};
-    var root = $1('#pun-viewtopic') || document;
-    var posts = $all('.post', root);
-    if (!posts.length){ alert('Постов не найдено'); return }
+  // ===== Конфиг =================================================================
+  var CFG = {
+    sourcePostId: 'p82',            // где рисуем кнопку
+    targetPostId: 'p83',            // в какой пост пишем результат
+    buttonText: 'Собрать хронологию',
+    titleHTML: '<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>',
+    // Разметка строки. Можно править как угодно.
+    rowTemplate: function (row) {
+      // row: { num, time, href, author }
+      return (
+        '<li>' +
+          '<span class="fmv-time">' + esc(row.time) + '</span>' +
+          ' — ' +
+          '<span class="fmv-author">' + esc(row.author) + '</span>' +
+          ' — ' +
+          '<a href="' + escAttr(row.href) + '">к посту #' + esc(row.num) + '</a>' +
+        '</li>'
+      );
+    },
+    // Вставить ли служебные стили компонента
+    injectCSS: true,
+  };
 
-    var rows = posts.map(function(p, idx){
-      var id   = p.id || ('post-' + (idx+1));
-      var link = $1('a.permalink', p);
+  // ===== Вспомогалки ============================================================
+  var LOG = '[FMV chrono]';
+
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+
+  function ready(fn) {
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(fn, 0);
+    } else {
+      document.addEventListener('DOMContentLoaded', fn, { once: true });
+    }
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function escAttr(s) {
+    // для href/src и т.п.
+    return esc(String(s).replace(/"/g, '&quot;'));
+  }
+
+  function ensureStyles() {
+    if (!CFG.injectCSS || $('#fmv-chrono-css')) return;
+    var css = document.createElement('style');
+    css.id = 'fmv-chrono-css';
+    css.textContent =
+      '.fmv-chrono-controls{margin-top:8px;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}' +
+      '.fmv-chrono-note{font-size:90%;opacity:.8}' +
+      '.fmv-chrono-list{margin:.5rem 0 0 1.25rem;padding:0}' +
+      '.fmv-chrono-list li{margin:.25rem 0;line-height:1.35}' +
+      '.fmv-chrono-list a{word-break:break-word;text-decoration:underline}' +
+      '.fmv-time{font-variant-numeric:tabular-nums}' +
+      '.fmv-author{font-weight:600}';
+    document.head.appendChild(css);
+  }
+
+  function log() { try { console.log.apply(console, arguments); } catch (_) {} }
+
+  // ===== Сбор данных по постам ==================================================
+  function collectPosts() {
+    var topicRoot = $('#pun-viewtopic') || document;
+    var posts = $all('.post', topicRoot);
+    if (!posts.length) return [];
+
+    return posts.map(function (p) {
+      var numEl = $('h3 strong', p);
+      var link = $('a.permalink', p);
+      var authEl = $('.pa-author a', p);
+
+      var num = numEl ? numEl.textContent.trim() : '';
       var time = link ? link.textContent.trim() : '';
-      var href = link ? link.href : ('#' + id);
-      var author = ($1('.pa-author a', p) || {}).textContent || '';
-      author = author.trim();
+      var href = link ? link.href : ('#' + (p.id || ''));
+      var author = authEl ? authEl.textContent.trim() : '';
 
-      // небольшой сниппет текста (по желанию)
-      var text = ($1('.post-content', p) || p).innerText
-                  .replace(/\s+/g,' ').trim();
-      if (text.length > 140) text = text.slice(0, 137) + '…';
-
-      return { id:id, time:time, href:href, author:author, text:text };
+      return { num: num, time: time, href: href, author: author };
     });
+  }
 
-    // Вывод по умолчанию — список ссылок; можно поменять формат тут
-    var out = rows.map(function(r){
-      return '• ['+r.time+'] '+r.author+' → '+r.href;
-    }).join('\n');
+  // ===== Построение HTML хронологии ============================================
+  function renderChronologyHTML(rows) {
+    var listHTML = rows.map(CFG.rowTemplate).join('');
+    return (
+      '<div class="fmv-chrono-wrap">' +
+        CFG.titleHTML +
+        '<ol class="fmv-chrono-list">' + listHTML + '</ol>' +
+      '</div>'
+    );
+  }
 
-    // Куда положить: modal | textarea | clipboard
-    var target = (opts.target || 'modal');
+  // ===== Вставка результата в target ===========================================
+  function writeToTarget(html) {
+    // 1) пробуем #p83-content
+    var out = $('#' + CFG.targetPostId + '-content');
+    // 2) иначе .post-content внутри #p83
+    if (!out) out = $('#' + CFG.targetPostId + ' .post-content');
+    if (!out) throw new Error('Не нашёл контейнер для вывода (#' + CFG.targetPostId + '-content)');
 
-    if (target === 'textarea') {
-      var ta = $1('#main-reply');
-      if (ta) {
-        ta.value += '\n[spoiler="хронология"]\n' + out + '\n[/spoiler]\n';
-        ta.focus();
+    out.innerHTML = html;
+  }
+
+  // ===== Публичный билдер =======================================================
+  function buildChronology() {
+    try {
+      note('Собираю…');
+      var rows = collectPosts();
+      if (!rows.length) {
+        note('Посты не найдены');
         return;
       }
+      var html = renderChronologyHTML(rows);
+      writeToTarget(html);
+      ensureStyles();
+      note('Готово');
+      log(LOG, 'Обновлён #' + CFG.targetPostId + '-content');
+    } catch (err) {
+      note('Ошибка: ' + err.message);
+      log(LOG, err);
     }
-
-    if (target === 'clipboard') {
-      try { navigator.clipboard.writeText(out).then(function(){
-        alert('Хронология скопирована в буфер обмена');
-      }); return; } catch(e){}
-    }
-
-    // Модалка с Copy/Вставить
-    showModal(out);
   }
 
-  function showModal(text){
+  // ===== Кнопка в конце #p82 .post-box =========================================
+  function injectButton() {
+    var container = $('#' + CFG.sourcePostId + ' .post-box') || $('#' + CFG.sourcePostId);
+    if (!container) {
+      log(LOG, '#' + CFG.sourcePostId + ' не найден — кнопку не вставил');
+      return;
+    }
+    if ($('[data-fmv-chrono-trigger]', container)) {
+      // уже есть
+      return;
+    }
+
     var wrap = document.createElement('div');
-    wrap.style.cssText =
-      'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:20px;';
-    var box = document.createElement('div');
-    box.style.cssText =
-      'max-width:900px;width:min(90vw,900px);background:#fff;color:#222;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:16px; font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial;';
-    box.innerHTML =
-      '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-        '<strong>Хронология</strong>' +
-        '<div style="display:flex;gap:8px;">' +
-          '<button id="fmv-copy" class="button">Скопировать</button>' +
-          '<button id="fmv-to-ta" class="button">Вставить в ответ</button>' +
-          '<button id="fmv-close" class="button">Закрыть</button>' +
-        '</div>' +
-      '</div>' +
-      '<textarea id="fmv-out" style="width:100%;height:50vh;white-space:pre;resize:vertical;"></textarea>';
-    wrap.appendChild(box);
-    document.body.appendChild(wrap);
-    $1('#fmv-out', box).value = text;
+    wrap.className = 'fmv-chrono-controls';
+    wrap.innerHTML =
+      '<a href="javascript:void(0)" class="button" data-fmv-chrono-trigger>' + esc(CFG.buttonText) + '</a>' +
+      '<span class="fmv-chrono-note" data-fmv-chrono-note></span>';
 
-    on($1('#fmv-close', box), 'click', function(){ wrap.remove() });
-    on($1('#fmv-copy',  box), 'click', function(){
-      $1('#fmv-out', box).select();
-      try{ document.execCommand('copy'); }catch(e){}
-    });
-    on($1('#fmv-to-ta', box), 'click', function(){
-      var ta = $1('#main-reply');
-      if (ta) {
-        ta.value += '\n[spoiler="хронология"]\n' + text + '\n[/spoiler]\n';
-        ta.focus(); wrap.remove();
-      } else { alert('Поле быстрого ответа не найдено'); }
+    container.appendChild(wrap);
+
+    var btn = $('[data-fmv-chrono-trigger]', wrap);
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      buildChronology();
     });
 
-    on(wrap, 'click', function(e){ if(e.target === wrap) wrap.remove() });
+    log(LOG, 'Кнопка добавлена (конец #' + CFG.sourcePostId + ' .post-box)');
   }
 
-  // Экспорт в глобал — это и искал твой логгер
-  window.FMV = window.FMV || {};
+  function note(text) {
+    var el = $('#' + CFG.sourcePostId + ' [data-fmv-chrono-note]');
+    if (el) el.textContent = text || '';
+  }
+
+  // ===== Инициализация ==========================================================
+  function init() {
+    ensureStyles();
+    injectButton();
+  }
+
+  // Экспорт для консоли
   window.FMV_buildChronology = buildChronology;
+  window.FMV = window.FMV || {};
   window.FMV.buildChronology = buildChronology;
 
-  // ---------- 2) Отрисовка кнопок ----------
-  function renderInlineButtons(){
-    $all('.post .post-box').forEach(function(box){
-      if (box.querySelector('[data-fmv-chrono-trigger]')) return;
-      var bar = document.createElement('div');
-      bar.style.cssText='display:flex;gap:.5rem;margin:.35rem 0 0;';
-      var btn = document.createElement('a');
-      btn.href = 'javascript:void(0)';
-      btn.className = 'button';
-      btn.setAttribute('data-fmv-chrono-trigger','');
-      btn.textContent = 'Собрать хронологию';
-      var note = document.createElement('span');
-      note.setAttribute('data-fmv-chrono-note','');
-      note.style.cssText='font-size:90%;opacity:.8;';
-      bar.appendChild(btn); bar.appendChild(note);
-      box.appendChild(bar);
-    });
-  }
+  // Старт
+  ready(init);
+  // подстраховка, если что-то дорисовывается после DOMContentLoaded
+  window.addEventListener('load', function () {
+    // если кнопки нет — попробуем ещё раз
+    if (!$('#' + CFG.sourcePostId + ' [data-fmv-chrono-trigger]')) {
+      injectButton();
+    }
+  });
 
-  function attachHandlers(){
-    on(document, 'click', function(e){
-      var t = e.target.closest('[data-fmv-chrono-trigger]');
-      if (!t) return;
-      e.preventDefault();
-      log(LOGPFX+'Нажата инлайн-кнопка');
-      if (typeof window.FMV_buildChronology === 'function'){
-        window.FMV_buildChronology({ target:'modal' });
-      } else {
-        console.warn(LOGPFX+'Функция сборки не найдена (ожидали FMV_buildChronology)');
-      }
-    });
-  }
-
-  function renderFallbackFAB(){
-    if ($1('#fmv-chrono-fab')) return;
-    var b = document.createElement('button');
-    b.id='fmv-chrono-fab';
-    b.title='Собрать хронологию';
-    b.textContent='⏱';
-    b.style.cssText='position:fixed;right:16px;bottom:16px;width:44px;height:44px;border-radius:50%;border:none;background:#2d7;box-shadow:0 4px 12px rgba(0,0,0,.25);color:#fff;font-size:20px;cursor:pointer;z-index:99998;';
-    on(b,'click',function(){
-      if (typeof window.FMV_buildChronology === 'function'){
-        window.FMV_buildChronology({ target:'modal' });
-      } else {
-        console.warn(LOGPFX+'Функция сборки не найдена (ожидали FMV_buildChronology)');
-      }
-    });
-    document.body.appendChild(b);
-    log(LOGPFX+'Резервная кнопка поставлена (правый нижний угол)');
-  }
-
-  function init(){
-    if (!$1('#pun-viewtopic')) return;         // только в теме
-    renderInlineButtons();
-    attachHandlers();
-    renderFallbackFAB();
-    log(LOGPFX+'Доступно window.FMV_buildChronology()');
-  }
-
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  } else { init() }
 })();

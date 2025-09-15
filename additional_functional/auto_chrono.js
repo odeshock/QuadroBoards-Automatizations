@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  /* ======================== АКТИВИРУЕМСЯ ТОЛЬКО В НУЖНОЙ ТЕМЕ ======================== */
+  /* ===== Активируемся только в нужной теме ===== */
   try {
     const u = new URL(location.href);
     if (!(u.hostname === 'testfmvoice.rusff.me' && u.pathname === '/viewtopic.php' && u.searchParams.get('id') === '13')) {
@@ -13,10 +13,10 @@
 
   console.group('[FMV] Автохронология (кнопка → p82, вывод → p83)');
 
-  /* ================================= КОНФИГ ================================= */
+  /* ============================ КОНФИГ ============================ */
   const BASE = 'https://testfmvoice.rusff.me';
 
-  // какие разделы собирать (как в эталонной версии)
+  // Разделы как в эталонной версии
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  },
     { id: 5, type: 'personal', status: 'off' },
@@ -25,37 +25,36 @@
   const MAX_PAGES_PER_SECTION = 50;
   const MAX_PAGES_USERLIST    = 200;
 
-  // где кнопка и куда вывод
-  const SRC_POST_ID  = 'p82';                     // кнопку — в конец этого поста
-  const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`;
-  const OUT_SEL      = '#p83-content';            // сюда перезаписываем после сборки
+  // Где кнопка и куда вывод
+  const SRC_POST_ID  = 'p82';
+  const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`; // кнопка — в конец этого контейнера
+  const OUT_SEL      = '#p83-content';              // сюда подменяем HTML после сборки
 
   // id элементов
   const WRAP_ID = 'fmv-chrono-inline';
   const BTN_ID  = 'fmv-chrono-inline-btn';
   const NOTE_ID = 'fmv-chrono-inline-note';
 
-  /* ================================ УТИЛИТЫ ================================= */
-  const abs   = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
-  const trimSp= (s) => String(s || '').replace(/\s+/g, ' ').trim();
-  const esc   = (s='') => String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  /* =========================== УТИЛИТЫ =========================== */
+  const abs    = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
+  const esc    = (s='') => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
 
   const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px';
 
-  /* ---------------- статус (как в целевой версии) ---------------- */
+  /* ---------- статусный бейдж ---------- */
   function renderStatus(type, status) {
     const map = {
-      on:       { word: 'active',   color: 'green'  },
-      off:      { word: 'closed',   color: 'teal'   },
-      archived: { word: 'archived', color: 'maroon' }
+      on:       { word: 'active'  },
+      off:      { word: 'closed'  },
+      archived: { word: 'archived'}
     };
     const st = map[status] || map.archived;
     return `[${type} / ${st.word}]`;
   }
 
-  /* ---------------- заголовок темы: "[дата] название" ---------------- */
+  /* ---------- заголовок темы: "[дата] эпизод" ---------- */
   const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
@@ -64,7 +63,7 @@
       : { dateRaw: '', episode: trimSp(text), hasBracket: false };
   }
 
-  /* ---------------- парсер дат (ru) ---------------- */
+  /* ---------- разбор дат (ru) ---------- */
   const RU_MONTHS = {
     'янв':1,'январь':1,'января':1,
     'фев':2,'февраль':2,'февраля':2,
@@ -82,6 +81,7 @@
   const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
   const TMAX = [9999,12,31];
   const yFix = (y)=> String(y).length<=2 ? 1900 + parseInt(y,10) : parseInt(y,10);
+  const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
 
   function parseDateRange(src) {
     let s = String(src||'').trim();
@@ -89,45 +89,29 @@
     s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
 
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) {
-      const a=[yFix(m[3]),+m[2],+m[1]];
-      const b=[yFix(m[6]),+m[5],+m[4]];
-      return { start:a, end:b, kind:'full-range', bad:false };
-    }
+    if (m) return { start:[yFix(m[3]),+m[2],+m[1]], end:[yFix(m[6]),+m[5],+m[4]], kind:'full-range', bad:false };
+
     m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) {
-      const y=yFix(m[4]), mo=+m[3];
-      const a=[y,mo,+m[1]], b=[y,mo,+m[2]];
-      return { start:a, end:b, kind:'day-range', bad:false };
-    }
+    if (m) { const y=yFix(m[4]),mo=+m[3]; return { start:[y,mo,+m[1]], end:[y,mo,+m[2]], kind:'day-range', bad:false }; }
+
     m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) {
-      const a=[yFix(m[3]),+m[2],+m[1]];
-      return { start:a, end:a.slice(), kind:'single', bad:false };
-    }
+    if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'single', bad:false }; }
+
     m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
-    if (m && RU_MONTHS[m[1]]) {
-      const y=+m[2], mo=RU_MONTHS[m[1]];
-      const a=[y,mo,0];
-      return { start:a, end:a.slice(), kind:'month', bad:false };
-    }
+    if (m && RU_MONTHS[m[1]]) { const y=+m[2], mo=RU_MONTHS[m[1]]; const a=[y,mo,0]; return { start:a, end:a.slice(), kind:'month', bad:false }; }
+
     m = s.match(/^(\d{4})$/);
-    if (m) {
-      const y=+m[1], a=[y,1,0];
-      return { start:a, end:a.slice(), kind:'year', bad:false };
-    }
+    if (m) { const y=+m[1], a=[y,1,0]; return { start:a, end:a.slice(), kind:'year', bad:false }; }
+
     m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
-    if (m) {
-      const a=[yFix(m[3]),+m[2],+m[1]];
-      return { start:a, end:a.slice(), kind:'fallback', bad:true };
-    }
+    if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'fallback', bad:true }; }
+
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  /* ---------------- анти-кракозябры: выбираем лучшую декодировку ---------------- */
+  /* ---------- декод/парс страниц (1251/utf-8 автоопределение) ---------- */
   function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
   function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
-
   function sniffMetaCharset(buf) {
     const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
     const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
@@ -136,7 +120,6 @@
     if (m2) return m2[1].toLowerCase();
     return '';
   }
-
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
     const sCyr  = countCyr(html);
@@ -145,22 +128,18 @@
     const hintBonus = hint ? 2 : 0;
     return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
   }
-
   async function fetchText(url, timeoutMs = 20000) {
-    console.log('[FMV] fetch →', url);
     const ctrl = new AbortController();
     const t = setTimeout(()=>ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { credentials: 'include', signal: ctrl.signal });
+      const res  = await fetch(url, { credentials:'include', signal:ctrl.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buf = await res.arrayBuffer();
+      const buf  = await res.arrayBuffer();
 
-      // charset hints
-      let headerCharset = '';
-      const ct = res.headers.get('content-type') || '';
-      const mCT = ct.match(/charset=([^;]+)/i);
-      if (mCT) headerCharset = mCT[1].trim().toLowerCase();
-      const metaCharset = sniffMetaCharset(buf);
+      const ct   = res.headers.get('content-type') || '';
+      const mCT  = ct.match(/charset=([^;]+)/i);
+      const headerCharset = mCT ? mCT[1].trim().toLowerCase() : '';
+      const metaCharset   = sniffMetaCharset(buf);
 
       const hints = { 'utf-8': false, 'windows-1251': false };
       if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
@@ -174,24 +153,20 @@
       let best = { score: -1e9, enc: '', html: '' };
       for (const enc of tryOrder) {
         let html = '';
-        try { html = new TextDecoder(enc, { fatal: false }).decode(buf); } catch { continue; }
+        try { html = new TextDecoder(enc, { fatal:false }).decode(buf); } catch { continue; }
         const score = scoreDecoded(html, hints[enc]);
         if (score > best.score) best = { score, enc, html };
       }
-      console.log(`[FMV] decode → ${best.enc}, �=${countFFFD(best.html)}, cyr=${countCyr(best.html)}`);
       return best.html;
-    } finally {
-      clearTimeout(t);
-    }
+    } finally { clearTimeout(t); }
   }
 
-  const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
+  const parseHTML     = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||
     doc.querySelector('.post.topicpost') || doc;
 
   function extractFromFirst(firstNode) {
-    // «виртуальные теги» в первом посте:
     const locNode   = firstNode.querySelector('location');
     const castNode  = firstNode.querySelector('characters');
     const orderNode = firstNode.querySelector('order');
@@ -202,17 +177,15 @@
     const charsSrc  = rawChars
       ? rawChars.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean)
       : [];
-    const charsLower = charsSrc.map(s => s.toLowerCase());
+    const charactersLower = charsSrc.map(s => s.toLowerCase());
 
     let order = null;
     if (orderNode) {
       const num = parseInt(orderNode.textContent.trim(), 10);
       if (Number.isFinite(num)) order = num;
     }
-    return { location, charactersLower: charsLower, order };
+    return { location, charactersLower, order };
   }
-
-  /* ================================ СКРАПЕРЫ ================================= */
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
     try {
@@ -232,7 +205,6 @@
   }
 
   async function scrapeSection(section) {
-    console.group(`[FMV] Раздел ${section.id} ${section.type}/${section.status}`);
     let page = `${BASE}/viewforum.php?id=${section.id}`;
     const seen = new Set();
     const out  = [];
@@ -240,7 +212,6 @@
 
     while (page && !seen.has(page) && pageCount < MAX_PAGES_PER_SECTION) {
       pageCount++;
-      console.log('[FMV] страница:', page);
       seen.add(page);
 
       const html = await fetchText(page);
@@ -271,14 +242,10 @@
       }
       page = nextHref ? abs(page, nextHref) : null;
     }
-
-    console.groupEnd();
     return out;
   }
 
-  // список юзеров (для проверки участников и ссылок на профиль)
   async function scrapeAllUsers() {
-    console.group('[FMV] Сбор пользователей');
     let page = `${BASE}/userlist.php`;
     const seen  = new Set();
     const nameToProfile = new Map(); // lowerName -> absolute href
@@ -287,7 +254,6 @@
     while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
       cnt++;
       seen.add(page);
-      console.log('[FMV][users] страница:', page);
 
       const html = await fetchText(page);
       const doc  = parseHTML(html);
@@ -311,14 +277,8 @@
       }
       page = nextHref ? abs(page, nextHref) : null;
     }
-
-    console.log('[FMV][users] всего пользователей:', nameToProfile.size);
-    console.groupEnd();
     return nameToProfile;
   }
-
-  /* ================================ СОРТИРОВКА ================================ */
-  const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
 
   function compareEvents(a, b) {
     const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
@@ -331,7 +291,7 @@
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
-  /* ========================= СБОРКА HTML (формат вывода) ========================= */
+  /* ================ СБОРКА HTML (без внутреннего заголовка) ================ */
   async function buildWrappedHTML() {
     const nameToProfile = await scrapeAllUsers();
 
@@ -346,11 +306,9 @@
     function renderNames(lowerArr) {
       if (!lowerArr || !lowerArr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
       return lowerArr.map((low) => {
-        const href = nameToProfile.get(low);            // сравнение в lowercase
-        const shown = esc(low);                         // вывод в lowercase
-        if (href) {
-          return `<a href="${esc(href)}">${shown}</a>`;
-        }
+        const href  = nameToProfile.get(low); // сравнение по lowercase
+        const shown = esc(low);               // вывод lowercase
+        if (href) return `<a href="${esc(href)}">${shown}</a>`;
         return `<span style="${MISS_STYLE}" title="пользователь не найден">${shown}</span>`;
       }).join(', ');
     }
@@ -367,12 +325,10 @@
 
       const names = renderNames(e.charactersLower);
       const loc   = e.location
-        ? esc(e.location)                                 // уже lowercase
+        ? esc(e.location) // уже lowercase
         : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
-      // формат записи:
-      // 1-я строка: [type/status] дата — <a>эпизод</a> [order]
-      // 2-я строка: участники (с линками) / локация (все lowercase)
+      // строка записи
       return `
         <p style="margin:0 0 .4em 0">
           <span>${statusHTML}</span> ${dateHTML} — <a href="${url}">${ttl}</a>${orderBadge}<br/>
@@ -381,44 +337,42 @@
       `;
     });
 
-    const innerBody = items.join('') || `<p>— пусто —</p>`;
-    const header    = `<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>`;
-    const full      = `${header}${innerBody}`;
+    const body = items.join('') || `<p>— пусто —</p>`;
 
-    // Оборачиваем в спойлер перед вставкой:
-    return `<div class="quote-box spoiler-box media-box"><div onclick="toggleSpoiler(this);" class="">Собранная хронология</div><blockquote class="">${full}</blockquote></div>`;
+    // ВНЕШНИЙ спойлер остаётся («Собранная хронология»),
+    // но ВНУТРЕННЕГО заголовка «Хронология» больше нет.
+    return `<div class="quote-box spoiler-box media-box"><div onclick="toggleSpoiler(this);" class="">Собранная хронология</div><blockquote class="">${body}</blockquote></div>`;
   }
 
-  /* =================== ЗАПУСК ПО КНОПКЕ + ПЕРЕЗАПИСЬ #p83 =================== */
+  /* =================== ЗАПУСК ПО КНОПКЕ + ПОДМЕНА #p83 =================== */
   async function handleBuild(opts) {
     const btn  = opts?.buttonEl || document.getElementById(BTN_ID);
     const note = opts?.noteEl   || document.getElementById(NOTE_ID);
 
-    console.group('[FMV] Запуск по кнопке');
     try {
       const host = document.querySelector(OUT_SEL);
       if (!host) { console.warn('[FMV] контейнер вывода не найден:', OUT_SEL); return; }
 
-      // статус — ТОЛЬКО в p82 (кнопка/заметка). Ничего не дублируем в p83 до результата.
-      if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
-      if (note){ note.textContent = 'Готовлю хронологию…'; note.style.opacity = '.85'; }
+      // статус: только в p82
+      if (btn)  { btn.disabled = true; btn.textContent = 'Собираю…'; }
+      if (note) { note.textContent = 'Готовлю хронологию…'; note.style.opacity = '.85'; note.classList.remove('fmv-note-bad'); }
 
       const html = await buildWrappedHTML();
-
-      // финальная подмена в p83
       host.innerHTML = html;
 
-      if (note) note.textContent = 'Готово';
-      console.groupEnd();
+      // Чистим индикатор, "Готово" не показываем.
+      if (note) note.textContent = '';
     } catch (e) {
       console.error('[FMV] Ошибка сборки:', e);
       if (note) {
         note.textContent = 'Ошибка сборки';
-        note.style.cssText += `;${MISS_STYLE}`;
+        note.classList.add('fmv-note-bad');
       }
+      if (btn) btn.textContent = 'Ошибка';
+      setTimeout(() => { if (btn) btn.textContent = 'Собрать хронологию'; }, 2000);
     } finally {
-      const btn2 = document.getElementById(BTN_ID);
-      if (btn2) { btn2.disabled = false; btn2.textContent = 'Собрать хронологию'; }
+      const b = document.getElementById(BTN_ID);
+      if (b) { b.disabled = false; b.textContent = 'Собрать хронологию'; }
     }
   }
 
@@ -450,7 +404,7 @@
 
     wrap.appendChild(btn);
     wrap.appendChild(note);
-    host.appendChild(wrap); // <— В САМЫЙ КОНЕЦ p82.post-box
+    host.appendChild(wrap); // в самый конец p82.post-box
 
     btn.addEventListener('click', () => handleBuild({ buttonEl: btn, noteEl: note }));
 
@@ -462,7 +416,6 @@
     if (mountInlineButton()) {
       console.log('[FMV] inline-кнопка готова');
     } else {
-      console.log('[FMV] ждём появление p82 через MutationObserver');
       const mo = new MutationObserver(() => {
         if (mountInlineButton()) mo.disconnect();
       });
@@ -470,10 +423,19 @@
       setTimeout(()=>mo.disconnect(), 10000);
     }
 
-    // экспортируем (совместимость с логами/ручным запуском)
+    // экспорт
     window.FMV_buildChronology = () => handleBuild({});
     console.log('[FMV] Доступно window.FMV_buildChronology()');
   }
+
+  // стили для сообщения об ошибке у заметки
+  (function ensureStyles(){
+    if (document.getElementById('fmv-chrono-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'fmv-chrono-styles';
+    style.textContent = `.fmv-note-bad{background:rgba(200,0,0,.14);padding:2px 6px;border-radius:4px}`;
+    document.documentElement.appendChild(style);
+  })();
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });

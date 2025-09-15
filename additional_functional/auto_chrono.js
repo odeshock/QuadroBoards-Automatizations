@@ -1,53 +1,42 @@
 /**
- * FMV Timeline Injector
- * - Целевая страница: https://testfmvoice.rusff.me/viewtopic.php?id=13
- * - Собирает темы из разделов:
- *     4 → [personal / on]
- *     5 → [personal / off]
- * - Для каждой темы:
- *     * дата и название из заголовка темы: "[дата] название"
- *     * location и characters — из ПЕРВОГО поста, теги <location> и <characters> (innerText)
- *     * characters: split по , ; / & и слову "и", в lowercase, trim()
- *     * location: lowercase
- * - Сортировка: от старых дат к новым
- * - Формат строки:
- *     [personal / on|off] [b]дата[/b] — [url=ссылка]название[/url]
- *     [i]участники через запятую / локация[/i]
- * - Результат подставляется вместо ВСЕГО содержимого #p83-content
+ * FMV Timeline Injector (robust decode)
+ * Страница: https://testfmvoice.rusff.me/viewtopic.php?id=13
+ * Разделы:
+ *   4 → [personal / on]
+ *   5 → [personal / off]
+ * Формат строки:
+ *   [personal / on|off] [b]дата[/b] — [url=ссылка]название[/url]
+ *   [i]участники через запятую / локация[/i]
  */
 (function () {
   'use strict';
 
-  // --- 0) Проверка URL (игнорируем hash) ---
+  // --- URL-guard (игнорируем hash) ---
   try {
     const u = new URL(location.href);
     const ok = (u.hostname === 'testfmvoice.rusff.me'
              && u.pathname === '/viewtopic.php'
              && u.searchParams.get('id') === '13');
-    if (!ok) {
-      console.info('[FMV] Не целевой URL, выходим:', location.href);
-      return;
-    }
-  } catch {
-    console.warn('[FMV] Не смог распарсить URL, выходим.');
-    return;
-  }
+    if (!ok) { console.info('[FMV] Не целевой URL:', location.href); return; }
+  } catch { console.warn('[FMV] Не смог распарсить URL'); return; }
 
   console.group('[FMV] Timeline injector: старт');
 
-  // --- 1) Константы/регэкспы ---
+  // --- Константы ---
   const BASE = 'https://testfmvoice.rusff.me';
   const SECTIONS = [
     { id: 4, label: '[personal / on]'  },
     { id: 5, label: '[personal / off]' },
   ];
-  const MAX_PAGES_PER_SECTION = 50; // защитный лимит
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu; // разделители для characters
+  const MAX_PAGES_PER_SECTION = 50;
+  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu; // делители имён
   const TITLE_RE   = /^\s*\[(.+?)\]\s*(.+)$/s;     // "[дата] название"
 
-  // --- 2) Утилиты ---
+  // --- Утилиты ---
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
   const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
+  const countFFFD = s => (s.match(/\uFFFD/g) || []).length;
+  const countCyr  = s => (s.match(/[А-Яа-яЁё]/g) || []).length;
 
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
@@ -64,7 +53,31 @@
     return isNaN(ts) ? 0 : ts;
   }
 
-  // --- 3) fetchText с правильной декодировкой (UTF-8 / windows-1251) ---
+  // =========================
+  //  Декодер с эвристикой
+  // =========================
+  function sniffMetaCharset(buf) {
+    // ASCII/latin всегда читаемы → достаточно 4KB
+    const headGuess = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
+    const m1 = headGuess.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
+    if (m1) return m1[1].toLowerCase();
+    const m2 = headGuess.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
+    if (m2) return m2[1].toLowerCase();
+    return '';
+  }
+
+  function scoreDecoded(html, hint) {
+    // Чем меньше � и больше кириллицы — тем лучше.
+    // Наличие <html> и <head> даёт небольшой бонус.
+    const sFFFD = countFFFD(html);
+    const sCyr  = countCyr(html);
+    const hasHtml = /<html[^>]*>/i.test(html) ? 1 : 0;
+    const hasHead = /<head[^>]*>/i.test(html) ? 1 : 0;
+    const hintBonus = hint ? 2 : 0;
+    // Итоговая метрика:
+    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
+  }
+
   async function fetchText(url, timeoutMs = 20000) {
     console.log('[FMV] fetch →', url);
     const ctrl = new AbortController();
@@ -74,49 +87,46 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = await res.arrayBuffer();
 
-      // 1) charset из заголовка
-      let charset = '';
+      // Подсказки: заголовок и meta
+      let headerCharset = '';
       const ct = res.headers.get('content-type') || '';
       const mCT = ct.match(/charset=([^;]+)/i);
-      if (mCT) charset = mCT[1].trim().toLowerCase();
+      if (mCT) headerCharset = mCT[1].trim().toLowerCase();
 
-      // 2) если в заголовке нет — попробуем найти в <meta ... charset=...>
-      if (!charset) {
-        const sniff = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
-        const mMeta = sniff.match(/charset\s*=\s*["']?([\w-]+)/i);
-        if (mMeta) charset = mMeta[1].toLowerCase();
-      }
+      const metaCharset = sniffMetaCharset(buf);
+      const hints = { 'utf-8': false, 'windows-1251': false };
+      if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
+      if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
 
-      const countFFFD = s => (s.match(/\uFFFD/g) || []).length;
+      // Кандидаты декодирования
+      const tryOrder = [];
+      // 1) если есть явный charset в заголовке — вперёд
+      if (headerCharset) tryOrder.push(headerCharset);
+      // 2) meta
+      if (metaCharset && !tryOrder.includes(metaCharset)) tryOrder.push(metaCharset);
+      // 3) стандартные
+      ['utf-8','windows-1251'].forEach(enc => { if (!tryOrder.includes(enc)) tryOrder.push(enc); });
 
-      // 3) пробуем указанную/utf-8
-      let html;
-      try {
-        html = new TextDecoder(charset || 'utf-8', { fatal: false }).decode(buf);
-      } catch {
-        html = new TextDecoder('utf-8', { fatal: false }).decode(buf);
-      }
-
-      // 4) если остались � — пробуем windows-1251
-      if (/\uFFFD/.test(html)) {
+      let best = { score: -1e9, enc: '', html: '' };
+      for (const enc of tryOrder) {
+        let html = '';
         try {
-          const html1251 = new TextDecoder('windows-1251', { fatal: false }).decode(buf);
-          if (countFFFD(html1251) < countFFFD(html)) {
-            console.log('[FMV] Переключился на windows-1251 для', url);
-            html = html1251;
-          }
-        } catch {/* оставляем как есть */}
+          html = new TextDecoder(enc, { fatal: false }).decode(buf);
+        } catch { continue; }
+        const score = scoreDecoded(html, hints[enc]);
+        if (score > best.score) best = { score, enc, html };
       }
 
-      return html;
+      console.log(`[FMV] decode: header=${headerCharset||'-'} meta=${metaCharset||'-'} → chosen=${best.enc}, score=${best.score}, �=${countFFFD(best.html)}, cyr=${countCyr(best.html)}`);
+      return best.html;
     } finally {
       clearTimeout(t);
     }
   }
 
+  // --- Парсинг темы ---
   const parseHTML = (html) => new DOMParser().parseFromString(html, 'text/html');
 
-  // --- 4) Парсинг темы ---
   function firstPostNode(doc) {
     return (
       doc.querySelector('.post.topicpost .post-content') ||
@@ -146,15 +156,18 @@
       const first = firstPostNode(doc);
       const { location, characters } = extractLocAndChars(first);
       const { date, episode } = parseTitle(rawTitle);
-      console.log('[FMV]   тема ✓', { date, episode, location, characters, url: topicUrl });
-      return { label, date, episode, url: topicUrl, location, characters };
+      // Локальный «ремонт»: если вдруг всё же есть �, попробуем выкинуть их
+      const safeLoc = location.replace(/\uFFFD+/g,'').trim();
+      const safeChars = characters.map(s => s.replace(/\uFFFD+/g,'').trim()).filter(Boolean);
+      console.log('[FMV]   тема ✓', { date, episode, location: safeLoc, characters: safeChars, url: topicUrl });
+      return { label, date, episode, url: topicUrl, location: safeLoc, characters: safeChars };
     } catch (e) {
       console.warn('[FMV]   тема ✗', topicUrl, e);
       return null;
     }
   }
 
-  // --- 5) Обход раздела с пагинацией ---
+  // --- Обход раздела ---
   async function scrapeSection(section) {
     console.group(`[FMV] Раздел ${section.id} ${section.label}`);
     let page = `${BASE}/viewforum.php?id=${section.id}`;
@@ -169,7 +182,6 @@
       const html = await fetchText(page);
       const doc  = parseHTML(html);
 
-      // Собираем уникальные темы (по id)
       const topicsMap = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
         const href = abs(page, a.getAttribute('href'));
@@ -177,7 +189,7 @@
         if (!m) return;
         const id = m[1];
         const title = a.textContent || a.innerText || '';
-        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return; // не берём сервисные ссылки
+        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
         if (!topicsMap.has(id)) topicsMap.set(id, { url: href, title });
       });
 
@@ -190,7 +202,7 @@
         console.groupEnd();
       }
 
-      // Пагинация "вперёд"
+      // next-пагинация
       const nextRel = doc.querySelector('a[rel="next"]');
       let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
@@ -210,7 +222,7 @@
     return out;
   }
 
-  // --- 6) Сборка хронологии ---
+  // --- Сборка хронологии ---
   async function buildTimelineText() {
     console.group('[FMV] Сборка хронологии');
     const t0 = performance.now();
@@ -237,7 +249,7 @@
     return text;
   }
 
-  // --- 7) Ждём #p83-content и полностью заменяем содержимое ---
+  // --- Инъекция в #p83-content ---
   function waitForP83() {
     return new Promise(resolve => {
       const now = document.querySelector('#p83-content');
@@ -255,13 +267,11 @@
     const host = await waitForP83();
     console.log('[FMV] Нашли #p83-content:', !!host);
 
-    // Заглушка
     host.innerHTML = '<div class="fmv-chrono-box" style="white-space:pre-wrap; font:inherit;">Готовлю хронологию…</div>';
     const box = host.querySelector('.fmv-chrono-box');
 
     try {
       const text = await buildTimelineText();
-      // Показываем как простой текст (чтобы не выполнять ничего)
       box.textContent = text || '— пусто —';
       console.log('[FMV] Инъекция завершена.');
     } catch (e) {

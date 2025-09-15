@@ -11,12 +11,10 @@
     }
   } catch { return; }
 
-  console.group('[FMV] Автохронология (кнопка → p82, вывод → p83)');
-
   /* ============================ КОНФИГ ============================ */
   const BASE = 'https://testfmvoice.rusff.me';
 
-  // Разделы — как в вашей версии
+  // Разделы (как в оригинале)
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  },
     { id: 5, type: 'personal', status: 'off' },
@@ -25,30 +23,23 @@
   const MAX_PAGES_PER_SECTION = 50;
   const MAX_PAGES_USERLIST    = 200;
 
-  // Где кнопка и куда вывод
+  // UI-мишени
   const SRC_POST_ID  = 'p82';
-  const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`; // кнопку — в КОНЕЦ этого контейнера
-  const OUT_SEL      = '#p83-content';              // сюда подменяем HTML после сборки
+  const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`;
+  const OUT_SEL      = '#p83-content';
 
-  // id элементов
+  // элементы
   const WRAP_ID = 'fmv-chrono-inline';
   const BTN_ID  = 'fmv-chrono-inline-btn';
   const NOTE_ID = 'fmv-chrono-inline-note';
 
-  /* =========================== УТИЛИТЫ =========================== */
-  const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
+  // стиль подсветки «пропуск/ошибка»
+  const MISS_STYLE = 'background:#ffeaea;color:#b00020;padding:0 3px;border-radius:3px';
 
-  const esc = (s='') => String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-
-  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
-
-  // разделитель имён/локаций в содержимом тегов
+  // разделитель имён/локаций
   const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
 
-  /* ---------- статусный бейдж (ДОБАВЛЕН ЦВЕТ) ---------- */
+  /* ---------- статусный бейдж (цвет) ---------- */
   function renderStatus(type, status) {
     const map = {
       on:       { word: 'active',   color: 'green'  },
@@ -56,10 +47,10 @@
       archived: { word: 'archived', color: 'maroon' }
     };
     const st = map[status] || map.archived;
-    return `[${esc(type)} / <span style="color:${st.color}">${st.word}</span>]`;
+    return `[${escapeHtml(type)} / <span style="color:${st.color}">${st.word}</span>]`;
   }
 
-  /* ---------- заголовок темы: "[дата] эпизод" ---------- */
+  /* ---------- заголовок темы ---------- */
   const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
@@ -68,7 +59,7 @@
       : { dateRaw: '', episode: trimSp(text), hasBracket: false };
   }
 
-  /* ---------- разбор дат (ru) ---------- */
+  /* ---------- даты ---------- */
   const RU_MONTHS = {
     'янв':1,'январь':1,'января':1, 'фев':2,'февраль':2,'февраля':2,
     'мар':3,'март':3,'марта':3, 'апр':4,'апрель':4,'апреля':4,
@@ -107,10 +98,9 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  /* ---------- декод/парс страниц (1251/utf-8 автоопределение) ---------- */
+  /* ---------- сеть/парс ---------- */
   function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
   function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
-
   function sniffMetaCharset(buf) {
     const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
     const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
@@ -119,7 +109,6 @@
     if (m2) return m2[1].toLowerCase();
     return '';
   }
-
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
     const sCyr  = countCyr(html);
@@ -128,7 +117,6 @@
     const hintBonus = hint ? 2 : 0;
     return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
   }
-
   async function fetchText(url, timeoutMs = 20000) {
     const ctrl = new AbortController();
     const t = setTimeout(()=>ctrl.abort(), timeoutMs);
@@ -162,43 +150,30 @@
       return best.html;
     } finally { clearTimeout(t); }
   }
-
   const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
-
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||
     doc.querySelector('.post.topicpost') ||
     doc;
 
-  /* ---------- ВАЖНО: собираем МНОЖЕСТВЕННЫЕ location/characters ---------- */
+  /* ---------- MНОЖЕСТВЕННЫЕ location/characters (unique, lowercase) ---------- */
   function extractFromFirst(firstNode) {
-    // несколько <location>
     const locSet = new Set();
     firstNode.querySelectorAll('location').forEach(n => {
       const raw = (n.textContent || n.innerText || '').trim();
       if (!raw) return;
-      raw.split(CHAR_SPLIT)
-         .map(s => s.trim())
-         .filter(Boolean)
-         .map(s => s.toLowerCase())
-         .forEach(v => locSet.add(v));
+      raw.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase()).forEach(v=>locSet.add(v));
     });
     const locationsLower = Array.from(locSet);
 
-    // несколько <characters>
     const charSet = new Set();
     firstNode.querySelectorAll('characters').forEach(n => {
       const raw = (n.textContent || n.innerText || '').trim();
       if (!raw) return;
-      raw.split(CHAR_SPLIT)
-         .map(s => s.trim())
-         .filter(Boolean)
-         .map(s => s.toLowerCase())
-         .forEach(v => charSet.add(v));
+      raw.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase()).forEach(v=>charSet.add(v));
     });
     const charactersLower = Array.from(charSet);
 
-    // порядок (берём первое валидное число, как раньше)
     let order = null;
     const orderNode = firstNode.querySelector('order');
     if (orderNode) {
@@ -320,7 +295,7 @@
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
-  /* ================ СБОРКА HTML (без внутреннего заголовка) ================ */
+  /* ================= СБОРКА HTML (с подсветкой пропусков) ================= */
   async function buildWrappedHTML() {
     const nameToProfile = await scrapeAllUsers();
 
@@ -333,35 +308,39 @@
     all.sort(compareEvents);
 
     function renderNames(lowerArr) {
-      if (!lowerArr || !lowerArr.length) return `не указаны`;
+      if (!lowerArr || !lowerArr.length) {
+        return `<span style="${MISS_STYLE}">не указаны</span>`;
+      }
       return lowerArr.map((low) => {
-        const href  = nameToProfile.get(low); // сравнение по lowercase
-        const shown = esc(low);               // вывод lowercase
-        if (href) return `<a href="${esc(href)}" rel="nofollow">${shown}</a>`;
-        return `${shown}`;
+        const href  = nameToProfile.get(low);   // сравнение по lowercase
+        const shown = escapeHtml(low);          // вывод lowercase
+        if (href) return `<a href="${escapeHtml(href)}" rel="nofollow">${shown}</a>`;
+        // не нашли в списке — подсветить
+        return `<span style="${MISS_STYLE}">${shown}</span>`;
       }).join(', ');
     }
 
     const items = all.map(e => {
       const statusHTML = renderStatus(e.type, e.status);
-      const dateHTML   = (!e.dateRaw || e.dateBad) ? `дата не указана/ошибка` : esc(e.dateRaw);
-      const url        = esc(e.url);
-      const ttl        = esc(e.episode);
-      const orderBadge = (e.order!=null) ? ` [${esc(String(e.order))}]` : '';
+      const dateHTML   = (!e.dateRaw || e.dateBad)
+        ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
+        : escapeHtml(e.dateRaw);
+
+      const url        = escapeHtml(e.url);
+      const ttl        = escapeHtml(e.episode);
+      const orderBadge = (e.order!=null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
       const names = renderNames(e.charactersLower);
 
       const loc = (e.locationsLower && e.locationsLower.length)
-        ? esc(e.locationsLower.join(', '))
-        : `локация не указана`;
+        ? escapeHtml(e.locationsLower.join(', '))
+        : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
-      // одна запись
       return `<p>${statusHTML} ${dateHTML} — <a href="${url}" rel="nofollow">${ttl}</a>${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
     });
 
     const body = items.join('') || `<p><i>— пусто —</i></p>`;
 
-    // Оборачиваем во ВНЕШНИЙ спойлер с нужным заголовком
     return `
 <div class="quote-box spoiler-box media-box">
   <div onclick="toggleSpoiler(this)">Собранная хронология</div>
@@ -381,14 +360,12 @@
         return;
       }
 
-      // статус: только в p82
       if (btn)  { btn.disabled = true; btn.textContent = 'Собираю…'; }
       if (note) { note.textContent = 'Готовлю хронологию…'; note.style.opacity = '.85'; note.classList.remove('fmv-note-bad'); }
 
       const html = await buildWrappedHTML();
       host.innerHTML = html;
 
-      // статус "Готово" — только около кнопки
       if (btn)  { btn.disabled = false; btn.textContent = 'Пересобрать хронологию'; }
       if (note) { note.textContent = 'Готово'; note.style.opacity = '1'; }
     } catch (e) {
@@ -432,11 +409,10 @@
 
     wrap.appendChild(btn);
     wrap.appendChild(note);
-    host.appendChild(wrap); // В КОНЕЦ post-box
+    host.appendChild(wrap);
 
     btn.addEventListener('click', () => handleBuild({ buttonEl: btn, noteEl: note }));
 
-    console.log('[FMV] Инлайн-кнопка добавлена в', SRC_HOST_SEL);
     return true;
   }
 
@@ -444,16 +420,20 @@
   function init() {
     ensureStyles();
     mountInlineButton();
-    // публичный API — как в исходнике
     window.FMV_buildChronology = handleBuild;
-    console.log('[FMV] Доступно window.FMV_buildChronology()');
   }
+
+  /* ============================== HELPERS ============================== */
+  const escapeHtml = (s='') => String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
+  const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
     init();
   }
-
-  console.groupEnd();
 })();

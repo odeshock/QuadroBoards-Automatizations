@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  // === Включаемся только на нужной странице (viewtopic.php?id=13)
+  // === Стартуем только на нужной теме
   try {
     const u = new URL(location.href);
     if (!(u.hostname === 'testfmvoice.rusff.me' &&
@@ -11,9 +11,9 @@
     }
   } catch { return; }
 
-  console.group('[FMV] Автохронология (кнопка запуска)');
+  console.group('[FMV] Хронология — внешний триггер');
 
-  // ===== Конфиг
+  // ---------- Конфиг
   const BASE = 'https://testfmvoice.rusff.me';
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  }, // active
@@ -22,7 +22,7 @@
   const MAX_PAGES_PER_SECTION = 50;
   const MAX_PAGES_USERLIST = 200;
 
-  // ===== Утилиты
+  // ---------- Утилиты
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
   const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
   const esc = (s='') => String(s)
@@ -30,7 +30,7 @@
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px';
 
-  // статус (цветом), тип не выделяем
+  // Рендер статуса (цветом), тип не выделяем
   function renderStatus(type, status) {
     const map = {
       on:       { word: 'active',   color: 'green'  },
@@ -41,7 +41,7 @@
     return `[${type} / <span style="color: ${st.color}">${st.word}</span>]`;
   }
 
-  // заголовок темы: "[дата] название"
+  // Заголовок темы: "[дата] название"
   const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
@@ -49,7 +49,7 @@
              : { dateRaw: '', episode: trimSp(text), hasBracket:false };
   }
 
-  // ===== парсер дат
+  // ---------- Парсер дат
   const RU_MONTHS = {
     'янв':1,'январь':1,'января':1,'фев':2,'февраль':2,'февраля':2,'мар':3,'март':3,'марта':3,
     'апр':4,'апрель':4,'апреля':4,'май':5,'мая':5,'июн':6,'июнь':6,'июня':6,'июл':7,'июль':7,'июля':7,
@@ -101,7 +101,7 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  // ===== декодирование (анти-кракозябры)
+  // ---------- Анти-кракозябры
   function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
   function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
   function sniffMetaCharset(buf) {
@@ -244,7 +244,7 @@
     return out;
   }
 
-  // ===== Список пользователей (userlist) с пагинацией
+  // ---------- Список пользователей
   async function scrapeAllUsers() {
     console.group('[FMV] Сбор пользователей');
     let page = `${BASE}/userlist.php`;
@@ -278,7 +278,7 @@
     return names;
   }
 
-  // ===== сортировка
+  // ---------- Сортировка
   const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
   function compareEvents(a, b) {
     const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
@@ -291,7 +291,7 @@
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
-  // ===== сборка HTML (со спойлером) + проверка участников
+  // ---------- Сборка HTML (со спойлером) + проверка участников
   async function buildWrappedHTML() {
     const userSet = await scrapeAllUsers();
 
@@ -340,75 +340,55 @@
            `</div>`;
   }
 
-  // ===== запуск «по кнопке» и подмена содержимого #p83-content
-  async function handleBuild(btn, note) {
-    console.group('[FMV] Запуск по кнопке');
+  // ---------- Запуск и подмена #p83-content
+  async function handleBuild(btnEl, noteEl) {
+    console.group('[FMV] Запуск сборки');
     try {
       const host = document.querySelector('#p83-content');
       if (!host) { console.warn('[FMV] #p83-content не найден'); return; }
 
-      btn.disabled = true;
-      const origText = btn.textContent;
-      btn.textContent = 'Собираю…';
-      note.textContent = 'Подготовка данных…';
+      if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Собираю…'; }
+      if (noteEl) noteEl.textContent = 'Подготовка данных…';
 
       host.innerHTML = '<div class="fmv-chrono-box" style="white-space:normal;font:inherit">Готовлю хронологию…</div>';
 
       const wrapped = await buildWrappedHTML();
       host.innerHTML = wrapped;
 
-      note.textContent = 'Готово';
-      btn.textContent = 'Пересобрать хронологию';
-      btn.disabled = false;
+      if (noteEl) noteEl.textContent = 'Готово';
+      if (btnEl) { btnEl.textContent = 'Пересобрать хронологию'; btnEl.disabled = false; }
       console.log('[FMV] Готово.');
     } catch (e) {
       console.error('[FMV] Ошибка:', e);
-      note.textContent = 'Ошибка при сборке';
+      if (noteEl) noteEl.textContent = 'Ошибка при сборке';
+      if (btnEl) btnEl.disabled = false;
     }
     console.groupEnd();
   }
 
-  // ===== вставка кнопки управления
-  function injectButton() {
-    const post = document.getElementById('p83');
-    if (!post) { console.warn('[FMV] Пост #p83 не найден'); return; }
-    const postBox = post.querySelector('.post-box') || post;
-
-    // Контейнер кнопки ставим ПЕРЕД #p83-content — чтобы после замены контентом он не пропал
-    const hostContent = post.querySelector('#p83-content');
-    if (!hostContent) { console.warn('[FMV] #p83-content не найден (кнопку всё равно добавим в начало .post-box)'); }
-
-    if (document.getElementById('fmv-chrono-controls')) {
-      console.log('[FMV] Кнопка уже добавлена');
-      return;
-    }
-
-    const controls = document.createElement('div');
-    controls.id = 'fmv-chrono-controls';
-    controls.style.cssText = 'margin:8px 0; display:flex; align-items:center; gap:8px;';
-    controls.innerHTML = `
-      <button id="fmv-chrono-btn" class="button" type="button">Собрать хронологию</button>
-      <span id="fmv-chrono-note" style="font-size:90%;opacity:.8"></span>
-    `;
-
-    if (hostContent && hostContent.parentNode === postBox) {
-      postBox.insertBefore(controls, hostContent);
+  // ---------- Подключение ВНЕШНЕЙ кнопки + глобальная функция
+  function hookExternalTrigger() {
+    const btn  = document.querySelector('[data-fmv-chrono-trigger]');
+    const note = document.querySelector('[data-fmv-chrono-note]');
+    if (btn) {
+      btn.addEventListener('click', () => handleBuild(btn, note));
+      console.log('[FMV] Внешняя кнопка подключена');
     } else {
-      postBox.insertAdjacentElement('afterbegin', controls);
+      console.log('[FMV] Внешняя кнопка не найдена (жду глобальные вызовы)');
     }
 
-    const btn  = controls.querySelector('#fmv-chrono-btn');
-    const note = controls.querySelector('#fmv-chrono-note');
-
-    btn.addEventListener('click', () => handleBuild(btn, note));
-    console.log('[FMV] Кнопка добавлена');
+    // Глобальная функция — можно дергать из любого места
+    window.FMV_buildChronology = function (opts={}) {
+      const b = opts.buttonEl || btn || null;
+      const n = opts.noteEl   || note || null;
+      return handleBuild(b, n);
+    };
   }
 
-  // Готово — добавляем кнопку (но ничего не собираем, пока не нажмут)
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectButton, { once:true });
+    document.addEventListener('DOMContentLoaded', hookExternalTrigger, { once:true });
   } else {
-    injectButton();
+    hookExternalTrigger();
   }
 
   console.groupEnd();

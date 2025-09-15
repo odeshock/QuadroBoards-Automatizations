@@ -11,24 +11,24 @@
     return;
   }
 
-  console.group('[FMV] Автохронология (кнопка + сборка по клику)');
+  console.group('[FMV] Автохронология (кнопка в p82 → вывод в p83)');
 
   /* ================================= КОНФИГ ================================= */
   const BASE = 'https://testfmvoice.rusff.me';
 
-  // какие разделы собирать (как в целевой версии)
+  // какие разделы собирать (как в рефе)
   const SECTIONS = [
-    { id: 4, type: 'personal', status: 'on'  }, // активные
-    { id: 5, type: 'personal', status: 'off' }, // закрытые
+    { id: 4, type: 'personal', status: 'on'  },
+    { id: 5, type: 'personal', status: 'off' },
   ];
 
   const MAX_PAGES_PER_SECTION = 50;
   const MAX_PAGES_USERLIST    = 200;
 
-  // где ставим кнопку и куда выводим результат
-  const SRC_POST_ID  = 'p82';                     // кнопка в самом конце этого поста
+  // где кнопка и куда вывод
+  const SRC_POST_ID  = 'p82';                     // кнопку — в конец этого поста
   const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`;
-  const OUT_SEL      = '#p83-content';            // этот контейнер перезаписываем
+  const OUT_SEL      = '#p83-content';            // сюда перезаписываем, когда всё готово
 
   // id элементов
   const WRAP_ID = 'fmv-chrono-inline';
@@ -52,7 +52,6 @@
       archived: { word: 'archived', color: 'maroon' }
     };
     const st = map[status] || map.archived;
-    // тип не красим, возвращаем текстовый бейдж
     return `[${type} / ${st.word}]`;
   }
 
@@ -89,46 +88,39 @@
     if (!s) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
     s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
 
-    // 01.02.2003-05.02.2003
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const a=[yFix(m[3]),+m[2],+m[1]];
       const b=[yFix(m[6]),+m[5],+m[4]];
       return { start:a, end:b, kind:'full-range', bad:false };
     }
-    // 01-05.02.2003
     m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const y=yFix(m[4]), mo=+m[3];
       const a=[y,mo,+m[1]], b=[y,mo,+m[2]];
       return { start:a, end:b, kind:'day-range', bad:false };
     }
-    // 01.02.2003
     m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const a=[yFix(m[3]),+m[2],+m[1]];
       return { start:a, end:a.slice(), kind:'single', bad:false };
     }
-    // март 2003
     m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
     if (m && RU_MONTHS[m[1]]) {
       const y=+m[2], mo=RU_MONTHS[m[1]];
       const a=[y,mo,0];
       return { start:a, end:a.slice(), kind:'month', bad:false };
     }
-    // 2003
     m = s.match(/^(\d{4})$/);
     if (m) {
       const y=+m[1], a=[y,1,0];
       return { start:a, end:a.slice(), kind:'year', bad:false };
     }
-    // подстраховка — вытащили хоть одну дату
     m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
     if (m) {
       const a=[yFix(m[3]),+m[2],+m[1]];
       return { start:a, end:a.slice(), kind:'fallback', bad:true };
     }
-
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
@@ -147,6 +139,7 @@
 
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
+    thead:0;
     const sCyr  = countCyr(html);
     const hasHtml = /<html[^>]*>/i.test(html) ? 1 : 0;
     const hasHead = /<head[^>]*>/i.test(html) ? 1 : 0;
@@ -199,23 +192,25 @@
     doc.querySelector('.post.topicpost') || doc;
 
   function extractFromFirst(firstNode) {
-    // ориентируемся на те же "виртуальные теги"
+    // «виртуальные теги» в первом посте:
     const locNode   = firstNode.querySelector('location');
     const castNode  = firstNode.querySelector('characters');
     const orderNode = firstNode.querySelector('order');
+
     const location  = (locNode ? locNode.innerText.trim() : '').toLowerCase();
 
-    const rawChars = castNode ? castNode.innerText : '';
-    const characters = rawChars
-      ? rawChars.split(CHAR_SPLIT).map(s=>s.trim().toLowerCase()).filter(Boolean)
+    const rawChars  = castNode ? castNode.innerText : '';
+    const charsOrig = rawChars
+      ? rawChars.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean)
       : [];
+    const charsNorm = charsOrig.map(s => s.toLowerCase());
 
     let order = null;
     if (orderNode) {
       const num = parseInt(orderNode.textContent.trim(), 10);
       if (Number.isFinite(num)) order = num;
     }
-    return { location, characters, order };
+    return { location, charactersOrig: charsOrig, charactersNorm: charsNorm, order };
   }
 
   /* ================================ СКРАПЕРЫ ================================= */
@@ -225,15 +220,12 @@
       const html = await fetchText(topicUrl);
       const doc  = parseHTML(html);
       const first= firstPostNode(doc);
-      const { location, characters, order } = extractFromFirst(first);
+      const { location, charactersOrig, charactersNorm, order } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
       const range  = parseDateRange(dateRaw);
       const dateBad = !hasBracket || range.bad;
 
-      console.log('[FMV][date]', dateRaw || '(нет)', '→', range.start, '-', range.end,
-                  '('+range.kind+')', 'bad=', dateBad, '| order=', order==null?'-':order);
-
-      return { type, status, dateRaw, episode, url: topicUrl, location, characters, order, range, dateBad };
+      return { type, status, dateRaw, episode, url: topicUrl, location, charactersOrig, charactersNorm, order, range, dateBad };
     } catch (e) {
       console.warn('[FMV] тема ✗', topicUrl, e);
       return null;
@@ -266,8 +258,6 @@
         if (!topics.has(id)) topics.set(id, { url: href, title });
       });
 
-      console.log('[FMV] тем найдено:', topics.size);
-
       for (const { url, title } of topics.values()) {
         const row = await scrapeTopic(url, title, section.type, section.status);
         if (row) out.push(row);
@@ -281,19 +271,18 @@
         if (candidate) nextHref = candidate.getAttribute('href');
       }
       page = nextHref ? abs(page, nextHref) : null;
-      console.log('[FMV] следующая страница:', page || '(нет)');
     }
 
     console.groupEnd();
     return out;
   }
 
-  // список юзеров (для проверки участников)
+  // список юзеров (для проверки участников и линков на профиль)
   async function scrapeAllUsers() {
     console.group('[FMV] Сбор пользователей');
     let page = `${BASE}/userlist.php`;
     const seen  = new Set();
-    const names = new Set();
+    const nameToProfile = new Map(); // normName -> absolute href
     let cnt = 0;
 
     while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
@@ -304,9 +293,15 @@
       const html = await fetchText(page);
       const doc  = parseHTML(html);
 
-      doc.querySelectorAll('.usersname a').forEach(a=>{
-        const name = (a.textContent || a.innerText || '').trim().toLowerCase();
-        if (name) names.add(name);
+      // наиболее типовая разметка списков пользователей:
+      const anchors = doc.querySelectorAll('.usersname a, a[href*="profile.php?id="]');
+      anchors.forEach(a=>{
+        const nameText = (a.textContent || a.innerText || '').trim();
+        if (!nameText) return;
+        const norm = nameText.toLowerCase();
+        if (!nameToProfile.has(norm)) {
+          nameToProfile.set(norm, abs(page, a.getAttribute('href')));
+        }
       });
 
       const nextRel = doc.querySelector('a[rel="next"]');
@@ -319,9 +314,9 @@
       page = nextHref ? abs(page, nextHref) : null;
     }
 
-    console.log('[FMV][users] всего пользователей:', names.size);
+    console.log('[FMV][users] всего пользователей:', nameToProfile.size);
     console.groupEnd();
-    return names;
+    return nameToProfile;
   }
 
   /* ================================ СОРТИРОВКА ================================ */
@@ -330,20 +325,17 @@
   function compareEvents(a, b) {
     const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
     if (sa !== sb) return sa - sb;
-
     const ea = dateKey(a.range.end), eb = dateKey(b.range.end);
     if (ea !== eb) return ea - eb;
-
     const ao = (a.order == null) ? Number.POSITIVE_INFINITY : a.order;
     const bo = (b.order == null) ? Number.POSITIVE_INFINITY : b.order;
     if (ao !== bo) return ao - bo;
-
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
   /* ========================= СБОРКА HTML (как в рефе) ========================= */
   async function buildWrappedHTML() {
-    const userSet = await scrapeAllUsers();
+    const nameToProfile = await scrapeAllUsers();
 
     let all = [];
     for (const sec of SECTIONS) {
@@ -351,14 +343,17 @@
       all = all.concat(part);
     }
     all = all.filter(Boolean);
-    console.log('[FMV] всего записей:', all.length);
     all.sort(compareEvents);
 
-    function renderNames(arr) {
-      if (!arr || !arr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
-      return arr.map(n => {
-        const safe = esc(n);
-        return userSet.has(n) ? safe : `<span style="${MISS_STYLE}" title="пользователь не найден">${safe}</span>`;
+    function renderNames(origArr, normArr) {
+      if (!origArr || !origArr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
+      return origArr.map((orig, i) => {
+        const norm = (normArr && normArr[i]) ? normArr[i] : String(orig).toLowerCase();
+        const href = nameToProfile.get(norm);
+        if (href) {
+          return `<a href="${esc(href)}">${esc(orig)}</a>`;
+        }
+        return `<span style="${MISS_STYLE}" title="пользователь не найден">${esc(orig)}</span>`;
       }).join(', ');
     }
 
@@ -372,12 +367,12 @@
       const ttl        = esc(e.episode);
       const orderBadge = (e.order!=null) ? ` <span>[${esc(String(e.order))}]</span>` : '';
 
-      const names = renderNames(e.characters);
+      const names = renderNames(e.charactersOrig, e.charactersNorm);
       const loc   = e.location ? esc(e.location) : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
-      // формат из рефа:
+      // формат:
       // 1-я строка: [type/status] дата — <a>эпизод</a> [order]
-      // 2-я строка: участники / локация
+      // 2-я строка: участники (с линками) / локация
       return `
         <p style="margin:0 0 .4em 0">
           <span>${statusHTML}</span> ${dateHTML} — <a href="${url}">${ttl}</a>${orderBadge}<br/>
@@ -386,13 +381,12 @@
       `;
     });
 
-    const inner = items.join('') || `<p>— пусто —</p>`;
+    const innerBody = items.join('') || `<p>— пусто —</p>`;
+    const header    = `<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>`;
+    const full      = `${header}${innerBody}`;
 
-    // «шапка» как у вас: центр, жирным
-    return `
-      <p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>
-      ${inner}
-    `;
+    // Оборачиваем в спойлер перед вставкой:
+    return `<div class="quote-box spoiler-box media-box"><div onclick="toggleSpoiler(this);" class="">Собранная хронология</div><blockquote class="">${full}</blockquote></div>`;
   }
 
   /* =================== ЗАПУСК ПО КНОПКЕ + ПЕРЕЗАПИСЬ #p83 =================== */
@@ -405,15 +399,13 @@
       const host = document.querySelector(OUT_SEL);
       if (!host) { console.warn('[FMV] контейнер вывода не найден:', OUT_SEL); return; }
 
+      // статус — ТОЛЬКО в p82 (кнопка/заметка). Никаких плейсхолдеров в p83.
       if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
-      if (note){ note.textContent = 'Готовлю данные…'; note.style.opacity = '.85'; }
-
-      // временный плейсхолдер
-      host.innerHTML = `<p>Готовлю хронологию…</p>`;
+      if (note){ note.textContent = 'Готовлю хронологию…'; note.style.opacity = '.85'; }
 
       const html = await buildWrappedHTML();
 
-      // финальная подмена
+      // финальная подмена в p83
       host.innerHTML = html;
 
       if (note) note.textContent = 'Готово';
@@ -478,7 +470,7 @@
       setTimeout(()=>mo.disconnect(), 10000);
     }
 
-    // экспортируем публичный ручной запуск (совместимость с логами)
+    // экспортируем (совместимость с логами/ручным запуском)
     window.FMV_buildChronology = () => handleBuild({});
     console.log('[FMV] Доступно window.FMV_buildChronology()');
   }

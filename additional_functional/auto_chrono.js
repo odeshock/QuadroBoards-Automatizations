@@ -1,22 +1,22 @@
 (function () {
   'use strict';
 
-  /* ======================== ВКЛЮЧАЕМСЯ ТОЛЬКО ТАМ, ГДЕ НУЖНО ======================== */
+  /* ======================== АКТИВИРУЕМСЯ ТОЛЬКО В НУЖНОЙ ТЕМЕ ======================== */
   try {
     const u = new URL(location.href);
     if (!(u.hostname === 'testfmvoice.rusff.me' && u.pathname === '/viewtopic.php' && u.searchParams.get('id') === '13')) {
-      return; // не наша тема
+      return;
     }
   } catch {
     return;
   }
 
-  console.group('[FMV] Автохронология (кнопка в p82 → вывод в p83)');
+  console.group('[FMV] Автохронология (кнопка → p82, вывод → p83)');
 
   /* ================================= КОНФИГ ================================= */
   const BASE = 'https://testfmvoice.rusff.me';
 
-  // какие разделы собирать (как в рефе)
+  // какие разделы собирать (как в эталонной версии)
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  },
     { id: 5, type: 'personal', status: 'off' },
@@ -28,7 +28,7 @@
   // где кнопка и куда вывод
   const SRC_POST_ID  = 'p82';                     // кнопку — в конец этого поста
   const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`;
-  const OUT_SEL      = '#p83-content';            // сюда перезаписываем, когда всё готово
+  const OUT_SEL      = '#p83-content';            // сюда перезаписываем после сборки
 
   // id элементов
   const WRAP_ID = 'fmv-chrono-inline';
@@ -139,7 +139,6 @@
 
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
-    thead:0;
     const sCyr  = countCyr(html);
     const hasHtml = /<html[^>]*>/i.test(html) ? 1 : 0;
     const hasHead = /<head[^>]*>/i.test(html) ? 1 : 0;
@@ -200,17 +199,17 @@
     const location  = (locNode ? locNode.innerText.trim() : '').toLowerCase();
 
     const rawChars  = castNode ? castNode.innerText : '';
-    const charsOrig = rawChars
+    const charsSrc  = rawChars
       ? rawChars.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean)
       : [];
-    const charsNorm = charsOrig.map(s => s.toLowerCase());
+    const charsLower = charsSrc.map(s => s.toLowerCase());
 
     let order = null;
     if (orderNode) {
       const num = parseInt(orderNode.textContent.trim(), 10);
       if (Number.isFinite(num)) order = num;
     }
-    return { location, charactersOrig: charsOrig, charactersNorm: charsNorm, order };
+    return { location, charactersLower: charsLower, order };
   }
 
   /* ================================ СКРАПЕРЫ ================================= */
@@ -220,12 +219,12 @@
       const html = await fetchText(topicUrl);
       const doc  = parseHTML(html);
       const first= firstPostNode(doc);
-      const { location, charactersOrig, charactersNorm, order } = extractFromFirst(first);
+      const { location, charactersLower, order } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
       const range  = parseDateRange(dateRaw);
       const dateBad = !hasBracket || range.bad;
 
-      return { type, status, dateRaw, episode, url: topicUrl, location, charactersOrig, charactersNorm, order, range, dateBad };
+      return { type, status, dateRaw, episode, url: topicUrl, location, charactersLower, order, range, dateBad };
     } catch (e) {
       console.warn('[FMV] тема ✗', topicUrl, e);
       return null;
@@ -277,12 +276,12 @@
     return out;
   }
 
-  // список юзеров (для проверки участников и линков на профиль)
+  // список юзеров (для проверки участников и ссылок на профиль)
   async function scrapeAllUsers() {
     console.group('[FMV] Сбор пользователей');
     let page = `${BASE}/userlist.php`;
     const seen  = new Set();
-    const nameToProfile = new Map(); // normName -> absolute href
+    const nameToProfile = new Map(); // lowerName -> absolute href
     let cnt = 0;
 
     while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
@@ -293,7 +292,6 @@
       const html = await fetchText(page);
       const doc  = parseHTML(html);
 
-      // наиболее типовая разметка списков пользователей:
       const anchors = doc.querySelectorAll('.usersname a, a[href*="profile.php?id="]');
       anchors.forEach(a=>{
         const nameText = (a.textContent || a.innerText || '').trim();
@@ -333,7 +331,7 @@
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
-  /* ========================= СБОРКА HTML (как в рефе) ========================= */
+  /* ========================= СБОРКА HTML (формат вывода) ========================= */
   async function buildWrappedHTML() {
     const nameToProfile = await scrapeAllUsers();
 
@@ -345,15 +343,15 @@
     all = all.filter(Boolean);
     all.sort(compareEvents);
 
-    function renderNames(origArr, normArr) {
-      if (!origArr || !origArr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
-      return origArr.map((orig, i) => {
-        const norm = (normArr && normArr[i]) ? normArr[i] : String(orig).toLowerCase();
-        const href = nameToProfile.get(norm);
+    function renderNames(lowerArr) {
+      if (!lowerArr || !lowerArr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
+      return lowerArr.map((low) => {
+        const href = nameToProfile.get(low);            // сравнение в lowercase
+        const shown = esc(low);                         // вывод в lowercase
         if (href) {
-          return `<a href="${esc(href)}">${esc(orig)}</a>`;
+          return `<a href="${esc(href)}">${shown}</a>`;
         }
-        return `<span style="${MISS_STYLE}" title="пользователь не найден">${esc(orig)}</span>`;
+        return `<span style="${MISS_STYLE}" title="пользователь не найден">${shown}</span>`;
       }).join(', ');
     }
 
@@ -367,12 +365,14 @@
       const ttl        = esc(e.episode);
       const orderBadge = (e.order!=null) ? ` <span>[${esc(String(e.order))}]</span>` : '';
 
-      const names = renderNames(e.charactersOrig, e.charactersNorm);
-      const loc   = e.location ? esc(e.location) : `<span style="${MISS_STYLE}">локация не указана</span>`;
+      const names = renderNames(e.charactersLower);
+      const loc   = e.location
+        ? esc(e.location)                                 // уже lowercase
+        : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
-      // формат:
+      // формат записи:
       // 1-я строка: [type/status] дата — <a>эпизод</a> [order]
-      // 2-я строка: участники (с линками) / локация
+      // 2-я строка: участники (с линками) / локация (все lowercase)
       return `
         <p style="margin:0 0 .4em 0">
           <span>${statusHTML}</span> ${dateHTML} — <a href="${url}">${ttl}</a>${orderBadge}<br/>
@@ -399,7 +399,7 @@
       const host = document.querySelector(OUT_SEL);
       if (!host) { console.warn('[FMV] контейнер вывода не найден:', OUT_SEL); return; }
 
-      // статус — ТОЛЬКО в p82 (кнопка/заметка). Никаких плейсхолдеров в p83.
+      // статус — ТОЛЬКО в p82 (кнопка/заметка). Ничего не дублируем в p83 до результата.
       if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
       if (note){ note.textContent = 'Готовлю хронологию…'; note.style.opacity = '.85'; }
 

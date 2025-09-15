@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  // === Включаемся только на нужной странице
+  // === Включаемся только на нужной странице (viewtopic.php?id=13)
   try {
     const u = new URL(location.href);
     if (!(u.hostname === 'testfmvoice.rusff.me' &&
@@ -11,7 +11,7 @@
     }
   } catch { return; }
 
-  console.group('[FMV] Автохронология + проверка участников');
+  console.group('[FMV] Автохронология (кнопка запуска)');
 
   // ===== Конфиг
   const BASE = 'https://testfmvoice.rusff.me';
@@ -314,7 +314,7 @@
 
     const items = all.map(e => {
       const statusHTML = renderStatus(e.type, e.status);
-      const dateHTML = (e.dateBad || !e.dateRaw)
+      const dateHTML = (!e.dateRaw || e.dateBad)
         ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
         : esc(e.dateRaw);
 
@@ -340,42 +340,76 @@
            `</div>`;
   }
 
-  // ===== ожидание и инъекция в #p83-content
-  function waitForP83() {
-    return new Promise(resolve => {
-      const now = document.querySelector('#p83-content');
-      if (now) return resolve(now);
-      const obs = new MutationObserver(() => {
-        const el = document.querySelector('#p83-content');
-        if (el) { obs.disconnect(); resolve(el); }
-      });
-      obs.observe(document.documentElement, { childList:true, subtree:true });
-    });
-  }
-
-  async function run() {
-    console.group('[FMV] Инъекция в #p83-content');
-    const host = await waitForP83();
-    console.log('[FMV] #p83-content найден:', !!host);
-
-    host.innerHTML = '<div class="fmv-chrono-box" style="white-space:normal;font:inherit">Готовлю хронологию…</div>';
-    const box = host.querySelector('.fmv-chrono-box');
-
+  // ===== запуск «по кнопке» и подмена содержимого #p83-content
+  async function handleBuild(btn, note) {
+    console.group('[FMV] Запуск по кнопке');
     try {
+      const host = document.querySelector('#p83-content');
+      if (!host) { console.warn('[FMV] #p83-content не найден'); return; }
+
+      btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = 'Собираю…';
+      note.textContent = 'Подготовка данных…';
+
+      host.innerHTML = '<div class="fmv-chrono-box" style="white-space:normal;font:inherit">Готовлю хронологию…</div>';
+
       const wrapped = await buildWrappedHTML();
       host.innerHTML = wrapped;
+
+      note.textContent = 'Готово';
+      btn.textContent = 'Пересобрать хронологию';
+      btn.disabled = false;
       console.log('[FMV] Готово.');
     } catch (e) {
       console.error('[FMV] Ошибка:', e);
-      box.textContent = 'Ошибка при сборке хронологии.';
+      note.textContent = 'Ошибка при сборке';
     }
-    console.groupEnd(); // инъекция
-    console.groupEnd(); // глобальная
+    console.groupEnd();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run, { once:true });
-  } else {
-    run();
+  // ===== вставка кнопки управления
+  function injectButton() {
+    const post = document.getElementById('p83');
+    if (!post) { console.warn('[FMV] Пост #p83 не найден'); return; }
+    const postBox = post.querySelector('.post-box') || post;
+
+    // Контейнер кнопки ставим ПЕРЕД #p83-content — чтобы после замены контентом он не пропал
+    const hostContent = post.querySelector('#p83-content');
+    if (!hostContent) { console.warn('[FMV] #p83-content не найден (кнопку всё равно добавим в начало .post-box)'); }
+
+    if (document.getElementById('fmv-chrono-controls')) {
+      console.log('[FMV] Кнопка уже добавлена');
+      return;
+    }
+
+    const controls = document.createElement('div');
+    controls.id = 'fmv-chrono-controls';
+    controls.style.cssText = 'margin:8px 0; display:flex; align-items:center; gap:8px;';
+    controls.innerHTML = `
+      <button id="fmv-chrono-btn" class="button" type="button">Собрать хронологию</button>
+      <span id="fmv-chrono-note" style="font-size:90%;opacity:.8"></span>
+    `;
+
+    if (hostContent && hostContent.parentNode === postBox) {
+      postBox.insertBefore(controls, hostContent);
+    } else {
+      postBox.insertAdjacentElement('afterbegin', controls);
+    }
+
+    const btn  = controls.querySelector('#fmv-chrono-btn');
+    const note = controls.querySelector('#fmv-chrono-note');
+
+    btn.addEventListener('click', () => handleBuild(btn, note));
+    console.log('[FMV] Кнопка добавлена');
   }
+
+  // Готово — добавляем кнопку (но ничего не собираем, пока не нажмут)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectButton, { once:true });
+  } else {
+    injectButton();
+  }
+
+  console.groupEnd();
 })();

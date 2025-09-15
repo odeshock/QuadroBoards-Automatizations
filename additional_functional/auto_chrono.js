@@ -1,197 +1,241 @@
-/* ============================================================================
- *  FMV — Автохронология
- *  Версия: 2.0 (переписано под конкретный форум)
- *  Что делает:
- *    • дорисовывает кнопку "Собрать хронологию" в конце #p82 .post-box
- *    • по клику собирает данные всех .post на странице
- *    • заменяет содержимое #p83-content оформленным списком
- *    • экспортирует window.FMV_buildChronology для ручного запуска из консоли
- *  Зависимости: нет (vanilla JS)
- *  Автор: вы + ваш будущий поклонник :) 
- * ============================================================================ */
-
+/* ============================================================
+ * FMV — Автохронология
+ * Вариант: inline-кнопка в #p82 .post-box → пишет в #p83-content
+ * ============================================================ */
 (function () {
   'use strict';
 
-  // ===== Конфиг =================================================================
-  var CFG = {
-    sourcePostId: 'p82',            // где рисуем кнопку
-    targetPostId: 'p83',            // в какой пост пишем результат
-    buttonText: 'Собрать хронологию',
-    titleHTML: '<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>',
-    // Разметка строки. Можно править как угодно.
-    rowTemplate: function (row) {
-      // row: { num, time, href, author }
-      return (
-        '<li>' +
-          '<span class="fmv-time">' + esc(row.time) + '</span>' +
-          ' — ' +
-          '<span class="fmv-author">' + esc(row.author) + '</span>' +
-          ' — ' +
-          '<a href="' + escAttr(row.href) + '">к посту #' + esc(row.num) + '</a>' +
-        '</li>'
+  /* ---------- настройки ---------- */
+  const POST_WITH_BUTTON_ID = 'p82';     // откуда «смотрим» и куда ставим кнопку
+  const OUTPUT_POST_ID      = 'p83';     // где перезаписываем контент хроной
+  const BUTTON_ID           = 'fmv-chrono-btn';
+  const NOTE_ID             = 'fmv-chrono-note';
+
+  // «красный» акцент для пропусков / несостыковок
+  const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px;';
+
+  // статус окрашиваем, personal — без акцента
+  function renderStatus(type, status) {
+    const map = {
+      on:       { word: 'active',  color: 'green'  },
+      off:      { word: 'closed',  color: 'teal'   },
+      archived: { word: 'archived',color: 'maroon' }
+    };
+    const st = map[status] || map.archived;
+    const color = (type === 'personal') ? 'inherit' : st.color;
+    return `[${type}] / <span style="color:${color}">${st.word}</span>`;
+  }
+
+  // заголовок темы: "[дата] название"
+  function renderHeader() {
+    const title = document.querySelector('#pun-main h1 span')?.textContent.trim()
+                  || document.title.replace(/\s*\-.*$/, '').trim();
+    const dateStr = document.querySelector(`#${CSS.escape(POST_WITH_BUTTON_ID)} h3 a.permalink`)?.textContent.trim()
+                    || '';
+    return `<p><strong>[${escapeHtml(dateStr)}] ${escapeHtml(title)}</strong></p>`;
+  }
+
+  // ===== helpers =======================================================
+  function $(sel, root=document){ return root.querySelector(sel); }
+  function $all(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
+  function escapeHtml(s=''){ return s.replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  function uniq(arr){ return Array.from(new Map(arr.map(x=>[x.toLowerCase(), x])).values()); }
+  const norm = s => s.trim().replace(/\s+/g,' ').toLowerCase();
+
+  // Список авторов, реально писавших в теме
+  function collectActualAuthors() {
+    const names = $all('.post .post-author .pa-author a').map(a => a.textContent.trim()).filter(Boolean);
+    return uniq(names);
+  }
+
+  // Попытка вытащить «заявленных участников»
+  // 1) data-fmv-members="Имя1, Имя2"
+  // 2) внутри #p82-content строка "участники:" или "участники —", затем перечисление
+  // 3) ссылки в первом посте (fallback)
+  function collectDeclaredAuthors() {
+    const box = $(`#${CSS.escape(POST_WITH_BUTTON_ID)}-content`) || $(`#${CSS.escape(POST_WITH_BUTTON_ID)} .post-content`);
+    if (!box) return [];
+
+    const dataAttr = box.querySelector('[data-fmv-members]');
+    if (dataAttr) {
+      return uniq(
+        dataAttr.getAttribute('data-fmv-members')
+          .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
       );
-    },
-    // Вставить ли служебные стили компонента
-    injectCSS: true,
-  };
-
-  // ===== Вспомогалки ============================================================
-  var LOG = '[FMV chrono]';
-
-  function $(sel, root) { return (root || document).querySelector(sel); }
-  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
-
-  function ready(fn) {
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      setTimeout(fn, 0);
-    } else {
-      document.addEventListener('DOMContentLoaded', fn, { once: true });
     }
+
+    const text = box.textContent || '';
+    const m = text.match(/участники[^:—-]*[:—-]\s*([^\n]+)/i);
+    if (m) {
+      return uniq(
+        m[1].split(/[,;]+/).map(s => s.replace(/\(.*?\)|\[.*?\]/g,'').trim()).filter(Boolean)
+      );
+    }
+
+    const links = $all('a', box).map(a => a.textContent.trim()).filter(Boolean);
+    return uniq(links);
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
-  function escAttr(s) {
-    // для href/src и т.п.
-    return esc(String(s).replace(/"/g, '&quot;'));
-  }
-
-  function ensureStyles() {
-    if (!CFG.injectCSS || $('#fmv-chrono-css')) return;
-    var css = document.createElement('style');
-    css.id = 'fmv-chrono-css';
-    css.textContent =
-      '.fmv-chrono-controls{margin-top:8px;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}' +
-      '.fmv-chrono-note{font-size:90%;opacity:.8}' +
-      '.fmv-chrono-list{margin:.5rem 0 0 1.25rem;padding:0}' +
-      '.fmv-chrono-list li{margin:.25rem 0;line-height:1.35}' +
-      '.fmv-chrono-list a{word-break:break-word;text-decoration:underline}' +
-      '.fmv-time{font-variant-numeric:tabular-nums}' +
-      '.fmv-author{font-weight:600}';
-    document.head.appendChild(css);
+  // Локации:
+  // 1) data-fmv-locations="Гора; Пляж"
+  // 2) «локации: ...» в первом посте
+  function collectLocations() {
+    const box = $(`#${CSS.escape(POST_WITH_BUTTON_ID)}-content`) || $(`#${CSS.escape(POST_WITH_BUTTON_ID)} .post-content`);
+    if (!box) return [];
+    const dataAttr = box.querySelector('[data-fmv-locations]');
+    if (dataAttr) {
+      return uniq(
+        dataAttr.getAttribute('data-fmv-locations')
+          .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
+      );
+    }
+    const txt = box.textContent || '';
+    const m = txt.match(/локац(ия|ии)[^:—-]*[:—-]\s*([^\n]+)/i);
+    if (m) {
+      return uniq(
+        m[2].split(/[,;]+/).map(s => s.trim()).filter(Boolean)
+      );
+    }
+    return [];
   }
 
-  function log() { try { console.log.apply(console, arguments); } catch (_) {} }
+  // Тип и статус (очень «мягкие» эвристики)
+  function detectTypeAndStatus() {
+    const box = $(`#${CSS.escape(POST_WITH_BUTTON_ID)}-content`) || $(`#${CSS.escape(POST_WITH_BUTTON_ID)} .post-content`);
+    const raw = (box?.textContent || '').toLowerCase();
 
-  // ===== Сбор данных по постам ==================================================
-  function collectPosts() {
-    var topicRoot = $('#pun-viewtopic') || document;
-    var posts = $all('.post', topicRoot);
-    if (!posts.length) return [];
+    // type
+    let type = 'common';
+    if (/\bpersonal\b|\bперсонал|\bличн/.test(raw)) type = 'personal';
 
-    return posts.map(function (p) {
-      var numEl = $('h3 strong', p);
-      var link = $('a.permalink', p);
-      var authEl = $('.pa-author a', p);
+    // status
+    let status = 'on';
+    if (/\bзакрыт|\bclosed|\boff\b/.test(raw)) status = 'off';
+    if (/\bархив|\barchive|\barchived/.test(raw)) status = 'archived';
 
-      var num = numEl ? numEl.textContent.trim() : '';
-      var time = link ? link.textContent.trim() : '';
-      var href = link ? link.href : ('#' + (p.id || ''));
-      var author = authEl ? authEl.textContent.trim() : '';
-
-      return { num: num, time: time, href: href, author: author };
-    });
+    return { type, status };
   }
 
-  // ===== Построение HTML хронологии ============================================
-  function renderChronologyHTML(rows) {
-    var listHTML = rows.map(CFG.rowTemplate).join('');
-    return (
-      '<div class="fmv-chrono-wrap">' +
-        CFG.titleHTML +
-        '<ol class="fmv-chrono-list">' + listHTML + '</ol>' +
-      '</div>'
-    );
+  // Сбор «красивых» блоков
+  function renderParticipantsBlock() {
+    const declared = collectDeclaredAuthors();
+    const actual   = collectActualAuthors();
+
+    const declaredN = new Set(declared.map(norm));
+    const actualN   = new Set(actual.map(norm));
+
+    const notAnswered = declared.filter(d => !actualN.has(norm(d)));
+    const extras      = actual.filter(a => !declaredN.has(norm(a)));
+
+    const rows = [];
+
+    if (declared.length) {
+      rows.push(`<p><strong>Участники:</strong> ${escapeHtml(declared.join(', '))}</p>`);
+    } else {
+      rows.push(`<p><strong>Участники:</strong> <span style="${MISS_STYLE}">не указаны</span></p>`);
+    }
+
+    rows.push(`<p><strong>Отписались:</strong> ${actual.length ? escapeHtml(actual.join(', ')) : '<span style="'+MISS_STYLE+'">никто</span>'}</p>`);
+
+    if (notAnswered.length) {
+      rows.push(`<p><strong>Не отписались:</strong> <span style="${MISS_STYLE}">${escapeHtml(notAnswered.join(', '))}</span></p>`);
+    }
+
+    if (extras.length) {
+      rows.push(`<p><strong>Лишние участники:</strong> <span style="${MISS_STYLE}">${escapeHtml(extras.join(', '))}</span></p>`);
+    }
+
+    return rows.join('\n');
   }
 
-  // ===== Вставка результата в target ===========================================
-  function writeToTarget(html) {
-    // 1) пробуем #p83-content
-    var out = $('#' + CFG.targetPostId + '-content');
-    // 2) иначе .post-content внутри #p83
-    if (!out) out = $('#' + CFG.targetPostId + ' .post-content');
-    if (!out) throw new Error('Не нашёл контейнер для вывода (#' + CFG.targetPostId + '-content)');
-
-    out.innerHTML = html;
+  function renderLocationsBlock() {
+    const locs = collectLocations();
+    if (!locs.length) {
+      return `<p><strong>Локации:</strong> <span style="${MISS_STYLE}">не указаны</span></p>`;
+    }
+    return `<p><strong>Локации:</strong> ${escapeHtml(locs.join(', '))}</p>`;
   }
 
-  // ===== Публичный билдер =======================================================
-  function buildChronology() {
+  // Финальный HTML хронологии
+  function buildChronologyHTML() {
+    const { type, status } = detectTypeAndStatus();
+
+    const parts = [];
+    parts.push(`<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>`);
+    parts.push(renderHeader());
+    parts.push(`<p>${renderStatus(type, status)}</p>`);
+    parts.push(renderLocationsBlock());
+    parts.push(renderParticipantsBlock());
+
+    return parts.join('\n');
+  }
+
+  /* ---------- кнопка и действия ---------- */
+  function placeInlineButton() {
+    if (document.getElementById(BUTTON_ID)) return;
+
+    const targetPostBox = $(`#${CSS.escape(POST_WITH_BUTTON_ID)} .post-box`);
+    if (!targetPostBox) return false;
+
+    const wrap = document.createElement('div');
+    wrap.style.marginTop = '10px';
+
+    const btn = document.createElement('a');
+    btn.id = BUTTON_ID;
+    btn.href = 'javascript://';
+    btn.className = 'button';
+    btn.textContent = 'Собрать хронологию';
+    btn.style.display = 'inline-block';
+
+    const note = document.createElement('span');
+    note.id = NOTE_ID;
+    note.style.cssText = 'font-size:90%;opacity:.8;margin-left:.75em;';
+
+    wrap.appendChild(btn);
+    wrap.appendChild(note);
+    targetPostBox.appendChild(wrap);
+
+    btn.addEventListener('click', onBuildClick);
+    console.log('[FMV] Нажата инлайн-кнопка');
+    return true;
+  }
+
+  function onBuildClick() {
     try {
-      note('Собираю…');
-      var rows = collectPosts();
-      if (!rows.length) {
-        note('Посты не найдены');
+      const html = buildChronologyHTML();
+      const out = $(`#${CSS.escape(OUTPUT_POST_ID)}-content`) || $(`#${CSS.escape(OUTPUT_POST_ID)} .post-content`);
+      if (!out) {
+        alert('Не нашёл контейнер для вывода (#'+OUTPUT_POST_ID+'-content).');
         return;
       }
-      var html = renderChronologyHTML(rows);
-      writeToTarget(html);
-      ensureStyles();
-      note('Готово');
-      log(LOG, 'Обновлён #' + CFG.targetPostId + '-content');
+      out.innerHTML = html;
+      const note = document.getElementById(NOTE_ID);
+      if (note) note.textContent = ' — обновлено ' + new Date().toLocaleString();
     } catch (err) {
-      note('Ошибка: ' + err.message);
-      log(LOG, err);
+      console.warn('[FMV] Ошибка сборки:', err);
+      alert('Ошибка при сборке хронологии. Подробности в консоли.');
     }
   }
 
-  // ===== Кнопка в конце #p82 .post-box =========================================
-  function injectButton() {
-    var container = $('#' + CFG.sourcePostId + ' .post-box') || $('#' + CFG.sourcePostId);
-    if (!container) {
-      log(LOG, '#' + CFG.sourcePostId + ' не найден — кнопку не вставил');
-      return;
-    }
-    if ($('[data-fmv-chrono-trigger]', container)) {
-      // уже есть
-      return;
-    }
+  // даём внешний хук (на всякий случай)
+  window.FMV_buildChronology = function () {
+    onBuildClick();
+  };
 
-    var wrap = document.createElement('div');
-    wrap.className = 'fmv-chrono-controls';
-    wrap.innerHTML =
-      '<a href="javascript:void(0)" class="button" data-fmv-chrono-trigger>' + esc(CFG.buttonText) + '</a>' +
-      '<span class="fmv-chrono-note" data-fmv-chrono-note></span>';
-
-    container.appendChild(wrap);
-
-    var btn = $('[data-fmv-chrono-trigger]', wrap);
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      buildChronology();
-    });
-
-    log(LOG, 'Кнопка добавлена (конец #' + CFG.sourcePostId + ' .post-box)');
-  }
-
-  function note(text) {
-    var el = $('#' + CFG.sourcePostId + ' [data-fmv-chrono-note]');
-    if (el) el.textContent = text || '';
-  }
-
-  // ===== Инициализация ==========================================================
+  /* ---------- инициализация ---------- */
   function init() {
-    ensureStyles();
-    injectButton();
+    const ok = placeInlineButton();
+    if (!ok) {
+      // если вдруг не смогли — тихо ничего не делаем
+      console.warn('[FMV] Не удалось поставить инлайн-кнопку (не нашёл .post-box в #'+POST_WITH_BUTTON_ID+')');
+    } else {
+      console.log('[FMV] Кнопка хронологии добавлена в #'+POST_WITH_BUTTON_ID+' .post-box');
+    }
   }
 
-  // Экспорт для консоли
-  window.FMV_buildChronology = buildChronology;
-  window.FMV = window.FMV || {};
-  window.FMV.buildChronology = buildChronology;
-
-  // Старт
-  ready(init);
-  // подстраховка, если что-то дорисовывается после DOMContentLoaded
-  window.addEventListener('load', function () {
-    // если кнопки нет — попробуем ещё раз
-    if (!$('#' + CFG.sourcePostId + ' [data-fmv-chrono-trigger]')) {
-      injectButton();
-    }
-  });
-
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();

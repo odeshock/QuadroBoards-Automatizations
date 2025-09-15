@@ -2,7 +2,7 @@
 // == FMV timeline injector ===============================================
 // Работает только на странице: https://testfmvoice.rusff.me/viewtopic.php?id=13#p83
 (function () {
-  const MUST_URL = 'https://testfmvoice.rusff.me/viewtopic.php?id=13#p83';
+  const MUST_URL = 'https://testfmvoice.rusff.me/viewtopic.php?id=13';
   // жёсткая проверка адреса (включая хеш)
   if (location.href !== MUST_URL) return;
 

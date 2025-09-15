@@ -1,42 +1,50 @@
-/* ============================================================
- * FMV — Автохронология
- * Кнопка в конце #p82 → пишет результат в #p83-content
- * ============================================================ */
 (function () {
   'use strict';
 
-  /* ---------------------------- Конфиг ---------------------------- */
-  const ENABLE_ON_TOPIC_ID = 13;       // только для этой темы
-  const SOURCE_POST_ID     = 'p82';    // где читать вводные и ставить кнопку
-  const OUTPUT_POST_ID     = 'p83';    // куда писать хронологию
+  /* ======================== ВКЛЮЧАЕМСЯ ТОЛЬКО ТАМ, ГДЕ НУЖНО ======================== */
+  try {
+    const u = new URL(location.href);
+    if (!(u.hostname === 'testfmvoice.rusff.me' && u.pathname === '/viewtopic.php' && u.searchParams.get('id') === '13')) {
+      return; // не наша тема
+    }
+  } catch {
+    return;
+  }
 
+  console.group('[FMV] Автохронология (кнопка + сборка по клику)');
+
+  /* ================================= КОНФИГ ================================= */
+  const BASE = 'https://testfmvoice.rusff.me';
+
+  // какие разделы собирать (как в целевой версии)
+  const SECTIONS = [
+    { id: 4, type: 'personal', status: 'on'  }, // активные
+    { id: 5, type: 'personal', status: 'off' }, // закрытые
+  ];
+
+  const MAX_PAGES_PER_SECTION = 50;
+  const MAX_PAGES_USERLIST    = 200;
+
+  // где ставим кнопку и куда выводим результат
+  const SRC_POST_ID  = 'p82';                     // кнопка в самом конце этого поста
+  const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`;
+  const OUT_SEL      = '#p83-content';            // этот контейнер перезаписываем
+
+  // id элементов
   const WRAP_ID = 'fmv-chrono-inline';
   const BTN_ID  = 'fmv-chrono-inline-btn';
   const NOTE_ID = 'fmv-chrono-inline-note';
 
-  /* ---------------------------- Utils ----------------------------- */
-  const $    = (s, root=document) => root.querySelector(s);
-  const $all = (s, root=document) => Array.from(root.querySelectorAll(s));
-  const esc  = (s='') => s.replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
-  const uniq = arr => Array.from(new Map(arr.map(x => [x.toLowerCase(), x])).values());
-  const norm = s => s.trim().replace(/\s+/g,' ').toLowerCase();
+  /* ================================ УТИЛИТЫ ================================= */
+  const abs   = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
+  const trimSp= (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const esc   = (s='') => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-  const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px;';
+  const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px';
 
-  function onRightTopic() {
-    // id темы есть и в ссылке, и в data-атрибутах контейнера
-    const byQS = location.search.match(/[?&]id=(\d+)/);
-    const byAttr = $('#pun-viewtopic')?.getAttribute('data-topic-id');
-    const val = Number(byQS?.[1] || byAttr || 0);
-    return val === ENABLE_ON_TOPIC_ID;
-  }
-
-  /* --------------------- Разбор исходных данных ------------------- */
-  function sourceBox() {
-    return $(`#${CSS.escape(SOURCE_POST_ID)}-content`) ||
-           $(`#${CSS.escape(SOURCE_POST_ID)} .post-content`);
-  }
-
+  /* ---------------- статус (как в целевой версии) ---------------- */
   function renderStatus(type, status) {
     const map = {
       on:       { word: 'active',   color: 'green'  },
@@ -44,189 +52,435 @@
       archived: { word: 'archived', color: 'maroon' }
     };
     const st = map[status] || map.archived;
-    const color = (type === 'personal') ? 'inherit' : st.color; // personal — без акцента
-    return `${type} / <span style="color:${color}">${st.word}</span>`;
+    // тип не красим, возвращаем текстовый бейдж
+    return `[${type} / ${st.word}]`;
   }
 
-  // Заголовок: "[дата] название темы"
-  function renderHeader() {
-    const topicTitle = $('#pun-main h1 span')?.textContent.trim()
-                   || document.title.replace(/\s*\-.*$/, '').trim();
-    const dateStr = $(`#${CSS.escape(SOURCE_POST_ID)} h3 a.permalink`)?.textContent.trim() || '';
-    return `<p><strong>[${esc(dateStr)}] ${esc(topicTitle)}</strong></p>`;
+  /* ---------------- заголовок темы: "[дата] название" ---------------- */
+  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
+  function parseTitle(text) {
+    const m = String(text||'').match(TITLE_RE);
+    return m
+      ? { dateRaw: m[1].trim(), episode: m[2].trim(), hasBracket: true }
+      : { dateRaw: '', episode: trimSp(text), hasBracket: false };
   }
 
-  function detectTypeAndStatus() {
-    const raw = (sourceBox()?.textContent || '').toLowerCase();
-    let type = 'common';
-    if (/\bpersonal\b|персонал|личн/.test(raw)) type = 'personal';
+  /* ---------------- парсер дат (ru) ---------------- */
+  const RU_MONTHS = {
+    'янв':1,'январь':1,'января':1,
+    'фев':2,'февраль':2,'февраля':2,
+    'мар':3,'март':3,'марта':3,
+    'апр':4,'апрель':4,'апреля':4,
+    'май':5,'мая':5,
+    'июн':6,'июнь':6,'июня':6,
+    'июл':7,'июль':7,'июля':7,
+    'авг':8,'август':8,'августа':8,
+    'сен':9,'сент':9,'сентябрь':9,'сентября':9,
+    'окт':10,'октябрь':10,'октября':10,
+    'ноя':11,'ноябрь':11,'ноября':11,
+    'дек':12,'декабрь':12,'декабря':12
+  };
+  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
+  const TMAX = [9999,12,31];
+  const yFix = (y)=> String(y).length<=2 ? 1900 + parseInt(y,10) : parseInt(y,10);
 
-    let status = 'on';
-    if (/\bclosed\b|закрыт|off\b/.test(raw)) status = 'off';
-    if (/\barchiv|архив/.test(raw)) status = 'archived';
+  function parseDateRange(src) {
+    let s = String(src||'').trim();
+    if (!s) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
+    s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
 
-    return { type, status };
-  }
-
-  // «заявленные участники»
-  function collectDeclaredAuthors() {
-    const box = sourceBox();
-    if (!box) return [];
-    // приоритет: data-атрибут
-    const dataAttr = box.querySelector('[data-fmv-members]');
-    if (dataAttr) {
-      return uniq(
-        dataAttr.getAttribute('data-fmv-members')
-          .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
-      );
-    }
-    // эвристика по тексту
-    const txt = box.textContent || '';
-    const m = txt.match(/участники[^:—-]*[:—-]\s*([^\n]+)/i);
+    // 01.02.2003-05.02.2003
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
-      return uniq(
-        m[1].split(/[,;]+/)
-          .map(s => s.replace(/\(.*?\)|\[.*?\]/g,'').trim())
-          .filter(Boolean)
-      );
+      const a=[yFix(m[3]),+m[2],+m[1]];
+      const b=[yFix(m[6]),+m[5],+m[4]];
+      return { start:a, end:b, kind:'full-range', bad:false };
     }
-    // ссылки внутри блока
-    const links = $all('a', box).map(a => a.textContent.trim()).filter(Boolean);
-    return uniq(links);
-  }
-
-  // Фактически отписавшиеся
-  function collectActualAuthors() {
-    const names = $all('.post .post-author .pa-author a')
-      .map(a => a.textContent.trim())
-      .filter(Boolean);
-    return uniq(names);
-  }
-
-  // Локации
-  function collectLocations() {
-    const box = sourceBox();
-    if (!box) return [];
-    const dataAttr = box.querySelector('[data-fmv-locations]');
-    if (dataAttr) {
-      return uniq(
-        dataAttr.getAttribute('data-fmv-locations')
-          .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
-      );
-    }
-    const txt = box.textContent || '';
-    const m = txt.match(/локац(?:ия|ии)[^:—-]*[:—-]\s*([^\n]+)/i);
+    // 01-05.02.2003
+    m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
-      return uniq(m[1].split(/[,;]+/).map(s => s.trim()).filter(Boolean));
+      const y=yFix(m[4]), mo=+m[3];
+      const a=[y,mo,+m[1]], b=[y,mo,+m[2]];
+      return { start:a, end:b, kind:'day-range', bad:false };
     }
-    return [];
-  }
-
-  /* ------------------------- Рендер блоков ------------------------- */
-  function renderParticipantsBlock() {
-    const declared = collectDeclaredAuthors();
-    const actual   = collectActualAuthors();
-
-    const declaredN = new Set(declared.map(norm));
-    const actualN   = new Set(actual.map(norm));
-
-    const notAnswered = declared.filter(d => !actualN.has(norm(d)));
-    const extras      = actual.filter(a => !declaredN.has(norm(a)));
-
-    const rows = [];
-    rows.push(`<p><strong>Участники:</strong> ${declared.length
-      ? esc(declared.join(', '))
-      : `<span style="${MISS_STYLE}">не указаны</span>`}</p>`);
-
-    rows.push(`<p><strong>Отписались:</strong> ${actual.length
-      ? esc(actual.join(', '))
-      : `<span style="${MISS_STYLE}">никто</span>`}</p>`);
-
-    if (notAnswered.length) {
-      rows.push(`<p><strong>Не отписались:</strong> <span style="${MISS_STYLE}">${esc(notAnswered.join(', '))}</span></p>`);
+    // 01.02.2003
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (m) {
+      const a=[yFix(m[3]),+m[2],+m[1]];
+      return { start:a, end:a.slice(), kind:'single', bad:false };
     }
-    if (extras.length) {
-      rows.push(`<p><strong>Лишние участники:</strong> <span style="${MISS_STYLE}">${esc(extras.join(', '))}</span></p>`);
+    // март 2003
+    m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
+    if (m && RU_MONTHS[m[1]]) {
+      const y=+m[2], mo=RU_MONTHS[m[1]];
+      const a=[y,mo,0];
+      return { start:a, end:a.slice(), kind:'month', bad:false };
     }
-    return rows.join('\n');
+    // 2003
+    m = s.match(/^(\d{4})$/);
+    if (m) {
+      const y=+m[1], a=[y,1,0];
+      return { start:a, end:a.slice(), kind:'year', bad:false };
+    }
+    // подстраховка — вытащили хоть одну дату
+    m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
+    if (m) {
+      const a=[yFix(m[3]),+m[2],+m[1]];
+      return { start:a, end:a.slice(), kind:'fallback', bad:true };
+    }
+
+    return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  function renderLocationsBlock() {
-    const locs = collectLocations();
-    return `<p><strong>Локации:</strong> ${locs.length
-      ? esc(locs.join(', '))
-      : `<span style="${MISS_STYLE}">не указаны</span>`}</p>`;
+  /* ---------------- анти-кракозябры: выбираем лучшую декодировку ---------------- */
+  function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
+  function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
+
+  function sniffMetaCharset(buf) {
+    const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
+    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
+    if (m1) return m1[1].toLowerCase();
+    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
+    if (m2) return m2[1].toLowerCase();
+    return '';
   }
 
-  function buildChronologyHTML() {
-    const { type, status } = detectTypeAndStatus();
-    return [
-      `<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>`,
-      renderHeader(),
-      `<p>${renderStatus(type, status)}</p>`,
-      renderLocationsBlock(),
-      renderParticipantsBlock()
-    ].join('\n');
+  function scoreDecoded(html, hint) {
+    const sFFFD = countFFFD(html);
+    const sCyr  = countCyr(html);
+    const hasHtml = /<html[^>]*>/i.test(html) ? 1 : 0;
+    const hasHead = /<head[^>]*>/i.test(html) ? 1 : 0;
+    const hintBonus = hint ? 2 : 0;
+    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
   }
 
-  /* ------------------ Кнопка в конце поста #p82 ------------------ */
+  async function fetchText(url, timeoutMs = 20000) {
+    console.log('[FMV] fetch →', url);
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { credentials: 'include', signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+
+      // charset hints
+      let headerCharset = '';
+      const ct = res.headers.get('content-type') || '';
+      const mCT = ct.match(/charset=([^;]+)/i);
+      if (mCT) headerCharset = mCT[1].trim().toLowerCase();
+      const metaCharset = sniffMetaCharset(buf);
+
+      const hints = { 'utf-8': false, 'windows-1251': false };
+      if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
+      if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
+
+      const tryOrder = [];
+      if (headerCharset) tryOrder.push(headerCharset);
+      if (metaCharset && !tryOrder.includes(metaCharset)) tryOrder.push(metaCharset);
+      ['utf-8','windows-1251'].forEach(enc => { if (!tryOrder.includes(enc)) tryOrder.push(enc); });
+
+      let best = { score: -1e9, enc: '', html: '' };
+      for (const enc of tryOrder) {
+        let html = '';
+        try { html = new TextDecoder(enc, { fatal: false }).decode(buf); } catch { continue; }
+        const score = scoreDecoded(html, hints[enc]);
+        if (score > best.score) best = { score, enc, html };
+      }
+      console.log(`[FMV] decode → ${best.enc}, �=${countFFFD(best.html)}, cyr=${countCyr(best.html)}`);
+      return best.html;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
+  const firstPostNode = (doc) =>
+    doc.querySelector('.post.topicpost .post-content') ||
+    doc.querySelector('.post.topicpost') || doc;
+
+  function extractFromFirst(firstNode) {
+    // ориентируемся на те же "виртуальные теги"
+    const locNode   = firstNode.querySelector('location');
+    const castNode  = firstNode.querySelector('characters');
+    const orderNode = firstNode.querySelector('order');
+    const location  = (locNode ? locNode.innerText.trim() : '').toLowerCase();
+
+    const rawChars = castNode ? castNode.innerText : '';
+    const characters = rawChars
+      ? rawChars.split(CHAR_SPLIT).map(s=>s.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    let order = null;
+    if (orderNode) {
+      const num = parseInt(orderNode.textContent.trim(), 10);
+      if (Number.isFinite(num)) order = num;
+    }
+    return { location, characters, order };
+  }
+
+  /* ================================ СКРАПЕРЫ ================================= */
+
+  async function scrapeTopic(topicUrl, rawTitle, type, status) {
+    try {
+      const html = await fetchText(topicUrl);
+      const doc  = parseHTML(html);
+      const first= firstPostNode(doc);
+      const { location, characters, order } = extractFromFirst(first);
+      const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
+      const range  = parseDateRange(dateRaw);
+      const dateBad = !hasBracket || range.bad;
+
+      console.log('[FMV][date]', dateRaw || '(нет)', '→', range.start, '-', range.end,
+                  '('+range.kind+')', 'bad=', dateBad, '| order=', order==null?'-':order);
+
+      return { type, status, dateRaw, episode, url: topicUrl, location, characters, order, range, dateBad };
+    } catch (e) {
+      console.warn('[FMV] тема ✗', topicUrl, e);
+      return null;
+    }
+  }
+
+  async function scrapeSection(section) {
+    console.group(`[FMV] Раздел ${section.id} ${section.type}/${section.status}`);
+    let page = `${BASE}/viewforum.php?id=${section.id}`;
+    const seen = new Set();
+    const out  = [];
+    let pageCount = 0;
+
+    while (page && !seen.has(page) && pageCount < MAX_PAGES_PER_SECTION) {
+      pageCount++;
+      console.log('[FMV] страница:', page);
+      seen.add(page);
+
+      const html = await fetchText(page);
+      const doc  = parseHTML(html);
+
+      const topics = new Map();
+      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
+        const href = abs(page, a.getAttribute('href'));
+        const m = href.match(/viewtopic\.php\?id=(\d+)/i);
+        if (!m) return;
+        const id = m[1];
+        const title = a.textContent || a.innerText || '';
+        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
+        if (!topics.has(id)) topics.set(id, { url: href, title });
+      });
+
+      console.log('[FMV] тем найдено:', topics.size);
+
+      for (const { url, title } of topics.values()) {
+        const row = await scrapeTopic(url, title, section.type, section.status);
+        if (row) out.push(row);
+      }
+
+      const nextRel = doc.querySelector('a[rel="next"]');
+      let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
+      if (!nextHref) {
+        const candidate = Array.from(doc.querySelectorAll('a'))
+          .find(a => /\b(След|Next|»|›)\b/i.test(a.textContent || ''));
+        if (candidate) nextHref = candidate.getAttribute('href');
+      }
+      page = nextHref ? abs(page, nextHref) : null;
+      console.log('[FMV] следующая страница:', page || '(нет)');
+    }
+
+    console.groupEnd();
+    return out;
+  }
+
+  // список юзеров (для проверки участников)
+  async function scrapeAllUsers() {
+    console.group('[FMV] Сбор пользователей');
+    let page = `${BASE}/userlist.php`;
+    const seen  = new Set();
+    const names = new Set();
+    let cnt = 0;
+
+    while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
+      cnt++;
+      seen.add(page);
+      console.log('[FMV][users] страница:', page);
+
+      const html = await fetchText(page);
+      const doc  = parseHTML(html);
+
+      doc.querySelectorAll('.usersname a').forEach(a=>{
+        const name = (a.textContent || a.innerText || '').trim().toLowerCase();
+        if (name) names.add(name);
+      });
+
+      const nextRel = doc.querySelector('a[rel="next"]');
+      let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
+      if (!nextHref) {
+        const candidate = Array.from(doc.querySelectorAll('a'))
+          .find(a => /\b(След|Next|»|›)\b/i.test(a.textContent || ''));
+        if (candidate) nextHref = candidate.getAttribute('href');
+      }
+      page = nextHref ? abs(page, nextHref) : null;
+    }
+
+    console.log('[FMV][users] всего пользователей:', names.size);
+    console.groupEnd();
+    return names;
+  }
+
+  /* ================================ СОРТИРОВКА ================================ */
+  const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
+
+  function compareEvents(a, b) {
+    const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
+    if (sa !== sb) return sa - sb;
+
+    const ea = dateKey(a.range.end), eb = dateKey(b.range.end);
+    if (ea !== eb) return ea - eb;
+
+    const ao = (a.order == null) ? Number.POSITIVE_INFINITY : a.order;
+    const bo = (b.order == null) ? Number.POSITIVE_INFINITY : b.order;
+    if (ao !== bo) return ao - bo;
+
+    return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
+  }
+
+  /* ========================= СБОРКА HTML (как в рефе) ========================= */
+  async function buildWrappedHTML() {
+    const userSet = await scrapeAllUsers();
+
+    let all = [];
+    for (const sec of SECTIONS) {
+      const part = await scrapeSection(sec);
+      all = all.concat(part);
+    }
+    all = all.filter(Boolean);
+    console.log('[FMV] всего записей:', all.length);
+    all.sort(compareEvents);
+
+    function renderNames(arr) {
+      if (!arr || !arr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
+      return arr.map(n => {
+        const safe = esc(n);
+        return userSet.has(n) ? safe : `<span style="${MISS_STYLE}" title="пользователь не найден">${safe}</span>`;
+      }).join(', ');
+    }
+
+    const items = all.map(e => {
+      const statusHTML = renderStatus(e.type, e.status);
+      const dateHTML   = (!e.dateRaw || e.dateBad)
+        ? `<span style="${MISS_STYLE}" title="дата не распознана/не указана">дата не указана/ошибка</span>`
+        : esc(e.dateRaw);
+
+      const url        = esc(e.url);
+      const ttl        = esc(e.episode);
+      const orderBadge = (e.order!=null) ? ` <span>[${esc(String(e.order))}]</span>` : '';
+
+      const names = renderNames(e.characters);
+      const loc   = e.location ? esc(e.location) : `<span style="${MISS_STYLE}">локация не указана</span>`;
+
+      // формат из рефа:
+      // 1-я строка: [type/status] дата — <a>эпизод</a> [order]
+      // 2-я строка: участники / локация
+      return `
+        <p style="margin:0 0 .4em 0">
+          <span>${statusHTML}</span> ${dateHTML} — <a href="${url}">${ttl}</a>${orderBadge}<br/>
+          ${names} / ${loc}
+        </p>
+      `;
+    });
+
+    const inner = items.join('') || `<p>— пусто —</p>`;
+
+    // «шапка» как у вас: центр, жирным
+    return `
+      <p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>
+      ${inner}
+    `;
+  }
+
+  /* =================== ЗАПУСК ПО КНОПКЕ + ПЕРЕЗАПИСЬ #p83 =================== */
+  async function handleBuild(opts) {
+    const btn  = opts?.buttonEl || document.getElementById(BTN_ID);
+    const note = opts?.noteEl   || document.getElementById(NOTE_ID);
+
+    console.group('[FMV] Запуск по кнопке');
+    try {
+      const host = document.querySelector(OUT_SEL);
+      if (!host) { console.warn('[FMV] контейнер вывода не найден:', OUT_SEL); return; }
+
+      if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
+      if (note){ note.textContent = 'Готовлю данные…'; note.style.opacity = '.85'; }
+
+      // временный плейсхолдер
+      host.innerHTML = `<p>Готовлю хронологию…</p>`;
+
+      const html = await buildWrappedHTML();
+
+      // финальная подмена
+      host.innerHTML = html;
+
+      if (note) note.textContent = 'Готово';
+      console.groupEnd();
+    } catch (e) {
+      console.error('[FMV] Ошибка сборки:', e);
+      if (note) {
+        note.textContent = 'Ошибка сборки';
+        note.style.cssText += `;${MISS_STYLE}`;
+      }
+    } finally {
+      const btn2 = document.getElementById(BTN_ID);
+      if (btn2) { btn2.disabled = false; btn2.textContent = 'Собрать хронологию'; }
+    }
+  }
+
+  /* ========================= РИСУЕМ КНОПКУ В КОНЕЦ p82 ========================= */
   function mountInlineButton() {
-    const host = $(`#${CSS.escape(SOURCE_POST_ID)} .post-box`);
-    if (!host || document.getElementById(WRAP_ID)) return !!host;
+    const host = document.querySelector(SRC_HOST_SEL);
+    if (!host) return false;
+    if (document.getElementById(WRAP_ID)) return true;
 
     const wrap = document.createElement('div');
     wrap.id = WRAP_ID;
-    wrap.style.cssText = 'margin-top:10px;display:flex;gap:10px;align-items:center;';
+    wrap.style.marginTop = '8px';
+    wrap.style.display   = 'flex';
+    wrap.style.alignItems= 'center';
+    wrap.style.gap       = '10px';
 
     const btn = document.createElement('a');
     btn.id = BTN_ID;
     btn.href = 'javascript:void(0)';
     btn.className = 'button';
     btn.textContent = 'Собрать хронологию';
+    btn.setAttribute('data-fmv-chrono-trigger', 'inline');
 
     const note = document.createElement('span');
     note.id = NOTE_ID;
-    note.style.cssText = 'font-size:90%;opacity:.85;';
+    note.setAttribute('data-fmv-chrono-note', 'inline');
+    note.style.fontSize = '90%';
+    note.style.opacity  = '.85';
 
     wrap.appendChild(btn);
     wrap.appendChild(note);
-    host.appendChild(wrap); // ← именно в КОНЕЦ #p82 .post-box
+    host.appendChild(wrap); // <— В САМЫЙ КОНЕЦ p82.post-box
 
-    btn.addEventListener('click', () => {
-      note.textContent = 'Собираю…';
-      const html = buildChronologyHTML();
+    btn.addEventListener('click', () => handleBuild({ buttonEl: btn, noteEl: note }));
 
-      const out = $(`#${CSS.escape(OUTPUT_POST_ID)}-content`) ||
-                  $(`#${CSS.escape(OUTPUT_POST_ID)} .post-content`);
-      if (!out) {
-        note.textContent = 'Не нашёл #p83-content';
-        note.style.cssText += `background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px;`;
-        return;
-      }
-      out.innerHTML = html;          // ← переписываем #p83 только ПО КЛИКУ
-      note.textContent = 'Готово';
-    });
-
+    console.log('[FMV] Кнопка добавлена в конец', SRC_HOST_SEL);
     return true;
   }
 
-  /* --------------------------- Инициализация --------------------------- */
   function init() {
-    if (!onRightTopic()) return;
-    // ставим кнопку сразу или через наблюдатель
-    if (!mountInlineButton()) {
+    if (mountInlineButton()) {
+      console.log('[FMV] inline-кнопка готова');
+    } else {
+      console.log('[FMV] ждём появление p82 через MutationObserver');
       const mo = new MutationObserver(() => {
         if (mountInlineButton()) mo.disconnect();
       });
       mo.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => mo.disconnect(), 10000);
+      setTimeout(()=>mo.disconnect(), 10000);
     }
-    // шорткат на всякий
-    window.FMV_buildChronology = function () {
-      const out = $(`#${CSS.escape(OUTPUT_POST_ID)}-content`) ||
-                  $(`#${CSS.escape(OUTPUT_POST_ID)} .post-content`);
-      if (out) out.innerHTML = buildChronologyHTML();
-    };
+
+    // экспортируем публичный ручной запуск (совместимость с логами)
+    window.FMV_buildChronology = () => handleBuild({});
+    console.log('[FMV] Доступно window.FMV_buildChronology()');
   }
 
   if (document.readyState === 'loading') {
@@ -234,4 +488,6 @@
   } else {
     init();
   }
+
+  console.groupEnd();
 })();

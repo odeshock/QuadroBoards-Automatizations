@@ -1,69 +1,123 @@
 /**
- * FMV Timeline Injector → HTML paragraphs
- * Целевая страница: https://testfmvoice.rusff.me/viewtopic.php?id=13
- * Разделы:
- *   4 → [personal / on]
- *   5 → [personal / off]
- * Формат вывода (внутри #p83-content):
- *   <p>[personal / on|off] <strong>дата</strong> — <a href="...">название</a><br>
- *      <span style="font-style:italic">имена через запятую / локация</span></p>
+ * FMV — автохронология (personal on/off) для поста #p83
+ * Работает только на: https://testfmvoice.rusff.me/viewtopic.php?id=13
+ * Выводит в #p83-content HTML вида:
+ * <p>[personal / on|off] <strong>ДАТА/ИНТЕРВАЛ</strong> — <a href="...">название</a> [order?]<br>
+ * <span style="font-style:italic">участники / локация</span></p>
  */
 (function () {
   'use strict';
 
-  // --- URL guard ---
+  // ===== Guard по URL
   try {
     const u = new URL(location.href);
-    const ok = (u.hostname === 'testfmvoice.rusff.me'
-             && u.pathname === '/viewtopic.php'
-             && u.searchParams.get('id') === '13');
-    if (!ok) { console.info('[FMV] Не целевой URL:', location.href); return; }
-  } catch { console.warn('[FMV] Не смог распарсить URL'); return; }
+    if (!(u.hostname === 'testfmvoice.rusff.me' &&
+          u.pathname === '/viewtopic.php' &&
+          u.searchParams.get('id') === '13')) {
+      return;
+    }
+  } catch { return; }
 
-  console.group('[FMV] Timeline injector: старт');
+  console.group('[FMV] Автохронология');
 
-  // --- Константы ---
+  // ===== Конфиг
   const BASE = 'https://testfmvoice.rusff.me';
   const SECTIONS = [
     { id: 4, label: '[personal / on]'  },
     { id: 5, label: '[personal / off]' },
   ];
   const MAX_PAGES_PER_SECTION = 50;
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
-  const TITLE_RE   = /^\s*\[(.+?)\]\s*(.+)$/s;
 
-  // --- Утилиты ---
+  // ===== Утилиты
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
   const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
-  const countFFFD = s => (s.match(/\uFFFD/g) || []).length;
-  const countCyr  = s => (s.match(/[А-Яа-яЁё]/g) || []).length;
   const esc = (s='') => String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
+  // Заголовок темы вида: "[дата] название"
+  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
     return m ? { date: m[1].trim(), episode: m[2].trim() } : { date: '', episode: trimSp(text) };
   }
 
-  function dateToTs(ddmmyy) {
-    const m = String(ddmmyy||'').match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})(?:-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4}))?$/);
-    if (!m) return 0;
-    let [, d, mm, y] = m;
-    d = +d; mm = +mm; y = +y;
-    if (String(y).length === 2) y = (y >= 50 ? 1900 : 2000) + y;
-    const ts = Date.UTC(y, mm - 1, d);
-    return isNaN(ts) ? 0 : ts;
+  // ---- Даты
+  const RU_MONTHS = {
+    'янв':1,'январь':1,'января':1, 'фев':2,'февраль':2,'февраля':2,
+    'мар':3,'март':3,'марта':3,   'апр':4,'апрель':4,'апреля':4,
+    'май':5,'мая':5,              'июн':6,'июнь':6,'июня':6,
+    'июл':7,'июль':7,'июля':7,    'авг':8,'август':8,'августа':8,
+    'сен':9,'сент':9,'сентябрь':9,'сентября':9,
+    'окт':10,'октябрь':10,'октября':10,
+    'ноя':11,'ноябрь':11,'ноября':11,
+    'дек':12,'декабрь':12,'декабря':12
+  };
+  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
+  const TMAX = [9999,12,31];
+  const yFix = (y)=> String(y).length<=2 ? 1900 + parseInt(y,10) : parseInt(y,10);
+
+  function parseDateRange(src) {
+    let s = String(src||'').trim();
+    if (!s) return { start: TMAX, end: TMAX, kind:'unknown' };
+    s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
+
+    // dd.mm.yy(yyyy)-dd.mm.yy(yyyy)
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (m) {
+      const a=[yFix(m[3]),+m[2],+m[1]];
+      const b=[yFix(m[6]),+m[5],+m[4]];
+      return { start:a, end:b, kind:'full-range' };
+    }
+
+    // dd1-dd2.mm.yy(yyyy)
+    m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (m) {
+      const y=yFix(m[4]), mo=+m[3];
+      const a=[y,mo,+m[1]], b=[y,mo,+m[2]];
+      return { start:a, end:b, kind:'day-range' };
+    }
+
+    // dd.mm.yy(yyyy)
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (m) {
+      const a=[yFix(m[3]),+m[2],+m[1]];
+      return { start:a, end:a.slice(), kind:'single' };
+    }
+
+    // <месяц> <год>
+    m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
+    if (m && RU_MONTHS[m[1]]) {
+      const y=+m[2], mo=RU_MONTHS[m[1]];
+      const a=[y,mo,0]; // «0-е число»
+      return { start:a, end:a.slice(), kind:'month' };
+    }
+
+    // просто год
+    m = s.match(/^(\d{4})$/);
+    if (m) {
+      const y=+m[1], a=[y,1,0]; // «0-е января»
+      return { start:a, end:a.slice(), kind:'year' };
+    }
+
+    // фоллбэк: первая дата
+    m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
+    if (m) {
+      const a=[yFix(m[3]),+m[2],+m[1]];
+      return { start:a, end:a.slice(), kind:'fallback' };
+    }
+
+    return { start:TMAX, end:TMAX, kind:'unknown' };
   }
 
-  // =========================
-  //  Декодер с эвристикой
-  // =========================
+  // ===== Борьба с кракозябрами (�) — подбираем кодировку
+  function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
+  function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
   function sniffMetaCharset(buf) {
-    const headGuess = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
-    const m1 = headGuess.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
+    const head = new TextDecoder('windows-1252').decode(buf.slice(0,4096));
+    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
     if (m1) return m1[1].toLowerCase();
-    const m2 = headGuess.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
+    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
     if (m2) return m2[1].toLowerCase();
     return '';
   }
@@ -78,16 +132,18 @@
   async function fetchText(url, timeoutMs = 20000) {
     console.log('[FMV] fetch →', url);
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const t = setTimeout(()=>ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(url, { credentials: 'include', signal: ctrl.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = await res.arrayBuffer();
+
       let headerCharset = '';
       const ct = res.headers.get('content-type') || '';
       const mCT = ct.match(/charset=([^;]+)/i);
       if (mCT) headerCharset = mCT[1].trim().toLowerCase();
       const metaCharset = sniffMetaCharset(buf);
+
       const hints = { 'utf-8': false, 'windows-1251': false };
       if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
       if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
@@ -104,29 +160,34 @@
         const score = scoreDecoded(html, hints[enc]);
         if (score > best.score) best = { score, enc, html };
       }
-      console.log(`[FMV] decode: header=${headerCharset||'-'} meta=${metaCharset||'-'} → chosen=${best.enc}, score=${best.score}, �=${countFFFD(best.html)}, cyr=${countCyr(best.html)}`);
+      console.log(`[FMV] decode → ${best.enc}, �=${countFFFD(best.html)}, cyr=${countCyr(best.html)}`);
       return best.html;
-    } finally {
-      clearTimeout(t);
-    }
+    } finally { clearTimeout(t); }
   }
 
-  // --- Парсинг темы ---
-  const parseHTML = (html) => new DOMParser().parseFromString(html, 'text/html');
+  // ===== Парсинг темы (первый пост)
+  const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||
     doc.querySelector('.post.topicpost') || doc;
 
-  function extractLocAndChars(firstNode) {
-    const locNode  = firstNode.querySelector('location');
-    const castNode = firstNode.querySelector('characters');
-    const location = locNode ? locNode.innerText.trim().toLowerCase() : '';
+  function extractFromFirst(firstNode) {
+    const locNode   = firstNode.querySelector('location');
+    const castNode  = firstNode.querySelector('characters');
+    const orderNode = firstNode.querySelector('order');
+
+    const location = (locNode ? locNode.innerText.trim() : '').toLowerCase();
     const rawChars = castNode ? castNode.innerText : '';
     const characters = rawChars
-      ? rawChars.split(CHAR_SPLIT).map(s => s.trim().toLowerCase()).filter(Boolean)
+      ? rawChars.split(CHAR_SPLIT).map(s=>s.trim().toLowerCase()).filter(Boolean)
       : [];
-    return { location: location.replace(/\uFFFD+/g, '').trim(),
-             characters: characters.map(s => s.replace(/\uFFFD+/g,'').trim()).filter(Boolean)};
+
+    let order = null;
+    if (orderNode) {
+      const num = parseInt(orderNode.textContent.trim(), 10);
+      if (Number.isFinite(num)) order = num;
+    }
+    return { location, characters, order };
   }
 
   async function scrapeTopic(topicUrl, rawTitle, label) {
@@ -134,17 +195,18 @@
       const html = await fetchText(topicUrl);
       const doc  = parseHTML(html);
       const first = firstPostNode(doc);
-      const { location, characters } = extractLocAndChars(first);
+      const { location, characters, order } = extractFromFirst(first);
       const { date, episode } = parseTitle(rawTitle);
-      console.log('[FMV]   тема ✓', { date, episode, location, characters, url: topicUrl });
-      return { label, date, episode, url: topicUrl, location, characters };
+      const range = parseDateRange(date);
+      console.log('[FMV][date]', date, '→', range.start, '-', range.end, '('+range.kind+')', '| order=', order==null?'-':order);
+      return { label, date, episode, url: topicUrl, location, characters, order, range };
     } catch (e) {
-      console.warn('[FMV]   тема ✗', topicUrl, e);
+      console.warn('[FMV] тема ✗', topicUrl, e);
       return null;
     }
   }
 
-  // --- Обход раздела ---
+  // ===== Обход раздела
   async function scrapeSection(section) {
     console.group(`[FMV] Раздел ${section.id} ${section.label}`);
     let page = `${BASE}/viewforum.php?id=${section.id}`;
@@ -156,27 +218,25 @@
       pageCount++;
       console.log('[FMV]  страница:', page);
       seen.add(page);
+
       const html = await fetchText(page);
       const doc  = parseHTML(html);
 
-      const topicsMap = new Map();
-      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
+      const topics = new Map();
+      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
         const href = abs(page, a.getAttribute('href'));
         const m = href.match(/viewtopic\.php\?id=(\d+)/i);
         if (!m) return;
         const id = m[1];
         const title = a.textContent || a.innerText || '';
         if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        if (!topicsMap.has(id)) topicsMap.set(id, { url: href, title });
+        if (!topics.has(id)) topics.set(id, { url: href, title });
       });
+      console.log('[FMV]  тем найдено:', topics.size);
 
-      console.log('[FMV]  найдено тем (уник.):', topicsMap.size);
-
-      for (const { url, title } of topicsMap.values()) {
-        console.groupCollapsed('[FMV]   тема →', url);
+      for (const { url, title } of topics.values()) {
         const row = await scrapeTopic(url, title, section.label);
         if (row) out.push(row);
-        console.groupEnd();
       }
 
       const nextRel = doc.querySelector('a[rel="next"]');
@@ -190,18 +250,32 @@
       console.log('[FMV]  следующая страница:', page || '(нет)');
     }
 
-    if (pageCount >= MAX_PAGES_PER_SECTION) {
-      console.warn('[FMV]  достигнут лимит страниц, оборвали обход.');
-    }
-
     console.groupEnd();
     return out;
   }
 
-  // --- Сборка HTML в новом шаблоне ---
+  // ===== Сортировка (ключи YYYYMMDD)
+  const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
+
+  function compareEvents(a, b) {
+    const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
+    if (sa !== sb) return sa - sb;
+
+    const ea = dateKey(a.range.end),   eb = dateKey(b.range.end);
+    if (ea !== eb) {
+      console.debug('[FMV sort] same start:', a.date, 'vs', b.date, '→ end', ea, 'vs', eb);
+      return ea - eb;
+    }
+
+    const ao = (a.order == null) ? Number.POSITIVE_INFINITY : a.order;
+    const bo = (b.order == null) ? Number.POSITIVE_INFINITY : b.order;
+    if (ao !== bo) return ao - bo;
+
+    return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
+  }
+
+  // ===== Рендер
   async function buildTimelineHTML() {
-    console.group('[FMV] Сборка хронологии (HTML)');
-    const t0 = performance.now();
     let all = [];
     for (const sec of SECTIONS) {
       const part = await scrapeSection(sec);
@@ -209,31 +283,27 @@
     }
     all = all.filter(Boolean);
 
-    console.log('[FMV] Всего записей до сортировки:', all.length);
-    all.sort((a, b) => dateToTs(a.date) - dateToTs(b.date));
-    console.log('[FMV] Сортировка по дате: OK');
+    console.log('[FMV] всего записей:', all.length);
+    all.sort(compareEvents);
 
-    const paras = all.map(e => {
-      const label = esc(e.label);
-      const date  = esc(e.date);
-      const url   = esc(e.url);
-      const title = esc(e.episode);
+    const items = all.map(e => {
+      const lab = esc(e.label);
+      const dt  = esc(e.date);
+      const url = esc(e.url);
+      const ttl = esc(e.episode);
+      const orderBadge = (e.order!=null) ? ` <span>[${esc(String(e.order))}]</span>` : '';
       const chars = esc(e.characters.join(', '));
       const loc   = esc(e.location || '');
-      const tail  = (chars && loc) ? `${chars} / ${loc}`
-                   : (chars || loc);
-      return `<p>${label} <strong>${date}</strong> — <a href="${url}">${title}</a><br>` +
+      const tail  = (chars && loc) ? `${chars} / ${loc}` : (chars || loc);
+
+      return `<p>${lab} <strong>${dt}</strong> — <a href="${url}">${ttl}</a>${orderBadge}<br>` +
              `<span style="font-style:italic">${tail}</span></p>`;
     });
 
-    const html = paras.join('');
-    const dt = Math.round(performance.now() - t0);
-    console.log('[FMV] Готовая HTML-разметка, символов:', html.length, 'за', dt, 'мс');
-    console.groupEnd();
-    return html;
+    return items.join('');
   }
 
-  // --- Инъекция в #p83-content ---
+  // ===== Инъекция в #p83-content
   function waitForP83() {
     return new Promise(resolve => {
       const now = document.querySelector('#p83-content');
@@ -242,34 +312,32 @@
         const el = document.querySelector('#p83-content');
         if (el) { obs.disconnect(); resolve(el); }
       });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
+      obs.observe(document.documentElement, { childList:true, subtree:true });
     });
   }
 
   async function run() {
     console.group('[FMV] Инъекция в #p83-content');
     const host = await waitForP83();
-    console.log('[FMV] Нашли #p83-content:', !!host);
+    console.log('[FMV] #p83-content найден:', !!host);
 
-    host.innerHTML = '<div class="fmv-chrono-box" style="white-space:normal; font:inherit;">Готовлю хронологию…</div>';
+    host.innerHTML = '<div class="fmv-chrono-box" style="white-space:normal;font:inherit">Готовлю хронологию…</div>';
     const box = host.querySelector('.fmv-chrono-box');
 
     try {
       const html = await buildTimelineHTML();
-      // Подменяем коробку на готовые <p>…</p>
       host.innerHTML = html || '<p>— пусто —</p>';
       console.log('[FMV] Инъекция завершена.');
     } catch (e) {
-      console.error('[FMV] Ошибка при сборке хронологии:', e);
+      console.error('[FMV] Ошибка:', e);
       box.textContent = 'Ошибка при сборке хронологии.';
     }
-
-    console.groupEnd(); // Инъекция
-    console.groupEnd(); // Главная группа
+    console.groupEnd(); // инъекция
+    console.groupEnd(); // глобальная
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run, { once: true });
+    document.addEventListener('DOMContentLoaded', run, { once:true });
   } else {
     run();
   }

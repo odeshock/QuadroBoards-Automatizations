@@ -1,12 +1,24 @@
-
 /**
- * FMV Timeline Injector → заменяет ВСЁ внутри #p83-content готовым текстом.
- * Работает только на https://testfmvoice.rusff.me/viewtopic.php?id=13
+ * FMV Timeline Injector
+ * - Целевая страница: https://testfmvoice.rusff.me/viewtopic.php?id=13
+ * - Собирает темы из разделов:
+ *     4 → [personal / on]
+ *     5 → [personal / off]
+ * - Для каждой темы:
+ *     * дата и название из заголовка темы: "[дата] название"
+ *     * location и characters — из ПЕРВОГО поста, теги <location> и <characters> (innerText)
+ *     * characters: split по , ; / & и слову "и", в lowercase, trim()
+ *     * location: lowercase
+ * - Сортировка: от старых дат к новым
+ * - Формат строки:
+ *     [personal / on|off] [b]дата[/b] — [url=ссылка]название[/url]
+ *     [i]участники через запятую / локация[/i]
+ * - Результат подставляется вместо ВСЕГО содержимого #p83-content
  */
 (function () {
   'use strict';
 
-  // --- Строгая проверка URL (игнорируем hash) ---
+  // --- 0) Проверка URL (игнорируем hash) ---
   try {
     const u = new URL(location.href);
     const ok = (u.hostname === 'testfmvoice.rusff.me'
@@ -16,28 +28,24 @@
       console.info('[FMV] Не целевой URL, выходим:', location.href);
       return;
     }
-  } catch (e) {
+  } catch {
     console.warn('[FMV] Не смог распарсить URL, выходим.');
     return;
   }
 
   console.group('[FMV] Timeline injector: старт');
 
-  // --- Константы / регэкспы ---
+  // --- 1) Константы/регэкспы ---
   const BASE = 'https://testfmvoice.rusff.me';
   const SECTIONS = [
     { id: 4, label: '[personal / on]'  },
     { id: 5, label: '[personal / off]' },
   ];
-  const MAX_PAGES_PER_SECTION = 50;
+  const MAX_PAGES_PER_SECTION = 50; // защитный лимит
+  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu; // разделители для characters
+  const TITLE_RE   = /^\s*\[(.+?)\]\s*(.+)$/s;     // "[дата] название"
 
-  // разделители для characters (всё в lowercase)
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
-
-  // заголовок темы: "[дата] название"
-  const TITLE_RE   = /^\s*\[(.+?)\]\s*(.+)$/s;
-
-  // --- Утилиты ---
+  // --- 2) Утилиты ---
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
   const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
 
@@ -56,14 +64,51 @@
     return isNaN(ts) ? 0 : ts;
   }
 
+  // --- 3) fetchText с правильной декодировкой (UTF-8 / windows-1251) ---
   async function fetchText(url, timeoutMs = 20000) {
     console.log('[FMV] fetch →', url);
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch(url, { credentials: 'include', signal: ctrl.signal });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return await r.text();
+      const res = await fetch(url, { credentials: 'include', signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+
+      // 1) charset из заголовка
+      let charset = '';
+      const ct = res.headers.get('content-type') || '';
+      const mCT = ct.match(/charset=([^;]+)/i);
+      if (mCT) charset = mCT[1].trim().toLowerCase();
+
+      // 2) если в заголовке нет — попробуем найти в <meta ... charset=...>
+      if (!charset) {
+        const sniff = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
+        const mMeta = sniff.match(/charset\s*=\s*["']?([\w-]+)/i);
+        if (mMeta) charset = mMeta[1].toLowerCase();
+      }
+
+      const countFFFD = s => (s.match(/\uFFFD/g) || []).length;
+
+      // 3) пробуем указанную/utf-8
+      let html;
+      try {
+        html = new TextDecoder(charset || 'utf-8', { fatal: false }).decode(buf);
+      } catch {
+        html = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+      }
+
+      // 4) если остались � — пробуем windows-1251
+      if (/\uFFFD/.test(html)) {
+        try {
+          const html1251 = new TextDecoder('windows-1251', { fatal: false }).decode(buf);
+          if (countFFFD(html1251) < countFFFD(html)) {
+            console.log('[FMV] Переключился на windows-1251 для', url);
+            html = html1251;
+          }
+        } catch {/* оставляем как есть */}
+      }
+
+      return html;
     } finally {
       clearTimeout(t);
     }
@@ -71,7 +116,7 @@
 
   const parseHTML = (html) => new DOMParser().parseFromString(html, 'text/html');
 
-  // --- Вспом. выборки в теме ---
+  // --- 4) Парсинг темы ---
   function firstPostNode(doc) {
     return (
       doc.querySelector('.post.topicpost .post-content') ||
@@ -109,7 +154,7 @@
     }
   }
 
-  // --- Обход раздела (пагинация) ---
+  // --- 5) Обход раздела с пагинацией ---
   async function scrapeSection(section) {
     console.group(`[FMV] Раздел ${section.id} ${section.label}`);
     let page = `${BASE}/viewforum.php?id=${section.id}`;
@@ -124,6 +169,7 @@
       const html = await fetchText(page);
       const doc  = parseHTML(html);
 
+      // Собираем уникальные темы (по id)
       const topicsMap = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
         const href = abs(page, a.getAttribute('href'));
@@ -131,7 +177,7 @@
         if (!m) return;
         const id = m[1];
         const title = a.textContent || a.innerText || '';
-        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
+        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return; // не берём сервисные ссылки
         if (!topicsMap.has(id)) topicsMap.set(id, { url: href, title });
       });
 
@@ -144,7 +190,7 @@
         console.groupEnd();
       }
 
-      // next-пагинация
+      // Пагинация "вперёд"
       const nextRel = doc.querySelector('a[rel="next"]');
       let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
@@ -164,7 +210,7 @@
     return out;
   }
 
-  // --- Сборка хронологии ---
+  // --- 6) Сборка хронологии ---
   async function buildTimelineText() {
     console.group('[FMV] Сборка хронологии');
     const t0 = performance.now();
@@ -191,7 +237,7 @@
     return text;
   }
 
-  // --- Ожидание #p83-content и полная замена содержимого ---
+  // --- 7) Ждём #p83-content и полностью заменяем содержимое ---
   function waitForP83() {
     return new Promise(resolve => {
       const now = document.querySelector('#p83-content');
@@ -209,13 +255,13 @@
     const host = await waitForP83();
     console.log('[FMV] Нашли #p83-content:', !!host);
 
-    // Ставим "заглушку" сразу
+    // Заглушка
     host.innerHTML = '<div class="fmv-chrono-box" style="white-space:pre-wrap; font:inherit;">Готовлю хронологию…</div>';
     const box = host.querySelector('.fmv-chrono-box');
 
     try {
       const text = await buildTimelineText();
-      // Пишем как обычный текст: переносы сохранятся через white-space:pre-wrap
+      // Показываем как простой текст (чтобы не выполнять ничего)
       box.textContent = text || '— пусто —';
       console.log('[FMV] Инъекция завершена.');
     } catch (e) {

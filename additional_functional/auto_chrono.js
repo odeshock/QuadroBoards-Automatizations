@@ -1,183 +1,234 @@
-/* ===================== FMV — кнопка сборки хронологии ===================== */
+/* ============================================================
+ * FMV — Автохронология
+ * Кнопка в конце #p82 → пишет результат в #p83-content
+ * ============================================================ */
 (function () {
   'use strict';
 
-  /* ---------------------------- Конфигурация ---------------------------- */
-  // На какой теме активировать
-  const ENABLE_ON_TOPIC_ID = 13;
+  /* ---------------------------- Конфиг ---------------------------- */
+  const ENABLE_ON_TOPIC_ID = 13;       // только для этой темы
+  const SOURCE_POST_ID     = 'p82';    // где читать вводные и ставить кнопку
+  const OUTPUT_POST_ID     = 'p83';    // куда писать хронологию
 
-  // Где рисуем инлайн-кнопку
-  const TARGET_POST_ID = 'p82'; // пост с кнопкой
-  const TARGET_SELECTOR = `#${TARGET_POST_ID} .post-box`;
-
-  // id-шники создаваемых элементов
   const WRAP_ID = 'fmv-chrono-inline';
   const BTN_ID  = 'fmv-chrono-inline-btn';
   const NOTE_ID = 'fmv-chrono-inline-note';
 
-  // Резервная (плавающая) кнопка
-  const FLOAT_ID = 'fmv-chrono-float-btn';
+  /* ---------------------------- Utils ----------------------------- */
+  const $    = (s, root=document) => root.querySelector(s);
+  const $all = (s, root=document) => Array.from(root.querySelectorAll(s));
+  const esc  = (s='') => s.replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+  const uniq = arr => Array.from(new Map(arr.map(x => [x.toLowerCase(), x])).values());
+  const norm = s => s.trim().replace(/\s+/g,' ').toLowerCase();
 
-  /* ------------------------------ Утилиты ------------------------------- */
-  const log  = (...a) => console.log('[FMV]', ...a);
-  const warn = (...a) => console.warn('[FMV]', ...a);
+  const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px;';
 
-  // Проверяем, что мы на нужной теме
   function onRightTopic() {
-    const m = location.search.match(/[?&]id=(\d+)/);
-    return m && Number(m[1]) === ENABLE_ON_TOPIC_ID;
+    // id темы есть и в ссылке, и в data-атрибутах контейнера
+    const byQS = location.search.match(/[?&]id=(\d+)/);
+    const byAttr = $('#pun-viewtopic')?.getAttribute('data-topic-id');
+    const val = Number(byQS?.[1] || byAttr || 0);
+    return val === ENABLE_ON_TOPIC_ID;
   }
 
-  // Универсальный вызов сборки (ищем знакомые entrypoints)
-  function invokeBuild(opts) {
-    const fn =
-      window.FMV_buildChronology ||
-      window.FMV?.buildChronology ||
-      window.FMV?.build ||
-      window.buildChronology ||
-      window.handleBuild;
+  /* --------------------- Разбор исходных данных ------------------- */
+  function sourceBox() {
+    return $(`#${CSS.escape(SOURCE_POST_ID)}-content`) ||
+           $(`#${CSS.escape(SOURCE_POST_ID)} .post-content`);
+  }
 
-    if (typeof fn === 'function') {
-      try {
-        fn(opts || {});
-        return true;
-      } catch (e) {
-        warn('Ошибка в функции сборки:', e);
-      }
-    } else {
-      warn('Функция сборки не найдена (ожидали FMV_buildChronology)');
+  function renderStatus(type, status) {
+    const map = {
+      on:       { word: 'active',   color: 'green'  },
+      off:      { word: 'closed',   color: 'teal'   },
+      archived: { word: 'archived', color: 'maroon' }
+    };
+    const st = map[status] || map.archived;
+    const color = (type === 'personal') ? 'inherit' : st.color; // personal — без акцента
+    return `${type} / <span style="color:${color}">${st.word}</span>`;
+  }
+
+  // Заголовок: "[дата] название темы"
+  function renderHeader() {
+    const topicTitle = $('#pun-main h1 span')?.textContent.trim()
+                   || document.title.replace(/\s*\-.*$/, '').trim();
+    const dateStr = $(`#${CSS.escape(SOURCE_POST_ID)} h3 a.permalink`)?.textContent.trim() || '';
+    return `<p><strong>[${esc(dateStr)}] ${esc(topicTitle)}</strong></p>`;
+  }
+
+  function detectTypeAndStatus() {
+    const raw = (sourceBox()?.textContent || '').toLowerCase();
+    let type = 'common';
+    if (/\bpersonal\b|персонал|личн/.test(raw)) type = 'personal';
+
+    let status = 'on';
+    if (/\bclosed\b|закрыт|off\b/.test(raw)) status = 'off';
+    if (/\barchiv|архив/.test(raw)) status = 'archived';
+
+    return { type, status };
+  }
+
+  // «заявленные участники»
+  function collectDeclaredAuthors() {
+    const box = sourceBox();
+    if (!box) return [];
+    // приоритет: data-атрибут
+    const dataAttr = box.querySelector('[data-fmv-members]');
+    if (dataAttr) {
+      return uniq(
+        dataAttr.getAttribute('data-fmv-members')
+          .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
+      );
     }
-    return false;
+    // эвристика по тексту
+    const txt = box.textContent || '';
+    const m = txt.match(/участники[^:—-]*[:—-]\s*([^\n]+)/i);
+    if (m) {
+      return uniq(
+        m[1].split(/[,;]+/)
+          .map(s => s.replace(/\(.*?\)|\[.*?\]/g,'').trim())
+          .filter(Boolean)
+      );
+    }
+    // ссылки внутри блока
+    const links = $all('a', box).map(a => a.textContent.trim()).filter(Boolean);
+    return uniq(links);
   }
 
-  // Ставим стили для плавающей кнопки и заметок
-  function ensureStyles() {
-    if (document.getElementById('fmv-chrono-styles')) return;
-    const css = `
-      #${FLOAT_ID}{
-        position:fixed; right:16px; bottom:16px; z-index:9999;
-        padding:.55em .9em; border-radius:6px; cursor:pointer;
-        background:#556B2F; color:#fff; font:600 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-        box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.92;
-      }
-      #${FLOAT_ID}:hover{ opacity:1; filter:brightness(1.05); }
-      #${WRAP_ID}{ margin:8px 0 0; display:flex; gap:10px; align-items:center; }
-      #${NOTE_ID}{ font-size:90%; opacity:.85; }
-      .fmv-note-bad{
-        background: rgba(200,0,0,.14);
-        padding: 2px 6px; border-radius: 4px;
-      }
-    `.trim();
-    const style = document.createElement('style');
-    style.id = 'fmv-chrono-styles';
-    style.textContent = css;
-    document.documentElement.appendChild(style);
+  // Фактически отписавшиеся
+  function collectActualAuthors() {
+    const names = $all('.post .post-author .pa-author a')
+      .map(a => a.textContent.trim())
+      .filter(Boolean);
+    return uniq(names);
   }
 
-  /* ----------------------- Инлайн-кнопка в посте ------------------------ */
+  // Локации
+  function collectLocations() {
+    const box = sourceBox();
+    if (!box) return [];
+    const dataAttr = box.querySelector('[data-fmv-locations]');
+    if (dataAttr) {
+      return uniq(
+        dataAttr.getAttribute('data-fmv-locations')
+          .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
+      );
+    }
+    const txt = box.textContent || '';
+    const m = txt.match(/локац(?:ия|ии)[^:—-]*[:—-]\s*([^\n]+)/i);
+    if (m) {
+      return uniq(m[1].split(/[,;]+/).map(s => s.trim()).filter(Boolean));
+    }
+    return [];
+  }
+
+  /* ------------------------- Рендер блоков ------------------------- */
+  function renderParticipantsBlock() {
+    const declared = collectDeclaredAuthors();
+    const actual   = collectActualAuthors();
+
+    const declaredN = new Set(declared.map(norm));
+    const actualN   = new Set(actual.map(norm));
+
+    const notAnswered = declared.filter(d => !actualN.has(norm(d)));
+    const extras      = actual.filter(a => !declaredN.has(norm(a)));
+
+    const rows = [];
+    rows.push(`<p><strong>Участники:</strong> ${declared.length
+      ? esc(declared.join(', '))
+      : `<span style="${MISS_STYLE}">не указаны</span>`}</p>`);
+
+    rows.push(`<p><strong>Отписались:</strong> ${actual.length
+      ? esc(actual.join(', '))
+      : `<span style="${MISS_STYLE}">никто</span>`}</p>`);
+
+    if (notAnswered.length) {
+      rows.push(`<p><strong>Не отписались:</strong> <span style="${MISS_STYLE}">${esc(notAnswered.join(', '))}</span></p>`);
+    }
+    if (extras.length) {
+      rows.push(`<p><strong>Лишние участники:</strong> <span style="${MISS_STYLE}">${esc(extras.join(', '))}</span></p>`);
+    }
+    return rows.join('\n');
+  }
+
+  function renderLocationsBlock() {
+    const locs = collectLocations();
+    return `<p><strong>Локации:</strong> ${locs.length
+      ? esc(locs.join(', '))
+      : `<span style="${MISS_STYLE}">не указаны</span>`}</p>`;
+  }
+
+  function buildChronologyHTML() {
+    const { type, status } = detectTypeAndStatus();
+    return [
+      `<p><span style="display:block;text-align:center"><strong>Хронология</strong></span></p>`,
+      renderHeader(),
+      `<p>${renderStatus(type, status)}</p>`,
+      renderLocationsBlock(),
+      renderParticipantsBlock()
+    ].join('\n');
+  }
+
+  /* ------------------ Кнопка в конце поста #p82 ------------------ */
   function mountInlineButton() {
-    const host = document.querySelector(TARGET_SELECTOR);
-    if (!host) return false;
-
-    if (document.getElementById(WRAP_ID)) return true; // уже стоит
+    const host = $(`#${CSS.escape(SOURCE_POST_ID)} .post-box`);
+    if (!host || document.getElementById(WRAP_ID)) return !!host;
 
     const wrap = document.createElement('div');
     wrap.id = WRAP_ID;
+    wrap.style.cssText = 'margin-top:10px;display:flex;gap:10px;align-items:center;';
 
     const btn = document.createElement('a');
     btn.id = BTN_ID;
     btn.href = 'javascript:void(0)';
     btn.className = 'button';
     btn.textContent = 'Собрать хронологию';
-    btn.setAttribute('data-fmv-chrono-trigger', 'inline');
 
     const note = document.createElement('span');
     note.id = NOTE_ID;
-    note.setAttribute('data-fmv-chrono-note', 'inline');
+    note.style.cssText = 'font-size:90%;opacity:.85;';
 
     wrap.appendChild(btn);
     wrap.appendChild(note);
-    host.appendChild(wrap);
+    host.appendChild(wrap); // ← именно в КОНЕЦ #p82 .post-box
 
     btn.addEventListener('click', () => {
-      log('Нажата инлайн-кнопка');
       note.textContent = 'Собираю…';
-      note.classList.remove('fmv-note-bad');
+      const html = buildChronologyHTML();
 
-      const ok = invokeBuild({ buttonEl: btn, noteEl: note });
-      if (!ok) {
-        note.textContent = 'Скрипт автохронологии не загружен';
-        note.classList.add('fmv-note-bad');
+      const out = $(`#${CSS.escape(OUTPUT_POST_ID)}-content`) ||
+                  $(`#${CSS.escape(OUTPUT_POST_ID)} .post-content`);
+      if (!out) {
+        note.textContent = 'Не нашёл #p83-content';
+        note.style.cssText += `background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px;`;
+        return;
       }
+      out.innerHTML = html;          // ← переписываем #p83 только ПО КЛИКУ
+      note.textContent = 'Готово';
     });
 
-    log('Инлайн-кнопка добавлена в', TARGET_SELECTOR);
     return true;
   }
 
-  /* ---------------------- Резервная плавающая кнопка -------------------- */
-  function mountFloatButton() {
-    if (document.getElementById(FLOAT_ID)) return true;
-
-    const b = document.createElement('button');
-    b.id = FLOAT_ID;
-    b.type = 'button';
-    b.textContent = 'Собрать хронологию';
-    document.body.appendChild(b);
-
-    b.addEventListener('click', () => {
-      log('Нажата плавающая кнопка');
-      // Попробуем найти/создать заметку от инлайн-кнопки (если есть)
-      const note = document.getElementById(NOTE_ID);
-      if (note) {
-        note.textContent = 'Собираю…';
-        note.classList.remove('fmv-note-bad');
-      }
-      const ok = invokeBuild({ buttonEl: b, noteEl: note || null });
-      if (!ok) {
-        // Покажем подсказку прямо в кнопке
-        b.textContent = 'Не найден FMV_buildChronology';
-        setTimeout(() => (b.textContent = 'Собрать хронологию'), 2500);
-      }
-    });
-
-    log('Резервная кнопка поставлена (правый нижний угол)');
-    return true;
-  }
-
-  /* ----------------------------- Инициализация -------------------------- */
+  /* --------------------------- Инициализация --------------------------- */
   function init() {
     if (!onRightTopic()) return;
-
-    ensureStyles();
-
-    // 1) Пробуем поставить инлайн-кнопку сразу
-    const okInline = mountInlineButton();
-    if (!okInline) {
-      log('Инлайн-хост не найден — ждём DOM через MutationObserver');
+    // ставим кнопку сразу или через наблюдатель
+    if (!mountInlineButton()) {
       const mo = new MutationObserver(() => {
         if (mountInlineButton()) mo.disconnect();
       });
       mo.observe(document.documentElement, { childList: true, subtree: true });
-      // Через 2 сек. подстрахуемся плавучей кнопкой
-      setTimeout(() => {
-        if (!document.getElementById(WRAP_ID)) {
-          log('Внешняя кнопка не найдена — включаю резервную');
-          mountFloatButton();
-        }
-      }, 2000);
-      // Отрубим наблюдатель через 10 сек. на всякий
       setTimeout(() => mo.disconnect(), 10000);
-    } else {
-      log('Внешняя кнопка установлена');
     }
-
-    // На всякий случай опубликуем шорткат в консоли
-    window.FMV_buildNow = () => invokeBuild({});
-    log('Доступно window.FMV_buildNow()');
+    // шорткат на всякий
+    window.FMV_buildChronology = function () {
+      const out = $(`#${CSS.escape(OUTPUT_POST_ID)}-content`) ||
+                  $(`#${CSS.escape(OUTPUT_POST_ID)} .post-content`);
+      if (out) out.innerHTML = buildChronologyHTML();
+    };
   }
 
-  // DOM готов?
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {

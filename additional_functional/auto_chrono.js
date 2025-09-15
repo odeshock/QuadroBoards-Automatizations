@@ -1,413 +1,186 @@
-(() => {
+/* ===================== FMV — кнопка сборки хронологии ===================== */
+(function () {
   'use strict';
 
-  // ======== ВКЛ/ВЫКЛ резервной плавающей кнопки =========
-  const SHOW_FALLBACK_BUTTON = true;
+  /* ---------------------------- Конфигурация ---------------------------- */
+  // На какой теме активировать
+  const ENABLE_ON_TOPIC_ID = 13;
 
-  // ======== Стартуем только на нужной теме =========
-  let ok = false;
-  try {
-    const u = new URL(location.href);
-    ok = (u.hostname === 'testfmvoice.rusff.me'
-       && u.pathname === '/viewtopic.php'
-       && u.searchParams.get('id') === '13');
-  } catch {}
-  if (!ok) return;
+  // Где рисуем инлайн-кнопку
+  const TARGET_POST_ID = 'p82'; // пост с кнопкой
+  const TARGET_SELECTOR = `#${TARGET_POST_ID} .post-box`;
 
-  console.group('[FMV] Chrono (ext trigger)');
+  // id-шники создаваемых элементов
+  const WRAP_ID = 'fmv-chrono-inline';
+  const BTN_ID  = 'fmv-chrono-inline-btn';
+  const NOTE_ID = 'fmv-chrono-inline-note';
 
-  // ---------- Конфиг разделов
-  const BASE = 'https://testfmvoice.rusff.me';
-  const SECTIONS = [
-    { id: 4, type: 'personal', status: 'on'  },  // active
-    { id: 5, type: 'personal', status: 'off' }   // closed
-    // когда появится архив — добавим {id: X, type:'personal', status:'archived'}
-  ];
-  const MAX_PAGES_PER_SECTION = 50;
-  const MAX_PAGES_USERLIST    = 200;
+  // Резервная (плавающая) кнопка
+  const FLOAT_ID = 'fmv-chrono-float-btn';
 
-  // ---------- Утилиты
-  const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
-  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
-  const esc = (s='') => String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  /* ------------------------------ Утилиты ------------------------------- */
+  const log  = (...a) => console.log('[FMV]', ...a);
+  const warn = (...a) => console.warn('[FMV]', ...a);
 
-  const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px';
-
-  function renderStatus(type, status) {
-    const map = {
-      on:       { word: 'active',   color: 'green'  },
-      off:      { word: 'closed',   color: 'teal'   },
-      archived: { word: 'archived', color: 'maroon' }
-    };
-    const st = map[status] || map.archived;
-    return `[${type} / <span style="color: ${st.color}">${st.word}</span>]`;
+  // Проверяем, что мы на нужной теме
+  function onRightTopic() {
+    const m = location.search.match(/[?&]id=(\d+)/);
+    return m && Number(m[1]) === ENABLE_ON_TOPIC_ID;
   }
 
-  // ---------- Заголовок темы "[дата] название"
-  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
-  function parseTitle(text) {
-    const m = String(text||'').match(TITLE_RE);
-    return m ? { dateRaw: m[1].trim(), episode: m[2].trim(), hasBracket:true }
-             : { dateRaw: '', episode: trimSp(text), hasBracket:false };
-  }
+  // Универсальный вызов сборки (ищем знакомые entrypoints)
+  function invokeBuild(opts) {
+    const fn =
+      window.FMV_buildChronology ||
+      window.FMV?.buildChronology ||
+      window.FMV?.build ||
+      window.buildChronology ||
+      window.handleBuild;
 
-  // ---------- Даты
-  const RU_MONTHS = {
-    'янв':1,'январь':1,'января':1,'фев':2,'февраль':2,'февраля':2,'мар':3,'март':3,'марта':3,
-    'апр':4,'апрель':4,'апреля':4,'май':5,'мая':5,'июн':6,'июнь':6,'июня':6,'июл':7,'июль':7,'июля':7,
-    'авг':8,'август':8,'августа':8,'сен':9,'сент':9,'сентябрь':9,'сентября':9,'окт':10,'октябрь':10,'октября':10,
-    'ноя':11,'ноябрь':11,'ноября':11,'дек':12,'декабрь':12,'декабря':12
-  };
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
-  const TMAX = [9999,12,31];
-  const yFix = (y)=> String(y).length<=2 ? 1900 + parseInt(y,10) : parseInt(y,10);
-
-  function parseDateRange(src) {
-    let s = String(src||'').trim();
-    if (!s) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-    s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
-
-    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) return { start:[yFix(m[3]),+m[2],+m[1]], end:[yFix(m[6]),+m[5],+m[4]], kind:'full-range', bad:false };
-
-    m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) { const y=yFix(m[4]), mo=+m[3]; return { start:[y,mo,+m[1]], end:[y,mo,+m[2]], kind:'day-range', bad:false }; }
-
-    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'single', bad:false }; }
-
-    m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
-    if (m && RU_MONTHS[m[1]]) { const y=+m[2], mo=RU_MONTHS[m[1]]; const a=[y,mo,0]; return { start:a, end:a.slice(), kind:'month', bad:false }; }
-
-    m = s.match(/^(\d{4})$/);
-    if (m) { const y=+m[1], a=[y,1,0]; return { start:a, end:a.slice(), kind:'year', bad:false }; }
-
-    m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
-    if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'fallback', bad:true }; }
-
-    return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
-  }
-
-  // ---------- Анти-кракозябры (декод страниц)
-  function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
-  function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
-  function sniffMetaCharset(buf) {
-    const head = new TextDecoder('windows-1252').decode(buf.slice(0,4096));
-    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
-    if (m1) return m1[1].toLowerCase();
-    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
-    if (m2) return m2[1].toLowerCase();
-    return '';
-  }
-  function scoreDecoded(html, hint) {
-    const sFFFD = countFFFD(html);
-    const sCyr  = countCyr(html);
-    const hasHtml = /<html[^>]*>/i.test(html) ? 1 : 0;
-    const hasHead = /<head[^>]*>/i.test(html) ? 1 : 0;
-    const hintBonus = hint ? 2 : 0;
-    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
-  }
-  async function fetchText(url, timeoutMs = 20000) {
-    console.log('[FMV] fetch:', url);
-    const ctrl = new AbortController();
-    const t = setTimeout(()=>ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { credentials:'include', signal:ctrl.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buf = await res.arrayBuffer();
-
-      let headerCharset = '';
-      const ct = res.headers.get('content-type') || '';
-      const mCT = ct.match(/charset=([^;]+)/i);
-      if (mCT) headerCharset = mCT[1].trim().toLowerCase();
-      const metaCharset = sniffMetaCharset(buf);
-
-      const hints = { 'utf-8': false, 'windows-1251': false };
-      if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
-      if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
-
-      const tryOrder = [];
-      if (headerCharset) tryOrder.push(headerCharset);
-      if (metaCharset && !tryOrder.includes(metaCharset)) tryOrder.push(metaCharset);
-      ['utf-8','windows-1251'].forEach(enc => { if (!tryOrder.includes(enc)) tryOrder.push(enc); });
-
-      let best = { score: -1e9, enc: '', html: '' };
-      for (const enc of tryOrder) {
-        let html = '';
-        try { html = new TextDecoder(enc, { fatal:false }).decode(buf); } catch { continue; }
-        const score = scoreDecoded(html, hints[enc]);
-        if (score > best.score) best = { score, enc, html };
+    if (typeof fn === 'function') {
+      try {
+        fn(opts || {});
+        return true;
+      } catch (e) {
+        warn('Ошибка в функции сборки:', e);
       }
-      console.log(`[FMV] decode: ${best.enc}, �=${countFFFD(best.html)}, cyr=${countCyr(best.html)}`);
-      return best.html;
-    } finally { clearTimeout(t); }
-  }
-
-  const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
-  const firstPostNode = (doc) =>
-    doc.querySelector('.post.topicpost .post-content') ||
-    doc.querySelector('.post.topicpost') || doc;
-
-  function extractFromFirst(firstNode) {
-    const locNode   = firstNode.querySelector('location');
-    const castNode  = firstNode.querySelector('characters');
-    const orderNode = firstNode.querySelector('order');
-
-    const location = (locNode ? locNode.innerText.trim() : '').toLowerCase();
-    const rawChars = castNode ? castNode.innerText : '';
-    const characters = rawChars
-      ? rawChars.split(CHAR_SPLIT).map(s=>s.trim().toLowerCase()).filter(Boolean)
-      : [];
-
-    let order = null;
-    if (orderNode) {
-      const num = parseInt(orderNode.textContent.trim(), 10);
-      if (Number.isFinite(num)) order = num;
+    } else {
+      warn('Функция сборки не найдена (ожидали FMV_buildChronology)');
     }
-    return { location, characters, order };
+    return false;
   }
 
-  async function scrapeTopic(topicUrl, rawTitle, type, status) {
-    try {
-      const html = await fetchText(topicUrl);
-      const doc  = parseHTML(html);
-      const first = firstPostNode(doc);
-      const { location, characters, order } = extractFromFirst(first);
-      const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
-      const range = parseDateRange(dateRaw);
-      const dateBad = !hasBracket || range.bad;
-      console.log('[FMV][date]', dateRaw || '(нет)', '→', range.start, '-', range.end, '('+range.kind+')', 'bad=', dateBad, '| order=', order==null?'-':order);
-      return { type, status, dateRaw, episode, url: topicUrl, location, characters, order, range, dateBad };
-    } catch (e) {
-      console.warn('[FMV] тема ✗', topicUrl, e);
-      return null;
-    }
-  }
-
-  async function scrapeSection(section) {
-    console.group(`[FMV] Раздел ${section.id} ${section.type}/${section.status}`);
-    let page = `${BASE}/viewforum.php?id=${section.id}`;
-    const seen = new Set();
-    const out  = [];
-    let pageCount = 0;
-
-    while (page && !seen.has(page) && pageCount < MAX_PAGES_PER_SECTION) {
-      pageCount++;
-      console.log('[FMV]  страница:', page);
-      seen.add(page);
-
-      const html = await fetchText(page);
-      const doc  = parseHTML(html);
-
-      const topics = new Map();
-      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
-        const href = abs(page, a.getAttribute('href'));
-        const m = href.match(/viewtopic\.php\?id=(\d+)/i);
-        if (!m) return;
-        const id = m[1];
-        const title = a.textContent || a.innerText || '';
-        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        if (!topics.has(id)) topics.set(id, { url: href, title });
-      });
-      console.log('[FMV]  тем найдено:', topics.size);
-
-      for (const { url, title } of topics.values()) {
-        const row = await scrapeTopic(url, title, section.type, section.status);
-        if (row) out.push(row);
+  // Ставим стили для плавающей кнопки и заметок
+  function ensureStyles() {
+    if (document.getElementById('fmv-chrono-styles')) return;
+    const css = `
+      #${FLOAT_ID}{
+        position:fixed; right:16px; bottom:16px; z-index:9999;
+        padding:.55em .9em; border-radius:6px; cursor:pointer;
+        background:#556B2F; color:#fff; font:600 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.92;
       }
-
-      const nextRel = doc.querySelector('a[rel="next"]');
-      let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
-      if (!nextHref) {
-        const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\b(След|Next|»|›)\b/i.test(a.textContent || ''));
-        if (candidate) nextHref = candidate.getAttribute('href');
+      #${FLOAT_ID}:hover{ opacity:1; filter:brightness(1.05); }
+      #${WRAP_ID}{ margin:8px 0 0; display:flex; gap:10px; align-items:center; }
+      #${NOTE_ID}{ font-size:90%; opacity:.85; }
+      .fmv-note-bad{
+        background: rgba(200,0,0,.14);
+        padding: 2px 6px; border-radius: 4px;
       }
-      page = nextHref ? abs(page, nextHref) : null;
-      console.log('[FMV]  следующая страница:', page || '(нет)');
-    }
-
-    console.groupEnd();
-    return out;
+    `.trim();
+    const style = document.createElement('style');
+    style.id = 'fmv-chrono-styles';
+    style.textContent = css;
+    document.documentElement.appendChild(style);
   }
 
-  async function scrapeAllUsers() {
-    console.group('[FMV] Сбор пользователей');
-    let page = `${BASE}/userlist.php`;
-    const seen = new Set();
-    const names = new Set();
-    let cnt = 0;
+  /* ----------------------- Инлайн-кнопка в посте ------------------------ */
+  function mountInlineButton() {
+    const host = document.querySelector(TARGET_SELECTOR);
+    if (!host) return false;
 
-    while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
-      cnt++; seen.add(page);
-      console.log('[FMV][users] страница:', page);
+    if (document.getElementById(WRAP_ID)) return true; // уже стоит
 
-      const html = await fetchText(page);
-      const doc  = parseHTML(html);
+    const wrap = document.createElement('div');
+    wrap.id = WRAP_ID;
 
-      doc.querySelectorAll('.usersname a').forEach(a=>{
-        const name = (a.textContent || a.innerText || '').trim().toLowerCase();
-        if (name) names.add(name);
-      });
+    const btn = document.createElement('a');
+    btn.id = BTN_ID;
+    btn.href = 'javascript:void(0)';
+    btn.className = 'button';
+    btn.textContent = 'Собрать хронологию';
+    btn.setAttribute('data-fmv-chrono-trigger', 'inline');
 
-      const nextRel = doc.querySelector('a[rel="next"]');
-      let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
-      if (!nextHref) {
-        const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\b(След|Next|»|›)\b/i.test(a.textContent || ''));
-        if (candidate) nextHref = candidate.getAttribute('href');
+    const note = document.createElement('span');
+    note.id = NOTE_ID;
+    note.setAttribute('data-fmv-chrono-note', 'inline');
+
+    wrap.appendChild(btn);
+    wrap.appendChild(note);
+    host.appendChild(wrap);
+
+    btn.addEventListener('click', () => {
+      log('Нажата инлайн-кнопка');
+      note.textContent = 'Собираю…';
+      note.classList.remove('fmv-note-bad');
+
+      const ok = invokeBuild({ buttonEl: btn, noteEl: note });
+      if (!ok) {
+        note.textContent = 'Скрипт автохронологии не загружен';
+        note.classList.add('fmv-note-bad');
       }
-      page = nextHref ? abs(page, nextHref) : null;
-    }
-    console.log('[FMV][users] всего пользователей:', names.size);
-    console.groupEnd();
-    return names;
-  }
-
-  // ---------- Сортировка
-  const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
-  function compareEvents(a, b) {
-    const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
-    if (sa !== sb) return sa - sb;
-    const ea = dateKey(a.range.end),   eb = dateKey(b.range.end);
-    if (ea !== eb) return ea - eb;
-    const ao = (a.order == null) ? Number.POSITIVE_INFINITY : a.order;
-    const bo = (b.order == null) ? Number.POSITIVE_INFINITY : b.order;
-    if (ao !== bo) return ao - bo;
-    return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
-  }
-
-  // ---------- Рендер
-  async function buildWrappedHTML() {
-    const userSet = await scrapeAllUsers();
-
-    let all = [];
-    for (const sec of SECTIONS) {
-      const part = await scrapeSection(sec);
-      all = all.concat(part);
-    }
-    all = all.filter(Boolean);
-    console.log('[FMV] всего записей:', all.length);
-    all.sort(compareEvents);
-
-    function renderNames(arr) {
-      if (!arr || !arr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
-      return arr.map(n => {
-        const safe = esc(n);
-        return userSet.has(n) ? safe : `<span style="${MISS_STYLE}">${safe}</span>`;
-      }).join(', ');
-    }
-
-    const items = all.map(e => {
-      const statusHTML = renderStatus(e.type, e.status);
-      const dateHTML = (!e.dateRaw || e.dateBad)
-        ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
-        : esc(e.dateRaw);
-
-      const url = esc(e.url);
-      const ttl = esc(e.episode);
-      const orderBadge = (e.order!=null) ? ` <span>[${esc(String(e.order))}]</span>` : '';
-
-      const names = renderNames(e.characters);
-      const loc = e.location
-        ? esc(e.location)
-        : `<span style="${MISS_STYLE}">локация не указана</span>`;
-
-      const tail = `${names} / ${loc}`;
-
-      return `<p>${statusHTML} <strong>${dateHTML}</strong> — <a href="${url}">${ttl}</a>${orderBadge}<br>` +
-             `<span style="font-style:italic">${tail}</span></p>`;
     });
 
-    const inner = items.join('') || '<p>— пусто —</p>';
-    return `<div class="quote-box spoiler-box media-box">` +
-           `<div onclick="toggleSpoiler(this);" class="">хронология</div>` +
-           `<blockquote class="">${inner}</blockquote>` +
-           `</div>`;
+    log('Инлайн-кнопка добавлена в', TARGET_SELECTOR);
+    return true;
   }
 
-  async function handleBuild(btnEl, noteEl) {
-    console.group('[FMV] Запуск сборки');
-    try {
-      const host = document.querySelector('#p83-content');
-      console.log('[FMV] host #p83-content найден:', !!host);
-      if (!host) return;
+  /* ---------------------- Резервная плавающая кнопка -------------------- */
+  function mountFloatButton() {
+    if (document.getElementById(FLOAT_ID)) return true;
 
-      if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Собираю…'; }
-      if (noteEl) noteEl.textContent = 'Подготовка…';
+    const b = document.createElement('button');
+    b.id = FLOAT_ID;
+    b.type = 'button';
+    b.textContent = 'Собрать хронологию';
+    document.body.appendChild(b);
 
-      host.innerHTML = '<div class="fmv-chrono-box" style="white-space:normal;font:inherit">Готовлю хронологию…</div>';
-
-      const wrapped = await buildWrappedHTML();
-      host.innerHTML = wrapped;
-
-      if (noteEl) noteEl.textContent = 'Готово';
-      if (btnEl) { btnEl.textContent = 'Пересобрать хронологию'; btnEl.disabled = false; }
-      console.log('[FMV] Готово');
-    } catch (e) {
-      console.error('[FMV] Ошибка:', e);
-      if (noteEl) noteEl.textContent = 'Ошибка при сборке';
-      if (btnEl) btnEl.disabled = false;
-    }
-    console.groupEnd();
-  }
-
-  // ---------- Хуки: внешняя кнопка, глобальная функция, резервная кнопка
-  function mountFallbackButton() {
-    if (!SHOW_FALLBACK_BUTTON) return null;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = 'Хронология';
-    btn.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:2147483000;padding:8px 10px;font:inherit;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)';
-    btn.addEventListener('click', () => handleBuild(btn, null));
-    document.body.appendChild(btn);
-    console.log('[FMV] Резервная кнопка поставлена (правый нижний угол)');
-    return btn;
-  }
-
-  // ЗАМЕНА функции hookExternalTrigger() в твоём скрипте
-  function hookExternalTrigger() {
-    // подпись-статус рядом с кнопкой (может подгружаться позже)
-    let noteEl = null;
-    const refreshNote = () => { noteEl = document.querySelector('[data-fmv-chrono-note]'); };
-    refreshNote();
-  
-    // 1) Делегируем клик: сработает для элементов, добавленных ПОСЛЕ загрузки
-    document.addEventListener('click', (ev) => {
-      const btn = ev.target.closest('[data-fmv-chrono-trigger]');
-      if (!btn) return;
-      console.log('[FMV] Внешний триггер: клик пойман');
-      handleBuild(btn, noteEl);
+    b.addEventListener('click', () => {
+      log('Нажата плавающая кнопка');
+      // Попробуем найти/создать заметку от инлайн-кнопки (если есть)
+      const note = document.getElementById(NOTE_ID);
+      if (note) {
+        note.textContent = 'Собираю…';
+        note.classList.remove('fmv-note-bad');
+      }
+      const ok = invokeBuild({ buttonEl: b, noteEl: note || null });
+      if (!ok) {
+        // Покажем подсказку прямо в кнопке
+        b.textContent = 'Не найден FMV_buildChronology';
+        setTimeout(() => (b.textContent = 'Собрать хронологию'), 2500);
+      }
     });
-  
-    // 2) Следим за появлением/перерисовкой подписи
-    const mo = new MutationObserver(() => refreshNote());
-    mo.observe(document.documentElement, { subtree: true, childList: true });
-  
-    // 3) Резервная плавающая кнопка (если уж совсем нет триггера в основном DOM)
-    const haveAny = !!document.querySelector('[data-fmv-chrono-trigger]');
-    if (!haveAny) {
-      console.log('[FMV] Внешняя кнопка не найдена — включаю резервную');
-      mountFallbackButton();
-    }
-  
-    // 4) Глобальная функция на всякий случай
-    window.FMV_buildChronology = (opts = {}) => {
-      const b = opts.buttonEl || document.querySelector('[data-fmv-chrono-trigger]') || null;
-      const n = opts.noteEl   || noteEl || null;
-      return handleBuild(b, n);
-    };
-    console.log('[FMV] Доступно window.FMV_buildChronology()');
+
+    log('Резервная кнопка поставлена (правый нижний угол)');
+    return true;
   }
 
-  // Ждём полной загрузки, чтоб наверняка
-  if (document.readyState === 'complete') {
-    hookExternalTrigger();
+  /* ----------------------------- Инициализация -------------------------- */
+  function init() {
+    if (!onRightTopic()) return;
+
+    ensureStyles();
+
+    // 1) Пробуем поставить инлайн-кнопку сразу
+    const okInline = mountInlineButton();
+    if (!okInline) {
+      log('Инлайн-хост не найден — ждём DOM через MutationObserver');
+      const mo = new MutationObserver(() => {
+        if (mountInlineButton()) mo.disconnect();
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+      // Через 2 сек. подстрахуемся плавучей кнопкой
+      setTimeout(() => {
+        if (!document.getElementById(WRAP_ID)) {
+          log('Внешняя кнопка не найдена — включаю резервную');
+          mountFloatButton();
+        }
+      }, 2000);
+      // Отрубим наблюдатель через 10 сек. на всякий
+      setTimeout(() => mo.disconnect(), 10000);
+    } else {
+      log('Внешняя кнопка установлена');
+    }
+
+    // На всякий случай опубликуем шорткат в консоли
+    window.FMV_buildNow = () => invokeBuild({});
+    log('Доступно window.FMV_buildNow()');
+  }
+
+  // DOM готов?
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
-    window.addEventListener('load', hookExternalTrigger, { once:true });
+    init();
   }
-
-  console.groupEnd();
 })();

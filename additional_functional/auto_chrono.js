@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  // --- включаемся только на нужной странице
+  // === Включаемся только на нужной странице
   try {
     const u = new URL(location.href);
     if (!(u.hostname === 'testfmvoice.rusff.me' &&
@@ -11,7 +11,7 @@
     }
   } catch { return; }
 
-  console.group('[FMV] Автохронология');
+  console.group('[FMV] Автохронология + проверка участников');
 
   // ===== Конфиг
   const BASE = 'https://testfmvoice.rusff.me';
@@ -20,6 +20,7 @@
     { id: 5, type: 'personal', status: 'off' }, // closed
   ];
   const MAX_PAGES_PER_SECTION = 50;
+  const MAX_PAGES_USERLIST = 200;
 
   // ===== Утилиты
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
@@ -27,10 +28,9 @@
   const esc = (s='') => String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-
   const MISS_STYLE = 'background:#ffe5e5;color:#900;padding:0 .25em;border-radius:4px';
 
-  // статус окрашиваем, personal — без акцента
+  // статус (цветом), тип не выделяем
   function renderStatus(type, status) {
     const map = {
       on:       { word: 'active',   color: 'green'  },
@@ -65,40 +65,34 @@
     if (!s) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
     s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
 
-    // dd.mm.yy(yyyy)-dd.mm.yy(yyyy)
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const a=[yFix(m[3]),+m[2],+m[1]];
       const b=[yFix(m[6]),+m[5],+m[4]];
       return { start:a, end:b, kind:'full-range', bad:false };
     }
-    // dd1-dd2.mm.yy(yyyy)
     m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const y=yFix(m[4]), mo=+m[3];
       const a=[y,mo,+m[1]], b=[y,mo,+m[2]];
       return { start:a, end:b, kind:'day-range', bad:false };
     }
-    // dd.mm.yy(yyyy)
     m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const a=[yFix(m[3]),+m[2],+m[1]];
       return { start:a, end:a.slice(), kind:'single', bad:false };
     }
-    // <месяц> <год>
     m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
     if (m && RU_MONTHS[m[1]]) {
       const y=+m[2], mo=RU_MONTHS[m[1]];
       const a=[y,mo,0];
       return { start:a, end:a.slice(), kind:'month', bad:false };
     }
-    // год
     m = s.match(/^(\d{4})$/);
     if (m) {
       const y=+m[1], a=[y,1,0];
       return { start:a, end:a.slice(), kind:'year', bad:false };
     }
-    // фоллбэк — хотя бы одна дата
     m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
     if (m) {
       const a=[yFix(m[3]),+m[2],+m[1]];
@@ -107,7 +101,7 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  // ===== декодирование страниц без кракозябр
+  // ===== декодирование (анти-кракозябры)
   function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
   function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
   function sniffMetaCharset(buf) {
@@ -162,7 +156,6 @@
     } finally { clearTimeout(t); }
   }
 
-  // ===== парсинг первого поста темы
   const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||
@@ -204,7 +197,6 @@
     }
   }
 
-  // ===== обход разделов
   async function scrapeSection(section) {
     console.group(`[FMV] Раздел ${section.id} ${section.type}/${section.status}`);
     let page = `${BASE}/viewforum.php?id=${section.id}`;
@@ -252,24 +244,57 @@
     return out;
   }
 
+  // ===== Список пользователей (userlist) с пагинацией
+  async function scrapeAllUsers() {
+    console.group('[FMV] Сбор пользователей');
+    let page = `${BASE}/userlist.php`;
+    const seen = new Set();
+    const names = new Set();
+    let cnt = 0;
+
+    while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
+      cnt++; seen.add(page);
+      console.log('[FMV][users] страница:', page);
+
+      const html = await fetchText(page);
+      const doc  = parseHTML(html);
+
+      doc.querySelectorAll('.usersname a').forEach(a=>{
+        const name = (a.textContent || a.innerText || '').trim().toLowerCase();
+        if (name) names.add(name);
+      });
+
+      const nextRel = doc.querySelector('a[rel="next"]');
+      let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
+      if (!nextHref) {
+        const candidate = Array.from(doc.querySelectorAll('a'))
+          .find(a => /\b(След|Next|»|›)\b/i.test(a.textContent || ''));
+        if (candidate) nextHref = candidate.getAttribute('href');
+      }
+      page = nextHref ? abs(page, nextHref) : null;
+    }
+    console.log('[FMV][users] всего пользователей:', names.size);
+    console.groupEnd();
+    return names;
+  }
+
   // ===== сортировка
   const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
   function compareEvents(a, b) {
     const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
     if (sa !== sb) return sa - sb;
-
     const ea = dateKey(a.range.end),   eb = dateKey(b.range.end);
     if (ea !== eb) return ea - eb;
-
     const ao = (a.order == null) ? Number.POSITIVE_INFINITY : a.order;
     const bo = (b.order == null) ? Number.POSITIVE_INFINITY : b.order;
     if (ao !== bo) return ao - bo;
-
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
-  // ===== сборка HTML (со спойлером)
+  // ===== сборка HTML (со спойлером) + проверка участников
   async function buildWrappedHTML() {
+    const userSet = await scrapeAllUsers();
+
     let all = [];
     for (const sec of SECTIONS) {
       const part = await scrapeSection(sec);
@@ -279,8 +304,16 @@
     console.log('[FMV] всего записей:', all.length);
     all.sort(compareEvents);
 
+    function renderNames(arr) {
+      if (!arr || !arr.length) return `<span style="${MISS_STYLE}">не указаны</span>`;
+      return arr.map(n => {
+        const safe = esc(n);
+        return userSet.has(n) ? safe : `<span style="${MISS_STYLE}">${safe}</span>`;
+      }).join(', ');
+    }
+
     const items = all.map(e => {
-      const statusHTML = renderStatus(e.type, e.status); // HTML со span'ом
+      const statusHTML = renderStatus(e.type, e.status);
       const dateHTML = (e.dateBad || !e.dateRaw)
         ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
         : esc(e.dateRaw);
@@ -289,15 +322,12 @@
       const ttl = esc(e.episode);
       const orderBadge = (e.order!=null) ? ` <span>[${esc(String(e.order))}]</span>` : '';
 
-      const chars = (e.characters && e.characters.length)
-        ? esc(e.characters.join(', '))
-        : `<span style="${MISS_STYLE}">не указаны</span>`;
-
+      const names = renderNames(e.characters);
       const loc = e.location
         ? esc(e.location)
-        : `<span style="${MISS_STYLE}">не указана</span>`;
+        : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
-      const tail = `${chars} / ${loc}`;
+      const tail = `${names} / ${loc}`;
 
       return `<p>${statusHTML} <strong>${dateHTML}</strong> — <a href="${url}">${ttl}</a>${orderBadge}<br>` +
              `<span style="font-style:italic">${tail}</span></p>`;

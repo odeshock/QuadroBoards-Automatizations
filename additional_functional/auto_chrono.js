@@ -1,13 +1,12 @@
-<script>
+
 /**
- * FMV Timeline Injector (фикс поиска спойлера + обновление шаблона)
- * Страница: https://testfmvoice.rusff.me/viewtopic.php?id=13
- * Кладёт собранную хронологию в пост #p83, спойлер "хронология".
+ * FMV Timeline Injector → заменяет ВСЁ внутри #p83-content готовым текстом.
+ * Работает только на https://testfmvoice.rusff.me/viewtopic.php?id=13
  */
 (function () {
   'use strict';
 
-  // --- 0) Целевая страница ---
+  // --- Строгая проверка URL (игнорируем hash) ---
   try {
     const u = new URL(location.href);
     const ok = (u.hostname === 'testfmvoice.rusff.me'
@@ -24,22 +23,23 @@
 
   console.group('[FMV] Timeline injector: старт');
 
-  // --- 1) Константы и регэкспы ---
+  // --- Константы / регэкспы ---
   const BASE = 'https://testfmvoice.rusff.me';
   const SECTIONS = [
     { id: 4, label: '[personal / on]'  },
     { id: 5, label: '[personal / off]' },
   ];
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
-  const TITLE_RE   = /^\s*\[(.+?)\]\s*(.+)$/s;
   const MAX_PAGES_PER_SECTION = 50;
 
-  // --- 2) Утилиты ---
+  // разделители для characters (всё в lowercase)
+  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
+
+  // заголовок темы: "[дата] название"
+  const TITLE_RE   = /^\s*\[(.+?)\]\s*(.+)$/s;
+
+  // --- Утилиты ---
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
   const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
-  const escapeHTML = (s) => String(s||'')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
@@ -71,7 +71,7 @@
 
   const parseHTML = (html) => new DOMParser().parseFromString(html, 'text/html');
 
-  // --- 3) Достаём данные темы ---
+  // --- Вспом. выборки в теме ---
   function firstPostNode(doc) {
     return (
       doc.querySelector('.post.topicpost .post-content') ||
@@ -109,7 +109,7 @@
     }
   }
 
-  // --- 4) Обход раздела с пагинацией ---
+  // --- Обход раздела (пагинация) ---
   async function scrapeSection(section) {
     console.group(`[FMV] Раздел ${section.id} ${section.label}`);
     let page = `${BASE}/viewforum.php?id=${section.id}`;
@@ -144,6 +144,7 @@
         console.groupEnd();
       }
 
+      // next-пагинация
       const nextRel = doc.querySelector('a[rel="next"]');
       let nextHref  = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
@@ -163,8 +164,8 @@
     return out;
   }
 
-  // --- 5) Сборка хронологии ---
-  async function buildTimeline() {
+  // --- Сборка хронологии ---
+  async function buildTimelineText() {
     console.group('[FMV] Сборка хронологии');
     const t0 = performance.now();
     let all = [];
@@ -173,6 +174,7 @@
       all = all.concat(part);
     }
     all = all.filter(Boolean);
+
     console.log('[FMV] Всего записей до сортировки:', all.length);
     all.sort((a, b) => dateToTs(a.date) - dateToTs(b.date));
     console.log('[FMV] Сортировка по дате: OK');
@@ -189,7 +191,7 @@
     return text;
   }
 
-  // --- 6) Ожидание DOM и инъекция ---
+  // --- Ожидание #p83-content и полная замена содержимого ---
   function waitForP83() {
     return new Promise(resolve => {
       const now = document.querySelector('#p83-content');
@@ -202,68 +204,23 @@
     });
   }
 
-  async function inject() {
-    console.group('[FMV] Инъекция в пост #p83');
+  async function run() {
+    console.group('[FMV] Инъекция в #p83-content');
     const host = await waitForP83();
     console.log('[FMV] Нашли #p83-content:', !!host);
 
-    // Найдём все спойлеры и залогируем их заголовки
-    const allSpoilers = Array.from(host.querySelectorAll('.quote-box.spoiler-box'));
-    console.log('[FMV] Всего спойлеров в #p83-content:', allSpoilers.length);
-    allSpoilers.forEach((box, i) => {
-      const head = box.querySelector('div[onclick*="toggleSpoiler"]') ||
-                   box.querySelector('.visible') ||
-                   box.firstElementChild;
-      console.log(`[FMV]  спойлер[${i}] заголовок:`, (head?.textContent || '').trim());
-    });
-
-    // Ищем тот, у которого заголовок содержит "хронология" (без опоры на .visible)
-    const spoilerBox = allSpoilers.find(box => {
-      const head = box.querySelector('div[onclick*="toggleSpoiler"]') ||
-                   box.querySelector('.visible') ||
-                   box.firstElementChild;
-      const title = (head?.textContent || '').trim().toLowerCase();
-      return title.includes('хронология');
-    });
-
-    if (!spoilerBox) {
-      console.warn('[FMV] Спойлер "хронология" не найден в #p83-content');
-      console.groupEnd();
-      console.groupEnd();
-      return;
-    }
-    console.log('[FMV] Спойлер "хронология" найден.');
-
-    const bq  = spoilerBox.querySelector('blockquote');
-    const tpl = spoilerBox.querySelector('script[type="text/html"]');
-
-    if (!bq)  console.warn('[FMV] Внутри спойлера нет <blockquote> — это необычно.');
-    if (!tpl) console.warn('[FMV] Внутри спойлера нет <script type="text/html"> (шаблона).');
-
-    if (bq)  bq.textContent = 'Загрузка хронологии...';
-    if (tpl) tpl.textContent = '<p>Загрузка хронологии...</p>';
+    // Ставим "заглушку" сразу
+    host.innerHTML = '<div class="fmv-chrono-box" style="white-space:pre-wrap; font:inherit;">Готовлю хронологию…</div>';
+    const box = host.querySelector('.fmv-chrono-box');
 
     try {
-      const text = await buildTimeline();
-      const html = '<p>' + escapeHTML(text).replace(/\n/g, '<br>') + '</p>';
-
-      // 1) Заполним шаблон — чтобы при разворачивании спойлера показался наш текст
-      if (tpl) {
-        tpl.textContent = html; // textContent, чтобы не выполнять скрипты при вставке
-        console.log('[FMV] Обновили шаблон <script type="text/html">');
-      }
-
-      // 2) Попробуем сразу показать внутри <blockquote> (если он уже открыт)
-      if (bq) {
-        bq.innerHTML = html;
-        console.log('[FMV] Обновили содержимое <blockquote>');
-      }
-
-      console.log('[FMV] Инъекция завершена успешно.');
+      const text = await buildTimelineText();
+      // Пишем как обычный текст: переносы сохранятся через white-space:pre-wrap
+      box.textContent = text || '— пусто —';
+      console.log('[FMV] Инъекция завершена.');
     } catch (e) {
       console.error('[FMV] Ошибка при сборке хронологии:', e);
-      if (bq)  bq.textContent  = 'Ошибка при сборке хронологии.';
-      if (tpl) tpl.textContent = '<p>Ошибка при сборке хронологии.</p>';
+      box.textContent = 'Ошибка при сборке хронологии.';
     }
 
     console.groupEnd(); // Инъекция
@@ -271,9 +228,8 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', inject, { once: true });
+    document.addEventListener('DOMContentLoaded', run, { once: true });
   } else {
-    inject();
+    run();
   }
 })();
-</script>

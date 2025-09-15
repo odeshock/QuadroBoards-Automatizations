@@ -367,21 +367,36 @@
     return btn;
   }
 
+  // ЗАМЕНА функции hookExternalTrigger() в твоём скрипте
   function hookExternalTrigger() {
-    const btn  = document.querySelector('[data-fmv-chrono-trigger]');
-    const note = document.querySelector('[data-fmv-chrono-note]');
-    if (btn) {
-      btn.addEventListener('click', () => handleBuild(btn, note));
-      console.log('[FMV] Внешняя кнопка подключена');
-    } else {
+    // подпись-статус рядом с кнопкой (может подгружаться позже)
+    let noteEl = null;
+    const refreshNote = () => { noteEl = document.querySelector('[data-fmv-chrono-note]'); };
+    refreshNote();
+  
+    // 1) Делегируем клик: сработает для элементов, добавленных ПОСЛЕ загрузки
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-fmv-chrono-trigger]');
+      if (!btn) return;
+      console.log('[FMV] Внешний триггер: клик пойман');
+      handleBuild(btn, noteEl);
+    });
+  
+    // 2) Следим за появлением/перерисовкой подписи
+    const mo = new MutationObserver(() => refreshNote());
+    mo.observe(document.documentElement, { subtree: true, childList: true });
+  
+    // 3) Резервная плавающая кнопка (если уж совсем нет триггера в основном DOM)
+    const haveAny = !!document.querySelector('[data-fmv-chrono-trigger]');
+    if (!haveAny) {
       console.log('[FMV] Внешняя кнопка не найдена — включаю резервную');
       mountFallbackButton();
     }
-
-    // Глобалка
-    window.FMV_buildChronology = function (opts={}) {
-      const b = opts.buttonEl || btn || null;
-      const n = opts.noteEl   || note || null;
+  
+    // 4) Глобальная функция на всякий случай
+    window.FMV_buildChronology = (opts = {}) => {
+      const b = opts.buttonEl || document.querySelector('[data-fmv-chrono-trigger]') || null;
+      const n = opts.noteEl   || noteEl || null;
       return handleBuild(b, n);
     };
     console.log('[FMV] Доступно window.FMV_buildChronology()');

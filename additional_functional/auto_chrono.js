@@ -60,42 +60,76 @@
   }
 
   /* ---------- даты ---------- */
-  const RU_MONTHS = {
-    'янв':1,'январь':1,'января':1, 'фев':2,'февраль':2,'февраля':2,
-    'мар':3,'март':3,'марта':3, 'апр':4,'апрель':4,'апреля':4,
-    'май':5,'мая':5, 'июн':6,'июнь':6,'июня':6, 'июл':7,'июль':7,'июля':7,
-    'авг':8,'август':8,'августа':8, 'сен':9,'сент':9,'сентябрь':9,'сентября':9,
-    'окт':10,'октябрь':10,'октября':10, 'ноя':11,'ноябрь':11,'ноября':11,
-    'дек':12,'декабрь':12,'декабря':12
-  };
   const TMAX = [9999,12,31];
   const yFix = (y)=> String(y).length<=2 ? 1900 + parseInt(y,10) : parseInt(y,10);
   const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
 
   function parseDateRange(src) {
-    let s = String(src||'').trim();
-    if (!s) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-    s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
+    let txt = String(src||'').trim();
+    if (!txt) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
+    // Normalize dashes and spaces
+    txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
 
-    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) return { start:[yFix(m[3]),+m[2],+m[1]], end:[yFix(m[6]),+m[5],+m[4]], kind:'full-range', bad:false };
+    // Patterns per spec
+    const P = {
+      single: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      dayRangeSameMonth: /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      crossMonthTailYear: /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      crossYearBothYears: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      monthYear: /^(\d{1,2})\.(\d{2}|\d{4})$/,
+      yearOnly: /^(\d{4})$/
+    };
 
-    m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) { const y=yFix(m[4]),mo=+m[3]; return { start:[y,mo,+m[1]], end:[y,mo,+m[2]], kind:'day-range', bad:false }; }
+    const toInt = (x)=>parseInt(x,10);
+    const fixYear = (y)=> String(y).length===2 ? 1900 + parseInt(y,10) : parseInt(y,10);
+    const clamp = (y,m,d)=>[Math.max(0, y), Math.min(Math.max(1,m),12), Math.min(Math.max(0,d),31)];
 
-    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'single', bad:false }; }
+    // 1) dd.mm.yy|yyyy
+    let m = txt.match(P.single);
+    if (m) {
+      const d=toInt(m[1]), mo=toInt(m[2]), y=fixYear(m[3]);
+      const a = clamp(y,mo,d); return { start:a, end:a.slice(), kind:'single', bad:false };
+    }
 
-    m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
-    if (m && RU_MONTHS[m[1]]) { const y=+m[2], mo=RU_MONTHS[m[1]]; const a=[y,mo,0]; return { start:a, end:a.slice(), kind:'month', bad:false }; }
+    // 2) dd-dd.mm.yy|yyyy
+    m = txt.match(P.dayRangeSameMonth);
+    if (m) {
+      const d1=toInt(m[1]), d2=toInt(m[2]), mo=toInt(m[3]), y=fixYear(m[4]);
+      return { start:clamp(y,mo,d1), end:clamp(y,mo,d2), kind:'day-range', bad:false };
+    }
 
-    m = s.match(/^(\d{4})$/);
-    if (m) { const y=+m[1], a=[y,1,0]; return { start:a, end:a.slice(), kind:'year', bad:false }; }
+    // 3) dd.mm-dd.mm.yy|yyyy (tail year applies to both)
+    m = txt.match(P.crossMonthTailYear);
+    if (m) {
+      const d1=toInt(m[1]), mo1=toInt(m[2]), d2=toInt(m[3]), mo2=toInt(m[4]), y=fixYear(m[5]);
+      return { start:clamp(y,mo1,d1), end:clamp(y,mo2,d2), kind:'cross-month', bad:false };
+    }
 
-    m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
-    if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'fallback', bad:true }; }
+    // 4) dd.mm.yy|yyyy - dd.mm.yy|yyyy (both sides with year)
+    m = txt.match(P.crossYearBothYears);
+    if (m) {
+      const d1=toInt(m[1]), mo1=toInt(m[2]), y1=fixYear(m[3]);
+      const d2=toInt(m[4]), mo2=toInt(m[5]), y2=fixYear(m[6]);
+      return { start:clamp(y1,mo1,d1), end:clamp(y2,mo2,d2), kind:(y1===y2?'cross-month':'cross-year'), bad:false };
+    }
 
-    return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
+    // 5) mm.yy|yyyy
+    m = txt.match(P.monthYear);
+    if (m) {
+      const mo=toInt(m[1]), y=fixYear(m[2]);
+      const a = clamp(y,mo,0);
+      return { start:a, end:a.slice(), kind:'month', bad:false };
+    }
+
+    // 6) yyyy
+    m = txt.match(P.yearOnly);
+    if (m) {
+      const y=toInt(m[1]);
+      const a = clamp(y,1,0);
+      return { start:a, end:a.slice(), kind:'year', bad:false };
+    }
+
+    return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
   }
 
   /* ---------- Новый декодер для чтения текста из DOM ---------- */

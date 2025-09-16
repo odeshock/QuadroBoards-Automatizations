@@ -17,7 +17,8 @@
   // Разделы (как в оригинале)
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  },
-    { id: 5, type: 'personal', status: 'off' },    { id: 8, type: 'au',       status: 'on'  },
+    { id: 5, type: 'personal', status: 'off' },
+    { id: 8, type: 'au',       status: 'on'  },
 
   ];
 
@@ -222,7 +223,8 @@
     const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
     const hasHead = /<\/head>/i.test(html) ? 1 : 0;
     const hintBonus = hint ? 2 : 0;
-    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50}
+    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
+  }
   async function fetchText(url, timeoutMs = 20000) {
     const ctrl = new AbortController();
     const t = setTimeout(()=>ctrl.abort(), timeoutMs);
@@ -403,8 +405,8 @@ type, status, dateRaw, episode, url: topicUrl,
       const ao = (a.order == null) ? 0 : a.order;
       const bo = (b.order == null) ? 0 : b.order;
       if (ao !== bo) return ao - bo;
-      return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity: 'base' });
-    }
+      return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity: 'base' }
+}
 
     // Default: by dates, then order (missing -> +∞), then title
     const sa = dateKey(a.range.start), sb = dateKey(b.range.start);

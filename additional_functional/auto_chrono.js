@@ -295,11 +295,14 @@
 
       const { locationsLower, charactersLower, order } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
-const isAu = (type === 'au');
-const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
-const titleLower = String(rawTitle || '').toLowerCase();
-const auBad = isAu ? !titleLower.includes('[au]') : false;
-const dateBad = isAu ? auBad : (!hasBracket || range.bad);
+      const isAu = (type === 'au');
+      const range = isAu
+        ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false }
+        : parseDateRange(dateRaw);
+      // [au] должно быть первым блоком в названии темы
+      const auAtStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));
+      const auBad = isAu ? !auAtStart : false;
+      const dateBad = isAu ? auBad : (!hasBracket || range.bad);
 
       return {
         type, status, dateRaw, episode, url: topicUrl,
@@ -429,7 +432,7 @@ const dateBad = isAu ? auBad : (!hasBracket || range.bad);
       const statusHTML = renderStatus(e.type, e.status);
       const dateHTML = e.type === 'au'
     ? (e.dateBad
-        ? `<span style="${MISS_STYLE}">[au] не указано в названии</span>`
+        ? `<span style="${MISS_STYLE}">проблема с [au] в названии</span>`
         : '')
     : ((!e.dateRaw || e.dateBad)
         ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`

@@ -226,8 +226,12 @@
         link: href||'',
         participants_list: participants,                 // [{label, href}]
         masks_list: masks,                               // [{label, href}]
-        participants_text: participants.map(x=>x.label).join('\n'),
-        masks_text: masks.map(x=>x.label).join('\n'),
+        participants_text: participants
+          .map(x => x.href ? `${x.label} — ${x.href}` : x.label)
+          .join('\n'),
+        masks_text: masks
+          .map(x => x.href ? `${x.label} — ${x.href}` : x.label)
+          .join('\n'),
         location: location||'',
         order:'',
         type: type||'',
@@ -407,7 +411,7 @@
   /* ===== Обработчик кнопки ===== */
   function onDownloadClick(){
     const rows = collectRows();
-    if (!rows.length) { alert('Не найдена собранная хронология :('); return; }
+    if (!rows.length) { alert('Не найдена собранная хронология'); return; }
     const xlsx = buildXLSX(rows);
     downloadXLSX(xlsx);
   }

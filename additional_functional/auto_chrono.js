@@ -42,13 +42,19 @@
 
   /* ---------- статусный бейдж (цвет) ---------- */
   function renderStatus(type, status) {
-    const map = {
+    const mapType = {
+      personal: { word: 'personal', color: 'black'  },
+      plot:     { word: 'plot',     color: 'black'  },
+      au:       { word: 'au',       color: 'red'    }
+    };
+    const mapStatus = {
       on:       { word: 'active',   color: 'green'  },
       off:      { word: 'closed',   color: 'teal'   },
       archived: { word: 'archived', color: 'maroon' }
     };
-    const st = map[status] || map.archived;
-    return `[${escapeHtml(type)} / <span style="color:${st.color}">${st.word}</span>]`;
+    const t = mapType[${escapeHtml(type)] || mapType.au;
+    const st = mapStatus[status] || mapStatus.archived;
+    return `[<span style="color:${t.color}">${t.word}</span> / <span style="color:${st.color}">${st.word}</span>]`;
   }
 
   /* ---------- заголовок темы ---------- */

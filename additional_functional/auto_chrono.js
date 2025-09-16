@@ -18,6 +18,7 @@
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  },
     { id: 5, type: 'personal', status: 'off' },
+    { id: 8, type: 'au', status: 'on' },
   ];
 
   const MAX_PAGES_PER_SECTION = 50;

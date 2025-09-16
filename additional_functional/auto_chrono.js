@@ -16,7 +16,7 @@
 
   // Разделы (как в оригинале)
   const SECTIONS = [
-    { id: 4, type: 'personal', status: 'on'  },
+    { id: 4, type: 'personal', status: 'archived'  },
     { id: 5, type: 'personal', status: 'off' },
     { id: 8, type: 'au', status: 'on' },
     { id: 9, type: 'plot', status: 'on' },

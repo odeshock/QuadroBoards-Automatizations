@@ -144,6 +144,33 @@
   return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
 }
 
+  /* ---------- НОРМАЛИЗОВАННЫЙ ВЫВОД ДАТЫ (строго ограничённые форматы) ---------- */
+  const z2 = (n) => String(n).padStart(2, '0');
+  function formatRange(r) {
+    if (!r || !r.start || !r.end) return '';
+    const [y1, m1, d1] = r.start;
+    const [y2, m2, d2] = r.end;
+
+    switch (r.kind) {
+      case 'single':       // dd.mm.yyyy
+        return `${z2(d1)}.${z2(m1)}.${y1}`;
+      case 'day-range':    // dd-dd.mm.yyyy
+        return `${z2(d1)}-${z2(d2)}.${z2(m1)}.${y1}`;
+      case 'cross-month':  // dd.mm-dd.mm.yyyy  (год берём хвостовой)
+        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
+      case 'month':        // mm.yyyy
+        return `${z2(m1)}.${y1}`;
+      case 'year':         // yyyy
+        return String(y1);
+      default: {
+        // На случай диапазона с двумя годами: покажем полный период как dd.mm.yyyy-dd.mm.yyyy
+        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${z2(d2)}.${z2(m2)}.${y2}`;
+        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
+      }
+    }
+  }
+
+
   /* ---------- Новый декодер для чтения текста из DOM ---------- */
   function safeNodeText(node) {
     const raw = (node && (node.innerText ?? node.textContent) || '').trim();
@@ -397,7 +424,7 @@
       const statusHTML = renderStatus(e.type, e.status);
       const dateHTML   = (!e.dateRaw || e.dateBad)
         ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
-        : escapeHtml(e.dateRaw);
+        : escapeHtml(formatRange(e.range));
 
       const url        = escapeHtml(e.url);
       const ttl        = escapeHtml(e.episode);

@@ -1,3 +1,12 @@
+// auto_chrono_per_character.js
+// Собирает персональные хронологии ТОЛЬКО из общей хроники (#p83-content).
+// Не ходит на /userlist.php — имена и ссылки берутся из DOM текущей страницы,
+// поэтому кодировка всегда корректная.
+//
+// Вставляет кнопку после #p82-content и кладёт результат в #p92-content.
+//
+// © you, 2025
+
 (() => {
   // Работать только на нужной странице
   try {
@@ -10,22 +19,21 @@
   } catch { return; }
 
   // ===== НАСТРОЙКИ =====
-  // ИД профилей, которых нужно пропустить (добавьте свои id)
+  // ID профилей, которых нужно пропустить
   const EXCLUDED_PROFILE_IDS = [
-    /* пример: 1, 2, 3 */
+    // пример: 1, 2, 3
   ];
-  const MAX_USER_PAGES = 200; // предохранитель
 
   // ===== ИНИЦИАЛИЗАЦИЯ UI =====
   const init = () => {
-    const anchor = document.querySelector('#fmv-chrono-inline');
+    const anchor = document.querySelector('#p82-content');
     if (!anchor) return;
 
-    // Уже создано?
     if (document.getElementById('fmv-chrono-people-inline')) return;
 
     const box = document.createElement('div');
     box.id = 'fmv-chrono-people-inline';
+
     const btn = document.createElement('a');
     btn.id = 'fmv-chrono-people-inline-btn';
     btn.className = 'button';
@@ -40,7 +48,6 @@
     box.appendChild(btn);
     box.appendChild(note);
 
-    // Вставить сразу после #p82-content
     anchor.insertAdjacentElement('afterend', box);
 
     btn.addEventListener('click', async () => {
@@ -49,14 +56,10 @@
 
       try {
         const episodes = parseEpisodesFromP83();
-        if (!episodes.length) {
-          throw new Error('Не найдена собранная хронология');
-        }
+        if (!episodes.length) throw new Error('Не найдено эпизодов в #p83-content');
 
-        const users = await fetchAllUsers();
-        const filteredUsers = users.filter(u => !EXCLUDED_PROFILE_IDS.includes(u.id));
-
-        const html = buildChronologies(episodes, filteredUsers);
+        const users = usersFromEpisodes(episodes);
+        const html = buildChronologies(episodes, users);
 
         const target = document.querySelector('#p92-content');
         if (!target) throw new Error('Не найден контейнер #p92-content');
@@ -76,7 +79,7 @@
     init();
   }
 
-  // ===== ПАРСИНГ ОБЩЕЙ ХРОНОЛОГИИ =====
+  // ===== ПАРСИНГ ОБЩЕЙ ХРОНИКИ (#p83-content) =====
   function parseEpisodesFromP83() {
     const container = document.querySelector('#p83-content .quote-box blockquote');
     if (!container) return [];
@@ -84,72 +87,40 @@
 
     const episodes = [];
     items.forEach(p => {
-      const firstLink = p.querySelector('a[href*="viewtopic.php"]');
-      if (!firstLink) return;
+      const topicLink = p.querySelector('a[href*="viewtopic.php"]');
+      if (!topicLink) return;
 
-      // Тип/статус — первые два <span> ДО ссылки
+      // Тип/статус — первые два <span> до ссылки
       const spansBefore = [];
       for (const node of p.childNodes) {
-        if (node === firstLink) break;
+        if (node === topicLink) break;
         if (node.nodeType === 1 && node.tagName === 'SPAN') spansBefore.push(node);
       }
       const type = (spansBefore[0]?.textContent || '').trim().toLowerCase();
       const status = (spansBefore[1]?.textContent || '').trim().toLowerCase();
 
-      // Дата — между закрывающей ']' и первым '—'
-      // --- извлекаем сырой фрагмент даты между ']' и последним тире перед заголовком
+      // Дата — текст между ']' и первым '—'
       const fullText = (p.textContent || '').replace(/\s+/g, ' ').trim();
       const bracketEnd = fullText.indexOf(']');
-      
-      const titleText = (firstLink.textContent || '').replace(/\s+/g, ' ').trim();
-      const titlePos  = titleText ? fullText.indexOf(titleText) : -1;
-      
-      let dashIndex = -1;
-      if (titlePos !== -1) {
-        dashIndex = Math.max(
-          fullText.lastIndexOf(' — ', titlePos),
-          fullText.lastIndexOf(' – ', titlePos),
-          fullText.lastIndexOf(' - ', titlePos),
-          fullText.lastIndexOf('—', titlePos - 1),
-          fullText.lastIndexOf('–', titlePos - 1),
-          fullText.lastIndexOf('-', titlePos - 1),
-        );
-      } else {
-        const from = Math.max(0, bracketEnd + 1);
-        const candidates = [' — ', ' – ', ' - ', '—', '–', '-']
-          .map(sep => fullText.indexOf(sep, from))
-          .filter(i => i !== -1)
-          .sort((a, b) => a - b);
-        dashIndex = candidates.length ? candidates[0] : -1;
-      }
-      
+      const dashIndex = fullText.indexOf('—', Math.max(0, bracketEnd + 1));
       let rawDate = '';
       if (bracketEnd !== -1 && dashIndex !== -1 && dashIndex > bracketEnd) {
         rawDate = fullText.slice(bracketEnd + 1, dashIndex).trim();
       }
-      
-      // --- разбиваем диапазон и нормализуем каждую часть в числовые форматы
-      const [dateStartRaw, dateEndRaw] = splitDate(rawDate);
-      const dateStart = normalizeNumericDate(dateStartRaw);
-      const dateEnd   = normalizeNumericDate(dateEndRaw);
+      const [dateStart, dateEnd] = splitDate(rawDate);
 
-
-      // Участники (в <i>), вместе с масками
+      // Участники с масками (элемент <i>)
       const iEl = p.querySelector(':scope > i');
       const participants = iEl ? parseParticipants(iEl) : [];
 
-      // Локация — после </i> и " / "
+      // Локация — текст после </i> и " / "
       const location = extractLocation(p, iEl);
 
       episodes.push({
-        type,
-        status,
-        dateStart,
-        dateEnd,
-        title: (firstLink.textContent || '').trim(),
-        href: firstLink.href,
-        participants,
-        location
+        type, status, dateStart, dateEnd,
+        title: (topicLink.textContent || '').trim(),
+        href: topicLink.href,
+        participants, location
       });
     });
 
@@ -158,44 +129,11 @@
 
   function splitDate(s) {
     if (!s || !s.trim()) return ['не указана', 'не указана'];
-    // поддержка -, – и —
-    const parts = s.split(/\s*[–—-]\s*/).filter(Boolean);
+    const parts = s.split('-').map(x => x.trim()).filter(Boolean);
     if (parts.length === 1) return [parts[0], parts[0]];
-    // если несколько тире, всё правее первого считаем концом
-    return [parts[0], parts.slice(1).join('—')];
+    return [parts[0], parts.slice(1).join('-')];
   }
 
-  // Приводит строку к одному из форматов: dd.mm.yyyy, mm.yyyy или yyyy
-  // Всё остальное возвращает как есть (без «умного» распознавания).
-  function normalizeNumericDate(raw) {
-    if (!raw) return 'не указана';
-    const s = raw.trim();
-  
-    // dd.mm.yyyy
-    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-    if (m) {
-      const d  = String(+m[1]).padStart(2, '0');
-      const mo = String(+m[2]).padStart(2, '0');
-      const y  = m[3];
-      return `${d}.${mo}.${y}`;
-    }
-  
-    // mm.yyyy
-    m = s.match(/^(\d{1,2})\.(\d{4})$/);
-    if (m) {
-      const mo = String(+m[1]).padStart(2, '0');
-      const y  = m[2];
-      return `${mo}.${y}`;
-    }
-  
-    // yyyy
-    m = s.match(/^(\d{4})$/);
-    if (m) return m[1];
-  
-    // Иначе — возвращаем как есть (например, если текстовый месяц)
-    return s;
-  }
-  
   function parseParticipants(iEl) {
     const out = [];
     const kids = Array.from(iEl.childNodes);
@@ -209,7 +147,7 @@
           const m = href.match(/profile\.php\?id=(\d+)/);
           if (m) id = Number(m[1]);
         }
-        // собрать текст до следующего A|SPAN — там может быть [as ...]
+        // Соберём текст между этой нодой и следующей A|SPAN — там может быть [as ...]
         let buff = '';
         let j = i + 1;
         while (j < kids.length && !(kids[j].nodeType === 1 && (kids[j].tagName === 'A' || kids[j].tagName === 'SPAN'))) {
@@ -219,7 +157,7 @@
         const m2 = buff.match(/\[as\s*([^\]]+)\]/i);
         const mask = m2 ? m2[1].trim() : null;
 
-        out.push({ name, href, id, mask });
+        out.push({ id, name, href, mask });
       }
     }
     return out;
@@ -235,90 +173,22 @@
     return loc || 'не указана';
   }
 
-  // ===== ЗАГРУЗКА СПИСКА ПОЛЬЗОВАТЕЛЕЙ С ПАГИНАЦИЕЙ =====
-  async function fetchAllUsers() {
-    const map = new Map(); // id -> {id,name,href}
-    for (let page = 1; page <= MAX_USER_PAGES; page++) {
-      const url = page === 1 ? '/userlist.php' : `/userlist.php?p=${page}`;
-      const html = await fetchHtml(url);
-      if (!html) break;
-
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const links = Array.from(doc.querySelectorAll('a[href*="profile.php?id="]'));
-
-      const before = map.size;
-      for (const a of links) {
-        const href = a.getAttribute('href') || '';
-        const m = href.match(/profile\.php\?id=(\d+)/);
-        if (!m) continue;
-        const id = Number(m[1]);
-        if (map.has(id)) continue;
-        const name = (a.textContent || '').trim();
-        // отсекаем мусорные ссылки без имени
-        if (!name) continue;
-        map.set(id, { id, name, href: new URL(href, location.origin).href });
-      }
-      if (map.size === before) {
-        // новая страница не дала новых профилей — дальше смысла нет
-        break;
+  // ===== УЧАСТНИКИ ТОЛЬКО ИЗ ЭПИЗОДОВ =====
+  function usersFromEpisodes(episodes) {
+    const map = new Map(); // id -> { id, name, href }
+    for (const ep of episodes) {
+      for (const p of ep.participants) {
+        if (p.id == null) continue; // нужен именно профиль (ссылка)
+        if (EXCLUDED_PROFILE_IDS.includes(p.id)) continue;
+        if (!map.has(p.id)) map.set(p.id, { id: p.id, name: p.name, href: p.href });
       }
     }
-    // алфавит по имени (русская локаль)
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }
 
-  // замените fetchHtml на вариант с явной декодировкой
-  async function fetchHtml(relUrl) {
-    try {
-      const resp = await fetch(relUrl, { credentials: 'include' });
-      if (!resp.ok) return null;
-  
-      const buf = await resp.arrayBuffer();
-  
-      // 1) попытка достать charset из заголовка
-      let enc = 'utf-8';
-      const ct = resp.headers.get('content-type') || '';
-      const m = ct.match(/charset=([^;]+)/i);
-      if (m) enc = m[1].toLowerCase();
-  
-      // 2) первичная декодировка
-      let html = new TextDecoder(enc).decode(buf);
-  
-      // 3) если в <meta> указан другой charset — декодируем повторно
-      const mm = html.match(/<meta[^>]+charset=["']?([\w-]+)/i);
-      if (mm && mm[1] && mm[1].toLowerCase() !== enc) {
-        enc = mm[1].toLowerCase();
-        html = new TextDecoder(enc).decode(buf);
-      }
-  
-      // 4) грубый fallback для русских форумов
-      if (/����/.test(html) && enc === 'utf-8') {
-        try { html = new TextDecoder('windows-1251').decode(buf); } catch {}
-      }
-  
-      return html;
-    } catch {
-      return null;
-    }
-  }
-  
-  const nameByIdFromEpisodes = new Map();
-  for (const ep of episodes) {
-    for (const p of ep.participants) {
-      if (p.id != null && p.name) nameByIdFromEpisodes.set(p.id, p.name);
-    }
-  }
-  
-  for (const u of filteredUsers) {
-    const fixed = nameByIdFromEpisodes.get(u.id);
-    if (fixed) u.name = fixed; // имя уже из DOM текущей страницы, без проблем с кодировкой
-  }
-
-  
-
   // ===== СБОРКА ИТОГОВОЙ РАЗМЕТКИ =====
   function buildChronologies(episodes, users) {
-    // индекс эпизодов по id профиля (только те, кто отмечен ссылкой)
+    // Индекс эпизодов по id профиля
     const byUser = new Map();
     for (const ep of episodes) {
       const ids = ep.participants.filter(p => p.id != null).map(p => p.id);
@@ -331,7 +201,6 @@
     const frag = document.createDocumentFragment();
 
     for (const user of users) {
-      if (EXCLUDED_PROFILE_IDS.includes(user.id)) continue;
       const eps = byUser.get(user.id);
       if (!eps || eps.length === 0) continue;
 
@@ -344,7 +213,6 @@
       link.href = user.href;
       link.rel = 'nofollow';
       link.textContent = user.name;
-      head.appendChild(document.createTextNode(' '));
       head.appendChild(link);
 
       const body = document.createElement('blockquote');
@@ -354,12 +222,8 @@
         const selfMask = selfPart?.mask || '';
 
         const others = ep.participants
-          .filter(p => p.id !== user.id) // включает и тех, у кого нет id (SPAN)
-          .map(p => {
-            const nm = p.name;
-            const mk = p.mask ? ` [as ${p.mask}]` : '';
-            return nm + mk;
-          })
+          .filter(p => p.id !== user.id)
+          .map(p => p.name + (p.mask ? ` [as ${p.mask}]` : ''))
           .join(', ');
 
         const pEl = document.createElement('p');
@@ -374,6 +238,7 @@
           `локация - ${safe(ep.location)}`,
           `участники - ${others || '—'}`
         ].join('<br>');
+
         body.appendChild(pEl);
       }
 

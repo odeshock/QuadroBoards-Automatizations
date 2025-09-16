@@ -26,7 +26,7 @@
 
   // ===== ИНИЦИАЛИЗАЦИЯ UI =====
   const init = () => {
-    const anchor = document.querySelector('#fmv-chrono-people-inline');
+    const anchor = document.querySelector('#fmv-chrono-inline');
     if (!anchor) return;
 
     if (document.getElementById('fmv-chrono-people-inline')) return;

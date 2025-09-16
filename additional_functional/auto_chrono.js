@@ -98,125 +98,58 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  /* ===================== Сеть и декодирование (обновлено) ===================== */
-
-  /**
-   * Нормализация метки кодировки (charset) к тому, что понимает TextDecoder.
-   */
-  function normalizeCharset(label) {
-    if (!label) return null;
-    label = String(label).trim().toLowerCase();
-
-    // популярные синонимы
-    if (label === 'utf8' || label === 'utf_8') return 'utf-8';
-    if (label === 'win-1251' || label === 'windows1251' || label === 'cp1251') return 'windows-1251';
-    if (label === 'koi8' || label === 'koi8_r' || label === 'koi8r') return 'koi8-r';
-    if (label === 'iso8859-5' || label === 'iso_8859-5') return 'iso-8859-5';
-    return label;
+  /* ---------- сеть/парс ---------- */
+  function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
+  function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
+  function sniffMetaCharset(buf) {
+    const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
+    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
+    if (m1) return m1[1].toLowerCase();
+    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
+    if (m2) return m2[1].toLowerCase();
+    return '';
   }
-
-  /**
-   * Вытащить charset из Content-Type.
-   */
-  function sniffCharsetFromContentType(contentType) {
-    if (!contentType) return null;
-    const m = /;\s*charset\s*=\s*("?)([^;"\s]+)\1/i.exec(contentType);
-    return normalizeCharset(m && m[2]);
+  function scoreDecoded(html, hint) {
+    const sFFFD = countFFFD(html);
+    const sCyr  = countCyr(html);
+    const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
+    const hasHead = /<\/head>/i.test(html) ? 1 : 0;
+    const hintBonus = hint ? 2 : 0;
+    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
   }
-
-  /**
-   * Пробный decode с указанной кодировкой.
-   */
-  function decodeWith(label, buf) {
+  async function fetchText(url, timeoutMs = 20000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), timeoutMs);
     try {
-      const dec = new TextDecoder(label || 'utf-8', { fatal: false });
-      return dec.decode(buf);
-    } catch (e) {
-      return null;
-    }
+      const res = await fetch(url, { credentials:'include', signal:ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+
+      const ct = res.headers.get('content-type') || '';
+      const mCT = ct.match(/charset=([^;]+)/i);
+      const headerCharset = mCT ? mCT[1].trim().toLowerCase() : '';
+      const metaCharset   = sniffMetaCharset(buf);
+
+      const hints = { 'utf-8': false, 'windows-1251': false };
+      if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
+      if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
+
+      const tryOrder = [];
+      if (headerCharset) tryOrder.push(headerCharset);
+      if (metaCharset && !tryOrder.includes(metaCharset)) tryOrder.push(metaCharset);
+      ['utf-8','windows-1251'].forEach(enc => { if (!tryOrder.includes(enc)) tryOrder.push(enc); });
+
+      let best = { score: -1e9, enc: '', html: '' };
+      for (const enc of tryOrder) {
+        let html = '';
+        try { html = new TextDecoder(enc, { fatal:false }).decode(buf); }
+        catch { continue; }
+        const score = scoreDecoded(html, hints[enc]);
+        if (score > best.score) best = { score, enc, html };
+      }
+      return best.html;
+    } finally { clearTimeout(t); }
   }
-
-  /**
-   * Очень простой детектор «ломаного» UTF-8 (типичные артефакты cp1251→utf8: Ð, Ñ, �)
-   */
-  function looksLikeUtf8Mojibake(s) {
-    if (!s) return false;
-    // много «Ð», «Ñ», «�» подряд — характерно для неверной декодировки русских букв
-    const badPairs = (s.match(/[ÐÑ�]{2,}/g) || []).length;
-    return badPairs >= 2;
-  }
-
-  /**
-   * Достаём <meta charset=...> из «первого UTF-8 прогона».
-   * Мы сначала пробуем UTF-8, парсим head и, если там явно указана не utf-8,
-   * повторно декодируем байты нужной кодировкой (буфер у нас ещё есть).
-   */
-  function sniffCharsetFromMeta(utf8Guess) {
-    if (!utf8Guess) return null;
-    const head = utf8Guess.slice(0, 8192).toLowerCase();
-
-    // <meta charset="windows-1251">
-    let m = head.match(/<meta[^>]+charset\s*=\s*["']?\s*([^"'>\s]+)/i);
-    if (m && m[1]) return normalizeCharset(m[1]);
-
-    // <meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
-    m = head.match(/<meta[^>]+http-equiv=["']content-type["'][^>]+content=["'][^"']*charset\s*=\s*([^"'>\s]+)/i);
-    if (m && m[1]) return normalizeCharset(m[1]);
-
-    return null;
-  }
-
-  /**
-   * Умный загрузчик текста страницы:
-   * 1) тянем как ArrayBuffer;
-   * 2) если в заголовке есть charset ≠ utf-8 — декодируем им;
-   * 3) иначе пробуем utf-8; если в <meta> указан другой charset — декодируем им;
-   * 4) иначе, если на лице «кракозябры» — пробуем windows-1251;
-   * 5) иначе оставляем utf-8.
-   */
-  async function fetchTextSmart(url, fetchInit) {
-    const res = await fetch(url, fetchInit || { credentials: 'include' });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-
-    const contentType = res.headers.get('content-type') || '';
-    const buf = new Uint8Array(await res.arrayBuffer());
-
-    // 1) content-type
-    const ctCharset = sniffCharsetFromContentType(contentType);
-    if (ctCharset && ctCharset !== 'utf-8') {
-      const t = decodeWith(ctCharset, buf);
-      if (t != null) return t;
-    }
-
-    // 2) пробуем UTF-8
-    const utf8Text = decodeWith('utf-8', buf) || '';
-
-    // 3) <meta charset=...>
-    const metaCharset = sniffCharsetFromMeta(utf8Text);
-    if (metaCharset && metaCharset !== 'utf-8') {
-      const t = decodeWith(metaCharset, buf);
-      if (t != null) return t;
-    }
-
-    // 4) эвристика «кракозябры»
-    if (looksLikeUtf8Mojibake(utf8Text)) {
-      const t1251 = decodeWith('windows-1251', buf);
-      if (t1251 != null) return t1251;
-    }
-
-    // 5) по умолчанию — UTF-8
-    return utf8Text;
-  }
-
-  /**
-   * Обёртка, возвращающая DOM-документ.
-   */
-  async function fetchDocumentSmart(url, fetchInit) {
-    const html = await fetchTextSmart(url, fetchInit);
-    return new DOMParser().parseFromString(html, 'text/html');
-  }
-
-
   const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||
@@ -253,8 +186,8 @@
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
     try {
-      const html = await fetchTextSmart(topicUrl);
-      const doc  = await fetchDocumentSmart(html);
+      const html = await fetchText(topicUrl);
+      const doc  = parseHTML(html);
       const first= firstPostNode(doc);
 
       const { locationsLower, charactersLower, order } = extractFromFirst(first);
@@ -283,8 +216,8 @@
       pageCount++;
       seen.add(page);
 
-      const html = await fetchTextSmart(url);
-      const doc  = await fetchDocumentSmart(url);
+      const html = await fetchText(page);
+      const doc  = parseHTML(html);
 
       const topics = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
@@ -324,8 +257,8 @@
       cnt++;
       seen.add(page);
 
-      const html = await fetchText(fetchTextSmart);
-      const doc  = await fetchDocumentSmart(html);
+      const html = await fetchText(page);
+      const doc  = parseHTML(html);
 
       const anchors = doc.querySelectorAll('.usersname a, a[href*="profile.php?id="]');
       anchors.forEach(a=>{

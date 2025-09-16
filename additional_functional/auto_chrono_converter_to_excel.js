@@ -1,6 +1,5 @@
 /* Только после https://github.com/odeshock/QuadroBoards-Automatizations/blob/main/additional_functional/auto_chrono.js */
 
-
 (() => {
   /* ===== Активируемся только в нужной теме ===== */
   try {
@@ -18,8 +17,6 @@
     if (!inlineBox) return false;
     if (inlineBox.querySelector('#dl-chrono-btn')) return true;
 
-    inlineBox.appendChild(document.createElement('br'));
-    
     const btn = document.createElement('a');
     btn.id = 'dl-chrono-btn';
     btn.href = 'javascript:void(0)';
@@ -98,15 +95,25 @@
     return {start:'', end:''};
   }
 
+  function tsInTZ(tz = 'Europe/Moscow') {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    }).formatToParts(new Date());
+    const get = t => parts.find(p => p.type === t).value;
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+  }
+
+
   /* ===== Извлечение из <p> ===== */
-  // Точно связываем роли [as ...] с последним именем (ссылка или нет),
-  // при этом сами [as ...] не попадают в список участников.
   function parseItalic(iElem){
     const participants = [];
     const masks = [];
     if (!iElem) return {participants, masks};
 
-    // Сначала соберём токены из дочерних узлов: NAME и ROLES
+    // Токены: имена (со/без ссылки) и блоки ролей [as ...]
     const tokens = [];
     iElem.childNodes.forEach(n=>{
       if (n.nodeType === 1) {
@@ -117,10 +124,8 @@
         } else {
           const label = text(n);
           if (label && !/\[as/i.test(label) && !/не указан/i.test(label)) {
-            // это имя без ссылки (например, <span>sebastian</span> или <span>tom</span>)
             tokens.push({type:'name', label, href:''});
           }
-          // если внутри элемента может быть [as ...] (редко), достанем тоже
           const mAll = (n.textContent||'').match(/\[as([^\]]+)\]/ig);
           if (mAll) {
             mAll.forEach(m0=>{
@@ -132,7 +137,6 @@
         }
       } else if (n.nodeType === 3) {
         const t = n.textContent || '';
-        // Только роли из текстовых узлов
         const re = /\[as([^\]]+)\]/ig;
         let mm;
         while ((mm = re.exec(t)) !== null) {
@@ -142,12 +146,11 @@
       }
     });
 
-    // Привязываем роли к последнему имени
     let lastName = null;
     tokens.forEach(tok=>{
       if (tok.type === 'name') {
         lastName = tok;
-        participants.push({label: tok.label, href: tok.href}); // добавляем участника
+        participants.push({label: tok.label, href: tok.href});
       } else if (tok.type === 'roles') {
         if (lastName) {
           tok.roles.forEach(r => masks.push({label: r, href: lastName.href || ''}));
@@ -215,8 +218,7 @@
       const italic = p.querySelector('i');
       const {participants, masks} = parseItalic(italic);
       const location = extractLocation(p);
-      const d=new Date();
-      const ts = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+      const ts = tsInTZ('Europe/Moscow'); // timestamp по Москве
 
       rows.push({
         start, end,
@@ -236,7 +238,8 @@
     return rows;
   }
 
-  /* ===== XLSX (3 листа) ===== */
+  /* ===== XLSX (3 листа, участники/маски как настоящие гиперссылки) ===== */
+  // ZIP helpers
   const CRC_TABLE = (()=>{let c,t=[],n; for(n=0;n<256;n++){c=n;for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0;} return t;})();
   const crc32 = (u8)=>{ let c=0^(-1); for(let i=0;i<u8.length;i++) c=(c>>>8)^CRC_TABLE[(c^u8[i])&255]; return (c^(-1))>>>0; };
   const str2u8 = s => new TextEncoder().encode(s);
@@ -259,7 +262,7 @@
     return cellInline(label||'');
   }
 
-  // Лист 1: Хронология (Название = гиперссылка на эп)
+  // Лист 1: Хронология (Название = гиперссылка, участники/маски — если один с URL → HYPERLINK)
   function sheetMainXML(rows){
     const header = ['#','Дата начала','Дата завершения','Название','Участники','Маски','Локация','Порядок','Тип','Статус','Timestamp обновления'];
     const headerRow = `<row r="1">${header.map(cellInline).join('')}</row>`;
@@ -268,9 +271,22 @@
       cells.push(cellInline(String(i+1)));
       cells.push(cellInline(r.start||''));
       cells.push(cellInline(r.end||''));
-      cells.push(linkCell(r.link, r.title || r.link));   // Гиперссылка
-      cells.push(cellInline(r.participants_text||''));    // только имена
-      cells.push(cellInline(r.masks_text||''));           // только роли
+      cells.push(linkCell(r.link, r.title || r.link));   // Название как гиперссылка
+
+      // Участники
+      if (r.participants_list && r.participants_list.length===1 && r.participants_list[0].href){
+        cells.push(linkCell(r.participants_list[0].href, r.participants_list[0].label));
+      } else {
+        cells.push(cellInline(r.participants_text||''));
+      }
+
+      // Маски
+      if (r.masks_list && r.masks_list.length===1 && r.masks_list[0].href){
+        cells.push(linkCell(r.masks_list[0].href, r.masks_list[0].label));
+      } else {
+        cells.push(cellInline(r.masks_text||''));
+      }
+
       cells.push(cellInline(r.location||''));
       cells.push(cellInline(r.order||''));
       cells.push(cellInline(r.type||''));
@@ -284,9 +300,9 @@
 </worksheet>`;
   }
 
-  // Лист 2: Участники — как "Имя | URL"
+  // Лист 2: Участники — один столбец Имя как HYPERLINK (если есть URL)
   function sheetParticipantsXML(rows){
-    const header = ['#','Имя','URL'];
+    const header = ['#','Имя'];
     const headerRow = `<row r="1">${header.map(cellInline).join('')}</row>`;
     let rIndex = 2;
     const dataRows = rows.map((row, i)=>{
@@ -294,9 +310,8 @@
       const list = row.participants_list || [];
       return list.map(p=>{
         const c1 = cellInline(String(idx));
-        const c2 = cellInline(p.label || '');
-        const c3 = cellInline(p.href || '');  // URL как текст: Sheets сделает кликабельным
-        const xml = `<row r="${rIndex}">${c1}${c2}${c3}</row>`; rIndex++; return xml;
+        const c2 = p.href ? linkCell(p.href, p.label) : cellInline(p.label||'');
+        const xml = `<row r="${rIndex}">${c1}${c2}</row>`; rIndex++; return xml;
       }).join('');
     }).join('');
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -305,9 +320,9 @@
 </worksheet>`;
   }
 
-  // Лист 3: Маски — как "Роль | URL" (URL берётся у того участника, перед которым стоял [as ...])
+  // Лист 3: Маски — один столбец Роль как HYPERLINK (если есть URL)
   function sheetMasksXML(rows){
-    const header = ['#','Роль','URL'];
+    const header = ['#','Роль'];
     const headerRow = `<row r="1">${header.map(cellInline).join('')}</row>`;
     let rIndex = 2;
     const dataRows = rows.map((row, i)=>{
@@ -315,9 +330,8 @@
       const list = row.masks_list || [];
       return list.map(p=>{
         const c1 = cellInline(String(idx));
-        const c2 = cellInline(p.label || '');
-        const c3 = cellInline(p.href || '');  // может быть пусто (как в примере с "jerry")
-        const xml = `<row r="${rIndex}">${c1}${c2}${c3}</row>`; rIndex++; return xml;
+        const c2 = p.href ? linkCell(p.href, p.label) : cellInline(p.label||'');
+        const xml = `<row r="${rIndex}">${c1}${c2}</row>`; rIndex++; return xml;
       }).join('');
     }).join('');
     return `<?xml version="1.0" encoding="UTF-8"?>

@@ -173,7 +173,6 @@
     }
   }
 
-
   /* ---------- Новый декодер для чтения текста из DOM ---------- */
   function safeNodeText(node) {
     const raw = (node && (node.innerText ?? node.textContent) || '').trim();
@@ -260,8 +259,9 @@
     doc.querySelector('.post.topicpost') ||
     doc;
 
-  /* ---------- MНОЖЕСТВЕННЫЕ location/characters (+ masks) ---------- */
+  /* ---------- MНОЖЕСТВЕННЫЕ location/characters/masks ---------- */
   function extractFromFirst(firstNode) {
+    // locations
     const locSet = new Set();
     firstNode.querySelectorAll('location').forEach(n => {
       const raw = safeNodeText(n);
@@ -270,6 +270,7 @@
     });
     const locationsLower = Array.from(locSet);
 
+    // characters
     const charSet = new Set();
     firstNode.querySelectorAll('characters').forEach(n => {
       const raw = safeNodeText(n);
@@ -278,25 +279,28 @@
     });
     const charactersLower = Array.from(charSet);
 
-    // NEW: parse <masks> — "name=role;name=role2;..."
-    // учитываем только те mask-ключи, которые встречаются в characters
+    // masks: "name=role; name=role2"
     const masksByCharLower = new Map(); // charLower -> Set(rolesLower)
     firstNode.querySelectorAll('masks').forEach(n => {
       const raw = safeNodeText(n);
       if (!raw) return;
       raw.split(/\s*;\s*/).forEach(pair => {
         if (!pair) return;
-        const eq = pair.indexOf('=');
-        if (eq <= 0) return;
-        const key = pair.slice(0, eq).trim().toLowerCase();
-        const val = pair.slice(eq+1).trim().toLowerCase();
-        if (!key || !val) return;
-        if (!charSet.has(key)) return; // смотрим только персонажей из <characters>
-        if (!masksByCharLower.has(key)) masksByCharLower.set(key, new Set());
-        masksByCharLower.get(key).add(val);
+        const p = pair.indexOf('=');
+        if (p <= 0) return;
+        const k = pair.slice(0, p).trim().toLowerCase();
+        const v = pair.slice(p + 1).trim().toLowerCase();
+        if (!k || !v) return;
+        if (!masksByCharLower.has(k)) masksByCharLower.set(k, new Set());
+        masksByCharLower.get(k).add(v);
       });
     });
+    const maskKeysLower = new Set(masksByCharLower.keys());
 
+    // объединённый список участников
+    const participantsLower = Array.from(new Set([...charactersLower, ...maskKeysLower]));
+
+    // order
     let order = null;
     const orderNode = firstNode.querySelector('order');
     if (orderNode) {
@@ -304,7 +308,7 @@
       if (Number.isFinite(num)) order = num;
     }
 
-    return { locationsLower, charactersLower, masksByCharLower, order };
+    return { locationsLower, charactersLower, participantsLower, masksByCharLower, maskKeysLower, order };
   }
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
@@ -313,19 +317,25 @@
       const doc  = parseHTML(html);
       const first= firstPostNode(doc);
 
-      const { locationsLower, charactersLower, masksByCharLower, order } = extractFromFirst(first);
+      const {
+        locationsLower, charactersLower, participantsLower,
+        masksByCharLower, maskKeysLower, order
+      } = extractFromFirst(first);
+
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
       const isAu = (type === 'au');
       const range = isAu
         ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false }
         : parseDateRange(dateRaw);
+      // [au] должно быть первым блоком в названии темы
       const auAtStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));
       const auBad = isAu ? !auAtStart : false;
       const dateBad = isAu ? auBad : (!hasBracket || range.bad);
 
       return {
         type, status, dateRaw, episode, url: topicUrl,
-        locationsLower, charactersLower, masksByCharLower, order,
+        locationsLower, charactersLower, participantsLower,
+        masksByCharLower, maskKeysLower, order,
         range, dateBad
       };
     } catch (e) {
@@ -423,7 +433,7 @@
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
   }
 
-  //* ================= СБОРКА HTML ================= */
+  /* ================= СБОРКА HTML ================= */
   async function buildWrappedHTML() {
     const nameToProfile = await scrapeAllUsers();
 
@@ -435,42 +445,53 @@
     all = all.filter(Boolean);
     all.sort(compareEvents);
 
-    // helper для линка/подсветки конкретного имени (персонажа или роли)
-    function renderOneNameLower(lower) {
-      const href  = nameToProfile.get(lower);
+    // — ссылки/подсветка только для людей; роли НЕ подсвечиваем и НЕ линкуем
+    function renderOnePerson(lower, { maskOnly }) {
       const shown = escapeHtml(lower);
+      // mask-only -> всегда красный
+      if (maskOnly) return `<span style="${MISS_STYLE}">${shown}</span>`;
+
+      const href = nameToProfile.get(lower);
       if (href) return `<a href="${escapeHtml(href)}" rel="nofollow">${shown}</a>`;
       return `<span style="${MISS_STYLE}">${shown}</span>`;
     }
 
-    // UPDATED: теперь учитываем masks
-    function renderNames(lowerArr, masksByCharLower) {
-      if (!lowerArr || !lowerArr.length) {
+    function renderRolesPlain(rolesSet) {
+      const roles = Array.from(rolesSet || []);
+      if (!roles.length) return '';
+      return ` [as ${escapeHtml(roles.join(', '))}]`;
+    }
+
+    function renderParticipants(participantsLower, masksByCharLower, charactersLower, maskKeysLower) {
+      if (!participantsLower?.length) {
         return `<span style="${MISS_STYLE}">не указаны</span>`;
       }
-      return lowerArr.map((lowChar) => {
-        const charHTML = renderOneNameLower(lowChar);
-
-        const rolesSet = masksByCharLower?.get(lowChar);
-        if (!rolesSet || rolesSet.size === 0) return charHTML;
-
-        const roles = Array.from(rolesSet);
-        const rolesHTML = roles.map(r => renderOneNameLower(r)).join(', ');
-        return `${charHTML} [as ${rolesHTML}]`;
+      const charsSet = new Set(charactersLower || []);
+      return participantsLower.map(low => {
+        const maskOnly = maskKeysLower?.has(low) && !charsSet.has(low);
+        const personHTML = renderOnePerson(low, { maskOnly });
+        const rolesTail  = renderRolesPlain(masksByCharLower.get(low)); // роли — plain text
+        return `${personHTML}${rolesTail}`;
       }).join(', ');
     }
 
     const items = all.map(e => {
       const statusHTML = renderStatus(e.type, e.status);
       const dateHTML = e.type === 'au'
-        ? (e.dateBad ? `<span style="${MISS_STYLE}">проблема с [au] в названии</span>` : '')
-        : ((!e.dateRaw || e.dateBad) ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>` : escapeHtml(formatRange(e.range)));
+        ? (e.dateBad
+            ? `<span style="${MISS_STYLE}">проблема с [au] в названии</span>`
+            : '')
+        : ((!e.dateRaw || e.dateBad)
+            ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
+            : escapeHtml(formatRange(e.range)));
 
       const url        = escapeHtml(e.url);
       const ttl        = escapeHtml(e.episode);
       const orderBadge = (e.order!=null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
-      const names = renderNames(e.charactersLower, e.masksByCharLower);
+      const names = renderParticipants(
+        e.participantsLower, e.masksByCharLower, e.charactersLower, e.maskKeysLower
+      );
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))
@@ -483,10 +504,10 @@
     const body = items.join('') || `<p><i>— пусто —</i></p>`;
 
     return `
-  <div class="quote-box spoiler-box media-box">
-    <div onclick="toggleSpoiler(this)">Собранная хронология</div>
-    <blockquote>${body}</blockquote>
-  </div>`;
+<div class="quote-box spoiler-box media-box">
+  <div onclick="toggleSpoiler(this)">Собранная хронология</div>
+  <blockquote>${body}</blockquote>
+</div>`;
   }
 
   /* =================== ЗАПУСК ПО КНОПКЕ + ПОДМЕНА #p83 =================== */

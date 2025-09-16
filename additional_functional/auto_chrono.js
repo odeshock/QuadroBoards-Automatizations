@@ -332,11 +332,16 @@
       const auBad = isAu ? !auAtStart : false;
       const dateBad = isAu ? auBad : (!hasBracket || range.bad);
 
+      // === NEW: для type: 'plot' требуем суффикс " [с]" в КОНЦЕ названия ===
+      const plotSuffixRe = /\s\[\s*с\s*\]\s*$/iu; // допускаем лишние пробелы
+      const plotBad = (type === 'plot') ? !plotSuffixRe.test(String(rawTitle || '')) : false;
+
       return {
         type, status, dateRaw, episode, url: topicUrl,
         locationsLower, charactersLower, participantsLower,
         masksByCharLower, maskKeysLower, order,
-        range, dateBad
+        range, dateBad,
+        plotBad // <— добавили
       };
     } catch (e) {
       console.warn('[FMV] тема ✗', topicUrl, e);
@@ -486,7 +491,18 @@
             : escapeHtml(formatRange(e.range)));
 
       const url        = escapeHtml(e.url);
-      const ttl        = escapeHtml(e.episode);
+
+      // === NEW: для хронологии удаляем завершающее " [с]" у plot ===
+      const cleanEpisode = e.type === 'plot'
+        ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '')
+        : e.episode;
+      const ttl        = escapeHtml(cleanEpisode);
+
+      // === NEW: ошибка рядом с названием, если для plot не найдено " [с]" ===
+      const plotErrorHTML = (e.type === 'plot' && e.plotBad)
+        ? ` <span style="${MISS_STYLE}">нет " [с]"</span>`
+        : '';
+
       const orderBadge = (e.order!=null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
       const names = renderParticipants(
@@ -498,7 +514,7 @@
         : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl}</a>${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
+      return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl}</a>${plotErrorHTML}${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
     });
 
     const body = items.join('') || `<p><i>— пусто —</i></p>`;

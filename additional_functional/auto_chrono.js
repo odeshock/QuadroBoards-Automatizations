@@ -253,8 +253,8 @@
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
     try {
-      const html = await fetchText(topicUrl);
-      const doc  = parseHTML(html);
+      const html = await fetchTextSmart(topicUrl);
+      const doc  = await fetchDocumentSmart(html);
       const first= firstPostNode(doc);
 
       const { locationsLower, charactersLower, order } = extractFromFirst(first);
@@ -324,8 +324,8 @@
       cnt++;
       seen.add(page);
 
-      const html = await fetchText(page);
-      const doc  = parseHTML(html);
+      const html = await fetchText(fetchTextSmart);
+      const doc  = await fetchDocumentSmart(html);
 
       const anchors = doc.querySelectorAll('.usersname a, a[href*="profile.php?id="]');
       anchors.forEach(a=>{

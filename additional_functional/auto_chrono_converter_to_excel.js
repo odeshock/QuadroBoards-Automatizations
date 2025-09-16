@@ -17,7 +17,7 @@
     if (!inlineBox) return false;
     if (inlineBox.querySelector('#dl-chrono-btn')) return true;
     
-    inlineBox.appendChild(document.createElement('br');
+    inlineBox.appendChild(document.createElement('br'));
     
     const btn = document.createElement('a');
     btn.id = 'dl-chrono-btn';

@@ -127,12 +127,126 @@
     return episodes;
   }
 
-  function splitDate(s) {
-    if (!s || !s.trim()) return ['не указана', 'не указана'];
-    const parts = s.split('-').map(x => x.trim()).filter(Boolean);
-    if (parts.length === 1) return [parts[0], parts[0]];
-    return [parts[0], parts.slice(1).join('-')];
-  }
+    // Замените ЭТУ функцию в вашем файле
+    function splitDate(s) {
+      if (!s || !s.trim()) return ['не указана', 'не указана'];
+  
+      // Нормализуем возможные тире к обычному дефису
+      s = s.replace(/[\u2012-\u2015]/g, '-').replace(/\s+/g, ' ').trim();
+  
+      // Делим по первому дефису: "начало - конец"
+      const m = s.match(/^(.*?)\s*-\s*(.+)$/);
+      const startRaw = (m ? m[1] : s).trim();
+      const endRaw   = (m ? m[2] : s).trim();
+  
+      // Разбираем правую часть (она полнее) и достраиваем левую
+      const endParts   = parseDateToken(endRaw);
+      const startParts = normalizeStartWithEnd(startRaw, endParts);
+  
+      const startFull = formatParts(startParts) || startRaw; // на всякий случай fallback
+  
+      // В задаче речь только о "дате начала", поэтому конец оставляем как есть
+      return [startFull, endRaw];
+    }
+  
+    // --- Хелперы ниже можно поместить рядом со splitDate ---
+  
+    // Разбор строки даты в компоненты (день/месяц/год), без "достраивания"
+    function parseDateToken(str) {
+      const t = (str || '').trim();
+      let m;
+  
+      // yyyy
+      if (/^\d{4}$/.test(t)) {
+        return { year: +t, hasYear: true };
+      }
+  
+      // dd.mm.yyyy
+      m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (m) {
+        return {
+          day: +m[1], month: +m[2], year: +m[3],
+          hasDay: true, hasMonth: true, hasYear: true
+        };
+      }
+  
+      // mm.yyyy
+      m = t.match(/^(\d{1,2})\.(\d{4})$/);
+      if (m) {
+        return { month: +m[1], year: +m[2], hasMonth: true, hasYear: true };
+      }
+  
+      // dd.mm
+      m = t.match(/^(\d{1,2})\.(\d{1,2})$/);
+      if (m) {
+        return { day: +m[1], month: +m[2], hasDay: true, hasMonth: true };
+      }
+  
+      // одиночное число (dd ИЛИ mm) — трактовку решим по правой части
+      m = t.match(/^(\d{1,2})$/);
+      if (m) {
+        return { num: +m[1], hasNum: true };
+      }
+  
+      return {};
+    }
+  
+    // Достраиваем левую часть диапазона до "полного" вида, используя правую
+    function normalizeStartWithEnd(startRaw, endCtx) {
+      const s = parseDateToken(startRaw);
+  
+      // Уже полный dd.mm.yyyy
+      if (s.hasDay && s.hasMonth && (s.year || endCtx.year)) {
+        return { day: s.day, month: s.month, year: s.year ?? endCtx.year };
+      }
+  
+      // dd.mm → достраиваем год из конца
+      if (s.hasDay && s.hasMonth && !s.year && endCtx.year) {
+        return { day: s.day, month: s.month, year: endCtx.year };
+      }
+  
+      // mm.yyyy — уже полный для формата "месяц.год"
+      if (!s.hasDay && s.hasMonth && (s.year || endCtx.year)) {
+        return { month: s.month, year: s.year ?? endCtx.year };
+      }
+  
+      // yyyy — уже полный год
+      if (s.year) return { year: s.year };
+  
+      // Одиночное число: решаем, день это или месяц
+      if (s.hasNum) {
+        // Если в правой части есть день — исходно был формат вида "dd - dd.mm.yyyy"
+        if (endCtx.hasDay && endCtx.month && endCtx.year) {
+          return { day: s.num, month: endCtx.month, year: endCtx.year };
+        }
+        // Если в правой части есть месяц и год — это "mm - mm.yyyy"
+        if (endCtx.hasMonth && endCtx.year) {
+          return { month: s.num, year: endCtx.year };
+        }
+      }
+  
+      // Ничего уверенного — возвращаем пусто (выше fallback вернёт startRaw)
+      return {};
+    }
+  
+    function formatParts(p) {
+      if (!p || typeof p !== 'object') return '';
+      if (isFinite(p.day) && isFinite(p.month) && isFinite(p.year)) {
+        return `${pad2(p.day)}.${pad2(p.month)}.${p.year}`;
+      }
+      if (isFinite(p.month) && isFinite(p.year)) {
+        return `${pad2(p.month)}.${p.year}`;
+      }
+      if (isFinite(p.year)) {
+        return String(p.year);
+      }
+      return '';
+    }
+  
+    function pad2(n) {
+      return String(n).padStart(2, '0');
+    }
+
 
   function parseParticipants(iEl) {
     const out = [];

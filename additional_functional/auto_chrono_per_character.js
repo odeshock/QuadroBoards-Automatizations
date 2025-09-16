@@ -50,7 +50,7 @@
       try {
         const episodes = parseEpisodesFromP83();
         if (!episodes.length) {
-          throw new Error('Не найдено эпизодов в #p83-content');
+          throw new Error('Не найдена собранная хронология');
         }
 
         const users = await fetchAllUsers();
@@ -207,15 +207,54 @@
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }
 
+  // замените fetchHtml на вариант с явной декодировкой
   async function fetchHtml(relUrl) {
     try {
       const resp = await fetch(relUrl, { credentials: 'include' });
       if (!resp.ok) return null;
-      return await resp.text();
+  
+      const buf = await resp.arrayBuffer();
+  
+      // 1) попытка достать charset из заголовка
+      let enc = 'utf-8';
+      const ct = resp.headers.get('content-type') || '';
+      const m = ct.match(/charset=([^;]+)/i);
+      if (m) enc = m[1].toLowerCase();
+  
+      // 2) первичная декодировка
+      let html = new TextDecoder(enc).decode(buf);
+  
+      // 3) если в <meta> указан другой charset — декодируем повторно
+      const mm = html.match(/<meta[^>]+charset=["']?([\w-]+)/i);
+      if (mm && mm[1] && mm[1].toLowerCase() !== enc) {
+        enc = mm[1].toLowerCase();
+        html = new TextDecoder(enc).decode(buf);
+      }
+  
+      // 4) грубый fallback для русских форумов
+      if (/����/.test(html) && enc === 'utf-8') {
+        try { html = new TextDecoder('windows-1251').decode(buf); } catch {}
+      }
+  
+      return html;
     } catch {
       return null;
     }
   }
+  
+  const nameByIdFromEpisodes = new Map();
+  for (const ep of episodes) {
+    for (const p of ep.participants) {
+      if (p.id != null && p.name) nameByIdFromEpisodes.set(p.id, p.name);
+    }
+  }
+  
+  for (const u of filteredUsers) {
+    const fixed = nameByIdFromEpisodes.get(u.id);
+    if (fixed) u.name = fixed; // имя уже из DOM текущей страницы, без проблем с кодировкой
+  }
+
+  
 
   // ===== СБОРКА ИТОГОВОЙ РАЗМЕТКИ =====
   function buildChronologies(episodes, users) {

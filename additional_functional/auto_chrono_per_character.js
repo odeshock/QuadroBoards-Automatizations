@@ -26,7 +26,7 @@
 
   // ===== ИНИЦИАЛИЗАЦИЯ UI =====
   const init = () => {
-    const anchor = document.querySelector('#p82-content');
+    const anchor = document.querySelector('#fmv-chrono-people-inline');
     if (!anchor) return;
 
     if (document.getElementById('fmv-chrono-people-inline')) return;
@@ -56,13 +56,13 @@
 
       try {
         const episodes = parseEpisodesFromP83();
-        if (!episodes.length) throw new Error('Не найдено эпизодов в #p83-content');
+        if (!episodes.length) throw new Error('Не найдена собранная хронология');
 
         const users = usersFromEpisodes(episodes);
         const html = buildChronologies(episodes, users);
 
         const target = document.querySelector('#p92-content');
-        if (!target) throw new Error('Не найден контейнер #p92-content');
+        if (!target) throw new Error('Не найден комментарий для вставки');
         target.innerHTML = html || '<p>Пусто</p>';
 
         note.textContent = 'Готово';

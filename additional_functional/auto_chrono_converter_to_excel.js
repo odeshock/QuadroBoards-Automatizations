@@ -273,19 +273,12 @@
       cells.push(cellInline(r.end||''));
       cells.push(linkCell(r.link, r.title || r.link));   // Название как гиперссылка
 
-      // Участники
-      if (r.participants_list && r.participants_list.length===1 && r.participants_list[0].href){
-        cells.push(linkCell(r.participants_list[0].href, r.participants_list[0].label));
-      } else {
-        cells.push(cellInline(r.participants_text||''));
-      }
+      // Участники — "имя — ссылка" построчно
+      cells.push(cellInline(r.participants_text || ''));
+      
+      // Маски — "имя — ссылка" построчно
+      cells.push(cellInline(r.masks_text || ''));
 
-      // Маски
-      if (r.masks_list && r.masks_list.length===1 && r.masks_list[0].href){
-        cells.push(linkCell(r.masks_list[0].href, r.masks_list[0].label));
-      } else {
-        cells.push(cellInline(r.masks_text||''));
-      }
 
       cells.push(cellInline(r.location||''));
       cells.push(cellInline(r.order||''));
@@ -414,7 +407,7 @@
   /* ===== Обработчик кнопки ===== */
   function onDownloadClick(){
     const rows = collectRows();
-    if (!rows.length) { alert('Не найдена собранная хронология.'); return; }
+    if (!rows.length) { alert('Не найдена собранная хронология :('); return; }
     const xlsx = buildXLSX(rows);
     downloadXLSX(xlsx);
   }

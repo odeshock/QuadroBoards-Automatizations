@@ -300,8 +300,11 @@
 
       const { locationsLower, charactersLower, order } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
-      const range  = parseDateRange(dateRaw);
-      const dateBad= !hasBracket || range.bad;
+const isAu = (type === 'au');
+const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
+const titleLower = String(rawTitle || '').toLowerCase();
+const auBad = isAu ? !titleLower.includes('[au]') : false;
+const dateBad = isAu ? auBad : (!hasBracket || range.bad);
 
       return {
         type, status, dateRaw, episode, url: topicUrl,
@@ -429,9 +432,13 @@
 
     const items = all.map(e => {
       const statusHTML = renderStatus(e.type, e.status);
-      const dateHTML   = (!e.dateRaw || e.dateBad)
+      const dateHTML = e.type === 'au'
+    ? (e.dateBad
+        ? `<span style="${MISS_STYLE}">[au] не указано в названии</span>`
+        : '')
+    : ((!e.dateRaw || e.dateBad)
         ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
-        : escapeHtml(formatRange(e.range));
+        : escapeHtml(formatRange(e.range)));
 
       const url        = escapeHtml(e.url);
       const ttl        = escapeHtml(e.episode);
@@ -443,7 +450,8 @@
         ? escapeHtml(e.locationsLower.join(', '))
         : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
-      return `<p>${statusHTML} ${dateHTML} — <a href="${url}" rel="nofollow">${ttl}</a>${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
+      const dash = dateHTML ? ' — ' : ' ';
+return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl}</a>${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
     });
 
     const body = items.join('') || `<p><i>— пусто —</i></p>`;

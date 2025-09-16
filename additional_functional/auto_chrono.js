@@ -279,6 +279,39 @@
     const charactersLower = Array.from(charSet);
 
     let order = null;
+    // parse masks: "character=role;character=role"
+    const masksMap = new Map();
+    const orphanMasks = []; // masks pointing to a character not listed in <characters>
+    firstNode.querySelectorAll('masks').forEach(n => {
+      const raw = safeNodeText(n);
+      if (!raw) return;
+      raw.split(';').map(s=>s.trim()).filter(Boolean).forEach(pair => {
+        const [left, right] = pair.split('=');
+        const who  = (left||'').trim().toLowerCase();
+        const role = (right||'').trim();
+        if (!who && role) {
+          // role without character name
+          orphanMasks.push({ who: '', role });
+          return;
+        }
+        if (!role) {
+          // empty role: treat as orphan entry to highlight
+          orphanMasks.push({ who, role: '' });
+          return;
+        }
+        if (!masksMap.has(who)) masksMap.set(who, []);
+        masksMap.get(who).push(role);
+      });
+    });
+
+    // masks referring to characters absent in <characters>
+    for (const [who, roles] of masksMap.entries()) {
+      if (!charactersLower.includes(who)) {
+        orphanMasks.push({ who, role: roles.join(', ') });
+      }
+    }
+
+    let order = null;
     const orderNode = firstNode.querySelector('order');
     if (orderNode) {
       const num = parseInt(safeNodeText(orderNode), 10);
@@ -294,7 +327,7 @@
       const doc  = parseHTML(html);
       const first= firstPostNode(doc);
 
-      const { locationsLower, charactersLower, order } = extractFromFirst(first);
+      const { locationsLower, charactersLower, masksMap, orphanMasks, order } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
       const isAu = (type === 'au');
       const range = isAu
@@ -307,7 +340,7 @@
 
       return {
         type, status, dateRaw, episode, url: topicUrl,
-        locationsLower, charactersLower, order,
+        locationsLower, charactersLower, masksMap, orphanMasks, order,
         range, dateBad
       };
     } catch (e) {
@@ -417,10 +450,36 @@
     all = all.filter(Boolean);
     all.sort(compareEvents);
 
-    function renderNames(lowerArr) {
+    
+    function renderNames(lowerArr, masksMap, orphanMasks) {
       if (!lowerArr || !lowerArr.length) {
         return `<span style="${MISS_STYLE}">не указаны</span>`;
       }
+      const parts = [];
+
+      lowerArr.forEach((low) => {
+        const href  = nameToProfile.get(low);
+        const shown = escapeHtml(low);
+        const roles = masksMap?.get(low) || [];
+        const rolesStr = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
+        if (href) {
+          parts.push(`<a href="${escapeHtml(href)}" rel="nofollow">${shown}</a>${rolesStr}`);
+        } else {
+          parts.push(`<span style="${MISS_STYLE}">${shown}</span>${rolesStr}`);
+        }
+      });
+
+      // add orphan masks (mask specified for character not present in <characters> or malformed)
+      if (orphanMasks && orphanMasks.length) {
+        orphanMasks.forEach(({ who, role }) => {
+          const whoShown = who ? escapeHtml(who) : '—';
+          const roleShown = role ? escapeHtml(role) : '—';
+          parts.push(`<span style="${MISS_STYLE}">${whoShown} [as ${roleShown}]</span>`);
+        });
+      }
+
+      return parts.join(', ');
+    }
       return lowerArr.map((low) => {
         const href  = nameToProfile.get(low);
         const shown = escapeHtml(low);
@@ -443,7 +502,7 @@
       const ttl        = escapeHtml(e.episode);
       const orderBadge = (e.order!=null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
-      const names = renderNames(e.charactersLower);
+      const names = renderNames(e.charactersLower, e.masksMap, e.orphanMasks);
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))

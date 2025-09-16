@@ -97,14 +97,42 @@
       const status = (spansBefore[1]?.textContent || '').trim().toLowerCase();
 
       // Дата — между закрывающей ']' и первым '—'
+      // --- извлекаем сырой фрагмент даты между ']' и последним тире перед заголовком
       const fullText = (p.textContent || '').replace(/\s+/g, ' ').trim();
       const bracketEnd = fullText.indexOf(']');
-      const dashIndex = fullText.indexOf('—', Math.max(0, bracketEnd + 1));
+      
+      const titleText = (firstLink.textContent || '').replace(/\s+/g, ' ').trim();
+      const titlePos  = titleText ? fullText.indexOf(titleText) : -1;
+      
+      let dashIndex = -1;
+      if (titlePos !== -1) {
+        dashIndex = Math.max(
+          fullText.lastIndexOf(' — ', titlePos),
+          fullText.lastIndexOf(' – ', titlePos),
+          fullText.lastIndexOf(' - ', titlePos),
+          fullText.lastIndexOf('—', titlePos - 1),
+          fullText.lastIndexOf('–', titlePos - 1),
+          fullText.lastIndexOf('-', titlePos - 1),
+        );
+      } else {
+        const from = Math.max(0, bracketEnd + 1);
+        const candidates = [' — ', ' – ', ' - ', '—', '–', '-']
+          .map(sep => fullText.indexOf(sep, from))
+          .filter(i => i !== -1)
+          .sort((a, b) => a - b);
+        dashIndex = candidates.length ? candidates[0] : -1;
+      }
+      
       let rawDate = '';
       if (bracketEnd !== -1 && dashIndex !== -1 && dashIndex > bracketEnd) {
         rawDate = fullText.slice(bracketEnd + 1, dashIndex).trim();
       }
-      const [dateStart, dateEnd] = splitDate(rawDate);
+      
+      // --- разбиваем диапазон и нормализуем каждую часть в числовые форматы
+      const [dateStartRaw, dateEndRaw] = splitDate(rawDate);
+      const dateStart = normalizeNumericDate(dateStartRaw);
+      const dateEnd   = normalizeNumericDate(dateEndRaw);
+
 
       // Участники (в <i>), вместе с масками
       const iEl = p.querySelector(':scope > i');
@@ -130,12 +158,44 @@
 
   function splitDate(s) {
     if (!s || !s.trim()) return ['не указана', 'не указана'];
-    const parts = s.split('-').map(x => x.trim()).filter(Boolean);
+    // поддержка -, – и —
+    const parts = s.split(/\s*[–—-]\s*/).filter(Boolean);
     if (parts.length === 1) return [parts[0], parts[0]];
-    // если в дате есть несколько дефисов, всё правее первого считаем концом
-    return [parts[0], parts.slice(1).join('-')];
+    // если несколько тире, всё правее первого считаем концом
+    return [parts[0], parts.slice(1).join('—')];
   }
 
+  // Приводит строку к одному из форматов: dd.mm.yyyy, mm.yyyy или yyyy
+  // Всё остальное возвращает как есть (без «умного» распознавания).
+  function normalizeNumericDate(raw) {
+    if (!raw) return 'не указана';
+    const s = raw.trim();
+  
+    // dd.mm.yyyy
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (m) {
+      const d  = String(+m[1]).padStart(2, '0');
+      const mo = String(+m[2]).padStart(2, '0');
+      const y  = m[3];
+      return `${d}.${mo}.${y}`;
+    }
+  
+    // mm.yyyy
+    m = s.match(/^(\d{1,2})\.(\d{4})$/);
+    if (m) {
+      const mo = String(+m[1]).padStart(2, '0');
+      const y  = m[2];
+      return `${mo}.${y}`;
+    }
+  
+    // yyyy
+    m = s.match(/^(\d{4})$/);
+    if (m) return m[1];
+  
+    // Иначе — возвращаем как есть (например, если текстовый месяц)
+    return s;
+  }
+  
   function parseParticipants(iEl) {
     const out = [];
     const kids = Array.from(iEl.childNodes);

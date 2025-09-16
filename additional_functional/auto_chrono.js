@@ -19,6 +19,7 @@
     { id: 4, type: 'personal', status: 'on'  },
     { id: 5, type: 'personal', status: 'off' },
     { id: 8, type: 'au', status: 'on' },
+    { id: 9, type: 'plot', status: 'on' },
   ];
 
   const MAX_PAGES_PER_SECTION = 50;

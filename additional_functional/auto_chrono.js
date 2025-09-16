@@ -311,7 +311,6 @@
       }
     }
 
-    let order = null;
     const orderNode = firstNode.querySelector('order');
     if (orderNode) {
       const num = parseInt(safeNodeText(orderNode), 10);

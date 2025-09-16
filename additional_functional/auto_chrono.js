@@ -52,7 +52,7 @@
       off:      { word: 'closed',   color: 'teal'   },
       archived: { word: 'archived', color: 'maroon' }
     };
-    const t = mapType[${escapeHtml(type)] || mapType.au;
+    const t = mapType[escapeHtml(type)] || mapType.au;
     const st = mapStatus[status] || mapStatus.archived;
     return `[<span style="color:${t.color}">${t.word}</span> / <span style="color:${st.color}">${st.word}</span>]`;
   }

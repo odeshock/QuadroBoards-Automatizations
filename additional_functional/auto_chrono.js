@@ -17,7 +17,8 @@
   // Разделы (как в оригинале)
   const SECTIONS = [
     { id: 4, type: 'personal', status: 'on'  },
-    { id: 5, type: 'personal', status: 'off' },
+    { id: 5, type: 'personal', status: 'off' },    { id: 8, type: 'au',       status: 'on'  },
+
   ];
 
   const MAX_PAGES_PER_SECTION = 50;
@@ -43,6 +44,17 @@
   function renderStatus(type, status) {
     const map = {
       on:       { word: 'active',   color: 'green'  },
+      off:      { word: 'closed',   color: 'teal'   },
+      archived: { word: 'archived', color: 'maroon' }
+    };
+    const st = map[status] || map.archived;
+
+    const typeHTML = String(type).toLowerCase() === 'au'
+      ? `<span style="color:red">${escapeHtml(type)}</span>`
+      : escapeHtml(type);
+
+    return `[${typeHTML} / <span style="color:${st.color}">${st.word}</span>]`;
+  },
       off:      { word: 'closed',   color: 'teal'   },
       archived: { word: 'archived', color: 'maroon' }
     };
@@ -293,13 +305,22 @@
 
       const { locationsLower, charactersLower, order } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
-      const range  = parseDateRange(dateRaw);
-      const dateBad= !hasBracket || range.bad;
+      let range, dateBad, auTagOk = false;
+      if (String(type).toLowerCase() === 'au') {
+        const mark = String(dateRaw||'').trim();
+        auTagOk = !!hasBracket && mark === 'au';
+        range   = { start: TMAX, end: TMAX, kind: 'unknown', bad: false };
+        dateBad = !auTagOk;
+      } else {
+        range   = parseDateRange(dateRaw);
+        dateBad = !hasBracket || range.bad;
+      }
+
 
       return {
-        type, status, dateRaw, episode, url: topicUrl,
+type, status, dateRaw, episode, url: topicUrl,
         locationsLower, charactersLower, order,
-        range, dateBad
+        range, dateBad, auTagOk
       };
     } catch (e) {
       console.warn('[FMV] тема ✗', topicUrl, e);
@@ -384,6 +405,15 @@
   }
 
   function compareEvents(a, b) {
+    // Special sort for AU: by 'order' (missing -> 0), then by title
+    if (String(a.type).toLowerCase() === 'au' && String(b.type).toLowerCase() === 'au') {
+      const ao = (a.order == null) ? 0 : a.order;
+      const bo = (b.order == null) ? 0 : b.order;
+      if (ao !== bo) return ao - bo;
+      return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity: 'base' });
+    }
+
+    // Default: by dates, then order (missing -> +∞), then title
     const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
     if (sa !== sb) return sa - sb;
     const ea = dateKey(a.range.end),   eb = dateKey(b.range.end);
@@ -394,6 +424,7 @@
     if (ao !== bo) return ao - bo;
 
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
+  });
   }
 
   /* ================= СБОРКА HTML ================= */
@@ -422,9 +453,16 @@
 
     const items = all.map(e => {
       const statusHTML = renderStatus(e.type, e.status);
-      const dateHTML   = (!e.dateRaw || e.dateBad)
-        ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
-        : escapeHtml(formatRange(e.range));
+      let dateHTML;
+      if (String(e.type).toLowerCase() === 'au') {
+        dateHTML = e.auTagOk
+          ? `<span style="color:red">au</span>`
+          : `<span style="${MISS_STYLE}">[au] отсутствует/ошибка</span>`;
+      } else {
+        dateHTML = (!e.dateRaw || e.dateBad)
+          ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
+          : escapeHtml(formatRange(e.range));
+      }
 
       const url        = escapeHtml(e.url);
       const ttl        = escapeHtml(e.episode);

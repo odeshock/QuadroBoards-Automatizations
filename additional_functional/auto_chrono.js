@@ -37,7 +37,7 @@
   const MISS_STYLE = 'background:#ffeaea;color:#b00020;padding:0 3px;border-radius:3px';
 
   // разделитель имён/локаций
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\\bи\\b)\\s*/iu;
+  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
 
   /* ---------- статусный бейдж (цвет) ---------- */
   function renderStatus(type, status) {
@@ -51,7 +51,7 @@
   }
 
   /* ---------- заголовок темы ---------- */
-  const TITLE_RE = /^\\s*\\[(.+?)\\]\\s*(.+)$/s;
+  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
     return m
@@ -75,24 +75,24 @@
   function parseDateRange(src) {
     let s = String(src||'').trim();
     if (!s) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-    s = s.replace(/[—–−]/g,'-').replace(/\\s*-\\s*/g,'-');
+    s = s.replace(/[—–−]/g,'-').replace(/\s*-\s*/g,'-');
 
-    let m = s.match(/^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})-(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/);
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) return { start:[yFix(m[3]),+m[2],+m[1]], end:[yFix(m[6]),+m[5],+m[4]], kind:'full-range', bad:false };
 
-    m = s.match(/^(\\d{1,2})-(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/);
+    m = s.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) { const y=yFix(m[4]),mo=+m[3]; return { start:[y,mo,+m[1]], end:[y,mo,+m[2]], kind:'day-range', bad:false }; }
 
-    m = s.match(/^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/);
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'single', bad:false }; }
 
-    m = s.toLowerCase().match(/^([а-яё]{3,})\\s+(\\d{4})$/i);
+    m = s.toLowerCase().match(/^([а-яё]{3,})\s+(\d{4})$/i);
     if (m && RU_MONTHS[m[1]]) { const y=+m[2], mo=RU_MONTHS[m[1]]; const a=[y,mo,0]; return { start:a, end:a.slice(), kind:'month', bad:false }; }
 
-    m = s.match(/^(\\d{4})$/);
+    m = s.match(/^(\d{4})$/);
     if (m) { const y=+m[1], a=[y,1,0]; return { start:a, end:a.slice(), kind:'year', bad:false }; }
 
-    m = s.match(/(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})/);
+    m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
     if (m) { const a=[yFix(m[3]),+m[2],+m[1]]; return { start:a, end:a.slice(), kind:'fallback', bad:true }; }
 
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
@@ -102,11 +102,9 @@
   function safeNodeText(node) {
     const raw = (node && (node.innerText ?? node.textContent) || '').trim();
     if (!raw) return '';
-    // Быстрый тест на «кракозябры»
-    const looksBroken = /[\\uFFFD]|[ÃÂÐÑ]{2,}/.test(raw);
+    const looksBroken = /[\uFFFD]|[ÃÂÐÑ]{2,}/.test(raw);
     if (!looksBroken) return raw;
 
-    // Берём текущие code units как байты Latin-1 и пробуем декодировать по-разному
     const bytes = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xFF;
 
@@ -114,10 +112,9 @@
     try { candidates.push(new TextDecoder('utf-8').decode(bytes)); } catch {}
     try { candidates.push(new TextDecoder('windows-1251').decode(bytes)); } catch {}
 
-    // Считаем «здоровость»: больше кириллицы, меньше � и последовательностей ÃÂÐÑ
     const score = (s) => {
       const cyr = (s.match(/[А-Яа-яЁё]/g)||[]).length;
-      const bad = (s.match(/[\\uFFFD]/g)||[]).length + (s.match(/[ÃÂÐÑ]/g)||[]).length;
+      const bad = (s.match(/[\uFFFD]/g)||[]).length + (s.match(/[ÃÂÐÑ]/g)||[]).length;
       return cyr * 4 - bad * 5;
     };
 
@@ -130,21 +127,21 @@
   }
 
   /* ---------- сеть/парс ---------- */
-  function countFFFD(s){return (s.match(/[\\uFFFD]/g)||[]).length}
+  function countFFFD(s){return (s.match(/[\uFFFD]/g)||[]).length}
   function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
   function sniffMetaCharset(buf) {
     const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
-    const m1 = head.match(/<meta[^>]+charset\\s*=\\s*["']?([\\w-]+)/i);
+    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
     if (m1) return m1[1].toLowerCase();
-    const m2 = head.match(/content\\s*=\\s*["'][^"']*charset=([\\w-]+)/i);
+    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
     if (m2) return m2[1].toLowerCase();
     return '';
   }
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
     const sCyr  = countCyr(html);
-    const hasHtml = /<\\/html>/i.test(html) ? 1 : 0;
-    const hasHead = /<\\/head>/i.test(html) ? 1 : 0;
+    const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
+    const hasHead = /<\/head>/i.test(html) ? 1 : 0;
     const hintBonus = hint ? 2 : 0;
     return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
   }
@@ -253,11 +250,11 @@
       const topics = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
         const href = abs(page, a.getAttribute('href'));
-        const m    = href.match(/viewtopic\\.php\\?id=(\\d+)/i);
+        const m    = href.match(/viewtopic\.php\?id=(\d+)/i);
         if (!m) return;
         const id = m[1];
         const title = safeNodeText(a);
-        if (/^\\s*(RSS|Atom)\\s*$/i.test(title)) return;
+        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
         if (!topics.has(id)) topics.set(id, { url: href, title });
       });
 
@@ -270,7 +267,7 @@
       let nextHref   = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
         const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\\b(След|Next|»|›)\\b/i.test(safeNodeText(a) || ''));
+          .find(a => /\b(След|Next|»|›)\b/i.test(safeNodeText(a) || ''));
         if (candidate) nextHref = candidate.getAttribute('href');
       }
       page = nextHref ? abs(page, nextHref) : null;
@@ -305,7 +302,7 @@
       let nextHref   = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
         const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\\b(След|Next|»|›)\\b/i.test(safeNodeText(a) || ''));
+          .find(a => /\b(След|Next|»|›)\b/i.test(safeNodeText(a) || ''));
         if (candidate) nextHref = candidate.getAttribute('href');
       }
       page = nextHref ? abs(page, nextHref) : null;
@@ -458,7 +455,7 @@
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
-  const trimSp = (s) => String(s||'').replace(/\\s+/g,' ').trim();
+  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
 
   if (document.readyState === 'loading') {

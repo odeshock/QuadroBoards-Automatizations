@@ -65,72 +65,84 @@
   const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
 
   function parseDateRange(src) {
-    let txt = String(src||'').trim();
-    if (!txt) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-    // Normalize dashes and spaces
-    txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
+  let txt = String(src||'').trim();
+  if (!txt) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
+  // Normalize dashes and spaces
+  txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
 
-    // Patterns per spec
-    const P = {
-      single: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      dayRangeSameMonth: /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossMonthTailYear: /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      monthYear: /^(\d{1,2})\.(\d{2}|\d{4})$/,
-      yearOnly: /^(\d{4})$/
-    };
+  // Patterns per spec
+  const P = {
+    single: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+    dayRangeSameMonth: /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+    crossMonthTailYear: /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+    crossYearBothYears: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+    monthYear: /^(\d{1,2})\.(\d{2}|\d{4})$/,
+    yearOnly: /^(\d{4})$/
+  };
 
-    const toInt = (x)=>parseInt(x,10);
-    const fixYear = (y)=> String(y).length===2 ? 1900 + parseInt(y,10) : parseInt(y,10);
-    const clamp = (y,m,d)=>[Math.max(0, y), Math.min(Math.max(1,m),12), Math.min(Math.max(0,d),31)];
+  const toInt = (x)=>parseInt(x,10);
+  const fixYear = (y)=> String(y).length===2 ? 1900 + parseInt(y,10) : parseInt(y,10);
 
-    // 1) dd.mm.yy|yyyy
-    let m = txt.match(P.single);
-    if (m) {
-      const d=toInt(m[1]), mo=toInt(m[2]), y=fixYear(m[3]);
-      const a = clamp(y,mo,d); return { start:a, end:a.slice(), kind:'single', bad:false };
-    }
+  // We'll still store clamped values, but "bad" will be true when inputs are out of bounds
+  const clamp = (y,m,d)=>[Math.max(0, y), Math.min(Math.max(1,m),12), Math.min(Math.max(0,d),31)];
+  const isBadMonth = (m)=> !Number.isFinite(m) || m < 1 || m > 12;
+  const isBadDay   = (d)=> !Number.isFinite(d) || d < 0 || d > 31;
+  const isBadYear  = (y)=> !Number.isFinite(y) || y < 0;
 
-    // 2) dd-dd.mm.yy|yyyy
-    m = txt.match(P.dayRangeSameMonth);
-    if (m) {
-      const d1=toInt(m[1]), d2=toInt(m[2]), mo=toInt(m[3]), y=fixYear(m[4]);
-      return { start:clamp(y,mo,d1), end:clamp(y,mo,d2), kind:'day-range', bad:false };
-    }
-
-    // 3) dd.mm-dd.mm.yy|yyyy (tail year applies to both)
-    m = txt.match(P.crossMonthTailYear);
-    if (m) {
-      const d1=toInt(m[1]), mo1=toInt(m[2]), d2=toInt(m[3]), mo2=toInt(m[4]), y=fixYear(m[5]);
-      return { start:clamp(y,mo1,d1), end:clamp(y,mo2,d2), kind:'cross-month', bad:false };
-    }
-
-    // 4) dd.mm.yy|yyyy - dd.mm.yy|yyyy (both sides with year)
-    m = txt.match(P.crossYearBothYears);
-    if (m) {
-      const d1=toInt(m[1]), mo1=toInt(m[2]), y1=fixYear(m[3]);
-      const d2=toInt(m[4]), mo2=toInt(m[5]), y2=fixYear(m[6]);
-      return { start:clamp(y1,mo1,d1), end:clamp(y2,mo2,d2), kind:(y1===y2?'cross-month':'cross-year'), bad:false };
-    }
-
-    // 5) mm.yy|yyyy
-    m = txt.match(P.monthYear);
-    if (m) {
-      const mo=toInt(m[1]), y=fixYear(m[2]);
-      const a = clamp(y,mo,0);
-      return { start:a, end:a.slice(), kind:'month', bad:false };
-    }
-
-    // 6) yyyy
-    m = txt.match(P.yearOnly);
-    if (m) {
-      const y=toInt(m[1]);
-      const a = clamp(y,1,0);
-      return { start:a, end:a.slice(), kind:'year', bad:false };
-    }
-
-    return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
+  // 1) dd.mm.yy|yyyy
+  let m = txt.match(P.single);
+  if (m) {
+    const d  = toInt(m[1]), mo = toInt(m[2]), y = fixYear(m[3]);
+    const bad = isBadYear(y) || isBadMonth(mo) || isBadDay(d);
+    const a = clamp(y,mo,d);
+    return { start:a, end:a.slice(), kind:'single', bad };
   }
+
+  // 2) dd-dd.mm.yy|yyyy
+  m = txt.match(P.dayRangeSameMonth);
+  if (m) {
+    const d1 = toInt(m[1]), d2 = toInt(m[2]), mo = toInt(m[3]), y = fixYear(m[4]);
+    const bad = isBadYear(y) || isBadMonth(mo) || isBadDay(d1) || isBadDay(d2);
+    return { start:clamp(y,mo,d1), end:clamp(y,mo,d2), kind:'day-range', bad };
+  }
+
+  // 3) dd.mm-dd.mm.yy|yyyy (tail year applies to both)
+  m = txt.match(P.crossMonthTailYear);
+  if (m) {
+    const d1 = toInt(m[1]), mo1 = toInt(m[2]), d2 = toInt(m[3]), mo2 = toInt(m[4]), y = fixYear(m[5]);
+    const bad = isBadYear(y) || isBadMonth(mo1) || isBadMonth(mo2) || isBadDay(d1) || isBadDay(d2);
+    return { start:clamp(y,mo1,d1), end:clamp(y,mo2,d2), kind:'cross-month', bad };
+  }
+
+  // 4) dd.mm.yy|yyyy - dd.mm.yy|yyyy (both sides with year)
+  m = txt.match(P.crossYearBothYears);
+  if (m) {
+    const d1 = toInt(m[1]), mo1 = toInt(m[2]), y1 = fixYear(m[3]);
+    const d2 = toInt(m[4]), mo2 = toInt(m[5]), y2 = fixYear(m[6]);
+    const bad = isBadYear(y1) || isBadYear(y2) || isBadMonth(mo1) || isBadMonth(mo2) || isBadDay(d1) || isBadDay(d2);
+    return { start:clamp(y1,mo1,d1), end:clamp(y2,mo2,d2), kind:(y1===y2?'cross-month':'cross-year'), bad };
+  }
+
+  // 5) mm.yy|yyyy
+  m = txt.match(P.monthYear);
+  if (m) {
+    const mo = toInt(m[1]), y = fixYear(m[2]);
+    const bad = isBadYear(y) || isBadMonth(mo); // 13.2005 -> bad:true
+    const a = clamp(y,mo,0);
+    return { start:a, end:a.slice(), kind:'month', bad };
+  }
+
+  // 6) yyyy
+  m = txt.match(P.yearOnly);
+  if (m) {
+    const y = toInt(m[1]);
+    const bad = isBadYear(y);
+    const a = clamp(y,1,0);
+    return { start:a, end:a.slice(), kind:'year', bad };
+  }
+
+  return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
+}
 
   /* ---------- Новый декодер для чтения текста из DOM ---------- */
   function safeNodeText(node) {

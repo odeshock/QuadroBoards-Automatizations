@@ -39,7 +39,7 @@
   const MISS_STYLE = 'background:#ffeaea;color:#b00020;padding:0 3px;border-radius:3px';
 
   // разделитель имён/локаций
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
+  const CHAR_SPLIT = /\\s*(?:,|;|\\/|&|\\bи\\b)\\s*/iu;
 
   /* ---------- статусный бейдж (цвет) ---------- */
   function renderStatus(type, status) {
@@ -59,7 +59,7 @@
   }
 
   /* ---------- заголовок темы ---------- */
-  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
+  const TITLE_RE = /^\\s*\\[(.+?)\\]\\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
     return m
@@ -84,15 +84,15 @@
   function parseDateRange(src) {
     let txt = String(src||'').trim();
     if (!txt) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-    txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
+    txt = txt.replace(/[\\u2012-\\u2015\\u2212—–−]+/g, '-').replace(/\\s*-\\s*/g, '-');
 
     const P = {
-      single: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      dayRangeSameMonth: /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossMonthTailYear: /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      monthYear: /^(\d{1,2})\.(\d{2}|\d{4})$/,
-      yearOnly: /^(\d{4})$/
+      single: /^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/,
+      dayRangeSameMonth: /^(\\d{1,2})-(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/,
+      crossMonthTailYear: /^(\\d{1,2})\\.(\\d{1,2})-(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/,
+      crossYearBothYears: /^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})-(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2}|\\d{4})$/,
+      monthYear: /^(\\d{1,2})\\.(\\d{2}|\\d{4})$/,
+      yearOnly: /^(\\d{4})$/
     };
 
     const toInt = (x)=>parseInt(x,10);
@@ -178,7 +178,7 @@
   function safeNodeText(node) {
     const raw = (node && (node.innerText ?? node.textContent) || '').trim();
     if (!raw) return '';
-    const looksBroken = /[\uFFFD]|[ÃÂÐÑ]{2,}/.test(raw);
+    const looksBroken = /[\\uFFFD]|[ÃÂÐÑ]{2,}/.test(raw);
     if (!looksBroken) return raw;
 
     const bytes = new Uint8Array(raw.length);
@@ -190,7 +190,7 @@
 
     const score = (s) => {
       const cyr = (s.match(/[А-Яа-яЁё]/g)||[]).length;
-      const bad = (s.match(/[\uFFFD]/g)||[]).length + (s.match(/[ÃÂÐÑ]/g)||[]).length;
+      const bad = (s.match(/[\\uFFFD]/g)||[]).length + (s.match(/[ÃÂÐÑ]/g)||[]).length;
       return cyr * 4 - bad * 5;
     };
 
@@ -203,21 +203,21 @@
   }
 
   /* ---------- сеть/парс ---------- */
-  function countFFFD(s){return (s.match(/[\uFFFD]/g)||[]).length}
+  function countFFFD(s){return (s.match(/[\\uFFFD]/g)||[]).length}
   function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
   function sniffMetaCharset(buf) {
     const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
-    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
+    const m1 = head.match(/<meta[^>]+charset\\s*=\\s*["']?([\\w-]+)/i);
     if (m1) return m1[1].toLowerCase();
-    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
+    const m2 = head.match(/content\\s*=\\s*["'][^"']*charset=([\\w-]+)/i);
     if (m2) return m2[1].toLowerCase();
     return '';
   }
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
     const sCyr  = countCyr(html);
-    const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
-    const hasHead = /<\/head>/i.test(html) ? 1 : 0;
+    const hasHtml = /<\\/html>/i.test(html) ? 1 : 0;
+    const hasHead = /<\\/head>/i.test(html) ? 1 : 0;
     const hintBonus = hint ? 2 : 0;
     return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
   }
@@ -260,7 +260,7 @@
     doc.querySelector('.post.topicpost') ||
     doc;
 
-  /* ---------- MНОЖЕСТВЕННЫЕ location/characters ---------- */
+  /* ---------- MНОЖЕСТВЕННЫЕ location/characters + masks ---------- */
   function extractFromFirst(firstNode) {
     const locSet = new Set();
     firstNode.querySelectorAll('location').forEach(n => {
@@ -278,46 +278,45 @@
     });
     const charactersLower = Array.from(charSet);
 
-    let order = null;
-    // parse masks: "character=role;character=role"
-    const masksMap = new Map();
-    const orphanMasks = []; // masks pointing to a character not listed in <characters>
+    // parse <masks>
+    const masksMap = new Map(); // whoLower -> [role, role...]
+    const orphanMasks = [];     // { who: string, role: string }
     firstNode.querySelectorAll('masks').forEach(n => {
       const raw = safeNodeText(n);
       if (!raw) return;
       raw.split(';').map(s=>s.trim()).filter(Boolean).forEach(pair => {
-        const [left, right] = pair.split('=');
-        const who  = (left||'').trim().toLowerCase();
-        const role = (right||'').trim();
-        if (!who && role) {
-          // role without character name
-          orphanMasks.push({ who: '', role });
+        const eq = pair.indexOf('=');
+        if (eq === -1) {
+          // нет "=", считаем как проблемную маску
+          orphanMasks.push({ who: pair.toLowerCase(), role: '' });
           return;
         }
-        if (!role) {
-          // empty role: treat as orphan entry to highlight
-          orphanMasks.push({ who, role: '' });
+        const who = pair.slice(0, eq).trim().toLowerCase();
+        const role = pair.slice(eq+1).trim();
+        if (!who || !role) {
+          orphanMasks.push({ who, role });
           return;
         }
         if (!masksMap.has(who)) masksMap.set(who, []);
         masksMap.get(who).push(role);
       });
     });
-
-    // masks referring to characters absent in <characters>
-    for (const [who, roles] of masksMap.entries()) {
+    // метим те маски, которых нет среди characters
+    for (const [who, roles] of masksMap) {
       if (!charactersLower.includes(who)) {
-        orphanMasks.push({ who, role: roles.join(', ') });
+        roles.forEach(r => orphanMasks.push({ who, role: r }));
       }
     }
 
+    // порядок
+    let ord = null;
     const orderNode = firstNode.querySelector('order');
     if (orderNode) {
       const num = parseInt(safeNodeText(orderNode), 10);
-      if (Number.isFinite(num)) order = num;
+      if (Number.isFinite(num)) ord = num;
     }
 
-    return { locationsLower, charactersLower, order };
+    return { locationsLower, charactersLower, order: ord, masksMap, orphanMasks };
   }
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
@@ -326,20 +325,21 @@
       const doc  = parseHTML(html);
       const first= firstPostNode(doc);
 
-      const { locationsLower, charactersLower, masksMap, orphanMasks, order } = extractFromFirst(first);
+      const { locationsLower, charactersLower, order: sortOrder, masksMap, orphanMasks } = extractFromFirst(first);
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
       const isAu = (type === 'au');
       const range = isAu
         ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false }
         : parseDateRange(dateRaw);
       // [au] должно быть первым блоком в названии темы
-      const auAtStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));
+      const auAtStart = /^\\s*\\[\\s*au\\s*\\]/i.test(String(rawTitle || ''));
       const auBad = isAu ? !auAtStart : false;
       const dateBad = isAu ? auBad : (!hasBracket || range.bad);
 
       return {
         type, status, dateRaw, episode, url: topicUrl,
-        locationsLower, charactersLower, masksMap, orphanMasks, order,
+        locationsLower, charactersLower, order: sortOrder,
+        masksMap, orphanMasks,
         range, dateBad
       };
     } catch (e) {
@@ -364,11 +364,11 @@
       const topics = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
         const href = abs(page, a.getAttribute('href'));
-        const m    = href.match(/viewtopic\.php\?id=(\d+)/i);
+        const m    = href.match(/viewtopic\\.php\\?id=(\\d+)/i);
         if (!m) return;
         const id = m[1];
         const title = safeNodeText(a);
-        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
+        if (/^\\s*(RSS|Atom)\\s*$/i.test(title)) return;
         if (!topics.has(id)) topics.set(id, { url: href, title });
       });
 
@@ -381,7 +381,7 @@
       let nextHref   = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
         const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\b(След|Next|»|›)\b/i.test(safeNodeText(a) || ''));
+          .find(a => /\\b(След|Next|»|›)\\b/i.test(safeNodeText(a) || ''));
         if (candidate) nextHref = candidate.getAttribute('href');
       }
       page = nextHref ? abs(page, nextHref) : null;
@@ -416,7 +416,7 @@
       let nextHref   = nextRel ? nextRel.getAttribute('href') : null;
       if (!nextHref) {
         const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\b(След|Next|»|›)\b/i.test(safeNodeText(a) || ''));
+          .find(a => /\\b(След|Next|»|›)\\b/i.test(safeNodeText(a) || ''));
         if (candidate) nextHref = candidate.getAttribute('href');
       }
       page = nextHref ? abs(page, nextHref) : null;
@@ -449,53 +449,39 @@
     all = all.filter(Boolean);
     all.sort(compareEvents);
 
-    
     function renderNames(lowerArr, masksMap, orphanMasks) {
       if (!lowerArr || !lowerArr.length) {
         return `<span style="${MISS_STYLE}">не указаны</span>`;
       }
-      const parts = [];
-
-      lowerArr.forEach((low) => {
+      const main = lowerArr.map((low) => {
         const href  = nameToProfile.get(low);
+        const roles = (masksMap && masksMap.get(low)) || [];
         const shown = escapeHtml(low);
-        const roles = masksMap?.get(low) || [];
-        const rolesStr = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
-        if (href) {
-          parts.push(`<a href="${escapeHtml(href)}" rel="nofollow">${shown}</a>${rolesStr}`);
-        } else {
-          parts.push(`<span style="${MISS_STYLE}">${shown}</span>${rolesStr}`);
-        }
-      });
-
-      // add orphan masks (mask specified for character not present in <characters> or malformed)
-      if (orphanMasks && orphanMasks.length) {
-        orphanMasks.forEach(({ who, role }) => {
-          const whoShown = who ? escapeHtml(who) : '—';
-          const roleShown = role ? escapeHtml(role) : '—';
-          parts.push(`<span style="${MISS_STYLE}">${whoShown} [as ${roleShown}]</span>`);
-        });
-      }
-
-      return parts.join(', ');
-    }
-      return lowerArr.map((low) => {
-        const href  = nameToProfile.get(low);
-        const shown = escapeHtml(low);
-        if (href) return `<a href="${escapeHtml(href)}" rel="nofollow">${shown}</a>`;
-        return `<span style="${MISS_STYLE}">${shown}</span>`;
+        const rolesHtml = roles.length ? ` [as ${roles.map(escapeHtml).join(', ')}]` : '';
+        const inner = `${shown}${rolesHtml}`;
+        if (href) return `<a href="${escapeHtml(href)}" rel="nofollow">${inner}</a>`;
+        return `<span style="${MISS_STYLE}">${inner}</span>`;
       }).join(', ');
+
+      const problems = (orphanMasks && orphanMasks.length)
+        ? ', ' + orphanMasks.map(({who, role}) => {
+            const txt = role ? `${escapeHtml(who)} [as ${escapeHtml(role)}]` : `${escapeHtml(who)} [as ?]`;
+            return `<span style="${MISS_STYLE}">${txt}</span>`;
+          }).join(', ')
+        : '';
+
+      return main + problems;
     }
 
     const items = all.map(e => {
       const statusHTML = renderStatus(e.type, e.status);
       const dateHTML = e.type === 'au'
-    ? (e.dateBad
-        ? `<span style="${MISS_STYLE}">проблема с [au] в названии</span>`
-        : '')
-    : ((!e.dateRaw || e.dateBad)
-        ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
-        : escapeHtml(formatRange(e.range)));
+        ? (e.dateBad
+            ? `<span style="${MISS_STYLE}">проблема с [au] в названии</span>`
+            : '')
+        : ((!e.dateRaw || e.dateBad)
+            ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
+            : escapeHtml(formatRange(e.range)));
 
       const url        = escapeHtml(e.url);
       const ttl        = escapeHtml(e.episode);
@@ -508,7 +494,7 @@
         : `<span style="${MISS_STYLE}">локация не указана</span>`;
 
       const dash = dateHTML ? ' — ' : ' ';
-return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl}</a>${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
+      return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl}</a>${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
     });
 
     const body = items.join('') || `<p><i>— пусто —</i></p>`;
@@ -600,7 +586,7 @@ return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
-  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
+  const trimSp = (s) => String(s||'').replace(/\\s+/g,' ').trim();
   const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
 
   if (document.readyState === 'loading') {

@@ -98,58 +98,111 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  /* ---------- сеть/парс ---------- */
-  function countFFFD(s){return (s.match(/\uFFFD/g)||[]).length}
-  function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
+  /* ---------- декод/парс страниц (1251/utf-8 автоопределение) ---------- */
+  function countFFFD(s){ return (s.match(/\uFFFD/g) || []).length; }
+  function countCyr(s){ return (s.match(/[А-Яа-яЁё]/g) || []).length; }
+  
+  /* mojibake-счётчик: часто встречающиеся следы “UTF-8 прочитали как latin-1/1252” */
+  function countMojibake(s){
+    // быстрый подсчёт одиночных «Ã Â Ð Ñ», плюс пар с продолжением
+    const singles = (s.match(/[ÃÂÐÑ]/g) || []).length;
+    const pairs   = (s.match(/[ÃÂÐÑ][\u0080-\u00BF]/g) || []).length;
+    return Math.max(pairs, Math.floor(singles / 2));
+  }
+  
+  /* вытаскиваем <meta charset=...> из головы документа (первые ~4КБ) */
   function sniffMetaCharset(buf) {
     const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
     const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
     if (m1) return m1[1].toLowerCase();
-    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
+    const m2 = head.match(/<meta[^>]+content\s*=\s*["'][^"']*charset=([\w-]+)/i);
     if (m2) return m2[1].toLowerCase();
     return '';
   }
+  
+  /* Оценка декодированного текста: чем больше кириллицы и валидного HTML — тем лучше;
+     много � (FFFD) и mojibake — плохо. */
   function scoreDecoded(html, hint) {
     const sFFFD = countFFFD(html);
     const sCyr  = countCyr(html);
-    const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
-    const hasHead = /<\/head>/i.test(html) ? 1 : 0;
+    const sMoj  = countMojibake(html);
+  
+    const hasHtml  = /<\/?[a-z][\s\S]*>/i.test(html) ? 1 : 0;
+    const hasHead  = /<html|<head|<meta|<title|<body/i.test(html) ? 1 : 0;
     const hintBonus = hint ? 2 : 0;
-    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
+  
+    // веса подобраны эмпирически: кириллица важна, “�” и mojibake — сильный минус
+    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50) - (sMoj * 8);
   }
+  
+  /* вспомогалки для “re-decode latin1 → utf8” */
+  function latin1BytesFromString(s){
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xFF;
+    return out;
+  }
+  function redecodeLatin1ToUtf8(s){
+    try { return new TextDecoder('utf-8', { fatal:false }).decode(latin1BytesFromString(s)); }
+    catch { return s; }
+  }
+  
+  /* основной загрузчик текста с автоопределением кодировки */
   async function fetchText(url, timeoutMs = 20000) {
     const ctrl = new AbortController();
-    const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  
     try {
-      const res = await fetch(url, { credentials:'include', signal:ctrl.signal });
+      const res = await fetch(url, { credentials: 'include', signal: ctrl.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  
       const buf = await res.arrayBuffer();
-
+  
+      // Подсказки из заголовка и meta
       const ct = res.headers.get('content-type') || '';
       const mCT = ct.match(/charset=([^;]+)/i);
       const headerCharset = mCT ? mCT[1].trim().toLowerCase() : '';
       const metaCharset   = sniffMetaCharset(buf);
-
-      const hints = { 'utf-8': false, 'windows-1251': false };
+  
+      const hints = { 'utf-8': false, 'windows-1251': false, 'windows-1252': false };
       if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
       if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
-
+      if (/1252|latin-?1/i.test(headerCharset) || /1252|latin-?1/i.test(metaCharset)) hints['windows-1252'] = true;
+  
+      // Порядок проб: сначала то, что подсказали заголовки/meta, затем стандартные
       const tryOrder = [];
       if (headerCharset) tryOrder.push(headerCharset);
       if (metaCharset && !tryOrder.includes(metaCharset)) tryOrder.push(metaCharset);
-      ['utf-8','windows-1251'].forEach(enc => { if (!tryOrder.includes(enc)) tryOrder.push(enc); });
-
+      ['utf-8', 'windows-1251', 'windows-1252'].forEach(enc => {
+        if (!tryOrder.includes(enc)) tryOrder.push(enc);
+      });
+  
+      // Выбираем лучшую декодировку по скорингу
       let best = { score: -1e9, enc: '', html: '' };
       for (const enc of tryOrder) {
         let html = '';
-        try { html = new TextDecoder(enc, { fatal:false }).decode(buf); }
-        catch { continue; }
+        try {
+          html = new TextDecoder(enc, { fatal: false }).decode(buf);
+        } catch { continue; }
         const score = scoreDecoded(html, hints[enc]);
         if (score > best.score) best = { score, enc, html };
       }
+  
+      // Доп. починка: если похоже на “UTF-8 прочитали как Latin-1/1252” — перепереведём
+      if (countMojibake(best.html) > 6) {
+        const fixed = redecodeLatin1ToUtf8(best.html);
+        const improved =
+          (countCyr(fixed) >= countCyr(best.html)) &&
+          (countMojibake(fixed) < countMojibake(best.html)) &&
+          (countFFFD(fixed) <= countFFFD(best.html));
+        if (improved) return fixed;
+      }
+  
       return best.html;
-    } finally { clearTimeout(t); }
+    } finally {
+      clearTimeout(t);
+    }
   }
+
   const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||

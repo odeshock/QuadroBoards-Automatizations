@@ -98,102 +98,125 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  /* ========================= СЕТЬ И ДЕКОДИРОВАНИЕ ========================= */
-  /* Мини-модуль без фоллбэков: тянем байты, пробуем UTF-8; если видим
-     � (U+FFFD) или явный charset=windows-1251 — декодируем CP1251. */
-  
-  (function attachNetAndDecode(FMV_NS) {
-    const FMV = (window.FMV = window.FMV || FMV_NS || {});
-  
-    const log  = (...a) => console.log('[FMV]', ...a);
-    const warn = (...a) => console.warn('[FMV]', ...a);
-  
-    /** Быстрый парсер HTML-строки в Document */
-    function parseHTML(html) {
-      return new DOMParser().parseFromString(html, 'text/html');
-    }
-  
-    /** Евристика: в строке есть символ замены � ? */
-    function hasReplacementChar(s) {
-      return s.indexOf('\uFFFD') !== -1;
-    }
-  
-    /** Заголовок вида "text/html; charset=windows-1251" → "windows-1251" */
-    function charsetFromContentType(ct) {
-      if (!ct) return null;
-      const m = ct.match(/charset\s*=\s*([^\s;]+)/i);
-      return m ? m[1].toLowerCase() : null;
-    }
-  
-    /** В HTML попалась мета с явным windows-1251? */
-    function htmlHintsCp1251(html) {
-      return /charset\s*=\s*["']?windows-1251/i.test(html);
-    }
-  
-    /** Декодирование байтов выбранной кодировкой */
-    function decode(buf, label) {
-      try {
-        return new TextDecoder(label, { fatal: false }).decode(buf);
-      } catch (e) {
-        warn(`TextDecoder не поддерживает "${label}"`, e);
-        // Последняя соломинка: пусть браузер сам решает (обычно UTF-8)
-        return new TextDecoder().decode(buf);
-      }
-    }
-  
-    /**
-     * Главная функция: тянет URL, честно декодирует (UTF-8 → CP1251 при необходимости)
-     * и возвращает { html, doc, charset }.
-     *
-     * Примечания:
-     * - credentials:'include' чтобы тянуть приватные темы в той же сессии.
-     * - Не полагаемся на авто-декодирование браузера; сами работаем с байтами.
-     */
-    FMV.fetchDocument = async function fetchDocument(url) {
-      const res = await fetch(url, { credentials: 'include' });
-      const buf = new Uint8Array(await res.arrayBuffer());
-  
-      // Подсказки от сервера
-      const ct = res.headers.get('content-type') || '';
-      const headerCharset = charsetFromContentType(ct);
-  
-      // Если сервер честно сказал windows-1251 — верим сразу
-      if (headerCharset === 'windows-1251' || headerCharset === 'cp1251') {
-        const html = decode(buf, 'windows-1251');
-        return { html, doc: parseHTML(html), charset: 'windows-1251' };
-      }
-  
-      // Иначе пробуем UTF-8
-      let html = decode(buf, 'utf-8');
-  
-      // Если в HTML явно написано windows-1251 или заметили � — пробуем CP1251
-      if (htmlHintsCp1251(html) || hasReplacementChar(html)) {
-        const html1251 = decode(buf, 'windows-1251');
-  
-        // Берём 1251-версию, если она выглядит «здоровее» (без �)
-        if (!hasReplacementChar(html1251) || hasReplacementChar(html)) {
-          html = html1251;
-          return { html, doc: parseHTML(html), charset: 'windows-1251' };
-        }
-      }
-  
-      // По умолчанию остаёмся на UTF-8
-      return { html, doc: parseHTML(html), charset: 'utf-8' };
-    };
-  
-    /**
-     * Удобный шорткат, если нужен только Document.
-     * Пример: const doc = await FMV.fetchDoc(url);
-     */
-    FMV.fetchDoc = async function fetchDoc(url) {
-      const { doc } = await FMV.fetchDocument(url);
-      return doc;
-    };
-  
-    log('Модуль сети/декодирования подключён: FMV.fetchDocument(), FMV.fetchDoc()');
-  })();
+  /* ===================== Сеть и декодирование (обновлено) ===================== */
 
-  
+  /**
+   * Нормализация метки кодировки (charset) к тому, что понимает TextDecoder.
+   */
+  function normalizeCharset(label) {
+    if (!label) return null;
+    label = String(label).trim().toLowerCase();
+
+    // популярные синонимы
+    if (label === 'utf8' || label === 'utf_8') return 'utf-8';
+    if (label === 'win-1251' || label === 'windows1251' || label === 'cp1251') return 'windows-1251';
+    if (label === 'koi8' || label === 'koi8_r' || label === 'koi8r') return 'koi8-r';
+    if (label === 'iso8859-5' || label === 'iso_8859-5') return 'iso-8859-5';
+    return label;
+  }
+
+  /**
+   * Вытащить charset из Content-Type.
+   */
+  function sniffCharsetFromContentType(contentType) {
+    if (!contentType) return null;
+    const m = /;\s*charset\s*=\s*("?)([^;"\s]+)\1/i.exec(contentType);
+    return normalizeCharset(m && m[2]);
+  }
+
+  /**
+   * Пробный decode с указанной кодировкой.
+   */
+  function decodeWith(label, buf) {
+    try {
+      const dec = new TextDecoder(label || 'utf-8', { fatal: false });
+      return dec.decode(buf);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Очень простой детектор «ломаного» UTF-8 (типичные артефакты cp1251→utf8: Ð, Ñ, �)
+   */
+  function looksLikeUtf8Mojibake(s) {
+    if (!s) return false;
+    // много «Ð», «Ñ», «�» подряд — характерно для неверной декодировки русских букв
+    const badPairs = (s.match(/[ÐÑ�]{2,}/g) || []).length;
+    return badPairs >= 2;
+  }
+
+  /**
+   * Достаём <meta charset=...> из «первого UTF-8 прогона».
+   * Мы сначала пробуем UTF-8, парсим head и, если там явно указана не utf-8,
+   * повторно декодируем байты нужной кодировкой (буфер у нас ещё есть).
+   */
+  function sniffCharsetFromMeta(utf8Guess) {
+    if (!utf8Guess) return null;
+    const head = utf8Guess.slice(0, 8192).toLowerCase();
+
+    // <meta charset="windows-1251">
+    let m = head.match(/<meta[^>]+charset\s*=\s*["']?\s*([^"'>\s]+)/i);
+    if (m && m[1]) return normalizeCharset(m[1]);
+
+    // <meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+    m = head.match(/<meta[^>]+http-equiv=["']content-type["'][^>]+content=["'][^"']*charset\s*=\s*([^"'>\s]+)/i);
+    if (m && m[1]) return normalizeCharset(m[1]);
+
+    return null;
+  }
+
+  /**
+   * Умный загрузчик текста страницы:
+   * 1) тянем как ArrayBuffer;
+   * 2) если в заголовке есть charset ≠ utf-8 — декодируем им;
+   * 3) иначе пробуем utf-8; если в <meta> указан другой charset — декодируем им;
+   * 4) иначе, если на лице «кракозябры» — пробуем windows-1251;
+   * 5) иначе оставляем utf-8.
+   */
+  async function fetchTextSmart(url, fetchInit) {
+    const res = await fetch(url, fetchInit || { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+
+    const contentType = res.headers.get('content-type') || '';
+    const buf = new Uint8Array(await res.arrayBuffer());
+
+    // 1) content-type
+    const ctCharset = sniffCharsetFromContentType(contentType);
+    if (ctCharset && ctCharset !== 'utf-8') {
+      const t = decodeWith(ctCharset, buf);
+      if (t != null) return t;
+    }
+
+    // 2) пробуем UTF-8
+    const utf8Text = decodeWith('utf-8', buf) || '';
+
+    // 3) <meta charset=...>
+    const metaCharset = sniffCharsetFromMeta(utf8Text);
+    if (metaCharset && metaCharset !== 'utf-8') {
+      const t = decodeWith(metaCharset, buf);
+      if (t != null) return t;
+    }
+
+    // 4) эвристика «кракозябры»
+    if (looksLikeUtf8Mojibake(utf8Text)) {
+      const t1251 = decodeWith('windows-1251', buf);
+      if (t1251 != null) return t1251;
+    }
+
+    // 5) по умолчанию — UTF-8
+    return utf8Text;
+  }
+
+  /**
+   * Обёртка, возвращающая DOM-документ.
+   */
+  async function fetchDocumentSmart(url, fetchInit) {
+    const html = await fetchTextSmart(url, fetchInit);
+    return new DOMParser().parseFromString(html, 'text/html');
+  }
+
+
   const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>
     doc.querySelector('.post.topicpost .post-content') ||
@@ -260,8 +283,8 @@
       pageCount++;
       seen.add(page);
 
-      const html = await fetchText(page);
-      const doc  = parseHTML(html);
+      const html = await fetchTextSmart(url);
+      const doc  = await fetchDocumentSmart(url);
 
       const topics = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{

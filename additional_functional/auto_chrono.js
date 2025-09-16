@@ -98,74 +98,101 @@
     return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  /* ========= СЕТЬ + ДЕКОДИРОВАНИЕ ДЛЯ RUSFF (UTF-8 / WINDOWS-1251) ========= */
-
-  /** Попытка вытащить charset из HTTP-заголовков */
-  function FMV_charsetFromHeaders(headers) {
-    const ct = headers.get('content-type') || '';
-    const m = ct.match(/charset\s*=\s*([a-z0-9_\-]+)/i);
-    return m ? m[1].toLowerCase() : '';
-  }
+  /* ========================= СЕТЬ И ДЕКОДИРОВАНИЕ ========================= */
+  /* Мини-модуль без фоллбэков: тянем байты, пробуем UTF-8; если видим
+     � (U+FFFD) или явный charset=windows-1251 — декодируем CP1251. */
   
-  /** Сниффинг charset из первых ~4КБ HTML ( <meta charset=...> / http-equiv ) */
-  function FMV_charsetFromBytes(buf) {
-    const head = new Uint8Array(buf.slice(0, Math.min(buf.byteLength, 4096)));
-    // Быстрое ascii-представление (ASCII-символы мета-тегов сохраняются как есть)
-    let ascii = '';
-    for (let i = 0; i < head.length; i++) ascii += String.fromCharCode(head[i] & 0x7f);
+  (function attachNetAndDecode(FMV_NS) {
+    const FMV = (window.FMV = window.FMV || FMV_NS || {});
   
-    // <meta charset="...">
-    let m = ascii.match(/<meta[^>]+charset\s*=\s*["']?\s*([a-z0-9_\-]+)/i);
-    if (m) return m[1].toLowerCase();
+    const log  = (...a) => console.log('[FMV]', ...a);
+    const warn = (...a) => console.warn('[FMV]', ...a);
   
-    // <meta http-equiv="Content-Type" content="text/html; charset=...">
-    m = ascii.match(/<meta[^>]+http-equiv\s*=\s*["']content-type["'][^>]*content\s*=\s*["'][^"']*charset\s*=\s*([a-z0-9_\-]+)/i);
-    if (m) return m[1].toLowerCase();
-  
-    return '';
-  }
-  
-  /** Унифицированное получение HTML как строки с корректной декодировкой */
-  async function FMV_fetchRusffHTML(url) {
-    const res = await fetch(url, {
-      credentials: 'include',   // нужны куки для приваток/пейджинга
-      cache: 'no-store',
-      redirect: 'follow'
-    });
-  
-    // читаем байты
-    const buf = await res.arrayBuffer();
-  
-    // 1) пробуем charset из заголовка
-    let charset = FMV_charsetFromHeaders(res.headers);
-  
-    // 2) если нет — смотрим в <meta ...>
-    if (!charset) charset = FMV_charsetFromBytes(buf);
-  
-    // 3) нормализуем типичные синонимы
-    if (charset === 'cp1251' || charset === 'windows1251') charset = 'windows-1251';
-    if (charset === 'utf8') charset = 'utf-8';
-  
-    // 4) выбираем дефолт: для rusff чаще windows-1251
-    if (!charset) charset = 'windows-1251';
-  
-    // 5) декодируем
-    let html = '';
-    try {
-      html = new TextDecoder(charset).decode(buf);
-    } catch (e) {
-      // если окружение не знает этот charset —fallback на UTF-8
-      html = new TextDecoder('utf-8').decode(buf);
+    /** Быстрый парсер HTML-строки в Document */
+    function parseHTML(html) {
+      return new DOMParser().parseFromString(html, 'text/html');
     }
   
-    return html;
-  }
+    /** Евристика: в строке есть символ замены � ? */
+    function hasReplacementChar(s) {
+      return s.indexOf('\uFFFD') !== -1;
+    }
   
-  /** Парсинг в Document */
-  async function FMV_fetchRusffDoc(url) {
-    const html = await FMV_fetchRusffHTML(url);
-    return new DOMParser().parseFromString(html, 'text/html');
-  }
+    /** Заголовок вида "text/html; charset=windows-1251" → "windows-1251" */
+    function charsetFromContentType(ct) {
+      if (!ct) return null;
+      const m = ct.match(/charset\s*=\s*([^\s;]+)/i);
+      return m ? m[1].toLowerCase() : null;
+    }
+  
+    /** В HTML попалась мета с явным windows-1251? */
+    function htmlHintsCp1251(html) {
+      return /charset\s*=\s*["']?windows-1251/i.test(html);
+    }
+  
+    /** Декодирование байтов выбранной кодировкой */
+    function decode(buf, label) {
+      try {
+        return new TextDecoder(label, { fatal: false }).decode(buf);
+      } catch (e) {
+        warn(`TextDecoder не поддерживает "${label}"`, e);
+        // Последняя соломинка: пусть браузер сам решает (обычно UTF-8)
+        return new TextDecoder().decode(buf);
+      }
+    }
+  
+    /**
+     * Главная функция: тянет URL, честно декодирует (UTF-8 → CP1251 при необходимости)
+     * и возвращает { html, doc, charset }.
+     *
+     * Примечания:
+     * - credentials:'include' чтобы тянуть приватные темы в той же сессии.
+     * - Не полагаемся на авто-декодирование браузера; сами работаем с байтами.
+     */
+    FMV.fetchDocument = async function fetchDocument(url) {
+      const res = await fetch(url, { credentials: 'include' });
+      const buf = new Uint8Array(await res.arrayBuffer());
+  
+      // Подсказки от сервера
+      const ct = res.headers.get('content-type') || '';
+      const headerCharset = charsetFromContentType(ct);
+  
+      // Если сервер честно сказал windows-1251 — верим сразу
+      if (headerCharset === 'windows-1251' || headerCharset === 'cp1251') {
+        const html = decode(buf, 'windows-1251');
+        return { html, doc: parseHTML(html), charset: 'windows-1251' };
+      }
+  
+      // Иначе пробуем UTF-8
+      let html = decode(buf, 'utf-8');
+  
+      // Если в HTML явно написано windows-1251 или заметили � — пробуем CP1251
+      if (htmlHintsCp1251(html) || hasReplacementChar(html)) {
+        const html1251 = decode(buf, 'windows-1251');
+  
+        // Берём 1251-версию, если она выглядит «здоровее» (без �)
+        if (!hasReplacementChar(html1251) || hasReplacementChar(html)) {
+          html = html1251;
+          return { html, doc: parseHTML(html), charset: 'windows-1251' };
+        }
+      }
+  
+      // По умолчанию остаёмся на UTF-8
+      return { html, doc: parseHTML(html), charset: 'utf-8' };
+    };
+  
+    /**
+     * Удобный шорткат, если нужен только Document.
+     * Пример: const doc = await FMV.fetchDoc(url);
+     */
+    FMV.fetchDoc = async function fetchDoc(url) {
+      const { doc } = await FMV.fetchDocument(url);
+      return doc;
+    };
+  
+    log('Модуль сети/декодирования подключён: FMV.fetchDocument(), FMV.fetchDoc()');
+  })();
+
   
   const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
   const firstPostNode = (doc) =>

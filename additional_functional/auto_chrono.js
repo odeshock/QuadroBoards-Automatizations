@@ -54,15 +54,9 @@
       : escapeHtml(type);
 
     return `[${typeHTML} / <span style="color:${st.color}">${st.word}</span>]`;
-  },
-      off:      { word: 'closed',   color: 'teal'   },
-      archived: { word: 'archived', color: 'maroon' }
-    };
-    const st = map[status] || map.archived;
-    return `[${escapeHtml(type)} / <span style="color:${st.color}">${st.word}</span>]`;
   }
 
-  /* ---------- заголовок темы ---------- */
+/* ---------- заголовок темы ---------- */
   const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
     const m = String(text||'').match(TITLE_RE);
@@ -228,8 +222,7 @@
     const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
     const hasHead = /<\/head>/i.test(html) ? 1 : 0;
     const hintBonus = hint ? 2 : 0;
-    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
-  }
+    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50}
   async function fetchText(url, timeoutMs = 20000) {
     const ctrl = new AbortController();
     const t = setTimeout(()=>ctrl.abort(), timeoutMs);
@@ -424,10 +417,9 @@ type, status, dateRaw, episode, url: topicUrl,
     if (ao !== bo) return ao - bo;
 
     return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
-  });
   }
 
-  /* ================= СБОРКА HTML ================= */
+/* ================= СБОРКА HTML ================= */
   async function buildWrappedHTML() {
     const nameToProfile = await scrapeAllUsers();
 

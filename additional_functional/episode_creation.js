@@ -93,7 +93,7 @@
     $chips.empty();
     selected.forEach(function(item, idx){
       var $chip=$('<div class="chip"/>');
-      var $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
+      var $name=$('<span class="name"/>').text(item.name);
       var masksText = item.masks && item.masks.length ? 'маски: '+item.masks.join(', ') : 'масок нет';
       var $masks=$('<span class="masks"/>').text(' — '+masksText);
       var $addMask=$('<button class="add-mask" type="button">добавить маску</button>');

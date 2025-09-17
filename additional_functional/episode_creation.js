@@ -1,28 +1,25 @@
 (function(){
-  /* ======= защита от двойной инициализации на странице ======= */
   if (window.__FMV_SCRIPT_INIT__) return; window.__FMV_SCRIPT_INIT__=true;
 
-  /* ======= таргетинг: только post.php?fid=8|9 ======= */
   if (!/\/post\.php(\?|$)/.test(location.pathname)) return;
   var fid = +(new URLSearchParams(location.search).get('fid')||0);
   if ([8,9].indexOf(fid)===-1) return;
 
-  /* ======= получаем форму и textarea ======= */
   var $form = $('#post form, form[action*="post.php"]').first();
   if (!$form.length) return;
   if ($form.data('fmvBound')) return; $form.data('fmvBound', true);
+
   var $area = $form.find('textarea[name="req_message"], textarea#main-reply, .questionary-post textarea').first();
   if (!$area.length) return;
 
-  /* на всякий случай уберём старый UI (если был) */
   $form.find('.msg-with-characters').remove();
 
-  /* ======= кэш участников (30 мин) ======= */
-  var CACHE_KEY='fmv_participants_cache_v6', TTL_MS=30*60*1000;
+  /* кэш участников (30 мин) */
+  var CACHE_KEY='fmv_participants_cache_v7', TTL_MS=30*60*1000;
   function readCache(){try{var r=sessionStorage.getItem(CACHE_KEY);if(!r)return null;var o=JSON.parse(r);return(Date.now()-o.time>TTL_MS)?null:o.data}catch(e){return null}}
   function writeCache(list){try{sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(),data:list}))}catch(e){}}
 
-  /* ======= парсинг /userlist.php + пагинация ======= */
+  /* парсинг /userlist.php + пагинация */
   function extractUsersFromHTML(html){
     var $doc=$('<div/>').html(html);
     var users=$doc.find('a[href*="profile.php?id="]').map(function(){
@@ -42,36 +39,25 @@
     var base=new URL(any, location.origin);
     return {users:users, lastPage:lastPage, base:base};
   }
-  function urlForPage(base,page){
-    var u=new URL(base, location.origin);
-    if(page>1) u.searchParams.set('p',page); else u.searchParams.delete('p');
-    return u.pathname+(u.search||'');
-  }
-  function dedupeSort(arr){
-    var map={}; arr.forEach(function(u){ map[u.code]=u; });
-    return Object.values(map).sort(function(a,b){ return a.name.localeCompare(b.name,'ru',{sensitivity:'base'}) });
-  }
+  function urlForPage(base,page){var u=new URL(base,location.origin); if(page>1)u.searchParams.set('p',page); else u.searchParams.delete('p'); return u.pathname+(u.search||'');}
+  function dedupeSort(arr){var map={}; arr.forEach(function(u){map[u.code]=u}); return Object.values(map).sort(function(a,b){return a.name.localeCompare(b.name,'ru',{sensitivity:'base'})});}
   function fetchAllParticipants(){
     var c=readCache(); if(c) return $.Deferred().resolve(c).promise();
     var dfd=$.Deferred();
     $.get('/userlist.php').done(function(h1){
       var first=extractUsersFromHTML(h1), all=[].concat(first.users);
-      var MAX_PAGES=Math.min(first.lastPage,50), batch=5, tasks=[];
-      for(var p=2;p<=MAX_PAGES;p++) tasks.push(p);
-      function fetchPage(p){return $.get(urlForPage(first.base,p)).then(function(h){all=all.concat(extractUsersFromHTML(h).users)})}
-      (function run(i){
-        if(i>=tasks.length){ var list=dedupeSort(all); writeCache(list); dfd.resolve(list); return; }
-        var slice=tasks.slice(i,i+batch).map(fetchPage);
-        $.when.apply($,slice).always(function(){run(i+batch)});
-      })(0);
+      var MAX=Math.min(first.lastPage,50), B=5, tasks=[]; for(var p=2;p<=MAX;p++) tasks.push(p);
+      function step(p){return $.get(urlForPage(first.base,p)).then(function(h){all=all.concat(extractUsersFromHTML(h).users)})}
+      (function run(i){ if(i>=tasks.length){var list=dedupeSort(all); writeCache(list); dfd.resolve(list); return;}
+        var slice=tasks.slice(i,i+B).map(step); $.when.apply($,slice).always(function(){run(i+B)}); })(0);
     }).fail(function(){ dfd.reject('Не удалось загрузить список участников'); });
     return dfd.promise();
   }
 
-  /* ======= UI ======= */
+  /* UI */
   var $wrap=$('<div class="msg-with-characters"/>');
 
-  // Комбобокс вместо select
+  // Комбобокс
   var $row=$('<div class="char-row"/>');
   var $combo=$('<div class="combo"/>');
   var $comboInput=$('<input type="text" id="character-combo" placeholder="Наберите имя персонажа…" autocomplete="off">');
@@ -84,27 +70,25 @@
   var $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию" required>');
   $placeRow.append($placeLabel,$placeInput);
 
-  // Выбранные персонажи (в столбик)
+  // Список выбранных
   var $chips=$('<div class="chips"/>');
-  var $hint=$('<div class="hint">Добавьте одного или нескольких персонажей; у каждого могут быть маски. Локация обязательна. Маски можно вводить и нажимать Enter.</div>');
+  var $hint=$('<div class="hint">Добавьте одного или нескольких персонажей; у каждого могут быть маски. Локация обязательна. Маски: Enter=Ок.</div>');
   var $err=$('<div class="error" style="display:none"></div>');
 
-  // Вставляем перед textarea
   $area.before($wrap);
   $wrap.append($row,$placeRow,$chips,$hint,$err,$area);
 
-  /* ======= состояние ======= */
-  // элемент: {code:'user4', name:'Имя', masks:['m1','m2']}
+  /* состояние */
   var selected=[], knownUsers=[];
 
-  /* ======= рендер чипсов + drag&drop ======= */
+  /* рендер чипсов */
   function renderChips(){
     $chips.empty();
     selected.forEach(function(item, idx){
       var $chip=$('<div class="chip" draggable="true" data-idx="'+idx+'"/>');
       var $drag=$('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
       var $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
-      var masksText = item.masks && item.masks.length ? 'маски: '+item.masks.join(', ') : 'масок нет';
+      var masksText=item.masks&&item.masks.length?'маски: '+item.masks.join(', '):'масок нет';
       var $masks=$('<span class="masks"/>').text(' — '+masksText);
       var $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
       var $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
@@ -115,63 +99,60 @@
       var $maskCancel=$('<button type="button">Отмена</button>');
       $maskBox.append($maskInput,$maskOk,$maskCancel);
 
-      // Enter = Ок
-      $maskInput.on('keydown', function(e){
-        if(e.key==='Enter'){ e.preventDefault(); $maskOk.click(); }
-      });
-
+      $maskInput.on('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); $maskOk.click(); }});
       $addMask.on('click', function(){ $maskBox.show(); $maskInput.val('').focus(); });
-      $maskOk.on('click', function(){
-        var v=$.trim($maskInput.val());
-        if(!v) return;
-        if(!item.masks) item.masks=[];
-        item.masks.push(v);
-        renderChips();
-      });
+      $maskOk.on('click', function(){ var v=$.trim($maskInput.val()); if(!v) return; (item.masks||(item.masks=[])).push(v); renderChips(); });
       $maskCancel.on('click', function(){ $maskBox.hide(); });
-
       $remove.on('click', function(){ selected.splice(idx,1); renderChips(); });
-
-      // DnD порядок
-      $chip.on('dragstart', function(e){ $(this).addClass('dragging'); e.originalEvent.dataTransfer.setData('text/plain', idx.toString()); });
-      $chip.on('dragend', function(){ $(this).removeClass('dragging'); });
-      $chips.on('dragover', function(e){ e.preventDefault(); });
-      $chips.on('drop', function(e){
-        e.preventDefault();
-        var from = +e.originalEvent.dataTransfer.getData('text/plain');
-        var $target = $(e.target).closest('.chip');
-        if(!$target.length) return;
-        var to = +$target.data('idx');
-        if (isNaN(from) || isNaN(to) || from===to) return;
-        var itemFrom = selected.splice(from,1)[0];
-        selected.splice(to,0,itemFrom);
-        renderChips();
-      });
 
       $chip.append($drag,$name,$masks,$addMask,$remove,$maskBox);
       $chips.append($chip);
     });
   }
 
-  /* ======= добавление персонажа по коду ======= */
+  /* делегированное DnD (без множества обработчиков) */
+  $chips.on('dragstart', '.chip', function(e){ $(this).addClass('dragging'); e.originalEvent.dataTransfer.setData('text/plain', $(this).data('idx')); });
+  $chips.on('dragend',   '.chip', function(){ $(this).removeClass('dragging'); });
+  $chips.on('dragover', function(e){ e.preventDefault(); });
+  $chips.on('drop', function(e){
+    e.preventDefault();
+    var from=+e.originalEvent.dataTransfer.getData('text/plain');
+    var $t=$(e.target).closest('.chip'); if(!$t.length) return;
+    var to=+$t.data('idx'); if(isNaN(from)||isNaN(to)||from===to) return;
+    var it=selected.splice(from,1)[0]; selected.splice(to,0,it); renderChips();
+  });
+
+  /* добавление персонажа */
   function addCharacterByCode(code){
-    if (!code) return;
-    if (selected.some(function(x){return x.code===code})) return;
-    var u = knownUsers.find(function(x){return x.code===code});
-    var name = u ? u.name : code;
-    selected.push({code:code, name:name, masks:[]});
-    renderChips();
-    $comboInput.val('');
-    $ac.hide().empty();
+    if(!code) return;
+    if(selected.some(function(x){return x.code===code})) return;
+    var u=knownUsers.find(function(x){return x.code===code});
+    selected.push({code:code, name:(u?u.name:code), masks:[]});
+    renderChips(); $comboInput.val(''); $ac.hide().empty();
   }
 
-  /* ======= автодополнение ======= */
+  /* поиск совпадения по введённой строке (точное имя/код или единственная находка) */
+  function pickByInput(){
+    var q=($comboInput.val()||'').trim(); if(!q) return null;
+    var qq=q.toLowerCase();
+    var pool=knownUsers.filter(function(u){return !selected.some(function(x){return x.code===u.code});});
+    // точное совпадение по имени
+    var exact=pool.find(function(u){return u.name.toLowerCase()===qq}); if(exact) return exact.code;
+    // точное по коду
+    var exactCode=pool.find(function(u){return u.code.toLowerCase()===qq}); if(exactCode) return exactCode.code;
+    // единственное подстрочное
+    var list=pool.filter(function(u){return u.name.toLowerCase().indexOf(qq)!==-1 || u.code.toLowerCase().indexOf(qq)!==-1});
+    if(list.length===1) return list[0].code;
+    return null;
+  }
+
+  /* автодополнение */
   function renderAC(q){
     var qq=(q||'').trim().toLowerCase();
     var items=knownUsers
-      .filter(function(u){ return !selected.some(function(x){return x.code===u.code}); })
-      .filter(function(u){ return !qq || u.name.toLowerCase().indexOf(qq)!==-1; })
-      .slice().sort(function(a,b){ return a.name.localeCompare(b.name,'ru',{sensitivity:'base'}) });
+      .filter(function(u){return !selected.some(function(x){return x.code===u.code});})
+      .filter(function(u){return !qq || u.name.toLowerCase().indexOf(qq)!==-1 || u.code.toLowerCase().indexOf(qq)!==-1;})
+      .slice().sort(function(a,b){return a.name.localeCompare(b.name,'ru',{sensitivity:'base'})});
 
     $ac.empty();
     if(!items.length){ $ac.append('<div class="ac-item"><span class="muted">Ничего не найдено</span></div>').show(); return; }
@@ -181,123 +162,71 @@
     });
     $ac.show(); setActive(0);
   }
-  function setActive(idx){
-    var $items=$ac.children('.ac-item'); $items.removeClass('active');
-    if(!$items.length) return;
-    idx=(idx+$items.length)%$items.length;
-    $items.eq(idx).addClass('active'); $ac.data('activeIndex',idx);
-  }
-  function getActiveCode(){
-    var idx=$ac.data('activeIndex')|0; var $it=$ac.children('.ac-item').eq(idx);
-    return $it.data('code');
-  }
+  function setActive(idx){ var $it=$ac.children('.ac-item'); $it.removeClass('active'); if(!$it.length)return; idx=(idx+$it.length)%$it.length; $it.eq(idx).addClass('active'); $ac.data('activeIndex',idx); }
+  function getActiveCode(){ var idx=$ac.data('activeIndex')|0; var $it=$ac.children('.ac-item').eq(idx); return $it.data('code'); }
 
   $comboInput.on('input', function(){ renderAC(this.value); });
   $comboInput.on('keydown', function(e){
-    if(!$ac.is(':visible')) return;
     var idx=$ac.data('activeIndex')|0;
-    if(e.key==='ArrowDown'){ e.preventDefault(); setActive(idx+1); }
-    else if(e.key==='ArrowUp'){ e.preventDefault(); setActive(idx-1); }
-    else if(e.key==='Enter'){ e.preventDefault(); var code=getActiveCode(); if(code) addCharacterByCode(code); }
-    else if(e.key==='Escape'){ $ac.hide(); }
+    if(e.key==='ArrowDown' && $ac.is(':visible')){ e.preventDefault(); setActive(idx+1); }
+    else if(e.key==='ArrowUp' && $ac.is(':visible')){ e.preventDefault(); setActive(idx-1); }
+    else if(e.key==='Enter'){
+      e.preventDefault();
+      var code=$ac.is(':visible') ? getActiveCode() : null;
+      if(!code) code=pickByInput();                 // ДОБАВЛЕНО: Enter работает и без выпадашки
+      if(code) addCharacterByCode(code); else renderAC(this.value);
+    } else if(e.key==='Escape'){ $ac.hide(); }
   });
   $ac.on('mousedown', '.ac-item', function(){ var code=$(this).data('code'); if(code) addCharacterByCode(code); });
   $(document).on('click', function(e){ if(!$(e.target).closest($combo).length) $ac.hide(); });
 
-  /* ======= загрузка участников и префилл ======= */
+  /* загрузка участников и префилл */
   fetchAllParticipants().done(function(list){
-    knownUsers=list.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'ru',{sensitivity:'base'}) });
-    prefillFromTextarea($area.val()||'');
-    renderChips();
-  }).fail(function(msg){
-    // покажем в комбобоксе ошибку
-    $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show();
-  });
+    knownUsers=list.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ru',{sensitivity:'base'})});
+    prefillFromTextarea($area.val()||''); renderChips();
+  }).fail(function(msg){ $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show(); });
 
-  /* ======= сериализация FMV (одной строкой, без переводов) ======= */
-  function buildFMVCast(){
-    if(!selected.length) return '';
-    var codes = selected.map(function(i){ return i.code; }).join(';');
-    return '[FMVcast]'+codes+'[/FMVcast]';
-  }
-  function buildFMVMask(){
-    var pairs=[];
-    selected.forEach(function(i){ (i.masks||[]).forEach(function(m){ pairs.push(i.code+'='+m); }); });
-    return pairs.length ? '[FMVmask]'+pairs.join(';')+'[/FMVmask]' : '';
-  }
-  function buildFMVPlace(){
-    var v = ($placeInput.val()||'').trim();
-    return v ? '[FMVplace]'+v+'[/FMVplace]' : '';
-  }
-  function stripOldFMV(text){
-    return (text||'')
-      .replace(/\[FMVcast\][\s\S]*?\[\/FMVcast\]/ig,'')
-      .replace(/\[FMVmask\][\s\S]*?\[\/FMVmask\]/ig,'')
-      .replace(/\[FMVplace\][\s\S]*?\[\/FMVplace\]/ig,'')
-      .replace(/^\s+|\s+$/g,'');
-  }
-  function buildMetaLine(){
-    // строго подряд, БЕЗ переносов и пробелов
-    var parts=[buildFMVCast(), buildFMVMask(), buildFMVPlace()].filter(Boolean);
-    return parts.join('');
-  }
+  /* сериализация (одной строкой) */
+  function buildFMVCast(){ if(!selected.length) return ''; return '[FMVcast]'+selected.map(function(i){return i.code}).join(';')+'[/FMVcast]'; }
+  function buildFMVMask(){ var pairs=[]; selected.forEach(function(i){ (i.masks||[]).forEach(function(m){ pairs.push(i.code+'='+m); }); }); return pairs.length?'[FMVmask]'+pairs.join(';')+'[/FMVmask]':''; }
+  function buildFMVPlace(){ var v=($placeInput.val()||'').trim(); return v?'[FMVplace]'+v+'[/FMVplace]':''; }
+  function stripOldFMV(text){return (text||'').replace(/\[FMVcast\][\s\S]*?\[\/FMVcast\]/ig,'').replace(/\[FMVmask\][\s\S]*?\[\/FMVmask\]/ig,'').replace(/\[FMVplace\][\s\S]*?\[\/FMVplace\]/ig,'').replace(/^\s+|\s+$/g,'');}
+  function buildMetaLine(){ return [buildFMVCast(),buildFMVMask(),buildFMVPlace()].filter(Boolean).join(''); }
 
-  /* ======= обратный парсинг при редактировании ======= */
+  /* префилл при редактировании */
   function prefillFromTextarea(text){
     var mc=text.match(/\[FMVcast\]([\s\S]*?)\[\/FMVcast\]/i);
-    var codes = (mc && mc[1]) ? mc[1].split(';').map(function(s){return s.trim()}).filter(Boolean) : [];
-
-    var mm=text.match(/\[FMVmask\]([\s\S]*?)\[\/FMVmask\]/i);
-    var maskPairs={};
-    if(mm && mm[1]){
-      mm[1].split(';').forEach(function(pair){
-        var i=pair.indexOf('=');
-        if(i<=0) return;
-        var code=pair.slice(0,i).trim();
-        var val=pair.slice(i+1).trim();
-        if(!code||!val) return;
-        if(!maskPairs[code]) maskPairs[code]=[];
-        maskPairs[code].push(val);
-      });
-    }
-
-    var mp=text.match(/\[FMVplace\]([\s\S]*?)\[\/FMVplace\]/i);
-    if(mp && typeof mp[1]==='string'){ $placeInput.val(mp[1].trim()); }
-
-    codes.forEach(function(code){
-      if (selected.some(function(x){return x.code===code})) return;
-      var u = knownUsers.find(function(x){return x.code===code});
-      var name = u ? u.name : code;
-      selected.push({code:code, name:name, masks:(maskPairs[code]||[])});
-    });
-    Object.keys(maskPairs).forEach(function(code){
-      if (selected.some(function(x){return x.code===code})) return;
-      var u = knownUsers.find(function(x){return x.code===code});
-      var name = u ? u.name : code;
-      selected.push({code:code, name:name, masks:maskPairs[code]});
-    });
+    var codes=(mc&&mc[1])?mc[1].split(';').map(function(s){return s.trim()}).filter(Boolean):[];
+    var mm=text.match(/\[FMVmask\]([\s\S]*?)\[\/FMVmask\]/i), maskPairs={};
+    if(mm&&mm[1]) mm[1].split(';').forEach(function(pair){ var i=pair.indexOf('='); if(i<=0)return; var code=pair.slice(0,i).trim(); var val=pair.slice(i+1).trim(); if(!code||!val)return; (maskPairs[code]||(maskPairs[code]=[])).push(val); });
+    var mp=text.match(/\[FMVplace\]([\s\S]*?)\[\/FMVplace\]/i); if(mp&&typeof mp[1]==='string') $placeInput.val(mp[1].trim());
+    codes.forEach(function(code){ if(selected.some(function(x){return x.code===code}))return; var u=knownUsers.find(function(x){return x.code===code}); selected.push({code:code,name:(u?u.name:code),masks:(maskPairs[code]||[])}); });
+    Object.keys(maskPairs).forEach(function(code){ if(selected.some(function(x){return x.code===code}))return; var u=knownUsers.find(function(x){return x.code===code}); selected.push({code:code,name:(u?u.name:code),masks:maskPairs[code]}); });
   }
 
-  /* ======= предпросмотр: не менять textarea ======= */
+  /* предпросмотр */
   var isPreview=false;
   $form.find('input[name="preview"], button[name="preview"]').on('click', function(){ isPreview=true; });
 
-  /* ======= submit: валидируем и пишем в textarea БЕЗ перевода строки ======= */
+  /* submit */
   $form.off('submit.fmv').on('submit.fmv', function(){
     if (isPreview) { isPreview=false; return true; }
 
-    // Требования: хотя бы 1 персонаж и непустая локация
-    var placeOk = ($placeInput.val()||'').trim().length>0;
+    // если в поле введено что-то — попробуем автоматически добавить
+    if(!selected.length){
+      var attempt=pickByInput(); if(attempt) addCharacterByCode(attempt);
+    }
+
+    var placeOk=($placeInput.val()||'').trim().length>0;
     if(!selected.length || !placeOk){
-      var msg = !selected.length && !placeOk
-        ? 'Выберите хотя бы одного персонажа и укажите локацию'
-        : (!selected.length ? 'Выберите хотя бы одного персонажа' : 'Укажите локацию');
+      var msg=!selected.length && !placeOk ? 'Выберите хотя бы одного персонажа и укажите локацию'
+               : (!selected.length ? 'Выберите хотя бы одного персонажа' : 'Укажите локацию');
       $err.text(msg).show(); setTimeout(function(){ $err.fadeOut(400); }, 2000);
-      if(!placeOk){ $placeInput[0].reportValidity && $placeInput[0].reportValidity(); $placeInput.focus(); }
+      if(!selected.length) { $comboInput.focus(); } else if(!placeOk) { $placeInput[0].reportValidity && $placeInput[0].reportValidity(); $placeInput.focus(); }
       return false;
     }
 
-    // Базовые поля формы не пустые — иначе не трогаем textarea
+    // базовые поля формы (форум сам проверит; мы мешать не будем)
     var $subject=$form.find('input[name="req_subject"]');
     var subjectOk=!$subject.length || ($subject.val()||'').trim().length>0;
     var messageOk=($area.val()||'').trim().length>0;
@@ -305,11 +234,11 @@
 
     var metaLine=buildMetaLine();
     var plain=stripOldFMV($area.val()).replace(/^\n+/, '');
-    $area.val(metaLine + plain); // одна строка меты + сразу текст, без \n между ними
+    $area.val(metaLine + plain); // одна строка меты + сразу текст
     return true;
   });
 
-  /* ======= направляем BB-кнопки в нашу textarea ======= */
+  /* направляем BB-кнопки в нашу textarea */
   $area.on('focus', function(){
     $('.questionary-post textarea').removeAttr('id');
     if(this.id!=='main-reply') this.id='main-reply';

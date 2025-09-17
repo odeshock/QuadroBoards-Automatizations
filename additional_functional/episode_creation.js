@@ -1,24 +1,30 @@
 (function(){
+  // ---- анти-дубли ----
   if (window.__FMV_SCRIPT_INIT__) return; window.__FMV_SCRIPT_INIT__=true;
+
+  // ---- только fid=8|9 ----
   if (!/\/post\.php(\?|$)/.test(location.pathname)) return;
-  var fid=+(new URLSearchParams(location.search).get('fid')||0); if([8,9].indexOf(fid)===-1) return;
+  var fid=+(new URLSearchParams(location.search).get('fid')||0);
+  if ([8,9].indexOf(fid)===-1) return;
 
   var $form=$('#post form, form[action*="post.php"]').first(); if(!$form.length) return;
-  if($form.data('fmvBound')) return; $form.data('fmvBound',true);
+  if ($form.data('fmvBound')) return; $form.data('fmvBound', true);
   var $area=$form.find('textarea[name="req_message"], textarea#main-reply, .questionary-post textarea').first(); if(!$area.length) return;
+
+  // подчистим старый UI, если вдруг есть
   $form.find('.msg-with-characters').remove();
 
-  /* ===== кэш участников ===== */
-  var CACHE_KEY='fmv_participants_cache_v8', TTL=30*60*1000;
+  // ===== кэш участников =====
+  var CACHE_KEY='fmv_participants_cache_v10', TTL=30*60*1000;
   function readCache(){try{var r=sessionStorage.getItem(CACHE_KEY);if(!r)return null;var o=JSON.parse(r);return(Date.now()-o.time>TTL)?null:o.data}catch(e){return null}}
   function writeCache(list){try{sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(),data:list}))}catch(e){}}
 
-  /* ===== парсинг userlist ===== */
+  // ===== парсинг userlist =====
   function extractUsersFromHTML(html){
     var $doc=$('<div/>').html(html);
     var users=$doc.find('a[href*="profile.php?id="]').map(function(){
       var a=$(this)[0], name=$(this).text().trim(), m=a.href.match(/profile\.php\?id=(\d+)/);
-      if(!m) return null; var code='user'+m[1]; return {id:+m[1], code:code, name:name};
+      if(!m) return null; return {id:+m[1], code:'user'+m[1], name:name};
     }).get().filter(Boolean);
     var pages=$doc.find('a[href*="userlist.php"]').map(function(){var u=new URL($(this)[0].href,location.origin);return +(u.searchParams.get('p')||0)}).get();
     var last=Math.max(1,...pages,1);
@@ -40,27 +46,33 @@
     return d.promise();
   }
 
-  /* ===== UI ===== */
+  // ===== UI =====
   var $wrap=$('<div class="msg-with-characters"/>');
+
+  // Комбобокс
   var $row=$('<div class="char-row"/>');
   var $combo=$('<div class="combo"/>');
   var $comboInput=$('<input type="text" id="character-combo" placeholder="Наберите имя персонажа…" autocomplete="off">');
   var $ac=$('<div class="ac-list" role="listbox" aria-label="Варианты персонажей"></div>');
   $combo.append($comboInput,$ac); $row.append($combo);
 
+  // Локация
   var $placeRow=$('<div class="place-row"/>');
   var $placeLabel=$('<label for="fmv-place" style="font-weight:600">Локация:</label>');
-  var $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию" required>');
+  var $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">'); // валидируем сами
   $placeRow.append($placeLabel,$placeInput);
 
   var $chips=$('<div class="chips"/>');
   var $hint=$('<div class="hint">Добавьте одного или нескольких персонажей; у каждого могут быть маски. Локация обязательна. Маски: Enter=Ок.</div>');
   var $err=$('<div class="error" style="display:none"></div>');
 
-  $area.before($wrap); $wrap.append($row,$placeRow,$chips,$hint,$err,$area);
+  $area.before($wrap);
+  $wrap.append($row,$placeRow,$chips,$hint,$err,$area);
 
+  // ===== state =====
   var selected=[], knownUsers=[];
 
+  // ===== chips + DnD =====
   function renderChips(){
     $chips.empty();
     selected.forEach(function(item, idx){
@@ -97,6 +109,7 @@
     if(isNaN(from)||isNaN(to)||from===to) return; var it=selected.splice(from,1)[0]; selected.splice(to,0,it); renderChips();
   });
 
+  // ===== добавление персонажа =====
   function addByCode(code){
     if(!code) return; if(selected.some(x=>x.code===code)) return;
     var u=knownUsers.find(x=>x.code===code); selected.push({code:code,name:(u?u.name:code),masks:[]});
@@ -110,6 +123,8 @@
     var list=pool.filter(u=>u.name.toLowerCase().includes(qq)||u.code.toLowerCase().includes(qq));
     return list.length===1 ? list[0].code : null;
   }
+
+  // ===== автодополнение =====
   function renderAC(q){
     var qq=(q||'').trim().toLowerCase();
     var items=knownUsers.filter(u=>!selected.some(x=>x.code===u.code))
@@ -136,12 +151,13 @@
   $ac.on('mousedown','.ac-item',function(){var code=$(this).data('code'); if(code) addByCode(code);});
   $(document).on('click',e=>{ if(!$(e.target).closest($combo).length) $ac.hide(); });
 
+  // ===== загрузка участников и префилл =====
   fetchUsers().done(list=>{
     knownUsers=list.slice().sort((a,b)=>a.name.localeCompare(b.name,'ru',{sensitivity:'base'}));
     prefillFromTextarea($area.val()||''); renderChips();
   }).fail(msg=>{ $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show(); });
 
-  /* ===== сериализация FMV (одной строкой) ===== */
+  // ===== сериализация одной строкой =====
   function castStr(){return selected.length ? '[FMVcast]'+selected.map(i=>i.code).join(';')+'[/FMVcast]' : '';}
   function maskStr(){var pairs=[];selected.forEach(i=>(i.masks||[]).forEach(m=>pairs.push(i.code+'='+m)));return pairs.length?'[FMVmask]'+pairs.join(';')+'[/FMVmask]':'';}
   function placeStr(){var v=($placeInput.val()||'').trim();return v?'[FMVplace]'+v+'[/FMVplace]':'';}
@@ -158,17 +174,22 @@
     Object.keys(masks).forEach(code=>{ if(selected.some(x=>x.code===code))return; var u=knownUsers.find(x=>x.code===code); selected.push({code:code,name:(u?u.name:code),masks:masks[code]}); });
   }
 
-  /* ===== submit: гарантированная отправка ===== */
-  var isPreview=false, isProgrammatic=false;
-  $form.find('input[name="preview"], button[name="preview"]').on('click', ()=>{isPreview=true;});
+  // ===== какой submit нажали? =====
+  var lastSubmitter=null;
+  $form.on('click.fmv','input[type=submit],button[type=submit]',function(){ lastSubmitter=this; });
 
+  // ===== контролируем submit =====
+  var submitting=false; // анти-дребезг
   $form.off('submit.fmv').on('submit.fmv', function(e){
-    if(isProgrammatic){ isProgrammatic=false; return; }         // позволяем нативный submit
-    if(isPreview){ isPreview=false; return; }                   // даём уйти на предпросмотр без вмешательства
+    // если предпросмотр — пропускаем
+    if (lastSubmitter && (/preview/i.test(lastSubmitter.name) || /предпрос/i.test(lastSubmitter.value||''))) {
+      lastSubmitter=null; return; // без preventDefault
+    }
 
-    e.preventDefault();                                         // полностью берём сабмит под контроль
+    e.preventDefault(); // всегда перехватываем обычную отправку
+    if (submitting) return; // на всякий случай
 
-    // если в поле что-то набрано — попробуем добавить автоматически
+    // если что-то набрано в поле — пробуем автоматически добавить
     if(!selected.length){ var pick=pickByInput(); if(pick) addByCode(pick); }
 
     var placeOk=($placeInput.val()||'').trim().length>0;
@@ -177,17 +198,17 @@
                : (!selected.length ? 'Выберите хотя бы одного персонажа' : 'Укажите локацию');
       $err.text(msg).show(); setTimeout(()=>{$err.fadeOut(400);},2000);
       if(!selected.length) $comboInput.focus(); else $placeInput.focus();
-      return;                                                   // не отправляем
+      lastSubmitter=null; return;
     }
 
-    // собираем мету и пишем в textarea (одной строкой, без \n)
+    // вписываем мету одной строкой
     var meta=metaLine();
     var plain=stripFMV($area.val()).replace(/^\n+/, '');
     $area.val(meta+plain);
 
-    // теперь позволяем нативную отправку одной командой
-    isProgrammatic=true;
-    HTMLFormElement.prototype.submit.call(this);                                              // нативный submit без jQuery/обработчиков
+    // гарантированная отправка: обходим name="submit"
+    submitting=true;
+    HTMLFormElement.prototype.submit.call(this);
   });
 
   // направляем BB-кнопки в нужную textarea

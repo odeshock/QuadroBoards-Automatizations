@@ -187,7 +187,7 @@
 
     // теперь позволяем нативную отправку одной командой
     isProgrammatic=true;
-    this.submit();                                              // нативный submit без jQuery/обработчиков
+    HTMLFormElement.prototype.submit.call(this);                                              // нативный submit без jQuery/обработчиков
   });
 
   // направляем BB-кнопки в нужную textarea

@@ -105,7 +105,7 @@
       $maskCancel.on('click', ()=>{ $maskBox.hide(); });
       $remove.on('click', ()=>{ selected.splice(idx,1); renderChips(); });
 
-      $chip.append($drag,$name,$мasks,$addMask,$remove,$maskBox);
+      $chip.append($drag,$name,$masks,$addMask,$remove,$maskBox);
       $chips.append($chip);
     });
   }

@@ -11,15 +11,9 @@
   if (!$area.length) return;
 
   // --- кэш участников (30 мин) ---
-  var CACHE_KEY='fmv_participants_cache_v3', TTL_MS=30*60*1000;
-  function readCache(){
-    try{var r=sessionStorage.getItem(CACHE_KEY); if(!r) return null;
-      var o=JSON.parse(r); return (Date.now()-o.time>TTL_MS)?null:o.data;
-    }catch(e){return null}
-  }
-  function writeCache(list){
-    try{sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(), data:list}))}catch(e){}
-  }
+  var CACHE_KEY='fmv_participants_cache_v4', TTL_MS=30*60*1000;
+  function readCache(){try{var r=sessionStorage.getItem(CACHE_KEY);if(!r)return null;var o=JSON.parse(r);return(Date.now()-o.time>TTL_MS)?null:o.data}catch(e){return null}}
+  function writeCache(list){try{sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(),data:list}))}catch(e){}}
 
   // --- парсинг userlist + пагинация ---
   function extractUsersFromHTML(html){
@@ -36,7 +30,7 @@
       var u=new URL($(this)[0].href, location.origin);
       return +(u.searchParams.get('p')||0);
     }).get();
-    var lastPage=Math.max(1, ...pages, 1);
+    var lastPage=Math.max(1,...pages,1);
     var any=$doc.find('a[href*="userlist.php"]').first().attr('href')||'userlist.php';
     var base=new URL(any, location.origin);
     return {users:users, lastPage:lastPage, base:base};
@@ -67,33 +61,43 @@
     return dfd.promise();
   }
 
-  // --- UI: селект + кнопка + список (в столбик) ---
+  // --- UI: селект + кнопка + Локация + список (в столбик) ---
   var $wrap=$('<div class="msg-with-characters"/>');
+
+  // селект персон
   var $row=$('<div class="char-row"/>');
   var $select=$('<select/>',{id:'character-select','aria-label':'Выберите персонажа'});
   var $addBtn=$('<button type="button">Добавить персонажа</button>');
-  var $chips=$('<div class="chips"/>');
-  var $hint=$('<div class="hint">Добавьте одного или нескольких персонажей; у каждого могут быть маски.</div>');
 
+  // локация
+  var $placeRow=$('<div class="place-row"/>');
+  var $placeInput=$('<input type="text" id="fmv-place" placeholder="Локация (необязательно)">');
+
+  // список выбранных
+  var $chips=$('<div class="chips"/>');
+  var $hint=$('<div class="hint">Добавьте одного или нескольких персонажей; у каждого могут быть маски. Локация пишется в [FMVplace].</div>');
+
+  // initial options
   $select.append($('<option/>',{value:'',text:'— Персонаж —',disabled:true,selected:true}));
   var $loadingOpt=$('<option/>',{value:'',text:'Загружается список…',disabled:true});
   $select.append($loadingOpt);
 
+  // mount
   $area.before($wrap);
   $row.append($select,$addBtn);
-  $wrap.append($row,$chips,$hint,$area);
+  $placeRow.append($('<label for="fmv-place" style="font-weight:600">Локация:</label>'),$placeInput);
+  $wrap.append($row,$placeRow,$chips,$hint,$area);
 
   // --- состояние выбранных ---
   // элемент: {code:'user4', name:'Имя', masks:['m1','m2']}
-  var selected=[];
-  var knownUsers=[];
+  var selected=[], knownUsers=[];
 
   // --- рендер в столбик ---
   function renderChips(){
     $chips.empty();
     selected.forEach(function(item, idx){
       var $chip=$('<div class="chip"/>');
-      var $name=$('<span class="name"/>').text(item.name);
+      var $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
       var masksText = item.masks && item.masks.length ? 'маски: '+item.masks.join(', ') : 'масок нет';
       var $masks=$('<span class="masks"/>').text(' — '+masksText);
       var $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
@@ -148,24 +152,35 @@
     renderChips();
   }).fail(function(msg){ $loadingOpt.text(msg||'Ошибка загрузки'); });
 
-  // --- сериализация FMV ---
+  // --- сериализация FMV в одну строку ---
   function buildFMVCast(){ // [FMVcast]user4;user2[/FMVcast]
     if(!selected.length) return '';
     var codes = selected.map(function(i){ return i.code; }).join(';');
-    return '[FMVcast]'+codes+'[/FMVcast]\n';
+    return '[FMVcast]'+codes+'[/FMVcast]';
   }
   function buildFMVMask(){ // [FMVmask]user4=mask1;user4=mask2;user2=mask3[/FMVmask]
     var pairs=[];
     selected.forEach(function(i){ (i.masks||[]).forEach(function(m){ pairs.push(i.code+'='+m); }); });
-    return '[FMVmask]'+pairs.join(';')+'[/FMVmask]\n';
+    return pairs.length ? '[FMVmask]'+pairs.join(';')+'[/FMVmask]' : '';
   }
-  function mergeFMVBlocks(text, cast, mask){
-    var t=text;
-    if (/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i.test(t)) t=t.replace(/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i, cast.trim());
-    else t = cast + t;
-    if (/\[FMVmask\][\s\S]*?\[\/FMVmask\]/i.test(t)) t=t.replace(/\[FMVmask\][\s\S]*?\[\/FMVmask\]/i, mask.trim());
-    else t = mask + t;
-    return t;
+  function buildFMVPlace(){ // [FMVplace]ответ[/FMVplace]
+    var v = ($placeInput.val()||'').trim();
+    return v ? '[FMVplace]'+v+'[/FMVplace]' : '';
+  }
+
+  // убрать старые FMV-блоки и вернуть чистый текст
+  function stripOldFMV(text){
+    return (text||'')
+      .replace(/\[FMVcast\][\s\S]*?\[\/FMVcast\]/ig,'')
+      .replace(/\[FMVmask\][\s\S]*?\[\/FMVmask\]/ig,'')
+      .replace(/\[FMVplace\][\s\S]*?\[\/FMVplace\]/ig,'')
+      .replace(/^\s+|\s+$/g,'') // обрезаем лишние пробелы/переносы по краям
+  }
+
+  // собрать одну мета-строку
+  function buildMetaLine(){
+    var parts = [buildFMVCast(), buildFMVMask(), buildFMVPlace()].filter(Boolean);
+    return parts.join(''); // ровно подряд, без переносов и пробелов
   }
 
   // --- обратный парсинг при редактировании ---
@@ -188,6 +203,10 @@
         maskPairs[code].push(val);
       });
     }
+    // FMVplace
+    var mp=text.match(/\[FMVplace\]([\s\S]*?)\[\/FMVplace\]/i);
+    if(mp && typeof mp[1]==='string'){ $placeInput.val(mp[1].trim()); }
+
     // восстановим выбранных
     codes.forEach(function(code){
       if (selected.some(function(x){return x.code===code})) return;
@@ -210,10 +229,9 @@
 
   // --- сабмит: меняем textarea только при валидных полях ---
   $form.off('submit.fmv').on('submit.fmv', function(){
-    // 0) если предпросмотр — пропускаем без изменений
     if (isPreview) { isPreview = false; return true; }
 
-    // 1) должен быть хотя бы один персонаж
+    // должен быть хотя бы один персонаж
     if(!selected.length){
       $select[0].setCustomValidity('Выберите хотя бы одного персонажа');
       $select[0].reportValidity && $select[0].reportValidity();
@@ -221,26 +239,24 @@
       return false;
     }
 
-    // 2) обязательные поля не пустые
-    var $subject = $form.find('input[name="req_subject"]'); // может отсутствовать при ответах
+    // обязательные поля не пустые
+    var $subject = $form.find('input[name="req_subject"]');
     var subjectOk = !$subject.length || ($subject.val()||'').trim().length>0;
     var messageOk = ($area.val()||'').trim().length>0;
-
     if(!subjectOk || !messageOk){
-      // даём форме отправиться, сервер/клиентская валидация сами отругают
-      // но textarea НЕ МЕНЯЕМ
-      return true;
+      return true; // не трогаем textarea — пускай отвалидируется
     }
 
-    // 3) всё ок — пишем блоки в textarea
-    var cast = buildFMVCast();
-    var mask = buildFMVMask();
-    var current=$area.val()||'';
-    $area.val(mergeFMVBlocks(current, cast, mask));
+    // собираем одну мета-строку
+    var metaLine = buildMetaLine(); // без переносов, без пробелов
+    // убираем прежние FMV-блоки из текста
+    var plain = stripOldFMV($area.val());
+    // вставляем: мета-строка + перевод строки + основной текст
+    $area.val( metaLine + (metaLine ? '\n' : '') + plain );
     return true;
   });
 
-  // --- совместимость с BB-кнопками: направляем в нашу textarea ---
+  // направляем BB-кнопки в нашу textarea
   $area.on('focus', function(){
     $('.questionary-post textarea').removeAttr('id');
     if(this.id!=='main-reply') this.id='main-reply';

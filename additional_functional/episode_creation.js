@@ -68,7 +68,7 @@
   // Локация
   var $placeRow=$('<div class="place-row"/>');
   var $placeLabel=$('<label for="fmv-place" style="font-weight:600">Локация:</label>');
-  var $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">'); // требуем сами
+  var $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">'); // валидируем сами
   $placeRow.append($placeLabel,$placeInput);
 
   var $chips=$('<div class="chips"/>');
@@ -89,7 +89,7 @@
       var $drag=$('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
       var $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
       var masksText=item.masks&&item.masks.length?'маски: '+item.masks.join(', '):'масок нет';
-      var $masks=$('<span class="masks"/>').text(' — '+masksText);
+      var $masks=$('<span class="masks"/>').text(' — '+мasksText);
       var $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
       var $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
 
@@ -105,7 +105,7 @@
       $maskCancel.on('click', ()=>{ $maskBox.hide(); });
       $remove.on('click', ()=>{ selected.splice(idx,1); renderChips(); });
 
-      $chip.append($drag,$name,$masks,$addMask,$remove,$maskBox);
+      $chip.append($drag,$name,$мasks,$addMask,$remove,$maskBox);
       $chips.append($chip);
     });
   }
@@ -187,7 +187,7 @@
   var lastSubmitter=null;
   $form.on('click.fmv','input[type=submit],button[type=submit]',function(){ lastSubmitter=this; });
 
-  /* ===== сабмит: без блокировок, только наша валидация ===== */
+  /* ===== сабмит: вставляем мету ТОЛЬКО если можно отправить ===== */
   $form.off('submit.fmv').on('submit.fmv', function(e){
     // если это предпросмотр — ничего не меняем, пропускаем
     if (lastSubmitter && (/preview/i.test(lastSubmitter.name) || /предпрос/i.test(lastSubmitter.value||''))) {
@@ -197,6 +197,7 @@
     // автодобавление персонажа, если поле не пусто
     if(!selected.length){ var pick=pickByInput(); if(pick) addByCode(pick); }
 
+    // наша валидация: нужен ≥1 персонаж и непустая локация
     var placeOk=($placeInput.val()||'').trim().length>0;
     if(!selected.length || !placeOk){
       e.preventDefault();
@@ -206,6 +207,18 @@
       if(!selected.length) $comboInput.focus(); else $placeInput.focus();
       lastSubmitter=null; return;
     }
+
+    /* >>> НОВОЕ: проверяем, что обязательные поля формы не пустые */
+    var $subject  = $form.find('input[name="req_subject"]');
+    var subjectOk = !$subject.length || ($subject.val()||'').trim().length > 0;
+    var messageOk = ($area.val()||'').trim().length > 0;
+
+    if (!subjectOk || !messageOk) {
+      // ничего НЕ вставляем — пусть браузер/форум сам заблокирует отправку
+      lastSubmitter = null;
+      return; // не preventDefault
+    }
+    /* <<< КОНЕЦ НОВОГО */
 
     // всё ок — вписываем мету одной строкой и даём форме уйти нативно
     var meta=metaLine();

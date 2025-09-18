@@ -60,7 +60,7 @@ async function FMVreplaceFieldData(user_id, field_id, new_value, overwriteIfExis
     // B1) если уже есть «что-то» и перезаписывать нельзя — выходим с ошибкой и сообщением
     if (hasSomething(prevValue) && !overwriteIfExists) {
       return {
-        status: 'error',
+        status: 'nochange',
         fieldId: String(field_id),
         value: new_value,
         serverMessage: 'Поле уже содержит значение. Перезапись запрещена.',

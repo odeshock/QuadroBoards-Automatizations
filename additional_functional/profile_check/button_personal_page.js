@@ -62,9 +62,9 @@
       const arg6 = '0';
 
       // 6) Вставляем кнопку + статус (+ блок подробностей)
-      let bodies = document.querySelectorAll('.topic .post-body .post-box');
+      let bodies = document.querySelectorAll('.topic .post-body .post-box .post-content');
       if (!bodies.length) {
-        try { await waitFor('.topic .post-body .post-box', 5000); bodies = document.querySelectorAll('.topic .post-body .post-box'); } catch { return; }
+        try { await waitFor('.topic .post-body .post-box .post-content', 5000); bodies = document.querySelectorAll('.topic .post-body .post-box .post-content'); } catch { return; }
       }
       const target = bodies[bodies.length - 1];
       if (!target || target.querySelector('.fmv-create-page')) return;

@@ -91,6 +91,6 @@ async function FMVreplaceFieldData(user_id, new_value) {
 
     console.log('✅ Установлено новое значение:', new_value, '| Прочитано из формы:', v2);
   } catch (e) {
-    console.error('❌ Ошибка:', e);
+    console.log('❌ Ошибка:', e);
   }
 };

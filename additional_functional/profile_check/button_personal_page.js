@@ -74,6 +74,7 @@
 
       const btn = document.createElement('button');
       btn.type = 'button';
+      btn.className = 'btn';
       btn.textContent = 'Создать страницу';
 
       const statusSpan = document.createElement('span');

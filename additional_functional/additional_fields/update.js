@@ -13,13 +13,17 @@
  * Требует: fetchCP1251Doc, fetchCP1251Text, serializeFormCP1251_SelectSubmit.
  *
  * @param {string|number} user_id
- * @param {string|number} field_id    // без # — только номер (например "3")
+ * @param {string|number} field_id           // без # — только номер (например "3")
  * @param {string} new_value
+ * @param {boolean} [overwriteIfExists=false] // если true — перезаписывать даже если там уже «что-то» есть
  * @returns {Promise<ReplaceFieldResult>}
  */
-async function FMVreplaceFieldData(user_id, field_id, new_value) {
+async function FMVreplaceFieldData(user_id, field_id, new_value, overwriteIfExists = false) {
   const editUrl = `/profile.php?section=fields&id=${encodeURIComponent(user_id)}&nohead`;
   const FIELD_SELECTOR = '#fld' + field_id;
+
+  // helper: "есть ли что-то" — всё, кроме "", " ", "0"
+  const hasSomething = (v) => v !== '' && v !== ' ' && v !== '0';
 
   try {
     // A) загрузка формы редактирования
@@ -40,7 +44,7 @@ async function FMVreplaceFieldData(user_id, field_id, new_value) {
       };
     }
 
-    // B) заполнение значения поля
+    // B0) найдём поле и прочитаем текущее значение ДО изменения
     const fld = form.querySelector(FIELD_SELECTOR);
     if (!fld) {
       return {
@@ -50,6 +54,21 @@ async function FMVreplaceFieldData(user_id, field_id, new_value) {
         serverMessage: `Поле ${FIELD_SELECTOR} не найдено. Проверьте номер fld.`
       };
     }
+
+    const prevValue = fld.value ?? '';
+
+    // B1) если уже есть «что-то» и перезаписывать нельзя — выходим с ошибкой и сообщением
+    if (hasSomething(prevValue) && !overwriteIfExists) {
+      return {
+        status: 'error',
+        fieldId: String(field_id),
+        value: new_value,
+        serverMessage: 'Поле уже содержит значение. Перезапись запрещена.',
+        details: `Прежнее значение: ${String(prevValue)}`
+      };
+    }
+
+    // B2) заполнение нового значения
     fld.value = new_value;
 
     // ensure name="update" (некоторые шаблоны требуют наличия этого поля)
@@ -73,7 +92,7 @@ async function FMVreplaceFieldData(user_id, field_id, new_value) {
 
     // D) POST «как будто со страницы редактирования» — важен referrer
     const postUrl = form.getAttribute('action') || '/profile.php';
-    const { res, text } = await fetchCP1251Text(postUrl, {
+    const { res } = await fetchCP1251Text(postUrl, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

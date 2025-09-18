@@ -1,4 +1,3 @@
-<script>
 const waitFor = (selector, timeout = 8000) =>
   new Promise((resolve, reject) => {
     const node = document.querySelector(selector);
@@ -163,4 +162,3 @@ const ready = new Promise(res => {
     console.log('[FMV injector] error:', e);
   }
 })();
-</script>

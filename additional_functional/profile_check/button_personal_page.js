@@ -140,5 +140,4 @@
     } catch (e) {
       console.log('[FMV injector] error:', e);
     }
-  })();
 })();

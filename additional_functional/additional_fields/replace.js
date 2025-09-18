@@ -49,7 +49,7 @@ async function fetchCP1251Doc(url){
 }
 
 // == УСТАНОВИТЬ ЗНАЧЕНИЕ ==
-async function FMVcreatePersonalPage(user_id, new_value) {
+async function FMVreplaceFieldData(user_id, new_value) {
   try {
     const editUrl = `/profile.php?section=fields&id=${encodeURIComponent(user_id)}&nohead`;
     const doc = await fetchCP1251Doc(editUrl);

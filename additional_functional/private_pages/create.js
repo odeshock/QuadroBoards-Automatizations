@@ -128,6 +128,7 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags,
 
     // --- нормализация в единый формат ---
     if (resultParsed.status === 'created' || existsAfter) {
+      console.log(serverMsg || 'Страница создана');
       return {
         status: 'created',
         title: new_title,
@@ -139,6 +140,7 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags,
     }
 
     if (resultParsed.status === 'duplicate') {
+      console.log(serverMsg || 'Уже существует страница с таким адресным именем');
       return {
         status: 'exists',
         title: new_title,
@@ -150,6 +152,7 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags,
     }
 
     if (resultParsed.status === 'error') {
+      console.log(resultParsed.msg || serverMsg || 'Ошибка при создании');
       return {
         status: 'error',
         title: new_title,
@@ -159,6 +162,7 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags,
       };
     }
 
+    console.log(serverMsg || 'Не удалось подтвердить создание. Проверьте админку.');
     return {
       status: 'uncertain',
       title: new_title,
@@ -172,7 +176,7 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags,
     const err = (e && e.message) ? e.message : String(e);
     const wrapped = new Error('Transport/Runtime error: ' + err);
     wrapped.cause = e;
-    console.log(e.message);
+    console.log(err);
     throw wrapped;
   }
 }

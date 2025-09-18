@@ -154,7 +154,7 @@
           const lines = [];
           if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
           if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
-          if (res?.title)         lines.push('Заголовок: ' + res.title);
+          if (res?.title)         lines.push('Пользователь: ' + res.title);
           if (res?.name)          lines.push('Адресное имя: ' + res.name);
           if (res?.details)       lines.push('Details: ' + res.details);
           pre.textContent = lines.join('\n') || 'Нет дополнительных данных';

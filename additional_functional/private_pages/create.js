@@ -48,34 +48,62 @@ function classifyResult(html){
 }
 
 // === ГЛАВНЫЙ ФЛОУ ===
-async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags, enable_group_ids, announcement) {
-  try{
-    const addUrl = '/admin_pages.php?action=adddel';
+/**
+ * @typedef {Object} CreatePageResult
+ * @property {'created'|'exists'|'error'|'uncertain'} status
+ * @property {string} title
+ * @property {string} name
+ * @property {string=} serverMessage
+ * @property {number=} httpStatus
+ * @property {string=} url
+ * @property {string=} details
+ */
 
-    // A) проверяем существование строго через edit_page=SLUG
+/**
+ * Возвращает промис с результатом; транспортные сбои — через throw/reject.
+ */
+async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags, enable_group_ids, announcement) {
+  const addUrl = '/admin_pages.php?action=adddel';
+
+  try {
+    // A) проверка существования
     const existedBefore = await pageExistsViaEditEndpoint(new_name);
-    if (existedBefore){
-      console.warn(`⚠️ Уже есть страница с адресным именем "${new_name}". Создание не отправляю.`);
-      return;
+    if (existedBefore) {
+      return /** @type {CreatePageResult} */({
+        status: 'exists',
+        title: new_title,
+        name: new_name,
+        serverMessage: `Страница "${new_name}" уже существует (до отправки формы).`,
+        url: `/admin_pages.php?edit_page=${encodeURIComponent(new_name)}`
+      });
     }
 
-    // B) грузим форму «Добавить»
+    // B) загрузка формы
     const doc = await fetchCP1251Doc(addUrl);
     const form = [...doc.querySelectorAll('form')].find(f => (f.action||'').includes('/admin_pages.php'))
               || doc.querySelector('form[action*="admin_pages.php"]');
-    if(!form) throw new Error('Форма добавления не найдена');
+    if (!form) {
+      return {
+        status: 'error',
+        title: new_title,
+        name: new_name,
+        serverMessage: 'Форма добавления не найдена',
+        details: 'admin_pages.php без формы'
+      };
+    }
 
-    // C) заполняем
+    // C) заполнение
     (form.querySelector('[name="title"]')   || {}).value = new_title;
     (form.querySelector('[name="name"]')    || {}).value = new_name;
     (form.querySelector('[name="content"]') || {}).value = new_content;
-    const tags = form.querySelector('[name="tags"]'); if(tags) tags.value = new_tags;
+    const tags = form.querySelector('[name="tags"]'); if (tags) tags.value = new_tags;
     const annSel = form.querySelector('select[name="announcement"]');
     if (annSel) annSel.value = announcement;
     else [...form.querySelectorAll('input[name="announcement"]')].forEach(r => r.checked = (r.value===announcement));
-    for(const id of enable_group_ids){
-      const cb = form.querySelector(`[name="group[${id}]"]`); if(cb) cb.checked = true;
+    for (const id of enable_group_ids) {
+      const cb = form.querySelector(`[name="group[${id}]"]`); if (cb) cb.checked = true;
     }
+
     let submitName = 'add_page';
     const addBtn = [...form.elements].find(el => el.type==='submit' && (el.name==='add_page' || /создать/i.test(el.value||'')));
     if (addBtn?.name) submitName = addBtn.name;
@@ -91,24 +119,60 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags,
       referrerPolicy: 'strict-origin-when-cross-origin',
       body
     });
-    console.log('POST статус:', res.status);
 
-    const result = classifyResult(text);
-    console.log('Сообщение сервера:\n', extractInfoMessage(text) || text.slice(0,500));
+    const resultParsed = classifyResult(text);          // ваша текущая функция-классификатор
+    const serverMsg = extractInfoMessage(text) || '';   // ваша функция извлечения сообщения
 
-    // E) окончательная проверка снова через edit_page=SLUG
+    // E) окончательная проверка
     const existsAfter = await pageExistsViaEditEndpoint(new_name);
 
-    if (result.status==='created' || existsAfter){
-      console.log('✅ Страница создана:', { title: new_title, name: new_name });
-    } else if (result.status==='duplicate'){
-      console.warn('♻️ Отклонено как дубликат (сообщение сервера выше).');
-    } else if (result.status==='error'){
-      console.error('⛔ Ошибка при создании:', result.msg);
-    } else {
-      console.warn('✳️ Не удалось подтвердить создание. Проверь админку.');
+    // --- нормализация в единый формат ---
+    if (resultParsed.status === 'created' || existsAfter) {
+      return {
+        status: 'created',
+        title: new_title,
+        name: new_name,
+        serverMessage: serverMsg || 'Страница создана',
+        httpStatus: res.status,
+        url: `/admin_pages.php?edit_page=${encodeURIComponent(new_name)}`
+      };
     }
-  }catch(e){
-    console.error('Ошибка флоу создания:', e);
+
+    if (resultParsed.status === 'duplicate') {
+      return {
+        status: 'exists',
+        title: new_title,
+        name: new_name,
+        serverMessage: serverMsg || 'Уже существует страница с таким адресным именем',
+        httpStatus: res.status,
+        url: `/admin_pages.php?edit_page=${encodeURIComponent(new_name)}`
+      };
+    }
+
+    if (resultParsed.status === 'error') {
+      return {
+        status: 'error',
+        title: new_title,
+        name: new_name,
+        serverMessage: resultParsed.msg || serverMsg || 'Ошибка при создании',
+        httpStatus: res.status
+      };
+    }
+
+    return {
+      status: 'uncertain',
+      title: new_title,
+      name: new_name,
+      serverMessage: serverMsg || 'Не удалось подтвердить создание. Проверьте админку.',
+      httpStatus: res.status
+    };
+
+  } catch (e) {
+    // транспорт/исключения — наружу
+    const err = (e && e.message) ? e.message : String(e);
+    const wrapped = new Error('Transport/Runtime error: ' + err);
+    wrapped.cause = e;
+    console.log(e.message);
+    throw wrapped;
   }
-};
+}

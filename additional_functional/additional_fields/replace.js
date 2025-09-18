@@ -5,91 +5,127 @@
  * @property {string} value
  * @property {string=} serverMessage
  * @property {number=} httpStatus
+ * @property {string=} details
  */
 
+/**
+ * Обновляет пользовательское поле профиля «как из формы», даже если вы не на странице редактирования.
+ * Требует: fetchCP1251Doc, fetchCP1251Text, serializeFormCP1251_SelectSubmit.
+ *
+ * @param {string|number} user_id
+ * @param {string|number} field_id    // без # — только номер (например "3")
+ * @param {string} new_value
+ * @returns {Promise<ReplaceFieldResult>}
+ */
 async function FMVreplaceFieldData(user_id, field_id, new_value) {
   const editUrl = `/profile.php?section=fields&id=${encodeURIComponent(user_id)}&nohead`;
+  const FIELD_SELECTOR = '#fld' + field_id;
 
   try {
-    // A) загрузка формы
+    // A) загрузка формы редактирования
     const doc = await fetchCP1251Doc(editUrl);
-    const FIELD_SELECTOR = '#fld' + field_id;
-    const form = doc.querySelector('form#profile8')
-      || [...doc.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
+
+    // форма редактирования (часто id="profile8"; подстрахуемся по action)
+    const form =
+      doc.querySelector('form#profile8') ||
+      [...doc.querySelectorAll('form')].find(f => (f.action || '').includes('/profile.php'));
+
     if (!form) {
       return {
         status: 'error',
-        fieldId: field_id,
+        fieldId: String(field_id),
         value: new_value,
-        serverMessage: 'Форма редактирования профиля не найдена'
+        serverMessage: 'Форма редактирования профиля не найдена',
+        details: 'profile.php без формы'
       };
     }
 
-    // B) заполнение
+    // B) заполнение значения поля
     const fld = form.querySelector(FIELD_SELECTOR);
     if (!fld) {
       return {
         status: 'error',
-        fieldId: field_id,
+        fieldId: String(field_id),
         value: new_value,
-        serverMessage: `Поле ${FIELD_SELECTOR} не найдено`
+        serverMessage: `Поле ${FIELD_SELECTOR} не найдено. Проверьте номер fld.`
       };
     }
     fld.value = new_value;
 
+    // ensure name="update" (некоторые шаблоны требуют наличия этого поля)
     if (![...form.elements].some(el => el.name === 'update')) {
       const hidden = doc.createElement('input');
-      hidden.type = 'hidden'; hidden.name = 'update'; hidden.value = '1';
+      hidden.type = 'hidden';
+      hidden.name = 'update';
+      hidden.value = '1';
       form.appendChild(hidden);
     }
 
-    // C) POST
+    // C) выбрать реальное имя submit-кнопки (как в create)
+    let submitName = 'update';
+    const submitEl = [...form.elements].find(el =>
+      el.type === 'submit' && (el.name || /сохран|обнов/i.test(el.value || ''))
+    );
+    if (submitEl?.name) submitName = submitEl.name;
+
+    // сериализация формы с учётом выбранного submit
+    const body = serializeFormCP1251_SelectSubmit(form, submitName);
+
+    // D) POST «как будто со страницы редактирования» — важен referrer
     const postUrl = form.getAttribute('action') || '/profile.php';
-    const body = serializeFormCP1251(form);
-    const res = await fetch(postUrl, {
+    const { res, text } = await fetchCP1251Text(postUrl, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      referrer: editUrl,
+      referrerPolicy: 'strict-origin-when-cross-origin',
       body
     });
+
     if (!res.ok) {
       return {
         status: 'error',
-        fieldId: field_id,
+        fieldId: String(field_id),
         value: new_value,
         httpStatus: res.status,
         serverMessage: `HTTP ${res.status} при сохранении`
       };
     }
 
-    // D) контрольное чтение
+    // E) контрольное чтение — подтверждаем, что значение действительно сохранилось
     const doc2 = await fetchCP1251Doc(editUrl);
-    const form2 = doc2.querySelector('form#profile8')
-      || [...doc2.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
+    const form2 =
+      doc2.querySelector('form#profile8') ||
+      [...doc2.querySelectorAll('form')].find(f => (f.action || '').includes('/profile.php'));
     const v2 = form2?.querySelector(FIELD_SELECTOR)?.value ?? null;
 
     if (v2 === new_value) {
       return {
         status: 'updated',
-        fieldId: field_id,
+        fieldId: String(field_id),
         value: new_value,
         httpStatus: res.status,
         serverMessage: 'Значение успешно обновлено'
       };
     }
 
+    // сервер ответил 200, но подтвердить новое значение не удалось
     return {
       status: 'uncertain',
-      fieldId: field_id,
+      fieldId: String(field_id),
       value: new_value,
       httpStatus: res.status,
       serverMessage: 'Не удалось подтвердить новое значение, проверьте вручную'
     };
 
   } catch (e) {
-    const err = e?.message || String(e);
+    // транспорт/исключения — наружу в виде throw (как в create)
+    const err = (e && e.message) ? e.message : String(e);
     const wrapped = new Error('Transport/Runtime error: ' + err);
     wrapped.cause = e;
     throw wrapped;
   }
 }
+
+// (по желанию) экспорт в глобал, если требуется из других скриптов
+// window.FMVreplaceFieldData = FMVreplaceFieldData;

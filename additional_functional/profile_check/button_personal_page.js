@@ -34,7 +34,7 @@
       const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
-          return u.pathname.endsWith('/viewforum.php') && (PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
+          return u.pathname.endsWith('/viewforum.php') && (PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id')));
         } catch { return false; }
       });
       if (!inAllowedForum) return;

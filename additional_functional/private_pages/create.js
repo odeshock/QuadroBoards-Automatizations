@@ -48,7 +48,7 @@ function classifyResult(html){
 }
 
 // === ГЛАВНЫЙ ФЛОУ ===
-async function FMVcreatePersonalPage(new_title, new_name, new_content, tags, enable_group_ids, announcement) {
+async function FMVcreatePersonalPage(new_title, new_name, new_content, new_tags, enable_group_ids, announcement) {
   try{
     const addUrl = '/admin_pages.php?action=adddel';
 
@@ -69,7 +69,7 @@ async function FMVcreatePersonalPage(new_title, new_name, new_content, tags, ena
     (form.querySelector('[name="title"]')   || {}).value = new_title;
     (form.querySelector('[name="name"]')    || {}).value = new_name;
     (form.querySelector('[name="content"]') || {}).value = new_content;
-    const tags = form.querySelector('[name="tags"]'); if(tags) tags.value = tags;
+    const tags = form.querySelector('[name="tags"]'); if(tags) tags.value = new_tags;
     const annSel = form.querySelector('select[name="announcement"]');
     if (annSel) annSel.value = announcement;
     else [...form.querySelectorAll('input[name="announcement"]')].forEach(r => r.checked = (r.value===announcement));

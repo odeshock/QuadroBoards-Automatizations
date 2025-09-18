@@ -74,7 +74,7 @@
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'btn';
+      btn.className = 'button';
       btn.textContent = 'Создать страницу';
 
       const statusSpan = document.createElement('span');
@@ -163,11 +163,6 @@
           statusSpan.style.color = 'red';
           pre.textContent = (err && err.message) ? err.message : String(err);
         }
-      });
-
-      Object.assign(btn.style, {
-        cursor: 'pointer', padding: '6px 10px', borderRadius: '8px',
-        border: '1px solid #bbb', background: '#f4f4f4', fontSize: '14px', marginTop: '8px'
       });
 
       wrap.appendChild(btn);

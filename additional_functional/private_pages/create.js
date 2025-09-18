@@ -48,7 +48,7 @@ function classifyResult(html){
 }
 
 // === ГЛАВНЫЙ ФЛОУ ===
-(async ()=>{
+async function createPage(NEW_TITLE, NEW_NAME, NEW_CONTENT, TAGS, ENABLE_GROUP_IDS, ANNOUNCEMENT) {
   try{
     const addUrl = '/admin_pages.php?action=adddel';
 
@@ -111,4 +111,4 @@ function classifyResult(html){
   }catch(e){
     console.error('Ошибка флоу создания:', e);
   }
-})();
+};

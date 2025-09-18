@@ -122,10 +122,10 @@
         statusSpan.style.color = '#555';
         pre.textContent = '';
   
-        if (typeof window.FMVupdateProfileField !== 'function') {
+        if (typeof window.FMVreplaceFieldData !== 'function') {
           statusSpan.textContent = '✖ функция обновления не найдена';
           statusSpan.style.color = 'red';
-          pre.textContent = 'Ожидалась window.FMVupdateProfileField(fieldId, value, userId)';
+          pre.textContent = 'Ожидалась window.FMVreplaceFieldData(fieldId, value, userId)';
           return;
         }
   

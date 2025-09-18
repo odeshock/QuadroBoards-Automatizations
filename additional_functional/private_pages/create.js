@@ -48,7 +48,7 @@ function classifyResult(html){
 }
 
 // === ГЛАВНЫЙ ФЛОУ ===
-async function createPage(NEW_TITLE, NEW_NAME, NEW_CONTENT, TAGS, ENABLE_GROUP_IDS, ANNOUNCEMENT) {
+async function FMVcreatePersonalPage() {
   try{
     const addUrl = '/admin_pages.php?action=adddel';
 

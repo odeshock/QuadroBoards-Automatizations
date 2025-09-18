@@ -130,7 +130,7 @@
         }
   
         try {
-          const res = await window.FMVupdateProfileField(userId, fieldId, fieldValue);
+          const res = await window.FMVreplaceFieldData(userId, fieldId, fieldValue);
           // ожидаем контракт в стиле {status, httpStatus, serverMessage, details, fieldId, userId, value}
           switch (res?.status) {
             case 'updated': statusSpan.textContent = '✔ обновлено'; statusSpan.style.color = 'green'; break;

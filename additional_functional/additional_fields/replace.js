@@ -1,18 +1,3 @@
-function serializeFormCP1251(form){
-  const pairs = [];
-  for (const el of Array.from(form.elements||[])) {
-    if (!el.name || el.disabled) continue;
-    if ((el.type==='checkbox'||el.type==='radio') && !el.checked) continue;
-    if (el.tagName==='SELECT' && el.multiple) {
-      for (const opt of el.options) if (opt.selected)
-        pairs.push(encodeURIcp1251(el.name)+'='+encodeURIcp1251(opt.value));
-      continue;
-    }
-    pairs.push(encodeURIcp1251(el.name)+'='+encodeURIcp1251(el.value));
-  }
-  return pairs.join('&');
-}
-
 // == УСТАНОВИТЬ ЗНАЧЕНИЕ ==
 async function FMVreplaceFieldData(user_id, field_id, new_value) {
   try {

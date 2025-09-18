@@ -175,7 +175,7 @@
       target.appendChild(wrap);
       log('Кнопка/статус добавлены');
     } catch (e) {
-      console.error('[FMV injector] error:', e);
+      console.log('[FMV injector] error:', e);
     }
   })();
 })();

@@ -8,8 +8,7 @@ async function pageExistsViaEditEndpoint(slug){
   const title = (doc.querySelector('title')?.textContent || '').trim();
   const h1    = (doc.querySelector('h1, .pagetitle, .tclcon h2')?.textContent || '').trim();
 
-  const looksLikeEditTitle =
-    'Страница создана'
+  const looksLikeEditTitle = /Страница создана/i.test(title);
 
   // форма редактирования обычно содержит hidden name="edit_page" или submit "Сохранить"
   const hasEditHidden = !!doc.querySelector('input[name="edit_page"]');

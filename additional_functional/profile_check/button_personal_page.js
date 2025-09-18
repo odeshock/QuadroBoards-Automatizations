@@ -1,6 +1,4 @@
 (() => {
-  const log = (...a) => console.log('[FMV injector]', ...a);
-
   const waitFor = (selector, timeout = 8000) =>
     new Promise((resolve, reject) => {
       const node = document.querySelector(selector);

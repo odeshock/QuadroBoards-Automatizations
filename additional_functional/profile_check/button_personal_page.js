@@ -69,6 +69,7 @@
       const target = bodies[bodies.length - 1];
       if (!target || target.querySelector('.fmv-create-page')) return;
 
+      const br = document.createElement('br');
       const wrap = document.createElement('div');
       wrap.className = 'fmv-create-page';
 
@@ -169,6 +170,8 @@
       wrap.appendChild(statusSpan);
       wrap.appendChild(link);
       wrap.appendChild(details);
+      target.appendChild(br);
+      target.appendChild(br);
       target.appendChild(wrap);
       log('Кнопка/статус добавлены');
     } catch (e) {

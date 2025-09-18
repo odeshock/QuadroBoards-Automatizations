@@ -23,7 +23,7 @@
       // 1) Проверка группы
       const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
       const groupId = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
-      if (![PROFILE_CHECK.GroupID.includes(groupId)) return;
+      if (!PROFILE_CHECK.GroupID.includes(groupId)) return;
 
       // 2) Проверка форума
       const crumbs = document.querySelector('.crumbs') || document.querySelector('#pun-crumbs') ||

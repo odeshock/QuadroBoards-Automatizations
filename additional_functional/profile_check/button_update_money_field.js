@@ -72,7 +72,7 @@
       // готовим поле и шаблон
       const fieldId = PROFILE_CHECK.MoneyFieldID;                 // что обновляем
       const rawTemplate = PROFILE_CHECK.MoneyFieldTemplate;       // откуда берём значение
-      const fieldValue = rawTemplate;
+      const fieldValue = String(rawTemplate);
   
       // куда добавляем
       let bodies = document.querySelectorAll('.ams_info');

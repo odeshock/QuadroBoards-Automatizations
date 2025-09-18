@@ -48,14 +48,14 @@ function classifyResult(html){
 }
 
 // === ГЛАВНЫЙ ФЛОУ ===
-async function FMVcreatePersonalPage() {
+async function FMVcreatePersonalPage(new_title, new_name, new_content, tags, enable_group_ids, announcement) {
   try{
     const addUrl = '/admin_pages.php?action=adddel';
 
     // A) проверяем существование строго через edit_page=SLUG
-    const existedBefore = await pageExistsViaEditEndpoint(NEW_NAME);
+    const existedBefore = await pageExistsViaEditEndpoint(new_name);
     if (existedBefore){
-      console.warn(`⚠️ Уже есть страница с адресным именем "${NEW_NAME}". Создание не отправляю.`);
+      console.warn(`⚠️ Уже есть страница с адресным именем "${new_name}". Создание не отправляю.`);
       return;
     }
 
@@ -66,14 +66,14 @@ async function FMVcreatePersonalPage() {
     if(!form) throw new Error('Форма добавления не найдена');
 
     // C) заполняем
-    (form.querySelector('[name="title"]')   || {}).value = NEW_TITLE;
-    (form.querySelector('[name="name"]')    || {}).value = NEW_NAME;
-    (form.querySelector('[name="content"]') || {}).value = NEW_CONTENT;
-    const tags = form.querySelector('[name="tags"]'); if(tags) tags.value = TAGS;
+    (form.querySelector('[name="title"]')   || {}).value = new_title;
+    (form.querySelector('[name="name"]')    || {}).value = new_name;
+    (form.querySelector('[name="content"]') || {}).value = new_content;
+    const tags = form.querySelector('[name="tags"]'); if(tags) tags.value = tags;
     const annSel = form.querySelector('select[name="announcement"]');
-    if (annSel) annSel.value = ANNOUNCEMENT;
-    else [...form.querySelectorAll('input[name="announcement"]')].forEach(r => r.checked = (r.value===ANNOUNCEMENT));
-    for(const id of ENABLE_GROUP_IDS){
+    if (annSel) annSel.value = announcement;
+    else [...form.querySelectorAll('input[name="announcement"]')].forEach(r => r.checked = (r.value===announcement));
+    for(const id of enable_group_ids){
       const cb = form.querySelector(`[name="group[${id}]"]`); if(cb) cb.checked = true;
     }
     let submitName = 'add_page';
@@ -97,10 +97,10 @@ async function FMVcreatePersonalPage() {
     console.log('Сообщение сервера:\n', extractInfoMessage(text) || text.slice(0,500));
 
     // E) окончательная проверка снова через edit_page=SLUG
-    const existsAfter = await pageExistsViaEditEndpoint(NEW_NAME);
+    const existsAfter = await pageExistsViaEditEndpoint(new_name);
 
     if (result.status==='created' || existsAfter){
-      console.log('✅ Страница создана:', { title: NEW_TITLE, name: NEW_NAME });
+      console.log('✅ Страница создана:', { title: new_title, name: new_name });
     } else if (result.status==='duplicate'){
       console.warn('♻️ Отклонено как дубликат (сообщение сервера выше).');
     } else if (result.status==='error'){

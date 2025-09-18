@@ -20,12 +20,12 @@
     try {
       await ready;
 
-      // 1) Проверка группы (пример для groupId 1 и 2)
+      // 1) Проверка группы
       const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
       const groupId = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
-      if (![1, 2].includes(groupId)) return;
+      if (![PROFILE_CHECK.GroupID.includes(groupId)) return;
 
-      // 2) Проверка форума (пример для forum id 9 и 10)
+      // 2) Проверка форума
       const crumbs = document.querySelector('.crumbs') || document.querySelector('#pun-crumbs') ||
                      document.querySelector('.pun_crumbs') || document.querySelector('.container .crumbs');
       if (!crumbs) return;
@@ -33,7 +33,7 @@
         try {
           const u = new URL(a.getAttribute('href'), location.href);
           return u.pathname.endsWith('/viewforum.php') &&
-                 ['9','10'].includes(u.searchParams.get('id'));
+                 PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
         } catch { return false; }
       });
       if (!inAllowedForum) return;

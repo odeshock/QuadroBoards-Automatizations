@@ -132,7 +132,7 @@
               break;
             case 'exists':
               statusSpan.textContent = 'ℹ уже существует';
-              statusSpan.style.color = '#2b6';
+              statusSpan.style.color = 'red';
               break;
             case 'error':
               statusSpan.textContent = '✖ ошибка';

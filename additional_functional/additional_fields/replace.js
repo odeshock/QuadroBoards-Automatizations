@@ -1,46 +1,95 @@
-// == УСТАНОВИТЬ ЗНАЧЕНИЕ ==
+/**
+ * @typedef {Object} ReplaceFieldResult
+ * @property {'updated'|'error'|'uncertain'} status
+ * @property {string} fieldId
+ * @property {string} value
+ * @property {string=} serverMessage
+ * @property {number=} httpStatus
+ */
+
 async function FMVreplaceFieldData(user_id, field_id, new_value) {
+  const editUrl = `/profile.php?section=fields&id=${encodeURIComponent(user_id)}&nohead`;
+
   try {
-    const editUrl = `/profile.php?section=fields&id=${encodeURIComponent(user_id)}&nohead`;
+    // A) загрузка формы
     const doc = await fetchCP1251Doc(editUrl);
-
-    // форма редактирования (на многих темах id="profile8"; подстрахуемся по action)
     const FIELD_SELECTOR = '#fld' + field_id;
-    const form = doc.querySelector('form#profile8') ||
-                 [...doc.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
-    if (!form) throw new Error('Не нашла форму редактирования профиля.');
+    const form = doc.querySelector('form#profile8')
+      || [...doc.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
+    if (!form) {
+      return {
+        status: 'error',
+        fieldId: field_id,
+        value: new_value,
+        serverMessage: 'Форма редактирования профиля не найдена'
+      };
+    }
 
-    // ставим новое значение в #fld3 (в просмотре это pa-fld3)
+    // B) заполнение
     const fld = form.querySelector(FIELD_SELECTOR);
-    if (!fld) throw new Error(`Поле ${FIELD_SELECTOR} не найдено. Проверьте номер fld.`);
+    if (!fld) {
+      return {
+        status: 'error',
+        fieldId: field_id,
+        value: new_value,
+        serverMessage: `Поле ${FIELD_SELECTOR} не найдено`
+      };
+    }
     fld.value = new_value;
 
-    // ensure name="update" присутствует (некоторые шаблоны требуют)
     if (![...form.elements].some(el => el.name === 'update')) {
       const hidden = doc.createElement('input');
       hidden.type = 'hidden'; hidden.name = 'update'; hidden.value = '1';
       form.appendChild(hidden);
     }
 
-    // отправляем как x-www-form-urlencoded с cp1251 percent-encoding
+    // C) POST
     const postUrl = form.getAttribute('action') || '/profile.php';
     const body = serializeFormCP1251(form);
-    const save = await fetch(postUrl, {
+    const res = await fetch(postUrl, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body
     });
-    if (!save.ok) throw new Error(`POST ${postUrl} → HTTP ${save.status}`);
+    if (!res.ok) {
+      return {
+        status: 'error',
+        fieldId: field_id,
+        value: new_value,
+        httpStatus: res.status,
+        serverMessage: `HTTP ${res.status} при сохранении`
+      };
+    }
 
-    // контрольное чтение (не обязательно, но полезно)
+    // D) контрольное чтение
     const doc2 = await fetchCP1251Doc(editUrl);
-    const form2 = doc2.querySelector('form#profile8') ||
-                  [...doc2.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
+    const form2 = doc2.querySelector('form#profile8')
+      || [...doc2.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
     const v2 = form2?.querySelector(FIELD_SELECTOR)?.value ?? null;
 
-    console.log('✅ Установлено новое значение:', new_value, '| Прочитано из формы:', v2);
+    if (v2 === new_value) {
+      return {
+        status: 'updated',
+        fieldId: field_id,
+        value: new_value,
+        httpStatus: res.status,
+        serverMessage: 'Значение успешно обновлено'
+      };
+    }
+
+    return {
+      status: 'uncertain',
+      fieldId: field_id,
+      value: new_value,
+      httpStatus: res.status,
+      serverMessage: 'Не удалось подтвердить новое значение, проверьте вручную'
+    };
+
   } catch (e) {
-    console.log('❌ Ошибка:', e);
+    const err = e?.message || String(e);
+    const wrapped = new Error('Transport/Runtime error: ' + err);
+    wrapped.cause = e;
+    throw wrapped;
   }
-};
+}

@@ -25,7 +25,7 @@
       // 1) Только для GroupID 1/2
       const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
       const groupId = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
-      if (![1, 2].includes(groupId)) return;
+      if (!PROFILE_CHECK.GroupID.includes(groupId)) return;
 
       // 2) Проверяем крошки на forum id=9/10
       const crumbs = document.querySelector('.crumbs') || document.querySelector('#pun-crumbs') ||
@@ -34,7 +34,7 @@
       const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
-          return u.pathname.endsWith('/viewforum.php') && (u.searchParams.get('id') === '9' || u.searchParams.get('id') === '10');
+          return u.pathname.endsWith('/viewforum.php') && (PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
         } catch { return false; }
       });
       if (!inAllowedForum) return;
@@ -58,9 +58,9 @@
       const arg2 = `usr${idMatch[1]}`;
 
       // 5) Остальные аргументы — фиксированные
-      const arg3 = '<div>шаблон</div>';
+      const arg3 = PROFILE_CHECK.PPageTemplate;
       const arg4 = '';
-      const arg5 = [1, 2, 4];
+      const arg5 = PROFILE_CHECK.PPageGroupIDs;
       const arg6 = '0';
 
       // 6) Вставляем кнопку + статус (+ блок подробностей)

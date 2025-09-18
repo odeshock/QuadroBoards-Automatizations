@@ -1,21 +1,4 @@
 (() => {
-  const waitFor = (selector, timeout = 8000) =>
-    new Promise((resolve, reject) => {
-      const node = document.querySelector(selector);
-      if (node) return resolve(node);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
-  const ready = new Promise(res => {
-    if (document.readyState === 'complete' || document.readyState === 'interactive') res();
-    else document.addEventListener('DOMContentLoaded', res, { once: true });
-  });
-
   (async () => {
     try {
       await ready;
@@ -62,9 +45,9 @@
       const arg6 = '0';
 
       // 6) Вставляем кнопку + статус (+ блок подробностей)
-      let bodies = document.querySelectorAll('.topic .post-body .post-box .post-content');
+      let bodies = document.querySelectorAll('.ams_info');
       if (!bodies.length) {
-        try { await waitFor('.topic .post-body .post-box .post-content', 5000); bodies = document.querySelectorAll('.topic .post-body .post-box .post-content'); } catch { return; }
+        try { await waitFor('.ams_info', 5000); bodies = document.querySelectorAll('.ams_info'); } catch { return; }
       }
       const target = bodies[bodies.length - 1];
       if (!target || target.querySelector('.fmv-create-page')) return;

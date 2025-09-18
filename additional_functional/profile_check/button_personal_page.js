@@ -1,77 +1,47 @@
-// button_personal_page.js
-// Запускается только после AMS (ждёт customEvent 'ams:ready') и конфига PROFILE_CHECK.
-
-(() => {
-  // --- утилиты ---
-  const waitForGlobal = (testFn, timeout = 8000, step = 50) =>
+  const waitFor = (selector, timeout = 8000) =>
     new Promise((resolve, reject) => {
-      const start = performance.now();
-      (function tick() {
-        try { const v = testFn(); if (v) return resolve(v); } catch {}
-        if (performance.now() - start >= timeout) return reject(new Error('timeout'));
-        setTimeout(tick, step);
-      })();
+      const node = document.querySelector(selector);
+      if (node) return resolve(node);
+      const obs = new MutationObserver(() => {
+        const n = document.querySelector(selector);
+        if (n) { obs.disconnect(); resolve(n); }
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
     });
 
-  const domReady = new Promise(res => {
+  const ready = new Promise(res => {
     if (document.readyState === 'complete' || document.readyState === 'interactive') res();
     else document.addEventListener('DOMContentLoaded', res, { once: true });
   });
 
-  const getNumber = v => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : NaN;
-  };
-
-  // --- основной код ---
-  (async () => {
+(async () => {
+    
     try {
-      await domReady;
+      await ready;
+      // --- НОВОЕ: выходим, если нет div.ams_info ---
+      const amsDiv = document.querySelector('div.ams_info');
+      if (!amsDiv) return;
 
-      // 1) Ждём AMS
-      const amsReady = new Promise(res =>
-        window.addEventListener('ams:ready', e => res(e.detail?.node || true), { once: true })
-      );
-      const amsNode =
-        window.__ams_ready === true
-          ? (document.querySelector('.ams_info') || true)
-          : await amsReady;
-      if (!amsNode) return;
+      // 1) Только для GroupID 1/2
+      const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
+      const groupId = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
+      if (!PROFILE_CHECK.GroupID.includes(groupId)) return;
 
-      // 2) Ждём конфиг
-      const PROFILE = await waitForGlobal(() => {
-        const pc = window.PROFILE_CHECK;
-        return pc && Array.isArray(pc.GroupID) && Array.isArray(pc.ForumIDs) ? pc : null;
-      });
-      if (!PROFILE) return;
-
-      // 3) Проверка группы
-      const bodyGroup = getNumber(document.body?.dataset?.groupId);
-      const groupId = getNumber(
-        window.GroupID
-        ?? window?.PUNBB?.group_id
-        ?? window?.PUNBB?.user?.g_id
-        ?? bodyGroup
-      );
-      if (!PROFILE.GroupID.includes(groupId)) return;
-
-      // 4) Проверка форума
-      const crumbs = document.querySelector('.crumbs')
-        || document.querySelector('#pun-crumbs')
-        || document.querySelector('.pun_crumbs')
-        || document.querySelector('.container .crumbs');
+      // 2) Проверяем крошки на forum id=9/10
+      const crumbs = document.querySelector('.crumbs') || document.querySelector('#pun-crumbs') ||
+                     document.querySelector('.pun_crumbs') || document.querySelector('.container .crumbs');
       if (!crumbs) return;
-
       const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
           return u.pathname.endsWith('/viewforum.php') &&
-                 PROFILE.ForumIDs.includes(u.searchParams.get('id'));
+                 PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
         } catch { return false; }
       });
       if (!inAllowedForum) return;
 
-      // 5) Аргументы
+      // 3) Аргументы
       const nameSpan = document.querySelector('#pun-main h1 span');
       const arg1 = nameSpan ? nameSpan.textContent.trim().toLowerCase() : '';
       if (!arg1) return;
@@ -80,56 +50,75 @@
         document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
+      if (!profLink) {
+        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+      }
       if (!profLink) return;
-      const idMatch = String(profLink.getAttribute('href') || '').match(/profile\.php\?id=(\d+)/i);
+      const idMatch = profLink.href.match(/profile\.php\?id=(\d+)/i);
       if (!idMatch) return;
       const arg2 = `usr${idMatch[1]}`;
-      const arg3 = PROFILE.PPageTemplate ?? '';
+
+      const arg3 = PROFILE_CHECK.PPageTemplate;
       const arg4 = '';
-      const arg5 = PROFILE.PPageGroupIDs ?? '';
+      const arg5 = PROFILE_CHECK.PPageGroupIDs;
       const arg6 = '0';
 
-      // 6) Вставляем элементы управления в последний .ams_info
-      const target = [...document.querySelectorAll('.ams_info')].pop();
-      if (!target) return;
+      // 4) Вставка кнопки/статуса в последний .topic .post-body .post-box .post-content
+      let bodies = document.querySelectorAll('.ams_info');
+      if (!bodies.length) {
+        try { await waitFor('.ams_info', 5000); bodies = document.querySelectorAll('.ams_info'); }
+        catch { return; }
+      }
+      const target = bodies[bodies.length - 1];
+      if (!target || target.querySelector('.fmv-create-page')) return;
 
+      const br = document.createElement('br');
       const wrap = document.createElement('div');
-      wrap.style.cssText = 'margin-top:.5rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;';
+      wrap.className = 'fmv-create-page';
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = 'Создать личную страницу';
-      btn.style.cssText = 'padding:.45rem .8rem; border-radius:8px; border:1px solid #d0d7de; background:#fff; cursor:pointer;';
+      btn.className = 'button';
+      btn.textContent = 'Создать страницу';
 
       const statusSpan = document.createElement('span');
-      statusSpan.style.cssText = 'font:400 12px/1.3 system-ui; color:#57606a;';
+      statusSpan.style.marginLeft = '10px';
+      statusSpan.style.fontSize = '14px';
+      statusSpan.style.color = '#555';
+
+      const details = document.createElement('details');
+      details.style.marginTop = '6px';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Показать детали';
+      summary.style.cursor = 'pointer';
+      const pre = document.createElement('pre');
+      pre.style.whiteSpace = 'pre-wrap';
+      pre.style.margin = '6px 0 0';
+      pre.style.fontSize = '12px';
+      details.appendChild(summary);
+      details.appendChild(pre);
 
       const link = document.createElement('a');
       link.target = '_blank';
       link.rel = 'noopener';
+      link.style.marginLeft = '10px';
+      link.style.fontSize = '14px';
       link.style.display = 'none';
 
-      const pre = document.createElement('pre');
-      pre.style.cssText = 'margin:0; padding:0; white-space:pre-wrap; font:12px/1.4 ui-monospace, monospace; color:#57606a;';
-
-      wrap.appendChild(btn);
-      wrap.appendChild(statusSpan);
-      wrap.appendChild(link);
-      target.appendChild(wrap);
-      target.appendChild(pre);
-
-      statusSpan.textContent =
-        (typeof window.FMVcreatePersonalPage === 'function')
-          ? 'готово'
-          : 'ожидание FMVcreatePersonalPage…';
-
-      // 7) Клик: твой оригинальный блок
       btn.addEventListener('click', async () => {
+        statusSpan.textContent = 'Создаём…';
+        statusSpan.style.color = '#555';
+        link.style.display = 'none';
+        link.textContent = '';
+        link.removeAttribute('href');
+        pre.textContent = '';
+
         if (typeof window.FMVcreatePersonalPage !== 'function') {
           statusSpan.textContent = '✖ функция не найдена';
           statusSpan.style.color = 'red';
           return;
         }
+
         try {
           const res = await window.FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6);
           switch (res?.status) {
@@ -156,8 +145,17 @@
           pre.textContent = (err && err.message) ? err.message : String(err);
         }
       });
+
+      wrap.appendChild(btn);
+      wrap.appendChild(statusSpan);
+      wrap.appendChild(link);
+      wrap.appendChild(details);
+      target.appendChild(br);
+      target.appendChild(br);
+      target.appendChild(wrap);
+
+      console.log('[FMV injector] кнопка/статус добавлены (div.ams_info найден)');
     } catch (e) {
       console.log('[FMV injector] error:', e);
     }
-  })();
 })();

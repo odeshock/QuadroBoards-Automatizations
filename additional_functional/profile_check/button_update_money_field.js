@@ -128,7 +128,7 @@
           // ожидаем контракт в стиле {status, httpStatus, serverMessage, details, fieldId, userId, value}
           switch (res?.status) {
             case 'updated': statusSpan.textContent = '✔ обновлено'; statusSpan.style.color = 'green'; break;
-            case 'nochange':statusSpan.textContent = 'ℹ без изменений'; statusSpan.style.color = '#b80'; break;
+            case 'nochange':statusSpan.textContent = 'ℹ изменения не внесены'; statusSpan.style.color = 'red'; break;
             case 'error':   statusSpan.textContent = '✖ ошибка'; statusSpan.style.color = 'red'; break;
             default:        statusSpan.textContent = '❔ не удалось подтвердить'; statusSpan.style.color = '#b80';
           }

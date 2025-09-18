@@ -1,33 +1,16 @@
 // button_personal_page.js
-// Работает ТОЛЬКО после AMS + при наличии PROFILE_CHECK.
-// Безопасен к порядку загрузки: ждёт события/селекторы/глобалы.
+// Запускается только после AMS (ждёт customEvent 'ams:ready') и конфига PROFILE_CHECK.
 
 (() => {
-  // ---------- Утилиты ----------
-  const waitFor = (selector, timeout = 5000, step = 50, root = document) =>
-    new Promise((resolve, reject) => {
-      const t0 = performance.now();
-      const tick = () => {
-        const n = root.querySelector(selector);
-        if (n) return resolve(n);
-        if (performance.now() - t0 >= timeout) return reject(new Error(`timeout: ${selector}`));
-        setTimeout(tick, step);
-      };
-      tick();
-    });
-
+  // --- утилиты ---
   const waitForGlobal = (testFn, timeout = 8000, step = 50) =>
     new Promise((resolve, reject) => {
-      const t0 = performance.now();
-      const tick = () => {
-        try {
-          const v = testFn();
-          if (v) return resolve(v);
-        } catch {}
-        if (performance.now() - t0 >= timeout) return reject(new Error('timeout: global'));
+      const start = performance.now();
+      (function tick() {
+        try { const v = testFn(); if (v) return resolve(v); } catch {}
+        if (performance.now() - start >= timeout) return reject(new Error('timeout'));
         setTimeout(tick, step);
-      };
-      tick();
+      })();
     });
 
   const domReady = new Promise(res => {
@@ -40,37 +23,29 @@
     return Number.isFinite(n) ? n : NaN;
   };
 
-  const last = arr => (arr && arr.length ? arr[arr.length - 1] : null);
-
-  // ---------- Основной поток ----------
+  // --- основной код ---
   (async () => {
     try {
       await domReady;
 
-      // 1) Ждём AMS: событие ИЛИ селектор (что случится раньше).
-      const amsReadyEvt = new Promise(res =>
-        window.addEventListener('ams:ready', e => res(e?.detail?.node || true), { once: true })
+      // 1) Ждём AMS
+      const amsReady = new Promise(res =>
+        window.addEventListener('ams:ready', e => res(e.detail?.node || true), { once: true })
       );
+      const amsNode =
+        window.__ams_ready === true
+          ? (document.querySelector('.ams_info') || true)
+          : await amsReady;
+      if (!amsNode) return;
 
-      const amsSel = waitFor('.ams_info', 5000).catch(() => null);
-
-      const amsNode = window.__ams_ready === true
-        ? (document.querySelector('.ams_info') || true)
-        : await Promise.race([amsReadyEvt, amsSel]);
-
-      if (!amsNode) return; // AMS не отработал — выходим молча.
-
-      // 2) Ждём конфиг PROFILE_CHECK из отдельного файла.
+      // 2) Ждём конфиг
       const PROFILE = await waitForGlobal(() => {
         const pc = window.PROFILE_CHECK;
-        return pc
-          && Array.isArray(pc.GroupID)
-          && Array.isArray(pc.ForumIDs)
-          ? pc
-          : null;
-      }, 8000);
+        return pc && Array.isArray(pc.GroupID) && Array.isArray(pc.ForumIDs) ? pc : null;
+      });
+      if (!PROFILE) return;
 
-      // 3) Проверяем группу пользователя.
+      // 3) Проверка группы
       const bodyGroup = getNumber(document.body?.dataset?.groupId);
       const groupId = getNumber(
         window.GroupID
@@ -80,7 +55,7 @@
       );
       if (!PROFILE.GroupID.includes(groupId)) return;
 
-      // 4) Проверяем, что мы в разрешённом форуме.
+      // 4) Проверка форума
       const crumbs = document.querySelector('.crumbs')
         || document.querySelector('#pun-crumbs')
         || document.querySelector('.pun_crumbs')
@@ -90,107 +65,97 @@
       const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
-          return u.pathname.endsWith('/viewforum.php') && PROFILE.ForumIDs.includes(u.searchParams.get('id'));
+          return u.pathname.endsWith('/viewforum.php') &&
+                 PROFILE.ForumIDs.includes(u.searchParams.get('id'));
         } catch { return false; }
       });
-
       if (!inAllowedForum) return;
 
-      // 5) Достаём имя пользователя (arg1) и id (arg2).
+      // 5) Аргументы
       const nameSpan = document.querySelector('#pun-main h1 span');
       const arg1 = nameSpan ? nameSpan.textContent.trim().toLowerCase() : '';
       if (!arg1) return;
 
-      // Пытаемся найти ссылку на профиль.
       let profLink =
         document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
-      if (!profLink) {
-        try {
-          await waitFor('a[href*="profile.php?id="]', 3000);
-          profLink = document.querySelector('a[href*="profile.php?id="]');
-        } catch {}
-      }
       if (!profLink) return;
-
       const idMatch = String(profLink.getAttribute('href') || '').match(/profile\.php\?id=(\d+)/i);
       if (!idMatch) return;
-
       const arg2 = `usr${idMatch[1]}`;
       const arg3 = PROFILE.PPageTemplate ?? '';
-      const arg4 = ''; // резерв
+      const arg4 = '';
       const arg5 = PROFILE.PPageGroupIDs ?? '';
       const arg6 = '0';
 
-      // 6) Куда вставлять кнопку: в последний .ams_info
-      const containers = Array.from(document.querySelectorAll('.ams_info'));
-      const target = last(containers);
-      if (!target || !(target instanceof HTMLElement)) return;
-
-      // 7) Создаём/вставляем кнопку.
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className =
-        'fmv-ppage-btn';
-      btn.textContent = 'Создать личную страницу';
-      btn.style.cssText = [
-        'display:inline-flex',
-        'align-items:center',
-        'gap:.5rem',
-        'padding:.45rem .8rem',
-        'border-radius:8px',
-        'border:1px solid #d0d7de',
-        'background:#fff',
-        'cursor:pointer',
-        'font:600 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji',
-        'box-shadow:0 1px 0 rgba(27,31,36,.04)',
-        'transition:background .15s ease, transform .02s ease'
-      ].join(';');
-
-      btn.addEventListener('mouseenter', () => { btn.style.background = '#f6f8fa'; });
-      btn.addEventListener('mouseleave', () => { btn.style.background = '#fff'; });
-      btn.addEventListener('mousedown',  () => { btn.style.transform = 'translateY(1px)'; });
-      btn.addEventListener('mouseup',    () => { btn.style.transform = 'translateY(0)'; });
-
-      const status = document.createElement('span');
-      status.className = 'fmv-ppage-status';
-      status.style.cssText = 'margin-left:.5rem; font:400 12px/1.3 system-ui; color:#57606a;';
+      // 6) Вставляем элементы управления в последний .ams_info
+      const target = [...document.querySelectorAll('.ams_info')].pop();
+      if (!target) return;
 
       const wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.5rem;';
+      wrap.style.cssText = 'margin-top:.5rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Создать личную страницу';
+      btn.style.cssText = 'padding:.45rem .8rem; border-radius:8px; border:1px solid #d0d7de; background:#fff; cursor:pointer;';
+
+      const statusSpan = document.createElement('span');
+      statusSpan.style.cssText = 'font:400 12px/1.3 system-ui; color:#57606a;';
+
+      const link = document.createElement('a');
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.style.display = 'none';
+
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'margin:0; padding:0; white-space:pre-wrap; font:12px/1.4 ui-monospace, monospace; color:#57606a;';
+
       wrap.appendChild(btn);
-      wrap.appendChild(status);
-
+      wrap.appendChild(statusSpan);
+      wrap.appendChild(link);
       target.appendChild(wrap);
+      target.appendChild(pre);
 
-      // 8) Поведение кнопки.
-      const invoke = () => {
+      statusSpan.textContent =
+        (typeof window.FMVcreatePersonalPage === 'function')
+          ? 'готово'
+          : 'ожидание FMVcreatePersonalPage…';
+
+      // 7) Клик: твой оригинальный блок
+      btn.addEventListener('click', async () => {
         if (typeof window.FMVcreatePersonalPage !== 'function') {
-          status.textContent = '✖ функция не найдена';
-          status.style.color = '#d1242f';
+          statusSpan.textContent = '✖ функция не найдена';
+          statusSpan.style.color = 'red';
           return;
         }
         try {
-          // FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6)
-          window.FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6);
-          status.textContent = '✓ отправлено';
-          status.style.color = '#1a7f37';
-        } catch (e) {
-          console.log('[FMV injector] error:', e);
-          status.textContent = '✖ ошибка выполнения';
-          status.style.color = '#d1242f';
+          const res = await window.FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6);
+          switch (res?.status) {
+            case 'created': statusSpan.textContent = '✔ создано'; statusSpan.style.color = 'green'; break;
+            case 'exists':  statusSpan.textContent = 'ℹ уже существует'; statusSpan.style.color = 'red'; break;
+            case 'error':   statusSpan.textContent = '✖ ошибка'; statusSpan.style.color = 'red'; break;
+            default:        statusSpan.textContent = '❔ не удалось подтвердить'; statusSpan.style.color = '#b80';
+          }
+          if (res?.url) {
+            link.href = res.url;
+            link.textContent = 'Открыть страницу';
+            link.style.display = 'inline';
+          }
+          const lines = [];
+          if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
+          if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
+          if (res?.title)         lines.push('Пользователь: ' + res.title);
+          if (res?.name)          lines.push('Адресное имя: ' + res.name);
+          if (res?.details)       lines.push('Details: ' + res.details);
+          pre.textContent = lines.join('\n') || 'Нет дополнительных данных';
+        } catch (err) {
+          statusSpan.textContent = '✖ сеть/транспорт';
+          statusSpan.style.color = 'red';
+          pre.textContent = (err && err.message) ? err.message : String(err);
         }
-      };
-
-      btn.addEventListener('click', invoke);
-
-      // 9) Мягкая инициализация статуса — подсказать, чего ждёт кнопка
-      if (typeof window.FMVcreatePersonalPage !== 'function') {
-        status.textContent = 'ожидание FMVcreatePersonalPage…';
-      } else {
-        status.textContent = 'готово';
-      }
+      });
     } catch (e) {
       console.log('[FMV injector] error:', e);
     }

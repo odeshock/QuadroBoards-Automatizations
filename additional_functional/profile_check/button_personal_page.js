@@ -1,7 +1,9 @@
-(() => {
-  (async () => {
+(async () => {
     try {
       await ready;
+      // --- НОВОЕ: выходим, если нет div.ams_info ---
+      const amsDiv = document.querySelector('div.ams_info');
+      if (!amsDiv) return;
 
       // 1) Только для GroupID 1/2
       const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
@@ -15,17 +17,17 @@
       const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
-          return u.pathname.endsWith('/viewforum.php') && (PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id')));
+          return u.pathname.endsWith('/viewforum.php') &&
+                 PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
         } catch { return false; }
       });
       if (!inAllowedForum) return;
 
-      // 3) Аргумент 1: #pun-main h1 span → lowercase ("Имя Фамилия")
+      // 3) Аргументы
       const nameSpan = document.querySelector('#pun-main h1 span');
       const arg1 = nameSpan ? nameSpan.textContent.trim().toLowerCase() : '';
       if (!arg1) return;
 
-      // 4) Аргумент 2: usrN из profile.php?id=N
       let profLink =
         document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
@@ -38,16 +40,16 @@
       if (!idMatch) return;
       const arg2 = `usr${idMatch[1]}`;
 
-      // 5) Остальные аргументы — фиксированные
       const arg3 = PROFILE_CHECK.PPageTemplate;
       const arg4 = '';
       const arg5 = PROFILE_CHECK.PPageGroupIDs;
       const arg6 = '0';
 
-      // 6) Вставляем кнопку + статус (+ блок подробностей)
+      // 4) Вставка кнопки/статуса в последний .topic .post-body .post-box .post-content
       let bodies = document.querySelectorAll('.ams_info');
       if (!bodies.length) {
-        try { await waitFor('.ams_info', 5000); bodies = document.querySelectorAll('.ams_info'); } catch { return; }
+        try { await waitFor('.ams_info', 5000); bodies = document.querySelectorAll('.ams_info'); }
+        catch { return; }
       }
       const target = bodies[bodies.length - 1];
       if (!target || target.querySelector('.fmv-create-page')) return;
@@ -78,13 +80,12 @@
       details.appendChild(summary);
       details.appendChild(pre);
 
-      // необязательная кнопка-ссылка на результат
       const link = document.createElement('a');
       link.target = '_blank';
       link.rel = 'noopener';
       link.style.marginLeft = '10px';
       link.style.fontSize = '14px';
-      link.style.display = 'none'; // покажем, когда будет URL
+      link.style.display = 'none';
 
       btn.addEventListener('click', async () => {
         statusSpan.textContent = 'Создаём…';
@@ -101,39 +102,18 @@
         }
 
         try {
-          /** ожидаем объект вида:
-           * { status:'created'|'exists'|'error'|'uncertain',
-           *   serverMessage?: string, httpStatus?: number, url?: string, title?: string, name?: string, details?: string }
-           */
           const res = await window.FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6);
-
-          // статусная надпись
           switch (res?.status) {
-            case 'created':
-              statusSpan.textContent = '✔ создано';
-              statusSpan.style.color = 'green';
-              break;
-            case 'exists':
-              statusSpan.textContent = 'ℹ уже существует';
-              statusSpan.style.color = 'red';
-              break;
-            case 'error':
-              statusSpan.textContent = '✖ ошибка';
-              statusSpan.style.color = 'red';
-              break;
-            default:
-              statusSpan.textContent = '❔ не удалось подтвердить';
-              statusSpan.style.color = '#b80';
+            case 'created': statusSpan.textContent = '✔ создано'; statusSpan.style.color = 'green'; break;
+            case 'exists':  statusSpan.textContent = 'ℹ уже существует'; statusSpan.style.color = 'red'; break;
+            case 'error':   statusSpan.textContent = '✖ ошибка'; statusSpan.style.color = 'red'; break;
+            default:        statusSpan.textContent = '❔ не удалось подтвердить'; statusSpan.style.color = '#b80';
           }
-
-          // ссылка (если есть)
           if (res?.url) {
             link.href = res.url;
             link.textContent = 'Открыть страницу';
             link.style.display = 'inline';
           }
-
-          // подробности
           const lines = [];
           if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
           if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
@@ -141,7 +121,6 @@
           if (res?.name)          lines.push('Адресное имя: ' + res.name);
           if (res?.details)       lines.push('Details: ' + res.details);
           pre.textContent = lines.join('\n') || 'Нет дополнительных данных';
-
         } catch (err) {
           statusSpan.textContent = '✖ сеть/транспорт';
           statusSpan.style.color = 'red';
@@ -156,7 +135,8 @@
       target.appendChild(br);
       target.appendChild(br);
       target.appendChild(wrap);
-      log('Кнопка/статус добавлены');
+
+      console.log('[FMV injector] кнопка/статус добавлены (div.ams_info найден)');
     } catch (e) {
       console.log('[FMV injector] error:', e);
     }

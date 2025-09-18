@@ -81,12 +81,12 @@
         catch { return; }
       }
       const target = bodies[bodies.length - 1];
-      if (!target || target.querySelector('.fmv-update-field')) return;
+      if (!target || target.querySelector('.fmv-update-money-field')) return;
   
       // узлы UI
       const br = document.createElement('br');
       const wrap = document.createElement('div');
-      wrap.className = 'fmv-update-field';
+      wrap.className = 'fmv-update-money-field';
   
       const btn = document.createElement('button');
       btn.type = 'button';

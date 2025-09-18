@@ -97,7 +97,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'button';
-      btn.textContent = 'Обновить поле профиля';
+      btn.textContent = 'Установить ЛЗ';
   
       const statusSpan = document.createElement('span');
       statusSpan.style.marginLeft = '10px';

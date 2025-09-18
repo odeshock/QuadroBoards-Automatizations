@@ -14,13 +14,13 @@ function serializeFormCP1251(form){
 }
 
 // == УСТАНОВИТЬ ЗНАЧЕНИЕ ==
-async function FMVreplaceFieldData(user_id, new_value) {
+async function FMVreplaceFieldData(user_id, field_id, new_value) {
   try {
     const editUrl = `/profile.php?section=fields&id=${encodeURIComponent(user_id)}&nohead`;
     const doc = await fetchCP1251Doc(editUrl);
 
     // форма редактирования (на многих темах id="profile8"; подстрахуемся по action)
-    const FIELD_SELECTOR = '#fld' + PROFILE_CHECK.PPageFieldID;
+    const FIELD_SELECTOR = '#fld' + field_id;
     const form = doc.querySelector('form#profile8') ||
                  [...doc.querySelectorAll('form')].find(f => (f.action||'').includes('/profile.php'));
     if (!form) throw new Error('Не нашла форму редактирования профиля.');
@@ -28,7 +28,7 @@ async function FMVreplaceFieldData(user_id, new_value) {
     // ставим новое значение в #fld3 (в просмотре это pa-fld3)
     const fld = form.querySelector(FIELD_SELECTOR);
     if (!fld) throw new Error(`Поле ${FIELD_SELECTOR} не найдено. Проверьте номер fld.`);
-    fld.value = PROFILE_CHECK.PPageFieldTemplate;
+    fld.value = new_value;
 
     // ensure name="update" присутствует (некоторые шаблоны требуют)
     if (![...form.elements].some(el => el.name === 'update')) {

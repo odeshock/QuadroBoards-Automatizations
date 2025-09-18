@@ -49,7 +49,7 @@
 
       const infoDiv = document.createElement('div');
       infoDiv.className = 'ams_info';
-      infoDiv.textContent = 'Информация будет добавлена скриптом create.js';
+      infoDiv.textContent = '';
 
       target.appendChild(document.createElement('br'));
       target.appendChild(infoDiv);

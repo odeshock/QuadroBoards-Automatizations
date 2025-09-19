@@ -174,6 +174,7 @@
       const rawOrder = FMV.readTagText(first, 'order');
 
       // карта id->имя (на всякий случай подхватим с текущей страницы темы)
+      // карта имён ровно по тем userID, что есть в <characters>/<masks>
       const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars, rawMasks);
 
       // строгие парсеры из общего модуля
@@ -203,7 +204,8 @@
         type, status, url: topicUrl,
         episode, dateRaw, range, dateBad, plotBad,
         locationsLower, charactersLower, participantsLower,
-        masksByCharLower, maskKeysLower, order
+        masksByCharLower, maskKeysLower, order,
+        idToNameMap              
       };
     } catch (e) {
       console.warn('[auto_chrono] skip topic', topicUrl, e);

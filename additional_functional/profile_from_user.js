@@ -6,11 +6,16 @@ const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
     (s||'').replace(/user(\d+)/gi, (_,d)=>{ ids.add(String(Number(d))); return _; });
     return Array.from(ids);
   }
-  function profileLink(id, name){
-    const txt = name || ('user'+id);
+  function profileLink(id, name) {
+    // если имя не найдено — добавляем приписку
+    const txt = name
+      ? name
+      : `user${id} (не найден)`;
+  
     if (!MAKE_NAMES_LINKS) return txt;
+  
     const a = document.createElement('a');
-    a.href = '/profile.php?id='+encodeURIComponent(id);
+    a.href = '/profile.php?id=' + encodeURIComponent(id);
     a.textContent = txt;
     return a.outerHTML;
   }

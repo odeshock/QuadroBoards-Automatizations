@@ -1,84 +1,127 @@
 const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
 
 // ─────────────── userN → имя ───────────────
-  function extractUserIdsFromString(s){
-    const ids = new Set();
-    (s||'').replace(/user(\d+)/gi, (_,d)=>{ ids.add(String(Number(d))); return _; });
-    return Array.from(ids);
-  }
-  function profileLink(id, name) {
-    // если имя не найдено — добавляем пометку
-    const txt = (typeof name === 'string' && name.length)
-      ? name
-      : `user${id} (не нашлось)`;
-  
-    if (!MAKE_NAMES_LINKS) return txt;
-  
-    const a = document.createElement('a');
-    a.href = '/profile.php?id=' + encodeURIComponent(id);
-    a.textContent = txt;
-    return a.outerHTML;
-  }
-   function replaceUserTokens(s, idToNameMap){
-    return escapeHtml(s || '').replace(/user(\d+)/gi, (m, d) => {
-      const id = String(Number(d));
-      // ПЕРЕДАЁМ undefined, если имени нет в карте
-      const name = idToNameMap.has(id) ? idToNameMap.get(id) : undefined;
-      return profileLink(id, name);
-    });
-  }
-  function replaceUserInPairs(s, idToNameMap){
-    return (s||'').split(/\s*;\s*/).filter(Boolean).map(pair=>{
-      const [left,right] = pair.split('=');
-      if (!right) return replaceUserTokens(left, idToNameMap);
-      const replacedLeft = replaceUserTokens(left, idToNameMap);
-      return `${replacedLeft}=${escapeHtml(right)}`;
-    }).join('; ');
-  }
-  function escapeHtml(s){
-    return (s||'').replace(/[&<>\"']/g, ch => (
-      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
-    ));
-  }
+function extractUserIdsFromString(s){
+  const ids = new Set();
+  (s||'').replace(/user(\d+)/gi, (_,d)=>{ ids.add(String(Number(d))); return _; });
+  return Array.from(ids);
+}
+
+function profileLink(id, name) {
+  // если имя не найдено — добавляем пометку
+  const txt = (typeof name === 'string' && name.length)
+    ? name
+    : `user${id} (не нашлось)`;
+
+  if (!MAKE_NAMES_LINKS) return txt;
+
+  const a = document.createElement('a');
+  a.href = '/profile.php?id=' + encodeURIComponent(id);
+  a.textContent = txt;
+  return a.outerHTML;
+}
+
+function replaceUserTokens(s, idToNameMap){
+  return escapeHtml(s || '').replace(/user(\d+)/gi, (m, d) => {
+    const id = String(Number(d));
+    const name = idToNameMap.has(id) ? idToNameMap.get(id) : undefined;
+    return profileLink(id, name);
+  });
+}
+
+function replaceUserInPairs(s, idToNameMap){
+  return (s||'').split(/\s*;\s*/).filter(Boolean).map(pair=>{
+    const [left,right] = pair.split('=');
+    if (!right) return replaceUserTokens(left, idToNameMap);
+    const replacedLeft = replaceUserTokens(left, idToNameMap);
+    return `${replacedLeft}=${escapeHtml(right)}`;
+  }).join('; ');
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>\"']/g, ch => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
+  ));
+}
 
 // ─────────────── userN → Имя профиля (с кэшем) ───────────────
-  const nameCache = new Map();
-  async function getProfileNameById(id){
-    id = String(Number(id));
-    if (nameCache.has(id)) return nameCache.get(id);
-    let name = getNameFromPageById(id);
-    if (!name){
-      try{
-        const html = await fetchHtml(`/profile.php?id=${id}`);
-        const doc  = new DOMParser().parseFromString(html, 'text/html');
-        name = extractNameFromDoc(doc);
-      }catch{}
+const nameCache = new Map();
+
+// --- ДОБАВЛЕНО: подгрузка имён удалённых профилей -------------
+let exProfilesMap = null;
+let exProfilesPromise = null;
+
+async function loadExProfiles() {
+  if (exProfilesMap) return exProfilesMap;
+  if (exProfilesPromise) return exProfilesPromise;
+
+  exProfilesPromise = (async () => {
+    const html = await fetchHtml(EX_PROFILES_URL);       // глобальная функция у вас уже есть
+    const doc  = new DOMParser().parseFromString(html, 'text/html');
+    const map  = new Map();
+    for (const a of doc.querySelectorAll('a[href*="profile.php?id="]')) {
+      const m = (a.getAttribute('href') || '').match(/profile\.php\?id=(\d+)/i);
+      if (!m) continue;
+      const id = String(Number(m[1]));
+      const nm = (a.textContent || '').trim();
+      if (nm && !map.has(id)) map.set(id, nm);
     }
-    nameCache.set(id, name || null);
-    return name || null;
+    exProfilesMap = map;
+    return map;
+  })();
+  return exProfilesPromise;
+}
+
+async function getExProfileName(id) {
+  const map = await loadExProfiles();
+  return map.get(String(Number(id))) || null;
+}
+// ----------------------------------------------------------------
+
+async function getProfileNameById(id){
+  id = String(Number(id));
+  if (nameCache.has(id)) return nameCache.get(id);
+
+  // 1) ищем на текущей странице
+  let name = getNameFromPageById(id);
+
+  // 2) пробуем загрузить сам профиль
+  if (!name){
+    try{
+      const html = await fetchHtml(`/profile.php?id=${id}`);
+      const doc  = new DOMParser().parseFromString(html, 'text/html');
+      name = extractNameFromDoc(doc);
+    }catch{}
   }
-  function getNameFromPageById(id){
-    const anchors = Array.from(document.querySelectorAll(`a[href*="profile.php?id=${id}"]`));
-    for (const a of anchors){
-      const t = (a.textContent||'').trim();
-      if (t && !/Профил|Profile/i.test(t)) return t;
-    }
-    return null;
+
+  // 3) fallback: смотрим в список удалённых профилей
+  if (!name){
+    try { name = await getExProfileName(id); } catch {}
   }
-  // profile_from_user (1).js
+
+  nameCache.set(id, name || null);
+  return name || null;
+}
+
+function getNameFromPageById(id){
+  const anchors = Array.from(document.querySelectorAll(`a[href*="profile.php?id=${id}"]`));
+  for (const a of anchors){
+    const t = (a.textContent||'').trim();
+    if (t && !/Профил|Profile/i.test(t)) return t;
+  }
+  return null;
+}
 
 function extractNameFromDoc(doc){
-  // 1) Надёжный маркер: ник в блоке идентификации профиля
   const usernameEl =
     doc.querySelector('.user-ident .username') ||
-    doc.querySelector('.user-box .username') || // на всякий случай альтернативный шаблон
+    doc.querySelector('.user-box .username') ||
     null;
   if (usernameEl) {
     const name = (usernameEl.textContent || '').trim();
     if (name) return name;
   }
 
-  // 2) Заголовки, но ТОЛЬКО если явно это страница профиля
   const headings = [
     '#pun-title span','h1 span','h1','h2.hn','.hn','.title','.subhead h2'
   ].map(sel => doc.querySelector(sel)).filter(Boolean)
@@ -87,11 +130,10 @@ function extractNameFromDoc(doc){
   const title = (doc.querySelector('title')?.textContent || '').trim();
   if (title) headings.unshift(title);
 
-  // Разрешаем брать имя из заголовка только при явных ключевых словах страницы профиля
   const PROFILE_PATTERNS = [
-    /Профил[ья]\s*[:\-—–]\s*(.+)$/i,           // «Профиль: murmur»
-    /Просмотр\s+профиля\s*[:\-—–]\s*(.+)$/i,   // «Просмотр профиля — murmur»
-    /Profile\s*[:\-—–]\s*(.+)$/i               // англ. вариант
+    /Профил[ья]\s*[:\-—–]\s*(.+)$/i,
+    /Просмотр\s+профиля\s*[:\-—–]\s*(.+)$/i,
+    /Profile\s*[:\-—–]\s*(.+)$/i
   ];
 
   for (let t of headings){
@@ -105,7 +147,5 @@ function extractNameFromDoc(doc){
       }
     }
   }
-
-  // Ничего убедительного — это не профиль
   return null;
 }

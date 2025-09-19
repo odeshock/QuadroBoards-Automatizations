@@ -120,4 +120,40 @@
     };
   };
 
+  // --- извлечение userID из сырого текста тегов ---
+  FMV.extractUserIdsFromTags = function (charsText, masksText) {
+    const ids = new Set();
+    const scan = (s) => String(s || '').replace(/user(\d+)/gi, (_, d) => {
+      ids.add(String(Number(d)));
+      return _;
+    });
+    scan(charsText);
+    scan(masksText);
+    return Array.from(ids);
+  };
+  
+  // --- построение карты id -> имя по userID из <characters>/<masks> ---
+  FMV.buildIdToNameMapFromTags = async function (charsText, masksText) {
+    // если есть глобальный кэш — используем его
+    if (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size) {
+      return window.__FMV_ID_TO_NAME_MAP__;
+    }
+  
+    // иначе резолвим только те id, что реально указаны в тегах
+    const ids = FMV.extractUserIdsFromTags(charsText, masksText);
+    const map = new Map();
+  
+    // getProfileNameById — из profile_from_user.js
+    if (typeof window.getProfileNameById !== 'function') return map;
+  
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const name = await window.getProfileNameById(id);
+        if (name) map.set(id, name);
+      } catch { /* no-op */ }
+    }));
+  
+    return map;
+  };
+
 })();

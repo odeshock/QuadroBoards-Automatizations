@@ -206,7 +206,7 @@
         const $err =$('<div class="error" style="display:none"></div>');
 
         $area.before($wrap);
-        $wrap.append($row,$chips,$placeRow,$ordRow,$hint,$err);
+        $wrap.append($row,$chips,$placeRow,$ordRow,$err);
 
         let selected=[], knownUsers=[];
 

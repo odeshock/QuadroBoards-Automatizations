@@ -1,4 +1,6 @@
-// ───────────────── пользовательская группа: ВАША СХЕМА ─────────────────
+window.CHRONO_CHECK = window.CHRONO_CHECK ?? { GroupID: ['1'] };
+
+// ───────────────── пользовательская группа ─────────────────
 function getCurrentGroupId() {
   const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
   const groupId = Number(

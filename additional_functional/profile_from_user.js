@@ -8,23 +8,23 @@ function extractUserIdsFromString(s){
 }
 
 function profileLink(id, name) {
-  const noNameHtml = `<span class="fmv-missing">user${id}</span> (не найден)`;
   const withNameTxt = (typeof name === 'string' && name.length) ? name : null;
 
-  if (!MAKE_NAMES_LINKS) {
-    // Без ссылок: можно вернуть HTML напрямую
-    return withNameTxt ?? noNameHtml;
+  // 1) Если имя не найдено — просто "userN (не найден)" БЕЗ <a>
+  if (!withNameTxt) {
+    return `user${id} (<span class="fmv-missing">не найден</span>)`;
   }
 
-  // Со ссылками: используем innerHTML, чтобы сохранить подсветку
-  const a = document.createElement('a');
-  a.href = '/profile.php?id=' + encodeURIComponent(id);
-  if (withNameTxt) {
+  // 2) Имя найдено:
+  //    - если включены ссылки — вернём <a>
+  //    - если выключены — просто текст
+  if (MAKE_NAMES_LINKS) {
+    const a = document.createElement('a');
+    a.href = '/profile.php?id=' + encodeURIComponent(id);
     a.textContent = withNameTxt;
-  } else {
-    a.innerHTML = noNameHtml;
+    return a.outerHTML;
   }
-  return a.outerHTML;
+  return withNameTxt;
 }
 
 function replaceUserTokens(s, idToNameMap){

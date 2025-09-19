@@ -81,7 +81,18 @@
     lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${escapeHtml(raw.location)}</div>`);
   }
   if (raw.order) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${escapeHtml(raw.order)}</div>`);
+    const ORDER_PATTERN = /^-?\d+$/;   // любое целое со знаком или без
+    if (!ORDER_PATTERN.test(raw.order.trim())) {
+      lines.push(
+        `<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>` +
+        `<span class="fmv-missing">Ошибка! Неверный формат, нужно целое число (пример: -3 или 5)</span>` +
+        ` — ${escapeHtml(raw.order)}</div>`
+      );
+    } else {
+      lines.push(
+        `<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${escapeHtml(raw.order)}</div>`
+      );
+    }
   }
 
   // если совсем нечего показать — не вставляем блок

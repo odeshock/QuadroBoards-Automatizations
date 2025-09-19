@@ -131,6 +131,12 @@
         if (opts.showOnlyIfFMVcast && !/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i.test($area.val() || '')) return null;
         if ($form.data('fmvBoundUI')) return $form.data('fmvBoundUI');
 
+        // ① текст ДО вырезания (для префилла), и мгновенно прячем мету в textarea при редактировании
+        const initialRaw = $area.val() || '';
+        if (opts.stripOnMount) {
+          $area.val(stripFMV(initialRaw));
+        }
+
         const wrapClass = 'msg-with-characters fmv ' + (opts.className || '');
         const $wrap=$('<div/>',{class:wrapClass});
         const $row =$('<div class="char-row"/>');
@@ -293,7 +299,7 @@
         $ac.on('mousedown','.ac-item',function(){ const code=$(this).data('code'); if(code) addByCode(code); });
         $(document).on('click',function(e){ if(!$(e.target).closest($combo).length) $ac.hide(); });
 
-        // Префилл из FMVcast/FMВplace
+        // Префилл из FMVcast/FMВplace — из исходника initialRaw
         function prefillFrom(text){
           selected = [];
           const by = parseFMVcast(text || '');
@@ -314,27 +320,23 @@
         if (window.FMV && typeof FMV.fetchUsers === 'function') {
           FMV.fetchUsers().done(function(list){
             knownUsers = (list || []).slice();
-            if (opts.prefill !== false) prefillFrom($area.val() || '');
-            // ③ При монтировании (например, на редактировании) скрываем теги из textarea
-            if (opts.stripOnMount) {
-              $area.val(stripFMV($area.val() || ''));
-            }
+            if (opts.prefill !== false) prefillFrom(initialRaw); // <— важно
           }).fail(function(msg){
             $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show();
           });
         }
 
-        // ② submit hook с валидацией и добавлением меты В КОНЕЦ (без обязательной пустой строки)
+        // ② submit hook с валидацией и добавлением меты В КОНЕЦ (пустая строка не обязательна)
         $form.off('submit.fmv.ui').on('submit.fmv.ui', function(e){
           const $subject = $form.find('input[name="req_subject"]');
           const haveSubject = !$subject.length || $.trim($subject.val()||'').length>0;
-        
+
           const rest = stripFMV($area.val() || '');
           const haveMessage = $.trim(rest).length > 0;
-        
+
           const haveParticipants = selected.length > 0;
           const havePlace = $.trim($placeInput.val()||'').length > 0;
-        
+
           if (!(haveSubject && haveMessage && haveParticipants && havePlace)) {
             e.preventDefault();
             const miss = [];
@@ -346,15 +348,15 @@
             setTimeout(() => $err.fadeOut(400), 1800);
             return; // textarea НЕ трогаем
           }
-        
+
           const meta = metaLine();
-        
+
           // оставляем \n на конце, срезаем только хвостовые пробелы/табуляции
           let base = rest.replace(/[ \t]+$/, '');
-        
+
           // добавляем мету в конец; если последнего \n нет — ставим ровно один
           const sep = (!base || /\n$/.test(base)) ? '' : '\n';
-        
+
           $area.val(base + sep + meta);
         });
 
@@ -398,7 +400,7 @@
             form:$form, textarea:$area,
             prefill:true, showOnlyIfFMVcast:false,
             className:'fmv--compact',
-            stripOnMount:false          // ③ на создании ничего не вырезаем
+            stripOnMount:false          // на создании ничего не вырезаем
           });
         }
       }
@@ -415,7 +417,7 @@
             form:$form, textarea:$area,
             prefill:true, showOnlyIfFMVcast:true,
             className:'fmv--compact',
-            stripOnMount:true           // ③ при редактировании скрываем мету из textarea
+            stripOnMount:true           // при редактировании скрываем мету из textarea мгновенно
           });
         }
       }

@@ -1,3 +1,5 @@
+const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
+
 // ─────────────── userN → имя ───────────────
   function extractUserIdsFromString(s){
     const ids = new Set();

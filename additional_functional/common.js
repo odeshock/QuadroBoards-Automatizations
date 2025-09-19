@@ -1,4 +1,4 @@
-// ===== FMV common (unified characters) =====
+// ===== FMV common (unified characters + users loader) =====
 (function () {
   'use strict';
 
@@ -55,7 +55,7 @@
   /* ---------- characters: извлечение id и карта имён ---------- */
 
   /** Вытягивает все userID из строки characters (формат: userN[=mask]; …) */
-  FMV.extractUserIdsFromTags = function (charsText) {
+  FMV.extractUserIdsFromTags = FMV.extractUserIdsFromTags || function (charsText) {
     const ids = new Set();
     String(charsText || '').replace(/user(\d+)/gi, (_, d) => {
       ids.add(String(Number(d)));
@@ -70,7 +70,7 @@
    * Если функция недоступна — вернёт пустую Map (а UI покажет "не найден").
    * Уважает глобальный кэш window.__FMV_ID_TO_NAME_MAP__ если он есть.
    */
-  FMV.buildIdToNameMapFromTags = async function (charsText) {
+  FMV.buildIdToNameMapFromTags = FMV.buildIdToNameMapFromTags || async function (charsText) {
     if (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size) {
       return window.__FMV_ID_TO_NAME_MAP__;
     }
@@ -102,7 +102,7 @@
    *   htmlMasks              — "<a ...>Имя</a>=mask; ..."
    *   htmlError              — HTML ошибки формата (если не ок)
    */
-  FMV.parseCharactersUnified = function (charsText, idToNameMap, profileLink = window.profileLink) {
+  FMV.parseCharactersUnified = FMV.parseCharactersUnified || function (charsText, idToNameMap, profileLink = window.profileLink) {
     const raw = String(charsText || '').trim();
     if (!raw) {
       return {
@@ -175,14 +175,7 @@
   };
 
   /* ---------- удобный рендер для «Участники:» ---------- */
-
-  /**
-   * Возвращает готовый HTML для строки «Участники:»
-   * — при успехе: htmlParticipants
-   * — при ошибке формата: htmlError
-   * — при пустом/непонятном вводе: дефолтная подсказка с исходной строкой
-   */
-  FMV.renderParticipantsHtml = function (charsText, idToNameMap, profileLink = window.profileLink) {
+  FMV.renderParticipantsHtml = FMV.renderParticipantsHtml || function (charsText, idToNameMap, profileLink = window.profileLink) {
     const uni = FMV.parseCharactersUnified(charsText, idToNameMap, profileLink);
     if (uni && uni.ok) return uni.htmlParticipants;
 
@@ -192,6 +185,123 @@
       : `<span class="fmv-missing">Аааа! Нужен формат: userN; userM=маска; userK</span> — ${raw}`;
 
     return err;
+  };
+
+  /* ---------- users loader (moved to common) ---------- */
+
+  /**
+   * FMV.fetchUsers({ force?:boolean, maxPages?:number, batchSize?:number })
+   * Возвращает $.Deferred().promise() с массивом:
+   *   [{ id:Number, code:'user<ID>', name:String }, ...] — 이미 отсортирован по name и без дублей
+   */
+  FMV.fetchUsers = FMV.fetchUsers || function (opts) {
+    opts = opts || {};
+    var force    = !!opts.force;
+    var maxPages = opts.maxPages || 50;   // защитный лимит
+    var batch    = opts.batchSize || 5;   // параллельная пачка
+
+    var CACHE_KEY = 'fmv_users_cache_v1';
+    var TTL_MS    = 30 * 60 * 1000;
+
+    function readCache(){
+      try{
+        var raw = sessionStorage.getItem(CACHE_KEY);
+        if(!raw) return null;
+        var obj = JSON.parse(raw);
+        if(!obj || !obj.time || !obj.data) return null;
+        if(Date.now() - obj.time > TTL_MS) return null;
+        return obj.data;
+      }catch(_){ return null; }
+    }
+    function writeCache(list){
+      try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(), data:list})); }catch(_){}
+    }
+    function fetchHtmlCompat(url){
+      if (typeof window.fetchHtml === 'function') {
+        var d=$.Deferred();
+        Promise.resolve(window.fetchHtml(url)).then(function(txt){ d.resolve(txt); }, function(e){ d.reject(e||'fetchHtml failed'); });
+        return d.promise();
+      }
+      // fallback на jQuery
+      return $.get(url, undefined, undefined, 'html');
+    }
+    function parseUserList(html){
+      var doc = document.implementation.createHTMLDocument('');
+      doc.documentElement.innerHTML = html;
+      var anchors = doc.querySelectorAll('a[href*="profile.php?id="]');
+      var users = [];
+      anchors.forEach(function(a){
+        var name = FMV.normSpace(a.textContent || '');
+        var m = (a.getAttribute('href')||'').match(/profile\.php\?id=(\d+)/);
+        if (!m) return;
+        var id = +m[1];
+        users.push({ id: id, code: 'user'+id, name: name });
+      });
+      var pageLinks = doc.querySelectorAll('a[href*="userlist.php"]');
+      var pages = [1];
+      var baseHref = 'userlist.php';
+      pageLinks.forEach(function(a){
+        var href = a.getAttribute('href') || '';
+        if (href) baseHref = href;
+        var u = new URL(href, location.origin);
+        var p = +(u.searchParams.get('p') || 0);
+        if (p) pages.push(p);
+      });
+      var last = Math.max.apply(null, pages);
+      return { users: users, last: last, base: baseHref };
+    }
+    function urlForPage(baseHref, p){
+      var u = new URL(baseHref, location.origin);
+      if (p > 1) u.searchParams.set('p', String(p));
+      else u.searchParams.delete('p');
+      return u.pathname + (u.search || '');
+    }
+    function uniqSort(list){
+      var map = {};
+      (list||[]).forEach(function(u){ map[u.code] = u; });
+      var out = Object.keys(map).map(function(k){ return map[k]; });
+      out.sort(function(a,b){ return a.name.localeCompare(b.name,'ru',{sensitivity:'base'}) });
+      return out;
+    }
+
+    var cached = !force && readCache();
+    if (cached) return $.Deferred().resolve(cached).promise();
+
+    var d=$.Deferred();
+    fetchHtmlCompat('/userlist.php').then(function(html1){
+      var first = parseUserList(html1);
+      var all   = first.users.slice();
+      var last  = Math.min(first.last || 1, maxPages);
+
+      var pages=[]; for (var p=2; p<=last; p++) pages.push(p);
+
+      function runBatch(start){
+        if (start >= pages.length) {
+          var list = uniqSort(all);
+          writeCache(list);
+          d.resolve(list);
+          return;
+        }
+        var chunk = pages.slice(start, start+batch);
+        $.when.apply($, chunk.map(function(p){
+          var url = urlForPage(first.base, p);
+          return fetchHtmlCompat(url).then(function(htmlN){
+            var part = parseUserList(htmlN);
+            all = all.concat(part.users);
+          });
+        })).always(function(){ runBatch(start+batch); });
+      }
+
+      runBatch(0);
+    }, function(err){
+      d.reject(err || 'Не удалось загрузить список участников');
+    });
+
+    return d.promise();
+  };
+
+  FMV.invalidateUsersCache = FMV.invalidateUsersCache || function () {
+    try { sessionStorage.removeItem('fmv_users_cache_v1'); } catch (_) {}
   };
 
 })();

@@ -91,6 +91,10 @@
         .fmv .mask-input input{width:220px; margin-right:6px; height:30px; padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px}
         .fmv .hint{font-size:13px; color:var(--fmv-muted); margin-top:6px}
         .fmv .error{color:#b00; margin-top:6px}
+        .fmv .chips .chip{ align-items:center; }
+        .fmv .chips .chip .mask-input{ margin-left:auto; } /* отталкивает всё справа */
+        .fmv .chips .chip .x{ margin-left:8px; }          /* небольшой отступ от поля маски */
+
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
@@ -147,7 +151,7 @@
             $maskCancel.on('click', function(){ $maskBox.hide(); });
             $remove.on('click', function(){ selected.splice(idx,1); renderChips(); });
 
-            $chip.append($drag,$name,$masks,$addMask,$remove,$maskBox);
+            $chip.append($drag,$name,$masks,$addMask,$maskBox,$remove);
             $chips.append($chip);
           });
         }

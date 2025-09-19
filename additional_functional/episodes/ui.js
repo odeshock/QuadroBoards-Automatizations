@@ -393,7 +393,7 @@
     })();
   }
 
-  // ───────────────── Bootstraps ─────────────────
+  // ───────────────── Bootstraps (автоподключение) ─────────────────
   function onReady(fn){
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
     else fn();
@@ -402,40 +402,44 @@
   onReady(function(){
     if (!FMV.UI || typeof FMV.UI.attach !== 'function') return;
 
-    const path = location.pathname;
+    const url  = new URL(location.href);
+    const path = url.pathname;
+    const q    = url.searchParams;
 
-    // создание
-    if (/\/post\.php(\?|$)/i.test(path)) {
-      const fid = +(new URLSearchParams(location.search).get('fid')||0);
-      if ([8,9].indexOf(fid) !== -1) {
-        const $form = $('#post form, form[action*="post.php"]').first();
-        const $area = $form.find('textarea[name="req_message"], #main-reply, .questionary-post textarea').first();
-        if ($form.length && $area.length) {
-          FMV.UI.attach({
-            form:$form, textarea:$area,
-            prefill:true, showOnlyIfFMVcast:false,
-            className:'fmv--compact',
-            stripOnMount:false
-          });
-        }
+    function attachToPage({ strip=false, showOnlyIfCast=false } = {}){
+      const $form = $('#post form, form[action*="post.php"], form[action*="edit.php"]').first();
+      const $area = $form.find('textarea[name="req_message"], #main-reply, .questionary-post textarea').first();
+      if ($form.length && $area.length) {
+        FMV.UI.attach({
+          form: $form,
+          textarea: $area,
+          prefill: true,
+          showOnlyIfFMVcast: !!showOnlyIfCast,
+          className: 'fmv--compact',
+          stripOnMount: !!strip   // ← удаляем теги из textarea сразу при монтировании
+        });
       }
     }
 
-    // редактирование первого поста
-    if (/\/edit\.php$/i.test(path)) {
-      const q = new URLSearchParams(location.search);
-      if (q.get('topicpost') === '1') {
-        const $form = $('#post form, form[action*="edit.php"]').first();
-        const $area = $form.find('textarea[name="req_message"], #main-reply, .questionary-post textarea').first();
-        if ($form.length && $area.length) {
-          FMV.UI.attach({
-            form:$form, textarea:$area,
-            prefill:true, showOnlyIfFMVcast:true,
-            className:'fmv--compact',
-            stripOnMount:true
-          });
-        }
-      }
+    // СТАРОЕ: создание по /post.php?fid=8|9 (без strip, UI виден всегда)
+    if (/\/post\.php$/i.test(path) && !q.has('action')) {
+      const fid = +(q.get('fid')||0);
+      if ([8,9].includes(fid)) attachToPage({ strip:false, showOnlyIfCast:false });
+    }
+
+    // СТАРОЕ: редактирование первого поста темы /edit.php?topicpost=1 (strip и только если есть FMVcast)
+    if (/\/edit\.php$/i.test(path) && q.get('topicpost') === '1') {
+      attachToPage({ strip:true, showOnlyIfCast:true });
+    }
+
+    // НОВОЕ: /post.php?action=post&fid=8 — парсим из textarea и удаляем теги
+    if (/\/post\.php$/i.test(path) && q.get('action') === 'post' && +q.get('fid') === 8) {
+      attachToPage({ strip:true, showOnlyIfCast:false });
+    }
+
+    // НОВОЕ: /edit.php?id=N&action=edit — парсим из textarea и удаляем теги
+    if (/\/edit\.php$/i.test(path) && q.get('action') === 'edit' && q.has('id')) {
+      attachToPage({ strip:true, showOnlyIfCast:false });
     }
   });
 

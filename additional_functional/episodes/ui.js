@@ -2,16 +2,15 @@
 (function(){
   'use strict';
 
-  // Требуется общий модуль, где есть FMV.fetchUsers (мы не падаем, но напомним в консоли)
-  if (!window.FMV || typeof window.FMV.fetchUsers !== 'function') {
+  if (!window.FMV) window.FMV = {};
+  if (!window.FMV.fetchUsers) {
     console.warn('[FMV] Подключите общий модуль с FMV.fetchUsers перед этим файлом');
   }
-  if (!window.FMV) window.FMV = {};
 
   // ───────────────── UI-модуль ─────────────────
   if (!window.FMV.UI) {
     (function(){
-      // ─── mini utils (без дублей из helpers/common) ───
+      // mini utils
       function splitBySemicolon(s){
         return String(s || '').split(';').map(v => v.trim()).filter(Boolean);
       }
@@ -42,14 +41,21 @@
         val = String(val || '').trim();
         return val ? '[FMVplace]' + val + '[/FMVplace]' : '';
       }
+      function buildFMVord(val){
+        // целое (может быть отрицательным); пустое = 0
+        let n = parseInt(String(val||'').trim(), 10);
+        if (Number.isNaN(n)) n = 0;
+        return '[FMVord]' + n + '[/FMVord]';
+      }
       function stripFMV(text){
         return String(text || '')
           .replace(/\[FMVcast\][\s\S]*?\[\/FMVcast\]/ig,'')
           .replace(/\[FMVplace\][\s\S]*?\[\/FMVplace\]/ig,'')
+          .replace(/\[FMVord\][\s\S]*?\[\/FMVord\]/ig,'')
           .replace(/^\s+|\s+$/g,'');
       }
 
-      // ─── CSS (компактный скин) ───
+      // CSS
       let cssInjected = false;
       function injectCSS(){
         if (cssInjected) return; cssInjected = true;
@@ -62,13 +68,16 @@
         .fmv .char-row{display:flex; gap:var(--fmv-gap); align-items:flex-start; flex-wrap:wrap}
         .fmv .combo{position:relative; flex:1 1 480px}
         .fmv .combo input,
-        .fmv .place-row input{
+        .fmv .place-row input,
+        .fmv .order-row input{
           width:100%; height:36px;
           padding:8px 10px; border:1px solid var(--fmv-b); border-radius:8px;
           background:#efe9dc; color:var(--fmv-text); font-size:14px;
         }
-        .fmv .place-row{margin-top:8px}
-        .fmv .place-row label{display:block; margin-bottom:4px; font-weight:600; color:var(--fmv-text)}
+        .fmv .place-row,.fmv .order-row{margin-top:8px}
+        .fmv .place-row label,.fmv .order-row label{display:block; margin-bottom:4px; font-weight:600; color:var(--fmv-text)}
+        .fmv .order-hint{font-size:12.5px; color:var(--fmv-muted); margin-top:4px}
+
         .fmv .ac-list{
           position:absolute; z-index:50; left:0; right:0; background:#fff;
           border:1px solid var(--fmv-b); border-radius:8px; margin-top:4px; max-height:240px; overflow:auto
@@ -77,7 +86,6 @@
         .fmv .ac-item.active,.fmv .ac-item:hover{background:#f0efe9}
         .fmv .ac-item .muted{color:var(--fmv-muted)}
 
-        /* Чипы — влево, не по центру */
         .fmv .chips .chip{
           display:flex; align-items:center; justify-content:flex-start;
           gap:10px; padding:.45em .6em; background:var(--fmv-chip);
@@ -86,7 +94,6 @@
         .fmv .chip .drag{cursor:grab; margin-right:.4em; color:#8b8378}
         .fmv .chip .name{font-weight:600}
 
-        /* Список масок возле имени */
         .fmv .masks{display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--fmv-muted)}
         .fmv .masks .masks-label{ color:var(--fmv-muted); margin-right:2px; }
         .fmv .mask-badge{
@@ -102,7 +109,6 @@
         .fmv .chip .add-mask{border:0; background:none; color:#2e5aac; cursor:pointer; padding:0; text-decoration:underline; margin-left:auto}
         .fmv .chip .x{border:0; background:none; font-size:16px; line-height:1; cursor:pointer; color:#8b8378; margin-left:8px}
 
-        /* Форма добавления маски: по умолчанию скрыта; когда открыта — справа */
         .fmv .chip .mask-input{ display:none; margin-left:auto; }
         .fmv .chip .mask-input.is-open{ display:flex; align-items:center; gap:8px; }
         .fmv .chip .mask-input input{
@@ -110,10 +116,7 @@
           padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
           background:#efe9dc; color:var(--fmv-text);
         }
-        .fmv .chip .btn{
-          border:1px solid var(--fmv-b); border-radius:6px;
-          background:#fff; padding:6px 10px; cursor:pointer; line-height:1;
-        }
+        .fmv .chip .btn{ border:1px solid var(--fmv-b); border-radius:6px; background:#fff; padding:6px 10px; cursor:pointer; line-height:1; }
         .fmv .chip .btn-ok{ background:#e9f6e9; }
         .fmv .chip .btn-cancel{ background:#f4eeee; }
 
@@ -130,18 +133,18 @@
         const $area = typeof opts.textarea === 'string' ? $(opts.textarea) : opts.textarea;
         if (!$form || !$form.length || !$area || !$area.length) return null;
 
-        // ── читаем исходный текст и сразу решаем судьбу виджета/textarea ──
-        const initialRaw = $area.val() || '';                 // с метой
+        // исходный текст и мгновенное скрытие меты при необходимости
+        const initialRaw = $area.val() || '';
         if (opts.showOnlyIfFMVcast && !/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i.test(initialRaw)) {
-          return null; // не монтируемся, если в исходнике нет FMVcast
+          return null;
         }
-        if (opts.stripOnMount) {                              // мгновенно скрываем мету в textarea (edit)
+        if (opts.stripOnMount) {
           $area.val( stripFMV(initialRaw) );
         }
 
         if ($form.data('fmvBoundUI')) return $form.data('fmvBoundUI');
 
-        // ── построение UI ──
+        // UI
         const wrapClass = 'msg-with-characters fmv ' + (opts.className || '');
         const $wrap=$('<div/>',{class:wrapClass});
         const $row =$('<div class="char-row"/>');
@@ -150,18 +153,26 @@
         const $ac=$('<div class="ac-list" role="listbox" aria-label="Варианты персонажей"></div>');
         $combo.append($comboInput,$ac); $row.append($combo);
 
+        const $chips=$('<div class="chips"/>');
+
         const $placeRow  =$('<div class="place-row"/>');
         const $placeLabel=$('<label for="fmv-place" style="font-weight:600">Локация:</label>');
         const $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">');
         $placeRow.append($placeLabel,$placeInput);
 
-        const $chips=$('<div class="chips"/>');
-        const $hint =$('<div class="hint">Участники/маски/локация. Сохранится как: [FMVcast]userN;userM=маска…[/FMVcast] + [FMVplace]…[/FMVplace].</div>');
+        // Новое поле порядка
+        const $ordRow = $('<div class="order-row"/>');
+        const $ordLabel = $('<label for="fmv-ord" style="font-weight:600">Для сортировки эпизодов в один день</label>');
+        const $ordInput = $('<input type="number" id="fmv-ord" placeholder="0" value="0" step="1">');
+        const $ordHint  = $('<div class="order-hint">Если вы не знаете, для чего это поле — оставьте 0 :)</div>');
+        $ordRow.append($ordLabel, $ordInput, $ordHint);
+
+        const $hint =$('<div class="hint">Участники/маски/локация/порядок. Сохранится как: [FMVcast]…[/FMVcast] + [FMVplace]…[/FMVplace] + [FMVord]…[/FMVord].</div>');
         const $err  =$('<div class="error" style="display:none"></div>');
 
-        // поиск → ЧИПЫ → Локация → подсказка → ошибки
         $area.before($wrap);
-        $wrap.append($row, $chips, $placeRow, $hint, $err);
+        // порядок: поиск → чипы → локация → порядок → подсказка → ошибки
+        $wrap.append($row, $chips, $placeRow, $ordRow, $hint, $err);
 
         let selected=[], knownUsers=[];
 
@@ -172,7 +183,6 @@
             const $drag=$('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
             const $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
 
-            // Маски как бейджи
             const $masks = $('<span class="masks"/>');
             if (item.masks && item.masks.length){
               $masks.append($('<span class="masks-label">— маски:</span>'));
@@ -189,7 +199,6 @@
             const $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
             const $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
 
-            // Поле добавления маски (по клику)
             const $maskBox   =$('<span class="mask-input"></span>').hide();
             const $maskInput =$('<input type="text" placeholder="маска (текст)">');
             const $maskOk    =$('<button type="button" class="btn btn-ok">Ок</button>');
@@ -205,13 +214,12 @@
             $maskOk.on('click', function(){
               const v=$.trim($maskInput.val()); if(!v) return;
               (item.masks||(item.masks=[])).push(v);
-              renderChips(); // перерисуем; форма снова будет скрыта
+              renderChips();
             });
             $maskCancel.on('click', function(){ $maskBox.removeClass('is-open').hide(); });
 
             $remove.on('click', function(){ selected.splice(idx,1); renderChips(); });
 
-            // порядок: перетаскивание, имя, маски, ссылка, поле, крестик
             $chip.append($drag,$name,$masks,$addMask,$maskBox,$remove);
             $chips.append($chip);
           });
@@ -233,7 +241,7 @@
           const it=selected.splice(from,1)[0]; selected.splice(to,0,it); renderChips();
         });
 
-        // Удаление конкретной маски по крестику на бейдже
+        // удалить одну маску
         $chips.on('click', '.mask-remove', function(){
           const $chip = $(this).closest('.chip');
           const idx = +$chip.data('idx');
@@ -245,7 +253,7 @@
           }
         });
 
-        // Добавление участника
+        // добавление участника
         function addByCode(code){
           if(!code) return;
           if(selected.some(x => x.code===code)) return;
@@ -254,7 +262,7 @@
           renderChips(); $comboInput.val(''); $ac.hide().empty();
         }
 
-        // Поиск по вводу
+        // поиск по вводу
         function pickByInput(){
           const q=($.trim($comboInput.val())||'').toLowerCase();
           if(!q) return null;
@@ -268,7 +276,7 @@
           return null;
         }
 
-        // Autocomplete
+        // автокомплит
         function renderAC(q){
           const qq=(q||'').trim().toLowerCase();
           const items=knownUsers
@@ -304,12 +312,20 @@
         $ac.on('mousedown','.ac-item',function(){ const code=$(this).data('code'); if(code) addByCode(code); });
         $(document).on('click',function(e){ if(!$(e.target).closest($combo).length) $ac.hide(); });
 
-        // Префилл из FMVcast/FMВplace — из исходника initialRaw
+        // префилл из initialRaw
         function prefillFrom(text){
           selected = [];
           const by = parseFMVcast(text || '');
           const mp = String(text || '').match(/\[FMVplace\]([\s\S]*?)\[\/FMVplace\]/i);
           if (mp && typeof mp[1] === 'string') $placeInput.val(mp[1].trim());
+
+          const mo = String(text || '').match(/\[FMVord\]([\s\S]*?)\[\/FMVord\]/i);
+          if (mo && typeof mo[1] === 'string') {
+            let n = parseInt(mo[1].trim(), 10);
+            if (Number.isNaN(n)) n = 0;
+            $ordInput.val(n);
+          }
+
           Object.keys(by).forEach(code => {
             const u=knownUsers.find(x => x.code===code);
             selected.push({ code, name:(u?u.name:code), masks:by[code].masks });
@@ -318,11 +334,15 @@
         }
 
         function metaLine(){
-          return [ buildFMVcast(selected), buildFMVplace($placeInput.val()) ].filter(Boolean).join('');
+          return [
+            buildFMVcast(selected),
+            buildFMVplace($placeInput.val()),
+            buildFMVord($ordInput.val())
+          ].filter(Boolean).join('');
         }
 
         // загрузка участников и префилл
-        if (window.FMV && typeof FMV.fetchUsers === 'function') {
+        if (typeof FMV.fetchUsers === 'function') {
           FMV.fetchUsers().done(function(list){
             knownUsers = (list || []).slice();
             if (opts.prefill !== false) prefillFrom(initialRaw);
@@ -331,7 +351,7 @@
           });
         }
 
-        // Валидация + добавление меты в КОНЕЦ (пустая строка не обязательна)
+        // submit + валидация + добавление меты В КОНЕЦ
         $form.off('submit.fmv.ui').on('submit.fmv.ui', function(e){
           const $subject = $form.find('input[name="req_subject"]');
           const haveSubject = !$subject.length || $.trim($subject.val()||'').length>0;
@@ -351,28 +371,19 @@
             if (!havePlace)        miss.push('локация');
             $err.text('Заполните: ' + miss.join(', ')).show();
             setTimeout(() => $err.fadeOut(400), 1800);
-            return; // textarea НЕ трогаем
+            return;
           }
 
           const meta = metaLine();
-
-          // оставляем \n на конце, срезаем только хвостовые пробелы/табуляции
           let base = rest.replace(/[ \t]+$/, '');
-
-          // если последнего \n нет — ставим ровно один
           const sep = (!base || /\n$/.test(base)) ? '' : '\n';
-
           $area.val(base + sep + meta);
         });
 
         const api = {
-          prefillFrom,
           serialize: () => metaLine(),
           stripFMV,
-          mountPoint: $wrap,
-          setKnownUsers: list => { knownUsers = (list||[]).slice(); },
-          getSelected: () => selected.slice(),
-          getPlace: () => String($placeInput.val() || '')
+          mountPoint: $wrap
         };
         $form.data('fmvBoundUI', api);
         return api;
@@ -382,18 +393,18 @@
     })();
   }
 
-  // ───────────────── Bootstraps (автоподключение) ─────────────────
+  // ───────────────── Bootstraps ─────────────────
   function onReady(fn){
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
     else fn();
   }
 
   onReady(function(){
-    if (!window.FMV || !FMV.UI || typeof FMV.UI.attach !== 'function') return;
+    if (!FMV.UI || typeof FMV.UI.attach !== 'function') return;
 
     const path = location.pathname;
 
-    // /post.php?fid=8|9 — создание
+    // создание
     if (/\/post\.php(\?|$)/i.test(path)) {
       const fid = +(new URLSearchParams(location.search).get('fid')||0);
       if ([8,9].indexOf(fid) !== -1) {
@@ -404,13 +415,13 @@
             form:$form, textarea:$area,
             prefill:true, showOnlyIfFMVcast:false,
             className:'fmv--compact',
-            stripOnMount:false          // на создании ничего не вырезаем
+            stripOnMount:false
           });
         }
       }
     }
 
-    // /edit.php?id=N&topicpost=1 — редактирование первого поста
+    // редактирование первого поста
     if (/\/edit\.php$/i.test(path)) {
       const q = new URLSearchParams(location.search);
       if (q.get('topicpost') === '1') {
@@ -421,7 +432,7 @@
             form:$form, textarea:$area,
             prefill:true, showOnlyIfFMVcast:true,
             className:'fmv--compact',
-            stripOnMount:true           // при редактировании мгновенно прячем мету в textarea
+            stripOnMount:true
           });
         }
       }

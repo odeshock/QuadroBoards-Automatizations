@@ -24,8 +24,7 @@
   // type: personal | plot | au
   // status: on | off | archived
   const SECTIONS = [
-    { id: 10, type: 'au',   status: 'on' },
-    { id: 11, type: 'plot', status: 'on' },
+    { id: 8, type: 'au',   status: 'on' },
     // добавляйте свои
   ];
   const MAX_PAGES_PER_SECTION = 50;

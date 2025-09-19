@@ -62,7 +62,7 @@
 
   if (charsJoined && !TEMPLATE_USERS.test(charsJoined)) {
     lines.push(
-      `<div class="fmv-row"><span class="fmv-missing">Аааа! Надо пересобрать по шаблону: userN;userN;userN</span> — ${escapeHtml(charsJoined)}</div>`
+      `<div class="fmv-row"><span class="fmv-label">Участники:</span><span class="fmv-missing">Ошибка! Нужно пересобрать по шаблону: userN;userN;userN</span> — ${escapeHtml(charsJoined)}</div>`
     );
   } else if (raw.participantsLower.length) {
     lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${data.participantsHtml}</div>`);
@@ -71,7 +71,7 @@
   if (masksJoined && !TEMPLATE_MASKS.test(masksJoined)) {
     const human = masksJoined.replace(/\s*;\s*/g, '; ');
     lines.push(
-      `<div class="fmv-row"><span class="fmv-missing">Аааа! Надо пересобрать по шаблону: userN=маска;userN=маска</span> — ${escapeHtml(human)}</div>`
+      `<div class="fmv-row"><span class="fmv-label">Маски:</span><span class="fmv-missing">Ошибка! Нужно пересобрать по шаблону: userN=маска;userN=маска</span> — ${escapeHtml(human)}</div>`
     );
   } else if (Object.keys(raw.masks).length) {
     lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${data.masksHtml}</div>`);

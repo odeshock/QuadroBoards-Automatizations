@@ -38,14 +38,11 @@
   // карта id->имя по тем userID, что есть в characters
   const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
 
-  // парсим участников
-  const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
-  const participantsHtml = FMV.renderParticipantsHtml(rawChars, idToNameMap, window.profileLink);
-
   // формируем строки
   const lines = [];
 
   if (rawChars) {
+    const participantsHtml = FMV.renderParticipantsHtml(rawChars, idToNameMap, window.profileLink); // парсим участников
     lines.push(
       `<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`
     );

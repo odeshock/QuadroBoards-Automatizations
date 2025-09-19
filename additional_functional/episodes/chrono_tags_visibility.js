@@ -123,13 +123,47 @@
   // btn.click();
 
   // ---------- стили ----------
-  const style = document.createElement('style');
-  style.textContent = `
-    .fmv-meta{margin:8px 0;padding:8px;border:1px solid #d7d7d7;background:#f7f7f7;border-radius:6px}
-    .fmv-row{margin:.25em 0}
-    .fmv-label{font-weight:700;margin-right:.25em}
-    .fmv-missing{color:#c00;background:#ffe6e6;border-radius:6px;padding:0 .35em;font-weight:700}
-    .fmv-toggle{background:none;border:none;cursor:pointer;font-size:14px;line-height:1}
-  `;
-  document.head.appendChild(style);
+    const style = document.createElement('style');
+    style.textContent = `
+      .fmv-meta{
+        margin:8px 0;
+        padding:8px;
+        border:1px solid #d7d7d7;
+        background:#f7f7f7;
+        border-radius:6px;
+        position:relative;
+      }
+      .fmv-row{margin:.25em 0}
+      .fmv-label{font-weight:700;margin-right:.25em}
+      .fmv-missing{
+        color:#c00;
+        background:#ffe6e6;
+        border-radius:6px;
+        padding:0 .35em;
+        font-weight:700;
+      }
+      /* Кнопка — минимализм */
+      .fmv-toggle{
+        position:absolute;
+        top:4px;
+        left:4px;
+        background:none;
+        border:none;
+        padding:0;
+        margin:0;
+        color:#aaa;            /* бледный серый */
+        font-size:12px;        /* меньше размер */
+        line-height:1;
+        cursor:pointer;
+        opacity:0.3;           /* почти прозрачная */
+        transition:opacity .2s,color .2s;
+      }
+      .fmv-toggle:hover,
+      .fmv-toggle:focus{
+        opacity:1;
+        color:#555;            /* проявляется при наведении */
+        outline:none;
+      }
+    `;
+    document.head.appendChild(style);
 })();

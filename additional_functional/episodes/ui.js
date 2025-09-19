@@ -211,8 +211,8 @@
           $(this).addClass('dragging');
           e.originalEvent.dataTransfer.setData('text/plain',$(this).data('idx'));
         });
-        $chips.on('dragend','.chip',function(){ $(this).removeClass('dragging'); });
-        $chips.on('dragover',function(e){ e.preventDefault(); });
+        $chips.on('dragend','.chip',function(){$(this).removeClass('dragging');});
+        $chips.on('dragover',function(e){e.preventDefault();});
         $chips.on('drop',function(e){
           e.preventDefault();
           const from=+e.originalEvent.dataTransfer.getData('text/plain');
@@ -315,16 +315,47 @@
           FMV.fetchUsers().done(function(list){
             knownUsers = (list || []).slice();
             if (opts.prefill !== false) prefillFrom($area.val() || '');
+            // ③ При монтировании (например, на редактировании) скрываем теги из textarea
+            if (opts.stripOnMount) {
+              $area.val(stripFMV($area.val() || ''));
+            }
           }).fail(function(msg){
             $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show();
           });
         }
 
-        // submit hook: подставляем мету в начало
-        $form.on('submit.fmv.ui', function(){
-          const meta = metaLine();
-          const rest = stripFMV($area.val()).replace(/^\n+/, '');
-          $area.val(meta + (rest ? '\n\n' + rest : ''));
+        // ② submit hook с валидацией и добавлением меты В КОНЕЦ
+        $form.off('submit.fmv.ui').on('submit.fmv.ui', function(e){
+          const $subject = $form.find('input[name="req_subject"]');
+          const haveSubject = !$subject.length || $.trim($subject.val()||'').length>0;
+
+          const rest = stripFMV($area.val() || '');
+          const haveMessage = $.trim(rest).length > 0;
+
+          const haveParticipants = selected.length > 0;
+          const havePlace = $.trim($placeInput.val()||'').length > 0;
+
+          if (!(haveSubject && haveMessage && haveParticipants && havePlace)) {
+            e.preventDefault();
+            const miss = [];
+            if (!haveSubject)      miss.push('заголовок');
+            if (!haveMessage)      miss.push('сообщение');
+            if (!haveParticipants) miss.push('участники');
+            if (!havePlace)        miss.push('локация');
+            $err.text('Заполните: ' + miss.join(', ')).show();
+            setTimeout(() => $err.fadeOut(400), 1800);
+            return; // textarea НЕ трогаем
+          }
+
+          const meta = metaLine(); // уже валидно — пустой быть не должен
+          // Добавляем В КОНЕЦ, аккуратно с переводами строк
+          let base = rest.replace(/\s+$/,''); // убираем хвостовые пробелы/переводы
+          let sep;
+          if (!base) sep = '';                  // если текста нет — просто мета
+          else if (/\n\n$/.test(base)) sep = ''; // уже есть пустая строка в конце
+          else if (/\n$/.test(base)) sep = '\n'; // есть одна — добавим ещё одну
+          else sep = '\n\n';                    // нет — добавим две
+          $area.val(base + sep + meta);
         });
 
         const api = {
@@ -363,7 +394,12 @@
         const $form = $('#post form, form[action*="post.php"]').first();
         const $area = $form.find('textarea[name="req_message"], #main-reply, .questionary-post textarea').first();
         if ($form.length && $area.length) {
-          FMV.UI.attach({ form:$form, textarea:$area, prefill:true, showOnlyIfFMVcast:false, className:'fmv--compact' });
+          FMV.UI.attach({
+            form:$form, textarea:$area,
+            prefill:true, showOnlyIfFMVcast:false,
+            className:'fmv--compact',
+            stripOnMount:false          // ③ на создании ничего не вырезаем
+          });
         }
       }
     }
@@ -375,7 +411,12 @@
         const $form = $('#post form, form[action*="edit.php"]').first();
         const $area = $form.find('textarea[name="req_message"], #main-reply, .questionary-post textarea').first();
         if ($form.length && $area.length) {
-          FMV.UI.attach({ form:$form, textarea:$area, prefill:true, showOnlyIfFMVcast:true, className:'fmv--compact' });
+          FMV.UI.attach({
+            form:$form, textarea:$area,
+            prefill:true, showOnlyIfFMVcast:true,
+            className:'fmv--compact',
+            stripOnMount:true           // ③ при редактировании скрываем мету из textarea
+          });
         }
       }
     }

@@ -233,20 +233,14 @@
       const ord = (e.order != null) ? ` [${FMV.escapeHtml(String(e.order))}]` : '';
 
       // участники
-      const charsSet = new Set(e.charactersLower || []);
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
-            const maskOnly = e.maskKeysLower?.has(low) && !charsSet.has(low);
-            // только имена (userN) линковать — роли «[as …]» не линкуем
-            const href = nameToProfile.get(low);
-            const base = FMV.escapeHtml(low);
-            const person = href && !maskOnly
-              ? `<a href="${FMV.escapeHtml(href)}" rel="nofollow">${base}</a>`
-              : (maskOnly ? `<span style="${MISS}">${base}</span>` : base);
-
+            // low = 'userN' → достаём N
+            const id = String(+low.replace(/^user/i,''));
+            const nameHtml = window.profileLink(id, e.idToNameMap?.get(id)); // делает ссылку/«не найден»
             const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length ? ` [as ${FMV.escapeHtml(roles.join(', '))}]` : '';
-            return person + tail;
+            return `${nameHtml}${tail}`;
           }).join(', ')
         : `<span style="${MISS}">не указаны</span>`;
 

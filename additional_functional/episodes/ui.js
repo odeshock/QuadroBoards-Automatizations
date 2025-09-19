@@ -186,7 +186,7 @@
         const $comboLabel = $('<label for="fmv-character" style="font-weight:600">Участники эпизода:</label>');
         const $comboInput=$('<input type="text" id="character-combo" placeholder="Наберите имя персонажа…" autocomplete="off">');
         const $ac=$('<div class="ac-list" role="listbox" aria-label="Варианты персонажей"></div>');
-        $combo.append($comboInput,$ac); $row.append($combo);
+        $combo.append($comboLabel,$comboInput,$ac); $row.append($combo);
 
         const $chips=$('<div class="chips"/>');
         const $comboHint  = $('<div class="hint">Если что-то не работает, напишите в Приемную.</div>');
@@ -203,10 +203,8 @@
         const $ordHint  = $('<div class="hint">Помогает упорядочить эпизоды, которые стоят в один день. Чем больше значение, тем позже эпизод. Лучше оставлять 0.</div>');
         $ordRow.append($ordLabel,$ordInput,$ordHint);
 
-        const $err =$('<div class="error" style="display:none"></div>');
-
         $area.before($wrap);
-        $wrap.append($row,$chips,$comboHint,$placeRow,$ordRow,$err);
+        $wrap.append($row,$chips,$comboHint,$placeRow,$ordRow);
 
         let selected=[], knownUsers=[];
 
@@ -331,10 +329,15 @@
           const haveSubject=!$subject.length || $.trim($subject.val()||'').length>0;
           const rest=stripFMV($area.val()||''); const haveMessage=$.trim(rest).length>0;
           const haveParticipants=selected.length>0; const havePlace=$.trim($placeInput.val()||'').length>0;
-          if(!(haveSubject && haveMessage && haveParticipants && havePlace)){
+          if (!(haveSubject && haveMessage && haveParticipants && havePlace)) {
             e.preventDefault();
-            const miss=[]; if(!haveSubject)miss.push('заголовок'); if(!haveMessage)miss.push('сообщение'); if(!haveParticipants)miss.push('участники'); if(!havePlace)miss.push('локация');
-            $err.text('Заполните: '+miss.join(', ')).show(); setTimeout(()=>{$err.fadeOut(400)},1800); return;
+            const miss = [];
+            if (!haveSubject)      miss.push('заголовок');
+            if (!haveMessage)      miss.push('сообщение');
+            if (!haveParticipants) miss.push('участники');
+            if (!havePlace)        miss.push('локация');
+            alert('Заполните: ' + miss.join(', '));
+            return;
           }
           const meta=metaLine(); let base=rest.replace(/[ \t]+$/,''); const sep=(!base || /\n$/.test(base))?'':'\n'; $area.val(base+sep+meta);
         });

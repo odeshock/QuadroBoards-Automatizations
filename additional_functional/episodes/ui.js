@@ -160,7 +160,7 @@
             const $chip=$('<div class="chip" draggable="true" data-idx="'+idx+'"/>');
             const $drag=$('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
             const $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
-            const masksText=item.masks&&item.masks.length?'маски: '+item.masks.join(', '):'масок нет';
+            const masksText=item.masks&&item.masks.length?'маска: '+item.masks.join(', '):'масок нет';
             const $masks=$('<span class="masks"/>').text(' — '+masksText);
             const $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
             const $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');

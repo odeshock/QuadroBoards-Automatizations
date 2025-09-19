@@ -40,15 +40,14 @@
 
   // парсим участников
   const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
+  const participantsHtml = FMV.renderParticipantsHtml(rawChars, idToNameMap, window.profileLink);
 
   // формируем строки
   const lines = [];
 
   if (rawChars) {
     lines.push(
-      `<div class="fmv-row"><span class="fmv-label">Участники:</span>${
-        uni.ok ? uni.htmlParticipants : uni.htmlError
-      }</div>`
+      `<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`
     );
   }
 

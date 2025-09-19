@@ -1,104 +1,72 @@
 // ==UserScript==
 // @name         chrono_tags_visibility
-// @description  Показывает мета-инфо темы (участники, маски, локация, сортировка)
+// @description  Показывает мета-инфо темы (участники, маски, локация, сортировка) c общей валидацией
 // @match        *://*/*
+// @run-at       document-end
 // @grant        none
 // ==/UserScript==
 
 (async function () {
   'use strict';
 
-  // ---------- утилиты ожидания ----------
-  const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
-  async function waitFor(fn, {timeout=10000, interval=100}={}) {
-    const t0 = performance.now();
-    while (performance.now() - t0 < timeout) {
-      try {
-        const v = fn();
-        if (v) return v;
-      } catch(_) {}
-      await sleep(interval);
-    }
-    return null;
-  }
+  // ——— зависимости: общий модуль + profile_from_user ———
+  const ok = await waitFor(() =>
+    window.FMV &&
+    typeof FMV.escapeHtml === 'function' &&
+    typeof FMV.parseCharactersStrict === 'function' &&
+    typeof FMV.parseMasksStrict === 'function' &&
+    typeof window.profileLink === 'function'
+  , { timeout: 12000 });
+  if (!ok) return;
 
-  // ---------- зависимости (helpers + profile_from_user) ----------
-  const depsOK = await waitFor(() =>
-    window.parseChronoTagsRaw &&
-    window.resolveChronoData   &&
-    typeof window.escapeHtml   === 'function' &&
-    typeof window.profileLink  === 'function'
-  , {timeout: 12000});
-  if (!depsOK) {
-    console.warn('[FMV] chrono: нет зависимостей (helpers/profile_from_user)');
-    return;
-  }
-
-  // ---------- первый пост топика ----------
-  const firstNode = await waitFor(() =>
+  // ——— первый пост ———
+  const first = await waitFor(() =>
     document.querySelector('.topic .post.topicpost, .post.topicpost, .message:first-of-type')
-  , {timeout: 10000});
-  if (!firstNode) {
-    console.warn('[FMV] chrono: не нашли первый пост');
-    return;
-  }
+  );
+  if (!first) return;
 
-  // ---------- (опц.) фильтр по группе ----------
+  // (опц.) фильтр по группам
   if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed()) return;
 
-  // ---------- разбираем теги и резолвим имена/ссылки ----------
-  const raw  = window.parseChronoTagsRaw(firstNode);
-  const data = await window.resolveChronoData(raw);
+  // ——— читаем СЫРЫЕ теги ———
+  const rawChars = FMV.readTagText(first, 'characters'); // строка вида "user1;user2"
+  const rawMasks = FMV.readTagText(first, 'masks');      // строка вида "user1=маска;user2=маска"
+  const rawLoc   = FMV.readTagText(first, 'location');
+  const rawOrder = FMV.readTagText(first, 'order');
 
-  // строгие шаблоны
-  const TEMPLATE_USERS = /^\s*user\d+(?:\s*;\s*user\d+)*\s*$/i;
-  const TEMPLATE_MASKS = /^\s*user\d+\s*=\s*[^;]+(?:\s*;\s*user\d+\s*=\s*[^;]+)*\s*$/i;
+  // карта id->имя (если глобальная есть — возьмём её; иначе с текущей страницы)
+  const idToNameMap =
+    (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size)
+      ? window.__FMV_ID_TO_NAME_MAP__
+      : FMV.idToNameFromPage();
+
+  // ——— ЕДИНАЯ строгая валидация/рендер ———
+  const chars = FMV.parseCharactersStrict(rawChars, idToNameMap, window.profileLink);
+  const masks = FMV.parseMasksStrict(rawMasks,      idToNameMap, window.profileLink);
 
   const lines = [];
 
-  // валидируем ТОЛЬКО если исходные строки есть
-  const charsJoined = raw.participantsLower.join('; ');
-  const masksJoined = Object.entries(raw.masks).map(([k,v]) => `${k}=${v}`).join('; ');
-
-  if (charsJoined && !TEMPLATE_USERS.test(charsJoined)) {
+  if (rawChars) {
+    lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${chars.html}</div>`);
+  }
+  if (rawMasks) {
+    lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${masks.html}</div>`);
+  }
+  if (rawLoc) {
+    lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${FMV.escapeHtml(rawLoc)}</div>`);
+  }
+  if (rawOrder) {
+    const okInt = /^-?\d+$/.test(rawOrder.trim());
     lines.push(
-      `<div class="fmv-row"><span class="fmv-label">Участники:</span><span class="fmv-missing">Ошибка! Нужно пересобрать по шаблону: userN;userN;userN</span> — ${escapeHtml(charsJoined)}</div>`
+      `<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>` +
+      (okInt ? FMV.escapeHtml(rawOrder)
+             : `<span class="fmv-missing">Ошибка! Нужен формат целого числа (пример: -3 или 5)</span> — ${FMV.escapeHtml(rawOrder)}`) +
+      `</div>`
     );
-  } else if (raw.participantsLower.length) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${data.participantsHtml}</div>`);
   }
-
-  if (masksJoined && !TEMPLATE_MASKS.test(masksJoined)) {
-    const human = masksJoined.replace(/\s*;\s*/g, '; ');
-    lines.push(
-      `<div class="fmv-row"><span class="fmv-label">Маски:</span><span class="fmv-missing">Ошибка! Нужно пересобрать по шаблону: userN=маска;userN=маска</span> — ${escapeHtml(human)}</div>`
-    );
-  } else if (Object.keys(raw.masks).length) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${data.masksHtml}</div>`);
-  }
-
-  if (raw.location) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${escapeHtml(raw.location)}</div>`);
-  }
-  if (raw.order) {
-    const ORDER_PATTERN = /^-?\d+$/;   // любое целое со знаком или без
-    if (!ORDER_PATTERN.test(raw.order.trim())) {
-      lines.push(
-        `<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>` +
-        `<span class="fmv-missing">Ошибка! Неверный формат, нужно целое число (пример: -3 или 5)</span>` +
-        ` — ${escapeHtml(raw.order)}</div>`
-      );
-    } else {
-      lines.push(
-        `<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${escapeHtml(raw.order)}</div>`
-      );
-    }
-  }
-
-  // если совсем нечего показать — не вставляем блок
   if (!lines.length) return;
 
-  // ---------- сборка блока ----------
+  // ——— вставка блока (перед контентом первого поста) ———
   const block = document.createElement('div');
   block.className = 'fmv-meta';
   block.innerHTML = `
@@ -106,75 +74,58 @@
     <div class="fmv-body" style="display:none">${lines.join('\n')}</div>
   `;
 
-  // ---------- точка вставки: ВНУТРИ .post-box ПЕРЕД .post-content ----------
-  const postBox   = firstNode.querySelector('.post-box');
+  const postBox   = first.querySelector('.post-box');
   const contentEl = postBox?.querySelector('.post-content, [id$="-content"]');
 
-  // убрать старую копию (перезапуски/пагинация)
-  (firstNode.querySelector('.post-box > .fmv-meta') ||
-   firstNode.querySelector('.post-content + .fmv-meta'))?.remove();
+  (first.querySelector('.post-box > .fmv-meta') ||
+   first.querySelector('.post-content + .fmv-meta'))?.remove();
 
   if (postBox && contentEl) {
-    postBox.insertBefore(block, contentEl); // строго перед контентом
+    postBox.insertBefore(block, contentEl);
   } else if (postBox) {
     postBox.insertBefore(block, postBox.firstChild);
   } else {
-    firstNode.insertBefore(block, firstNode.firstChild);
+    first.insertBefore(block, first.firstChild);
   }
 
-  // ---------- поведение кнопки ----------
+  // ——— поведение кнопки ———
   const btn  = block.querySelector('.fmv-toggle');
   const body = block.querySelector('.fmv-body');
   btn.addEventListener('click', () => {
-    const hidden = body.style.display === 'none';
-    body.style.display = hidden ? '' : 'none';
-    btn.textContent = hidden ? '▾' : '▸';
+    const show = body.style.display === 'none';
+    body.style.display = show ? '' : 'none';
+    btn.textContent = show ? '▾' : '▸';
   });
-  // по умолчанию можно раскрыть (если хочется)
-  // btn.click();
 
-  // ---------- стили ----------
+  // ——— стили ———
+  injectStyle(`
+    .fmv-meta{
+      margin:8px 0; padding:8px; border:1px solid #d7d7d7;
+      background:#f7f7f7; border-radius:6px; position:relative;
+    }
+    .fmv-row{margin:.25em 0}
+    .fmv-label{font-weight:700;margin-right:.25em}
+    .fmv-missing{color:#c00;background:#ffe6e6;border-radius:6px;padding:0 .35em;font-weight:700}
+    .fmv-toggle{
+      position:absolute; top:4px; left:4px; background:none; border:none; padding:0; margin:0;
+      color:#aaa; font-size:12px; line-height:1; cursor:pointer; opacity:.3; transition:opacity .2s,color .2s
+    }
+    .fmv-toggle:hover,.fmv-toggle:focus{opacity:1;color:#555;outline:none}
+  `);
+
+  // ——— утилиты ———
+  function injectStyle(css){
     const style = document.createElement('style');
-    style.textContent = `
-      .fmv-meta{
-        margin:8px 0;
-        padding:8px;
-        border:1px solid #d7d7d7;
-        background:#f7f7f7;
-        border-radius:6px;
-        position:relative;
-      }
-      .fmv-row{margin:.25em 0}
-      .fmv-label{font-weight:700;margin-right:.25em}
-      .fmv-missing{
-        color:#c00;
-        background:#ffe6e6;
-        border-radius:6px;
-        padding:0 .35em;
-        font-weight:700;
-      }
-      /* Кнопка — минимализм */
-      .fmv-toggle{
-        position:absolute;
-        top:4px;
-        left:4px;
-        background:none;
-        border:none;
-        padding:0;
-        margin:0;
-        color:#aaa;            /* бледный серый */
-        font-size:12px;        /* меньше размер */
-        line-height:1;
-        cursor:pointer;
-        opacity:0.3;           /* почти прозрачная */
-        transition:opacity .2s,color .2s;
-      }
-      .fmv-toggle:hover,
-      .fmv-toggle:focus{
-        opacity:1;
-        color:#555;            /* проявляется при наведении */
-        outline:none;
-      }
-    `;
+    style.textContent = css;
     document.head.appendChild(style);
+  }
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+  async function waitFor(fn, {timeout=10000, interval=100}={}) {
+    const t0 = performance.now();
+    while (performance.now() - t0 < timeout) {
+      try { const v = fn(); if (v) return v; } catch(_) {}
+      await sleep(interval);
+    }
+    return null;
+  }
 })();

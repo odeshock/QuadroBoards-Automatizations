@@ -2,17 +2,16 @@
 (function(){
   'use strict';
 
-  // ───────────────── deps ─────────────────
+  // Требуется общий модуль, где есть FMV.fetchUsers
   if (!window.FMV || typeof window.FMV.fetchUsers !== 'function') {
     console.error('[FMV] Требуется общий модуль с FMV.fetchUsers (подключите common раньше этого файла)');
-    // продолжаем всё равно, чтобы не падать при сборке; но attach вернёт null
   }
 
   // ───────────────── UI-модуль ─────────────────
   if (!window.FMV) window.FMV = {};
   if (!window.FMV.UI) {
     (function(){
-      // mini utils (без дублей helpers/common)
+      // mini utils
       function splitBySemicolon(s){
         return String(s || '').split(';').map(v => v.trim()).filter(Boolean);
       }
@@ -50,7 +49,7 @@
           .replace(/^\s+|\s+$/g,'');
       }
 
-      // CSS (компактный общий скин)
+      // CSS (компактный скин)
       let cssInjected = false;
       function injectCSS(){
         if (cssInjected) return; cssInjected = true;
@@ -77,124 +76,49 @@
         .fmv .ac-item{padding:.45em .65em; cursor:pointer; font-size:14px}
         .fmv .ac-item.active,.fmv .ac-item:hover{background:#f0efe9}
         .fmv .ac-item .muted{color:var(--fmv-muted)}
+
+        /* Чипы — влево, не по центру */
         .fmv .chips .chip{
-          display:flex; justify-content:space-between; align-items:center;
+          display:flex; align-items:center; justify-content:flex-start;
           gap:10px; padding:.45em .6em; background:var(--fmv-chip);
           border:1px solid var(--fmv-b); border-radius:8px; margin:.35em 0; font-size:14px
         }
         .fmv .chip .drag{cursor:grab; margin-right:.4em; color:#8b8378}
         .fmv .chip .name{font-weight:600}
-        .fmv .chip .masks{color:var(--fmv-muted)}
-        .fmv .chip .add-mask{border:0; background:none; color:#2e5aac; cursor:pointer; padding:0; text-decoration:underline}
-        .fmv .chip .x{border:0; background:none; font-size:16px; line-height:1; cursor:pointer; color:#8b8378}
-        .fmv .mask-input{display:none; margin-left:8px}
-        .fmv .mask-input input{width:220px; margin-right:6px; height:30px; padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px}
-        .fmv .hint{font-size:13px; color:var(--fmv-muted); margin-top:6px}
-        .fmv .error{color:#b00; margin-top:6px}
-        .fmv .chips .chip{ align-items:center; }
-        .fmv .chips .chip .mask-input{ margin-left:auto; } /* отталкивает всё справа */
-        .fmv .chips .chip .x{ margin-left:8px; }          /* небольшой отступ от поля маски */
-        
-        /* Чипы — выравнивание по центру */
-        .fmv .chips .chip{ align-items:center; }
-        
-        /* Блок с полем и кнопками — в ряд, с зазором; прилипает вправо */
-        .fmv .chips .chip .mask-input{
-          display:flex; align-items:center; gap:8px; margin-left:auto;
-        }
-        
-        /* Поле растягивается, размеры как в теме */
-        .fmv .chips .chip .mask-input input{
-          flex:1; min-width:260px; height:30px;
-          padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
-          background:#efe9dc; color:var(--fmv-text);
-        }
-        
-        /* Кнопки — отдельные, удобные для клика */
-        .fmv .chips .chip .btn{
-          border:1px solid var(--fmv-b); border-radius:6px;
-          background:#fff; padding:6px 10px; cursor:pointer; line-height:1;
-        }
-        .fmv .chips .chip .btn-ok{ background:#e9f6e9; }
-        .fmv .chips .chip .btn-cancel{ background:#f4eeee; }
-        
-        /* Отступ от поля до крестика */
-        .fmv .chips .chip .x{ margin-left:8px; }
 
-        /* Блок с полем и кнопками — по умолчанию скрыт */
-        .fmv .chips .chip .mask-input{
-          display:none;               /* <— скрыто */
-          margin-left:auto;
-        }
-        
-        /* Когда открыт — в ряд, с зазором */
-        .fmv .chips .chip .mask-input.is-open{
-          display:flex;               /* <— показываем */
-          align-items:center;
-          gap:8px;
-        }
-        
-        /* Поле и кнопки оставляем как были */
-        .fmv .chips .chip .mask-input input{
-          flex:1; min-width:260px; height:30px;
-          padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
-          background:#efe9dc; color:var(--fmv-text);
-        }
-        .fmv .chips .chip .btn{
-          border:1px solid var(--fmv-b); border-radius:6px;
-          background:#fff; padding:6px 10px; cursor:pointer; line-height:1;
-        }
-        .fmv .chips .chip .btn-ok{ background:#e9f6e9; }
-        .fmv .chips .chip .btn-cancel{ background:#f4eeee; }
-        .fmv .chips .chip .x{ margin-left:8px; }
-
-        /* список масок рядом с именем */
-        .fmv .masks{
-          display:flex;
-          align-items:center;
-          gap:6px;
-          flex-wrap:wrap;
-        }
+        /* Список масок возле имени */
+        .fmv .masks{display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--fmv-muted)}
         .fmv .masks .masks-label{ color:var(--fmv-muted); margin-right:2px; }
-        
-        /* бейдж одной маски */
         .fmv .mask-badge{
-          display:inline-flex;
-          align-items:center;
-          gap:6px;
-          padding:2px 8px;
-          border:1px solid var(--fmv-b);
-          border-radius:999px;
-          background:#efe9dc;
-          font-size:13px;
+          display:inline-flex; align-items:center; gap:6px;
+          padding:2px 8px; border:1px solid var(--fmv-b); border-radius:999px;
+          background:#efe9dc; font-size:13px; color:var(--fmv-text);
         }
-        
-        /* кнопка удаления конкретной маски */
         .fmv .mask-badge .mask-remove{
           border:0; background:none; cursor:pointer; line-height:1;
           color:#8b8378; font-size:14px; padding:0 2px;
         }
 
-        /* было: justify-content:space-between */
-        .fmv .chips .chip{
-          display:flex;
-          align-items:center;
-          gap:10px;
-          justify-content:flex-start;   /* ← текст не центрируется */
-        }
-        
-        /* когда форма маски закрыта – ссылка уезжает вправо */
-        .fmv .chips .chip .add-mask{ margin-left:auto; }
-        
-        /* когда форма маски открыта – она уезжает вправо */
-        .fmv .chips .chip .mask-input{ display:none; margin-left:auto; }
-        .fmv .chips .chip .mask-input.is-open{
-          display:flex; align-items:center; gap:8px;
-        }
-        
-        /* (остальное оставить как было) */
-        .fmv .chips .chip .x{ margin-left:8px; }
+        .fmv .chip .add-mask{border:0; background:none; color:#2e5aac; cursor:pointer; padding:0; text-decoration:underline; margin-left:auto}
+        .fmv .chip .x{border:0; background:none; font-size:16px; line-height:1; cursor:pointer; color:#8b8378; margin-left:8px}
 
+        /* Форма добавления маски: по умолчанию скрыта; когда открыта — справа */
+        .fmv .chip .mask-input{ display:none; margin-left:auto; }
+        .fmv .chip .mask-input.is-open{ display:flex; align-items:center; gap:8px; }
+        .fmv .chip .mask-input input{
+          flex:1; min-width:260px; height:30px;
+          padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
+          background:#efe9dc; color:var(--fmv-text);
+        }
+        .fmv .chip .btn{
+          border:1px solid var(--fmv-b); border-radius:6px;
+          background:#fff; padding:6px 10px; cursor:pointer; line-height:1;
+        }
+        .fmv .chip .btn-ok{ background:#e9f6e9; }
+        .fmv .chip .btn-cancel{ background:#f4eeee; }
+
+        .fmv .hint{font-size:13px; color:var(--fmv-muted); margin-top:6px}
+        .fmv .error{color:#b00; margin-top:6px}
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
@@ -221,10 +145,12 @@
         $placeRow.append($placeLabel,$placeInput);
 
         const $chips=$('<div class="chips"/>');
+        const $hint =$('<div class="hint">Участники/маски/локация. Сохранится как: [FMVcast]userN;userM=маска…[/FMVcast] + [FMVplace]…[/FMVplace].</div>');
         const $err  =$('<div class="error" style="display:none"></div>');
 
+        // Вставляем: поиск → ЧИПЫ → Локация → подсказка → ошибки
         $area.before($wrap);
-        $wrap.append($row, $chips, $placeRow, $hint, $err); 
+        $wrap.append($row, $chips, $placeRow, $hint, $err);
 
         let selected=[], knownUsers=[];
 
@@ -234,11 +160,13 @@
             const $chip=$('<div class="chip" draggable="true" data-idx="'+idx+'"/>');
             const $drag=$('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
             const $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
-            var $masks = $('<span class="masks"/>');
+
+            // Маски как бейджи
+            const $masks = $('<span class="masks"/>');
             if (item.masks && item.masks.length){
               $masks.append($('<span class="masks-label">— маски:</span>'));
               item.masks.forEach(function(msk, mi){
-                var $badge = $('<span class="mask-badge" data-mi="'+mi+'"></span>');
+                const $badge = $('<span class="mask-badge" data-mi="'+mi+'"></span>');
                 $badge.append($('<span class="mask-text"></span>').text(msk));
                 $badge.append($('<button type="button" class="mask-remove" aria-label="Удалить маску">×</button>'));
                 $masks.append($badge);
@@ -250,41 +178,41 @@
             const $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
             const $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
 
-            var $maskBox   =$('<span class="mask-input"></span>').hide();
-            var $maskInput =$('<input type="text" placeholder="маска (текст)">');
-            var $maskOk=$('<button type="button" class="btn btn-ok">Ок</button>');
-            var $maskCancel=$('<button type="button" class="btn btn-cancel">Отмена</button>');
-
+            // Поле добавления маски (по клику)
+            const $maskBox   =$('<span class="mask-input"></span>').hide();
+            const $maskInput =$('<input type="text" placeholder="маска (текст)">');
+            const $maskOk    =$('<button type="button" class="btn btn-ok">Ок</button>');
+            const $maskCancel=$('<button type="button" class="btn btn-cancel">Отмена</button>');
             $maskBox.append($maskInput,$maskOk,$maskCancel);
 
             $maskInput.on('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); $maskOk.click(); } });
             $addMask.on('click', function(){
-              
-              // закрыть открытые в этом чипе (на всякий)
               $chip.find('.mask-input').removeClass('is-open').hide();
               $maskBox.addClass('is-open').show();
               $maskInput.val('').focus();
             });
-            
             $maskOk.on('click', function(){
-              var v=$.trim($maskInput.val()); if(!v) return;
+              const v=$.trim($maskInput.val()); if(!v) return;
               (item.masks||(item.masks=[])).push(v);
-              renderChips(); // после перерендера форма снова скрыта
+              renderChips(); // перерисуем; форма снова будет скрыта
             });
-            
-            $maskCancel.on('click', function(){
-              $maskBox.removeClass('is-open').hide();
-            });
-            
+            $maskCancel.on('click', function(){ $maskBox.removeClass('is-open').hide(); });
+
             $remove.on('click', function(){ selected.splice(idx,1); renderChips(); });
 
+            // порядок: перетаскивание, имя, маски, ссылка, поле, крестик
             $chip.append($drag,$name,$masks,$addMask,$maskBox,$remove);
             $chips.append($chip);
           });
         }
-        $chips.on('dragstart','.chip',function(e){$(this).addClass('dragging');e.originalEvent.dataTransfer.setData('text/plain',$(this).data('idx'));});
-        $chips.on('dragend','.chip',function(){$(this).removeClass('dragging');});
-        $chips.on('dragover',function(e){e.preventDefault();});
+
+        // DnD
+        $chips.on('dragstart','.chip',function(e){
+          $(this).addClass('dragging');
+          e.originalEvent.dataTransfer.setData('text/plain',$(this).data('idx'));
+        });
+        $chips.on('dragend','.chip',function(){ $(this).removeClass('dragging'); });
+        $chips.on('dragover',function(e){ e.preventDefault(); });
         $chips.on('drop',function(e){
           e.preventDefault();
           const from=+e.originalEvent.dataTransfer.getData('text/plain');
@@ -294,11 +222,11 @@
           const it=selected.splice(from,1)[0]; selected.splice(to,0,it); renderChips();
         });
 
-        // удаление одной маски по крестику на бейдже
+        // Удаление конкретной маски по крестику на бейдже
         $chips.on('click', '.mask-remove', function(){
-          var $chip = $(this).closest('.chip');
-          var idx = +$chip.data('idx');
-          var mi  = +$(this).closest('.mask-badge').data('mi');
+          const $chip = $(this).closest('.chip');
+          const idx = +$chip.data('idx');
+          const mi  = +$(this).closest('.mask-badge').data('mi');
           if (isNaN(idx) || isNaN(mi)) return;
           if (Array.isArray(selected[idx].masks)) {
             selected[idx].masks.splice(mi, 1);
@@ -306,6 +234,7 @@
           }
         });
 
+        // Добавление участника
         function addByCode(code){
           if(!code) return;
           if(selected.some(x => x.code===code)) return;
@@ -313,6 +242,8 @@
           selected.push({ code, name:(u?u.name:code), masks:[] });
           renderChips(); $comboInput.val(''); $ac.hide().empty();
         }
+
+        // Поиск по вводу
         function pickByInput(){
           const q=($.trim($comboInput.val())||'').toLowerCase();
           if(!q) return null;
@@ -325,6 +256,8 @@
           if(prefix.length===1) return prefix[0].code;
           return null;
         }
+
+        // Autocomplete
         function renderAC(q){
           const qq=(q||'').trim().toLowerCase();
           const items=knownUsers
@@ -338,9 +271,14 @@
           });
           $ac.show(); setActive(0);
         }
-        function setActive(i){const $it=$ac.children('.ac-item');$it.removeClass('active');if(!$it.length)return;i=(i+$it.length)%$it.length;$it.eq(i).addClass('active');$ac.data('activeIndex',i);}
-        function getActiveCode(){const i=$ac.data('activeIndex')|0;const $it=$ac.children('.ac-item').eq(i);return $it.data('code');}
-
+        function setActive(i){
+          const $it=$ac.children('.ac-item');
+          $it.removeClass('active'); if(!$it.length) return;
+          i=(i+$it.length)%$it.length; $it.eq(i).addClass('active'); $ac.data('activeIndex',i);
+        }
+        function getActiveCode(){
+          const i=$ac.data('activeIndex')|0; const $it=$ac.children('.ac-item').eq(i); return $it.data('code');
+        }
         $comboInput.on('input', function(){ renderAC(this.value); });
         $comboInput.on('keydown', function(e){
           const idx=$ac.data('activeIndex')|0;
@@ -355,6 +293,7 @@
         $ac.on('mousedown','.ac-item',function(){ const code=$(this).data('code'); if(code) addByCode(code); });
         $(document).on('click',function(e){ if(!$(e.target).closest($combo).length) $ac.hide(); });
 
+        // Префилл из FMVcast/FMВplace
         function prefillFrom(text){
           selected = [];
           const by = parseFMVcast(text || '');
@@ -366,6 +305,7 @@
           });
           renderChips();
         }
+
         function metaLine(){
           return [ buildFMVcast(selected), buildFMVplace($placeInput.val()) ].filter(Boolean).join('');
         }
@@ -380,9 +320,7 @@
           });
         }
 
-        // submit hook
-        let lastSubmitter=null;
-        $form.on('click.fmv.ui','input[type=submit],button[type=submit]',function(){ lastSubmitter=this; });
+        // submit hook: подставляем мету в начало
         $form.on('submit.fmv.ui', function(){
           const meta = metaLine();
           const rest = stripFMV($area.val()).replace(/^\n+/, '');

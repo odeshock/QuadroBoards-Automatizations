@@ -2,16 +2,16 @@
 (function(){
   'use strict';
 
-  // Требуется общий модуль, где есть FMV.fetchUsers
+  // Требуется общий модуль, где есть FMV.fetchUsers (мы не падаем, но напомним в консоли)
   if (!window.FMV || typeof window.FMV.fetchUsers !== 'function') {
-    console.error('[FMV] Требуется общий модуль с FMV.fetchUsers (подключите common раньше этого файла)');
+    console.warn('[FMV] Подключите общий модуль с FMV.fetchUsers перед этим файлом');
   }
+  if (!window.FMV) window.FMV = {};
 
   // ───────────────── UI-модуль ─────────────────
-  if (!window.FMV) window.FMV = {};
   if (!window.FMV.UI) {
     (function(){
-      // mini utils
+      // ─── mini utils (без дублей из helpers/common) ───
       function splitBySemicolon(s){
         return String(s || '').split(';').map(v => v.trim()).filter(Boolean);
       }
@@ -49,7 +49,7 @@
           .replace(/^\s+|\s+$/g,'');
       }
 
-      // CSS (компактный скин)
+      // ─── CSS (компактный скин) ───
       let cssInjected = false;
       function injectCSS(){
         if (cssInjected) return; cssInjected = true;
@@ -125,18 +125,23 @@
 
       function attach(opts){
         injectCSS();
+
         const $form = typeof opts.form === 'string' ? $(opts.form) : opts.form;
         const $area = typeof opts.textarea === 'string' ? $(opts.textarea) : opts.textarea;
         if (!$form || !$form.length || !$area || !$area.length) return null;
-        if (opts.showOnlyIfFMVcast && !/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i.test($area.val() || '')) return null;
-        if ($form.data('fmvBoundUI')) return $form.data('fmvBoundUI');
 
-        // ① текст ДО вырезания (для префилла), и мгновенно прячем мету в textarea при редактировании
-        const initialRaw = $area.val() || '';
-        if (opts.stripOnMount) {
-          $area.val(stripFMV(initialRaw));
+        // ── читаем исходный текст и сразу решаем судьбу виджета/textarea ──
+        const initialRaw = $area.val() || '';                 // с метой
+        if (opts.showOnlyIfFMVcast && !/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i.test(initialRaw)) {
+          return null; // не монтируемся, если в исходнике нет FMVcast
+        }
+        if (opts.stripOnMount) {                              // мгновенно скрываем мету в textarea (edit)
+          $area.val( stripFMV(initialRaw) );
         }
 
+        if ($form.data('fmvBoundUI')) return $form.data('fmvBoundUI');
+
+        // ── построение UI ──
         const wrapClass = 'msg-with-characters fmv ' + (opts.className || '');
         const $wrap=$('<div/>',{class:wrapClass});
         const $row =$('<div class="char-row"/>');
@@ -154,7 +159,7 @@
         const $hint =$('<div class="hint">Участники/маски/локация. Сохранится как: [FMVcast]userN;userM=маска…[/FMVcast] + [FMVplace]…[/FMVplace].</div>');
         const $err  =$('<div class="error" style="display:none"></div>');
 
-        // Вставляем: поиск → ЧИПЫ → Локация → подсказка → ошибки
+        // поиск → ЧИПЫ → Локация → подсказка → ошибки
         $area.before($wrap);
         $wrap.append($row, $chips, $placeRow, $hint, $err);
 
@@ -320,13 +325,13 @@
         if (window.FMV && typeof FMV.fetchUsers === 'function') {
           FMV.fetchUsers().done(function(list){
             knownUsers = (list || []).slice();
-            if (opts.prefill !== false) prefillFrom(initialRaw); // <— важно
+            if (opts.prefill !== false) prefillFrom(initialRaw);
           }).fail(function(msg){
             $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show();
           });
         }
 
-        // ② submit hook с валидацией и добавлением меты В КОНЕЦ (пустая строка не обязательна)
+        // Валидация + добавление меты в КОНЕЦ (пустая строка не обязательна)
         $form.off('submit.fmv.ui').on('submit.fmv.ui', function(e){
           const $subject = $form.find('input[name="req_subject"]');
           const haveSubject = !$subject.length || $.trim($subject.val()||'').length>0;
@@ -354,7 +359,7 @@
           // оставляем \n на конце, срезаем только хвостовые пробелы/табуляции
           let base = rest.replace(/[ \t]+$/, '');
 
-          // добавляем мету в конец; если последнего \n нет — ставим ровно один
+          // если последнего \n нет — ставим ровно один
           const sep = (!base || /\n$/.test(base)) ? '' : '\n';
 
           $area.val(base + sep + meta);
@@ -377,8 +382,7 @@
     })();
   }
 
-  // ───────────────── Bootstraps ─────────────────
-
+  // ───────────────── Bootstraps (автоподключение) ─────────────────
   function onReady(fn){
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
     else fn();
@@ -389,7 +393,7 @@
 
     const path = location.pathname;
 
-    // /post.php?fid=8|9
+    // /post.php?fid=8|9 — создание
     if (/\/post\.php(\?|$)/i.test(path)) {
       const fid = +(new URLSearchParams(location.search).get('fid')||0);
       if ([8,9].indexOf(fid) !== -1) {
@@ -406,7 +410,7 @@
       }
     }
 
-    // /edit.php?id=N&topicpost=1
+    // /edit.php?id=N&topicpost=1 — редактирование первого поста
     if (/\/edit\.php$/i.test(path)) {
       const q = new URLSearchParams(location.search);
       if (q.get('topicpost') === '1') {
@@ -417,7 +421,7 @@
             form:$form, textarea:$area,
             prefill:true, showOnlyIfFMVcast:true,
             className:'fmv--compact',
-            stripOnMount:true           // при редактировании скрываем мету из textarea мгновенно
+            stripOnMount:true           // при редактировании мгновенно прячем мету в textarea
           });
         }
       }

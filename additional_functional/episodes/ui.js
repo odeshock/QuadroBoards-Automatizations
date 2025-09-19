@@ -110,7 +110,7 @@
           }
           .fmv .place-row,.fmv .order-row{margin-top:8px}
           .fmv .place-row label,.fmv .order-row label{display:block; margin-bottom:4px; font-weight:600; color:var(--fmv-text)}
-          .fmv .order-hint{font-size:12.5px; color:var(--fmv-muted); margin-top:4px}
+          .fmv .hint{font-size:12.5px; color:var(--fmv-muted); margin-top:4px}
           
           .fmv .ac-list{
             position:absolute; z-index:50; background:#fff;
@@ -186,27 +186,27 @@
         const $comboLabel = $('<label for="fmv-character" style="font-weight:600">Участники эпизода:</label>');
         const $comboInput=$('<input type="text" id="character-combo" placeholder="Наберите имя персонажа…" autocomplete="off">');
         const $ac=$('<div class="ac-list" role="listbox" aria-label="Варианты персонажей"></div>');
-        const $comboHint  = $('<div class="character-hint">Если что-то не работает, напишите в Приемную.</div>');
-        $combo.append($comboInput,$ac); $row.append($combo,$comboHint);
+        $combo.append($comboInput,$ac); $row.append($combo);
 
         const $chips=$('<div class="chips"/>');
+        const $comboHint  = $('<div class="hint">Если что-то не работает, напишите в Приемную.</div>');
 
         const $placeRow  =$('<div class="place-row"/>');
         const $placeLabel=$('<label for="fmv-place" style="font-weight:600">Локация:</label>');
         const $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">');
-        const $placeHint  = $('<div class="place-hint">Лучше указывать в едином формате: Хогвартс, Косая аллея, Лютный переулок, Министерство и т.д.</div>');
+        const $placeHint  = $('<div class="hint">Лучше указывать в едином формате: Хогвартс, Косая аллея, Лютный переулок, Министерство и т.д.</div>');
         $placeRow.append($placeLabel,$placeInput,$placeHint);
 
         const $ordRow = $('<div class="order-row"/>');
         const $ordLabel = $('<label for="fmv-ord" style="font-weight:600">Порядок эпизода:</label>');
         const $ordInput = $('<input type="number" id="fmv-ord" placeholder="0" value="0" step="1">');
-        const $ordHint  = $('<div class="order-hint">Помогает упорядочить эпизоды, которые стоят в один день. Чем больше значение, тем позже эпизод. Лучше оставлять 0.</div>');
+        const $ordHint  = $('<div class="hint">Помогает упорядочить эпизоды, которые стоят в один день. Чем больше значение, тем позже эпизод. Лучше оставлять 0.</div>');
         $ordRow.append($ordLabel,$ordInput,$ordHint);
 
         const $err =$('<div class="error" style="display:none"></div>');
 
         $area.before($wrap);
-        $wrap.append($row,$chips,$placeRow,$ordRow,$err);
+        $wrap.append($row,$chips,$comboHint,$placeRow,$ordRow,$err);
 
         let selected=[], knownUsers=[];
 

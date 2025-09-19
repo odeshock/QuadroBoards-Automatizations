@@ -7,10 +7,10 @@ const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
     return Array.from(ids);
   }
   function profileLink(id, name) {
-    // если имя не найдено — добавляем приписку
-    const txt = name
+    // если имя не найдено — добавляем пометку
+    const txt = (typeof name === 'string' && name.length)
       ? name
-      : `user${id} (не найден)`;
+      : `user${id} (не нашлось)`;
   
     if (!MAKE_NAMES_LINKS) return txt;
   

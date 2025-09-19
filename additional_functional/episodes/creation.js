@@ -3,7 +3,7 @@
   try{
     if (!/\/post\.php(\?|$)/.test(location.pathname)) return;
     var fid = +(new URLSearchParams(location.search).get('fid')||0);
-    if ([8,9].indexOf(fid) === -1) return;
+    if (CHRONO_CHECK.ForumID.indexOf(fid) === -1) return;
 
     var $form = $('#post form, form[action*="post.php"]').first();
     var $area = $form.find('textarea[name="req_message"], #main-reply, .questionary-post textarea').first();

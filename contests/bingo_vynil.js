@@ -1,29 +1,23 @@
 (() => {
-  // ---------- найти наш <script> и вытащить marks ----------
+  // ---------- найти наш <script> ----------
   function findSelfScript() {
     const scripts = Array.from(document.getElementsByTagName('script'));
-    // Берём последний скрипт, чей src оканчивается на bingo-vinyl.js (или содержит его)
     const bySrc = scripts.filter(s => (s.src||'').includes('bingo-vinyl.js'));
     if (bySrc.length) return bySrc[bySrc.length - 1];
-    // fallback: currentScript
     return document.currentScript || scripts[scripts.length - 1] || null;
   }
   function getMarks() {
     const el = findSelfScript();
     if (!el) return '';
-    // 1) атрибуты marks / data-marks
     const a = el.getAttribute('marks') || el.getAttribute('data-marks');
     if (a) return a;
-    // 2) query-параметр ?m=... (или ?marks=...)
     try {
       const u = new URL(el.src, location.href);
-      const q = u.searchParams.get('m') || u.searchParams.get('marks');
-      if (q) return decodeURIComponent(q);
-    } catch (_) {}
-    return '';
+      return u.searchParams.get('m') || '';
+    } catch(_) { return ''; }
   }
 
-  // ---------- редактируемый список задач (кириллица ок) ----------
+  // ---------- задачи ----------
   const CAPTIONS = [
     "привёл друга",
     "набрал 100 сообщений",
@@ -41,18 +35,14 @@
 
   const MARKS = getMarks();
 
-  // ---------- утилиты ----------
-  const RE_SPACE = /[\s\u00A0\u2000-\u200B\u202F\u205F\u3000]+/ug; // любые пробелы/NBSP
-  function isChecked(sym) {
-    const s = String(sym||'').normalize('NFKC').replace(RE_SPACE,'');
-    return /[xх]/iu.test(s);             // лат/кир x/X/х/Х → выполнено
-  }
+  // ---------- парсер marks ----------
+  // формат: строка из 0 и 1 (без пробелов), лишние символы игнорируются
   function parseMarks(str, n) {
-    const t = String(str||'').trim().split(RE_SPACE);
-    return Array.from({length:n}, (_,i)=> isChecked(t[i]||'.'));
+    const clean = String(str).replace(/[^01]/g,'');
+    return Array.from({length:n},(_,i)=> clean[i]==='1');
   }
 
-  // полная блокировка интерактива
+  // ---------- блокировка интерактивности ----------
   function lock(input,label,val){
     input.checked = !!val;
     input.disabled = true;
@@ -69,7 +59,7 @@
     }
   }
 
-  // стили
+  // ---------- стили ----------
   function ensureStyles(){
     if (document.getElementById('bingo-vinyl-css')) return;
     const font=document.createElement('link');

@@ -27,28 +27,6 @@ function profileLink(id, name) {
   return withNameTxt;
 }
 
-function replaceUserTokens(s, idToNameMap){
-  return escapeHtml(s || '').replace(/user(\d+)/gi, (m, d) => {
-    const id = String(Number(d));
-    const name = idToNameMap.get(id);
-    if (!name) return `<span class="fmv-missing">user${id}</span> (не найден)`;
-    return profileLink(id, name);
-  });
-}
-
-function replaceUserInPairs(s, idToNameMap){
-  return (s||'').split(/\s*;\s*/).filter(Boolean).map(pair=>{
-    const [left,right] = pair.split('=');
-    if (!right) {
-      // нет знака равенства — считаем ошибкой
-      return `<span class="fmv-missing">${replaceUserTokens(left, idToNameMap)} (ожидалось =маска)</span>`;
-    }
-    const replacedLeft = replaceUserTokens(left, idToNameMap);
-    return `${replacedLeft}=${escapeHtml(right)}`;
-  }).join('; ');
-}
-
-
 // ─────────────── userN → Имя профиля (с кэшем) ───────────────
 const nameCache = new Map();
 

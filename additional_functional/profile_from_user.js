@@ -90,7 +90,10 @@ async function getProfileNameById(id){
 
   // 3) fallback: смотрим в список удалённых профилей
   if (!name){
-    try { name = await getExProfileName(id); } catch {}
+    try {
+        const exName = await getExProfileName(id);
+        if (exName) name = `[ex] ${exName}`;
+    } catch {}
   }
 
   nameCache.set(id, name || null);

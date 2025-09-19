@@ -1,4 +1,4 @@
-const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
+const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? true);
 
 // ─────────────── userN → имя ───────────────
 function extractUserIdsFromString(s){

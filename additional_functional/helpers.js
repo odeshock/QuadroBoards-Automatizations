@@ -67,3 +67,12 @@ function serializeFormCP1251(form){
   }
   return pairs.join('&');
 }
+
+async function fetchHtml(url){
+  const res = await fetch(url, { credentials:'include' });
+  if (!res.ok) throw new Error('HTTP '+res.status);
+  const buf = await res.arrayBuffer();
+  let html = new TextDecoder('windows-1251').decode(buf);
+  if (!/[А-Яа-яЁё]/.test(html)) html = new TextDecoder('utf-8').decode(buf);
+  return html;
+}

@@ -148,6 +148,32 @@
         .fmv .chips .chip .btn-cancel{ background:#f4eeee; }
         .fmv .chips .chip .x{ margin-left:8px; }
 
+        /* список масок рядом с именем */
+        .fmv .masks{
+          display:flex;
+          align-items:center;
+          gap:6px;
+          flex-wrap:wrap;
+        }
+        .fmv .masks .masks-label{ color:var(--fmv-muted); margin-right:2px; }
+        
+        /* бейдж одной маски */
+        .fmv .mask-badge{
+          display:inline-flex;
+          align-items:center;
+          gap:6px;
+          padding:2px 8px;
+          border:1px solid var(--fmv-b);
+          border-radius:999px;
+          background:#efe9dc;
+          font-size:13px;
+        }
+        
+        /* кнопка удаления конкретной маски */
+        .fmv .mask-badge .mask-remove{
+          border:0; background:none; cursor:pointer; line-height:1;
+          color:#8b8378; font-size:14px; padding:0 2px;
+        }
 
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
@@ -188,8 +214,19 @@
             const $chip=$('<div class="chip" draggable="true" data-idx="'+idx+'"/>');
             const $drag=$('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
             const $name=$('<span class="name"/>').text(item.name+' ('+item.code+')');
-            const masksText=item.masks&&item.masks.length?'маска: '+item.masks.join(', '):'масок нет';
-            const $masks=$('<span class="masks"/>').text(' — '+masksText);
+            var $masks = $('<span class="masks"/>');
+            if (item.masks && item.masks.length){
+              $masks.append($('<span class="masks-label">— маски:</span>'));
+              item.masks.forEach(function(msk, mi){
+                var $badge = $('<span class="mask-badge" data-mi="'+mi+'"></span>');
+                $badge.append($('<span class="mask-text"></span>').text(msk));
+                $badge.append($('<button type="button" class="mask-remove" aria-label="Удалить маску">×</button>'));
+                $masks.append($badge);
+              });
+            } else {
+              $masks.text(' — масок нет');
+            }
+
             const $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
             const $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
 
@@ -235,6 +272,18 @@
           const to=+$t.data('idx');
           if(isNaN(from)||isNaN(to)||from===to) return;
           const it=selected.splice(from,1)[0]; selected.splice(to,0,it); renderChips();
+        });
+
+        // удаление одной маски по крестику на бейдже
+        $chips.on('click', '.mask-remove', function(){
+          var $chip = $(this).closest('.chip');
+          var idx = +$chip.data('idx');
+          var mi  = +$(this).closest('.mask-badge').data('mi');
+          if (isNaN(idx) || isNaN(mi)) return;
+          if (Array.isArray(selected[idx].masks)) {
+            selected[idx].masks.splice(mi, 1);
+            renderChips();
+          }
         });
 
         function addByCode(code){

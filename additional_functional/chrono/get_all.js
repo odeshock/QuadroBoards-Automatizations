@@ -174,7 +174,7 @@
       const rawOrder = FMV.readTagText(first, 'order');
 
       // карта id->имя (на всякий случай подхватим с текущей страницы темы)
-      const idToNameMap = FMV.idToNameFromPage();
+      const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars, rawMasks);
 
       // строгие парсеры из общего модуля
       const chars = FMV.parseCharactersStrict(rawChars, idToNameMap, window.profileLink);

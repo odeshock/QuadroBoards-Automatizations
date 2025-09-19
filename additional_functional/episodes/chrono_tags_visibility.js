@@ -142,10 +142,27 @@
       }));
 
       const lines = [];
-      if (charText){
-        const normalized = charText.split(/\s*;\s*/).filter(Boolean).join('; ');
-        const nice = replaceUserTokens(normalized, idToNameMap);
-        lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${nice}</div>`);
+      // стало:
+      if (charText) {
+        // допустимый шаблон: userN(; userN)*
+        const TEMPLATE = /^\s*user\d+(?:\s*;\s*user\d+)*\s*$/i;
+      
+        // нормализованный вывод (для показа исходного ввода с пробелами)
+        const human = charText.split(/\s*;\s*/).filter(Boolean).join('; ');
+      
+        if (!TEMPLATE.test(charText)) {
+          // Совсем не по шаблону — ругаемся и подсвечиваем
+          lines.push(
+            `<div class="fmv-row"><span class="fmv-label">Участники:</span> ` +
+            `<span class="fmv-missing">Аааа! Надо пересобрать всё внутри по шаблону: userN;userN;userN</span> — ${escapeHtml(human)}</div>`
+          );
+        } else {
+          // По шаблону — парсим ids в исходном порядке
+          const orderIds = (charText.match(/user(\d+)/gi) || []).map(m => String(Number(m.replace(/^\D+/,'') || '')));
+          // превращаем в ссылки/имена или "userN (не найден)" с подсветкой
+          const rendered = orderIds.map(id => profileLink(id, idToNameMap.get(id))).join('; ');
+          lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${rendered}</div>`);
+        }
       }
       if (maskText){
         const pairs = replaceUserInPairs(maskText, idToNameMap);

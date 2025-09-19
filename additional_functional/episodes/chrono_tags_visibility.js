@@ -154,7 +154,7 @@
           // Совсем не по шаблону — ругаемся и подсвечиваем
           lines.push(
             `<div class="fmv-row"><span class="fmv-label">Участники:</span> ` +
-            `<span class="fmv-missing">Аааа! Надо пересобрать всё внутри по шаблону: userN;userN;userN</span> — ${escapeHtml(human)}</div>`
+            `<span class="fmv-missing">Ошибка! Нужно пересобрать по шаблону: userN;userN;userN</span> — ${escapeHtml(human)}</div>`
           );
         } else {
           // По шаблону — парсим ids в исходном порядке
@@ -175,7 +175,7 @@
           // формат неверный — показываем единую ошибку и сам ввод
           lines.push(
             `<div class="fmv-row"><span class="fmv-label">Маски:</span> ` +
-            `<span class="fmv-missing">Аааа! Надо пересобрать всё внутри по шаблону: userN=маска;userN=маска</span> — ${escapeHtml(human)}</div>`
+            `<span class="fmv-missing">Ошибка! Нужно пересобрать по шаблону userN=маска;userN=маска</span> — ${escapeHtml(human)}</div>`
           );
         } else {
           // парсим пары в исходном порядке

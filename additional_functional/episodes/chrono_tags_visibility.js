@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name         chrono_tags_visibility (unified characters)
-// @description  Показывает мета-инфо темы (участники, маски, локация, сортировка) из единого <characters>
+// @name         chrono_tags_visibility (unified characters, no masks)
+// @description  Показывает мета-инфо темы (участники, локация, сортировка) из единого <characters>
 // @match        *://*/*
 // @run-at       document-end
 // @grant        none
@@ -27,38 +27,29 @@
   , { timeout: 15000 });
   if (!first) return;
 
-  // (опц.) фильтр по группам, если подключён check_group
+  // (опц.) фильтр по группам
   if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed()) return;
 
   // читаем СЫРЫЕ теги
-  const rawChars = FMV.readTagText(first, 'characters'); // формат: userN; userM=mask; userM=mask; userK
+  const rawChars = FMV.readTagText(first, 'characters'); // формат: userN; userM=mask; ...
   const rawLoc   = FMV.readTagText(first, 'location');
   const rawOrder = FMV.readTagText(first, 'order');
 
-  // карта id->имя ровно по тем userID, что есть в characters
+  // карта id->имя по тем userID, что есть в characters
   const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
 
-  // единый парсер участников/масок
+  // парсим участников
   const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
 
   // формируем строки
   const lines = [];
 
   if (rawChars) {
-    if (!uni.ok) {
-      lines.push(
-        `<div class="fmv-row"><span class="fmv-label">Участники:</span>${uni.htmlError}</div>`
-      );
-    } else {
-      lines.push(
-        `<div class="fmv-row"><span class="fmv-label">Участники:</span>${uni.htmlParticipants}</div>`
-      );
-      if (uni.htmlMasks) {
-        lines.push(
-          `<div class="fmv-row"><span class="fmv-label">Маски:</span>${uni.htmlMasks}</div>`
-        );
-      }
-    }
+    lines.push(
+      `<div class="fmv-row"><span class="fmv-label">Участники:</span>${
+        uni.ok ? uni.htmlParticipants : uni.htmlError
+      }</div>`
+    );
   }
 
   if (rawLoc) {
@@ -76,7 +67,7 @@
 
   if (!lines.length) return;
 
-  // вставка блока (перед контентом первого поста)
+  // вставляем блок
   const block = document.createElement('div');
   block.className = 'fmv-meta';
   block.innerHTML = `
@@ -123,7 +114,7 @@
     .fmv-toggle:hover,.fmv-toggle:focus{opacity:1;color:#555;outline:none}
   `);
 
-  // ——— утилиты ———
+  // вспомогательные утилиты
   function injectStyle(css){
     const style = document.createElement('style');
     style.textContent = css;

@@ -10,7 +10,6 @@
   'use strict';
 
   /*** НАСТРОЙКИ ***/
-  const REQUIRED_GROUP_ID = 1;      // показываем только этой группе
   const DEFAULT_COLLAPSED = true;   // блок по умолчанию свёрнут?
   const MAKE_NAMES_LINKS  = false;  // делать имена ссылками на профили
 
@@ -100,7 +99,7 @@
 
   async function ensureAllowed() {
     const gid = await getCurrentGroupId();
-    return gid === REQUIRED_GROUP_ID;
+    return CHRONO_CHECK.GroupID.includes(gid);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

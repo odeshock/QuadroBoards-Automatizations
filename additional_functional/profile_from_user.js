@@ -12,7 +12,7 @@ function profileLink(id, name) {
 
   // 1) Если имя не найдено — просто "userN (не найден)" БЕЗ <a>
   if (!withNameTxt) {
-    return `user${id} (<span class="fmv-missing">не найден</span>)`;
+    return `<span class="fmv-missing">user${id}</span> (не найден)`;
   }
 
   // 2) Имя найдено:

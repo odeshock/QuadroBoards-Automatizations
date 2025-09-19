@@ -1,3 +1,38 @@
+// ─────────────── userN → имя ───────────────
+  function extractUserIdsFromString(s){
+    const ids = new Set();
+    (s||'').replace(/user(\d+)/gi, (_,d)=>{ ids.add(String(Number(d))); return _; });
+    return Array.from(ids);
+  }
+  function profileLink(id, name){
+    const txt = name || ('user'+id);
+    if (!MAKE_NAMES_LINKS) return txt;
+    const a = document.createElement('a');
+    a.href = '/profile.php?id='+encodeURIComponent(id);
+    a.textContent = txt;
+    return a.outerHTML;
+  }
+  function replaceUserTokens(s, idToNameMap){
+    return escapeHtml(s||'').replace(/user(\d+)/gi, (m,d)=>{
+      const id = String(Number(d));
+      const nm = idToNameMap.get(id) || ('user'+id);
+      return profileLink(id, nm);
+    });
+  }
+  function replaceUserInPairs(s, idToNameMap){
+    return (s||'').split(/\s*;\s*/).filter(Boolean).map(pair=>{
+      const [left,right] = pair.split('=');
+      if (!right) return replaceUserTokens(left, idToNameMap);
+      const replacedLeft = replaceUserTokens(left, idToNameMap);
+      return `${replacedLeft}=${escapeHtml(right)}`;
+    }).join('; ');
+  }
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>\"']/g, ch => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
+    ));
+  }
+
 // ─────────────── userN → Имя профиля (с кэшем) ───────────────
   const nameCache = new Map();
   async function getProfileNameById(id){

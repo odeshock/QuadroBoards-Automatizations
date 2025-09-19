@@ -76,3 +76,9 @@ async function fetchHtml(url){
   if (!/[А-Яа-яЁё]/.test(html)) html = new TextDecoder('utf-8').decode(buf);
   return html;
 }
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>\"']/g, ch => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
+  ));
+}

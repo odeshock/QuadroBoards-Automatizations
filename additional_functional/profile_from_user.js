@@ -59,18 +59,47 @@ const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
     }
     return null;
   }
-  function extractNameFromDoc(doc){
-    const candidates = [
-      '#pun-title span','h1 span','h1','h2.hn','.hn','.title','.subhead h2','.user-ident .username'
-    ].map(sel => doc.querySelector(sel)).filter(Boolean)
-     .map(el => (el.textContent||'').trim()).filter(Boolean);
-    const title = (doc.querySelector('title')?.textContent||'').trim();
-    if (title) candidates.unshift(title);
-    for (let t of candidates){
-      t = t.replace(/\s+/g,' ').trim();
-      const m = t.match(/Профил[ья]\s*[:\-—–]\s*(.+)$/i) || t.match(/Просмотр\s+профиля\s*[:\-—–]\s*(.+)$/i);
-      if (m) return m[1].trim();
-      if (t && !/Профил|Profile|Просмотр|Информация|Страниц/i.test(t)) return t;
-    }
-    return null;
+  // profile_from_user (1).js
+
+function extractNameFromDoc(doc){
+  // 1) Надёжный маркер: ник в блоке идентификации профиля
+  const usernameEl =
+    doc.querySelector('.user-ident .username') ||
+    doc.querySelector('.user-box .username') || // на всякий случай альтернативный шаблон
+    null;
+  if (usernameEl) {
+    const name = (usernameEl.textContent || '').trim();
+    if (name) return name;
   }
+
+  // 2) Заголовки, но ТОЛЬКО если явно это страница профиля
+  const headings = [
+    '#pun-title span','h1 span','h1','h2.hn','.hn','.title','.subhead h2'
+  ].map(sel => doc.querySelector(sel)).filter(Boolean)
+   .map(el => (el.textContent || '').trim()).filter(Boolean);
+
+  const title = (doc.querySelector('title')?.textContent || '').trim();
+  if (title) headings.unshift(title);
+
+  // Разрешаем брать имя из заголовка только при явных ключевых словах страницы профиля
+  const PROFILE_PATTERNS = [
+    /Профил[ья]\s*[:\-—–]\s*(.+)$/i,           // «Профиль: murmur»
+    /Просмотр\s+профиля\s*[:\-—–]\s*(.+)$/i,   // «Просмотр профиля — murmur»
+    /Profile\s*[:\-—–]\s*(.+)$/i               // англ. вариант
+  ];
+
+  for (let t of headings){
+    t = t.replace(/\s+/g,' ').trim();
+    for (const re of PROFILE_PATTERNS){
+      const m = t.match(re);
+      if (m) {
+        const raw = m[1].trim();
+        const clean = raw.replace(/^[«"'\\[]|[»"'\\]]$/g,'').trim();
+        if (clean) return clean;
+      }
+    }
+  }
+
+  // Ничего убедительного — это не профиль
+  return null;
+}

@@ -1,607 +1,191 @@
+// ==UserScript==
+// @name         get_all
+// @description  Сбор всех страниц темы в один список (с участниками/масками как в chrono)
+// @match        *://*/*viewtopic.php?id=*
+// @grant        none
+// ==/UserScript==
+
 (function () {
   'use strict';
 
-  /* ===== Активируемся только в нужной теме ===== */
-  try {
-    const u = new URL(location.href);
-    if (!(u.hostname === 'testfmvoice.rusff.me' &&
-          u.pathname === '/viewtopic.php' &&
-          u.searchParams.get('id') === '13')) {
-      return;
+  // ---------------- small utils ----------------
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  async function waitForDeps(timeout=12000){
+    const t0 = performance.now();
+    while (performance.now()-t0 < timeout){
+      if (window.parseChronoTagsRaw &&
+          window.resolveChronoData   &&
+          typeof window.escapeHtml   === 'function' &&
+          typeof window.profileLink  === 'function') return true;
+      await sleep(120);
     }
-  } catch { return; }
-
-  /* ============================ КОНФИГ ============================ */
-  const BASE = 'https://testfmvoice.rusff.me';
-
-  // Разделы (как в оригинале)
-  const SECTIONS = [
-    { id: 4, type: 'personal', status: 'archived'  },
-    { id: 5, type: 'personal', status: 'off' },
-    { id: 8, type: 'au', status: 'on' },
-    { id: 9, type: 'plot', status: 'on' },
-  ];
-
-  const MAX_PAGES_PER_SECTION = 50;
-  const MAX_PAGES_USERLIST    = 200;
-
-  // UI-мишени
-  const SRC_POST_ID  = 'p82';
-  const SRC_HOST_SEL = `#${SRC_POST_ID} .post-box`;
-  const OUT_SEL      = '#p83-content';
-
-  // элементы
-  const WRAP_ID = 'fmv-chrono-inline';
-  const BTN_ID  = 'fmv-chrono-inline-btn';
-  const NOTE_ID = 'fmv-chrono-inline-note';
-
-  // стиль подсветки «пропуск/ошибка»
-  const MISS_STYLE = 'background:#ffeaea;color:#b00020;padding:0 3px;border-radius:3px';
-
-  // разделитель имён/локаций
-  const CHAR_SPLIT = /\s*(?:,|;|\/|&|\bи\b)\s*/iu;
-
-  /* ---------- статусный бейдж (цвет) ---------- */
-  function renderStatus(type, status) {
-    const mapType = {
-      personal: { word: 'personal', color: 'black'  },
-      plot:     { word: 'plot',     color: 'black'  },
-      au:       { word: 'au',       color: 'red'    }
-    };
-    const mapStatus = {
-      on:       { word: 'active',   color: 'green'  },
-      off:      { word: 'closed',   color: 'teal'   },
-      archived: { word: 'archived', color: 'maroon' }
-    };
-    const t = mapType[escapeHtml(type)] || mapType.au;
-    const st = mapStatus[status] || mapStatus.archived;
-    return `[<span style="color:${t.color}">${t.word}</span> / <span style="color:${st.color}">${st.word}</span>]`;
+    console.warn('[get_all] deps not ready');
+    return false;
   }
 
-  /* ---------- заголовок темы ---------- */
-  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
-  function parseTitle(text) {
-    const m = String(text||'').match(TITLE_RE);
-    return m
-      ? { dateRaw: m[1].trim(), episode: m[2].trim(), hasBracket: true }
-      : { dateRaw: '', episode: trimSp(text), hasBracket: false };
-  }
+  // ---------------- entry ----------------
+  const ready = document.readyState === 'complete' || document.readyState === 'interactive';
+  if (!ready) document.addEventListener('DOMContentLoaded', mount); else mount();
 
-  /* ---------- даты ---------- */
-  const TMAX = [9999,12,31];
-  const yFix = (y)=> String(y).length<=2 ? 1900 + parseInt(y,10) : parseInt(y,10);
-  const dateKey = (t) => t[0]*10000 + t[1]*100 + t[2];
+  async function mount(){
+    if (!await waitForDeps()) return;
 
-  // --- Новая функция проверки существования дня
-  function isValidDate(y, m, d) {
-    if (!Number.isFinite(y) || y < 0) return false;
-    if (!Number.isFinite(m) || m < 1 || m > 12) return false;
-    if (!Number.isFinite(d) || d < 1) return false;
-    const dim = new Date(y, m, 0).getDate();
-    return d <= dim;
-  }
+    // куда положить кнопку
+    const h2 = $('div.topic > h2, #pun-viewtopic h2, .topic h2') || document.body;
+    const btn = document.createElement('button');
+    btn.textContent = 'Собрать хронологию';
+    btn.style.cssText = `
+      margin:6px 0 12px; padding:6px 10px; border-radius:6px; border:1px solid #bbb;
+      background:#fafafa; cursor:pointer; font-size:14px;
+    `;
+    h2.insertAdjacentElement('afterend', btn);
 
-  function parseDateRange(src) {
-    let txt = String(src||'').trim();
-    if (!txt) return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-    txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
+    const out = document.createElement('div');
+    out.id = 'get-all-output';
+    h2.insertAdjacentElement('afterend', out);
 
-    const P = {
-      single: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      dayRangeSameMonth: /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossMonthTailYear: /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears: /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      monthYear: /^(\d{1,2})\.(\d{2}|\d{4})$/,
-      yearOnly: /^(\d{4})$/
-    };
-
-    const toInt = (x)=>parseInt(x,10);
-    const fixYear = (y)=> String(y).length===2 ? 1900 + parseInt(y,10) : parseInt(y,10);
-    const clamp = (y,m,d)=>[Math.max(0, y), Math.min(Math.max(1,m),12), Math.min(Math.max(0,d),31)];
-
-    // 1) dd.mm.yy|yyyy
-    let m = txt.match(P.single);
-    if (m) {
-      const d  = toInt(m[1]), mo = toInt(m[2]), y = fixYear(m[3]);
-      const bad = !isValidDate(y, mo, d);
-      const a = clamp(y,mo,d);
-      return { start:a, end:a.slice(), kind:'single', bad };
-    }
-
-    // 2) dd-dd.mm.yy|yyyy
-    m = txt.match(P.dayRangeSameMonth);
-    if (m) {
-      const d1 = toInt(m[1]), d2 = toInt(m[2]), mo = toInt(m[3]), y = fixYear(m[4]);
-      const bad = !isValidDate(y, mo, d1) || !isValidDate(y, mo, d2);
-      return { start:clamp(y,mo,d1), end:clamp(y,mo,d2), kind:'day-range', bad };
-    }
-
-    // 3) dd.mm-dd.mm.yy|yyyy (tail year applies to both)
-    m = txt.match(P.crossMonthTailYear);
-    if (m) {
-      const d1 = toInt(m[1]), mo1 = toInt(m[2]), d2 = toInt(m[3]), mo2 = toInt(m[4]), y = fixYear(m[5]);
-      const bad = !isValidDate(y, mo1, d1) || !isValidDate(y, mo2, d2);
-      return { start:clamp(y,mo1,d1), end:clamp(y,mo2,d2), kind:'cross-month', bad };
-    }
-
-    // 4) dd.mm.yy|yyyy - dd.mm.yy|yyyy
-    m = txt.match(P.crossYearBothYears);
-    if (m) {
-      const d1 = toInt(m[1]), mo1 = toInt(m[2]), y1 = fixYear(m[3]);
-      const d2 = toInt(m[4]), mo2 = toInt(m[5]), y2 = fixYear(m[6]);
-      const bad = !isValidDate(y1, mo1, d1) || !isValidDate(y2, mo2, d2);
-      return { start:clamp(y1,mo1,d1), end:clamp(y2,mo2,d2), kind:(y1===y2?'cross-month':'cross-year'), bad };
-    }
-
-    // 5) mm.yy|yyyy
-    m = txt.match(P.monthYear);
-    if (m) {
-      const mo = toInt(m[1]), y = fixYear(m[2]);
-      const bad = !Number.isFinite(y) || mo < 1 || mo > 12;
-      const a = clamp(y,mo,0);
-      return { start:a, end:a.slice(), kind:'month', bad };
-    }
-
-    // 6) yyyy
-    m = txt.match(P.yearOnly);
-    if (m) {
-      const y = toInt(m[1]);
-      const bad = !Number.isFinite(y) || y < 0;
-      const a = clamp(y,1,0);
-      return { start:a, end:a.slice(), kind:'year', bad };
-    }
-
-    return { start: TMAX, end: TMAX, kind:'unknown', bad:true };
-  }
-
-  /* ---------- НОРМАЛИЗОВАННЫЙ ВЫВОД ДАТЫ ---------- */
-  const z2 = (n) => String(n).padStart(2, '0');
-  function formatRange(r) {
-    if (!r || !r.start || !r.end) return '';
-    const [y1, m1, d1] = r.start;
-    const [y2, m2, d2] = r.end;
-
-    switch (r.kind) {
-      case 'single':       return `${z2(d1)}.${z2(m1)}.${y1}`;
-      case 'day-range':    return `${z2(d1)}-${z2(d2)}.${z2(m1)}.${y1}`;
-      case 'cross-month':  return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
-      case 'month':        return `${z2(m1)}.${y1}`;
-      case 'year':         return String(y1);
-      default:
-        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${z2(d2)}.${z2(m2)}.${y2}`;
-        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
-    }
-  }
-
-  /* ---------- Новый декодер для чтения текста из DOM ---------- */
-  function safeNodeText(node) {
-    const raw = (node && (node.innerText ?? node.textContent) || '').trim();
-    if (!raw) return '';
-    const looksBroken = /[\uFFFD]|[ÃÂÐÑ]{2,}/.test(raw);
-    if (!looksBroken) return raw;
-
-    const bytes = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xFF;
-
-    const candidates = [raw];
-    try { candidates.push(new TextDecoder('utf-8').decode(bytes)); } catch {}
-    try { candidates.push(new TextDecoder('windows-1251').decode(bytes)); } catch {}
-
-    const score = (s) => {
-      const cyr = (s.match(/[А-Яа-яЁё]/g)||[]).length;
-      const bad = (s.match(/[\uFFFD]/g)||[]).length + (s.match(/[ÃÂÐÑ]/g)||[]).length;
-      return cyr * 4 - bad * 5;
-    };
-
-    let best = candidates[0], bestScore = score(best);
-    for (const c of candidates.slice(1)) {
-      const sc = score(c);
-      if (sc > bestScore) { best = c; bestScore = sc; }
-    }
-    return best;
-  }
-
-  /* ---------- сеть/парс ---------- */
-  function countFFFD(s){return (s.match(/[\uFFFD]/g)||[]).length}
-  function countCyr(s){return (s.match(/[А-Яа-яЁё]/g)||[]).length}
-  function sniffMetaCharset(buf) {
-    const head = new TextDecoder('windows-1252').decode(buf.slice(0, 4096));
-    const m1 = head.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i);
-    if (m1) return m1[1].toLowerCase();
-    const m2 = head.match(/content\s*=\s*["'][^"']*charset=([\w-]+)/i);
-    if (m2) return m2[1].toLowerCase();
-    return '';
-  }
-  function scoreDecoded(html, hint) {
-    const sFFFD = countFFFD(html);
-    const sCyr  = countCyr(html);
-    const hasHtml = /<\/html>/i.test(html) ? 1 : 0;
-    const hasHead = /<\/head>/i.test(html) ? 1 : 0;
-    const hintBonus = hint ? 2 : 0;
-    return (sCyr * 5) + (hasHtml + hasHead + hintBonus) * 3 - (sFFFD * 50);
-  }
-  async function fetchText(url, timeoutMs = 20000) {
-    const ctrl = new AbortController();
-    const t = setTimeout(()=>ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { credentials:'include', signal:ctrl.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buf = await res.arrayBuffer();
-
-      const ct = res.headers.get('content-type') || '';
-      const mCT = ct.match(/charset=([^;]+)/i);
-      const headerCharset = mCT ? mCT[1].trim().toLowerCase() : '';
-      const metaCharset   = sniffMetaCharset(buf);
-
-      const hints = { 'utf-8': false, 'windows-1251': false };
-      if (/utf-?8/i.test(headerCharset) || /utf-?8/i.test(metaCharset)) hints['utf-8'] = true;
-      if (/1251|cp-?1251/i.test(headerCharset) || /1251|cp-?1251/i.test(metaCharset)) hints['windows-1251'] = true;
-
-      const tryOrder = [];
-      if (headerCharset) tryOrder.push(headerCharset);
-      if (metaCharset && !tryOrder.includes(metaCharset)) tryOrder.push(metaCharset);
-      ['utf-8','windows-1251'].forEach(enc => { if (!tryOrder.includes(enc)) tryOrder.push(enc); });
-
-      let best = { score: -1e9, enc: '', html: '' };
-      for (const enc of tryOrder) {
-        let html = '';
-        try { html = new TextDecoder(enc, { fatal:false }).decode(buf); }
-        catch { continue; }
-        const score = scoreDecoded(html, hints[enc]);
-        if (score > best.score) best = { score, enc, html };
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true; btn.textContent = 'Собираю…';
+      try{
+        const items = await collectTopic();
+        out.innerHTML = buildWrappedHTML(items);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Собрать хронологию';
       }
-      return best.html;
-    } finally { clearTimeout(t); }
-  }
-  const parseHTML = (html)=> new DOMParser().parseFromString(html,'text/html');
-  const firstPostNode = (doc) =>
-    doc.querySelector('.post.topicpost .post-content') ||
-    doc.querySelector('.post.topicpost') ||
-    doc;
-
-  /* ---------- MНОЖЕСТВЕННЫЕ location/characters/masks ---------- */
-  function extractFromFirst(firstNode) {
-    // Находим собранный блок chrono_tags_visibility
-    const fmv = firstNode.querySelector('.fmv-body');
-    if (!fmv) return { participantsLower: [], masks: {} };
-  
-    // ---- Участники ----
-    const rowChars = Array.from(fmv.querySelectorAll('.fmv-row')).find(r => {
-      const lab = r.querySelector('.fmv-label');
-      return lab && /Участники:/i.test(lab.textContent || '');
     });
-  
-    const participantsLower = rowChars
-      ? (rowChars.textContent || '')
-          .replace(/^\s*Участники:\s*/i, '')
-          .split(/\s*;\s*/)
-          .map(s => s.trim().toLowerCase())
-          .filter(Boolean)
-      : [];
-  
-    // ---- Маски ----
-    const rowMasks = Array.from(fmv.querySelectorAll('.fmv-row')).find(r => {
-      const lab = r.querySelector('.fmv-label');
-      return lab && /Маски:/i.test(lab.textContent || '');
-    });
-  
-    const masks = {};
-    if (rowMasks) {
-      const maskPairs = (rowMasks.textContent || '')
-        .replace(/^\s*Маски:\s*/i, '')
-        .split(/\s*;\s*/)
-        .map(s => s.trim())
-        .filter(Boolean);
-      maskPairs.forEach(pair => {
-        const [user, mask] = pair.split('=');
-        if (user && mask) masks[user.trim().toLowerCase()] = mask.trim();
+  }
+
+  // ---------------- core: collect pages ----------------
+  async function collectTopic(){
+    const pages = getAllPageLinks();
+    const results = [];
+    for (let i=0; i<pages.length; i++){
+      const url = pages[i];
+      const html = await fetchText(url);
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      // первый пост на странице
+      const first = doc.querySelector('.topic .post.topicpost, .post.topicpost, .message:first-of-type');
+      if (!first) continue;
+
+      // заголовок/таймстемп страницы (оставляю максимально просто)
+      const timeLink = first.querySelector('h3 .permalink, h3 a[href*="#p"]');
+      const when = timeLink ? timeLink.textContent.trim() : '';
+
+      const titleNode = doc.querySelector('#pun-viewtopic h2, .topic > h2') || document.title;
+      const title = (titleNode && titleNode.textContent) ? titleNode.textContent.trim() : (''+titleNode);
+
+      // --- chrono tags: "сырьё"
+      const raw = window.parseChronoTagsRaw(first);
+
+      // --- order: целое число или ошибка
+      let order = null, orderBad = false;
+      if (raw.order && raw.order.trim()){
+        const v = raw.order.trim();
+        if (/^-?\d+$/.test(v)) order = Number(v);
+        else orderBad = true;
+      }
+
+      // --- резолв имён/ссылок/не-найдены (как в chrono)
+      const resolved = await window.resolveChronoData(raw);
+
+      results.push({
+        pageUrl: url,
+        when, title,
+        // «сырьё» если нужно для сортировок/фильтров:
+        participantsLower: raw.participantsLower,
+        masks: raw.masks,
+        location: raw.location,
+        order,
+        orderBad,
+        rawOrder: raw.order || '',
+        // готовый HTML для вывода:
+        participantsHtml: resolved.participantsHtml,
+        masksHtml: resolved.masksHtml
       });
     }
-  
-    return { participantsLower, masks };
+    return results;
   }
 
-  async function scrapeTopic(topicUrl, rawTitle, type, status) {
-    try {
-      const html = await fetchText(topicUrl);
-      const doc  = parseHTML(html);
-      const first= firstPostNode(doc);
+  function getAllPageLinks(){
+    // ссылки пагинации в шапке/подвале
+    const base = location.href.replace(/(&|\\?)p=\\d+/, '');
+    const anchors = $$('div.topic h2 a, .pagelink a, .pagemenu a, .pages a')
+      .map(a => a.href).filter(Boolean);
+    // включим текущую страницу
+    if (!anchors.includes(location.href)) anchors.unshift(location.href);
+    // дедуп + нормализация
+    const uniq = Array.from(new Set(anchors.map(u => u.split('#')[0])));
+    // гарантированно полные URL одной темы
+    return uniq.filter(u => /viewtopic\\.php\\?id=/.test(u))
+               .sort((a,b)=>pageNum(a)-pageNum(b));
 
-      const {
-        locationsLower, charactersLower, participantsLower,
-        masksByCharLower, maskKeysLower, order
-      } = extractFromFirst(first);
-
-      const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
-      const isAu = (type === 'au');
-      const range = isAu
-        ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false }
-        : parseDateRange(dateRaw);
-      // [au] должно быть первым блоком в названии темы
-      const auAtStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));
-      const auBad = isAu ? !auAtStart : false;
-      const dateBad = isAu ? auBad : (!hasBracket || range.bad);
-
-      // === NEW: для type: 'plot' требуем суффикс " [с]" в КОНЦЕ названия ===
-      const plotSuffixRe = /\s\[\s*с\s*\]\s*$/iu; // допускаем лишние пробелы
-      const plotBad = (type === 'plot') ? !plotSuffixRe.test(String(rawTitle || '')) : false;
-
-      return {
-        type, status, dateRaw, episode, url: topicUrl,
-        locationsLower, charactersLower, participantsLower,
-        masksByCharLower, maskKeysLower, order,
-        range, dateBad,
-        plotBad // <— добавили
-      };
-    } catch (e) {
-      console.warn('[FMV] тема ✗', topicUrl, e);
-      return null;
+    function pageNum(u){
+      const m = /[?&]p=(\\d+)/.exec(u); return m ? +m[1] : 1;
     }
   }
 
-  async function scrapeSection(section) {
-    let page = `${BASE}/viewforum.php?id=${section.id}`;
-    const seen = new Set();
-    const out  = [];
-    let pageCount = 0;
-
-    while (page && !seen.has(page) && pageCount < MAX_PAGES_PER_SECTION) {
-      pageCount++;
-      seen.add(page);
-
-      const html = await fetchText(page);
-      const doc  = parseHTML(html);
-
-      const topics = new Map();
-      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a=>{
-        const href = abs(page, a.getAttribute('href'));
-        const m    = href.match(/viewtopic\.php\?id=(\d+)/i);
-        if (!m) return;
-        const id = m[1];
-        const title = safeNodeText(a);
-        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        if (!topics.has(id)) topics.set(id, { url: href, title });
-      });
-
-      for (const { url, title } of topics.values()) {
-        const row = await scrapeTopic(url, title, section.type, section.status);
-        if (row) out.push(row);
-      }
-
-      const nextRel  = doc.querySelector('a[rel="next"]');
-      let nextHref   = nextRel ? nextRel.getAttribute('href') : null;
-      if (!nextHref) {
-        const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\b(След|Next|»|›)\b/i.test(safeNodeText(a) || ''));
-        if (candidate) nextHref = candidate.getAttribute('href');
-      }
-      page = nextHref ? abs(page, nextHref) : null;
-    }
-    return out;
+  async function fetchText(url){
+    const res = await fetch(url, {credentials:'include'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    return await res.text();
   }
 
-  async function scrapeAllUsers() {
-    let page = `${BASE}/userlist.php`;
-    const seen = new Set();
-    const nameToProfile = new Map();
-    let cnt = 0;
+  // ---------------- render ----------------
+  function buildWrappedHTML(items){
+    if (!items.length) return '<div class="ga-wrap">ничего не нашлось</div>';
 
-    while (page && !seen.has(page) && cnt < MAX_PAGES_USERLIST) {
-      cnt++;
-      seen.add(page);
+    const MISS_STYLE = 'color:#c00;background:#ffe6e6;border-radius:6px;padding:0 .35em;font-weight:700;';
+    const rows = items.map((e, i) => {
+      // участники
+      const names = e.participantsHtml && e.participantsHtml.trim()
+        ? e.participantsHtml
+        : `<span style="${MISS_STYLE}">не указаны</span>`;
 
-      const html = await fetchText(page);
-      const doc  = parseHTML(html);
-
-      const anchors = doc.querySelectorAll('.usersname a, a[href*="profile.php?id="]');
-      anchors.forEach(a=>{
-        const nameText = safeNodeText(a);
-        if (!nameText) return;
-        const norm = nameText.toLowerCase();
-        if (!nameToProfile.has(norm)) {
-          nameToProfile.set(norm, abs(page, a.getAttribute('href')));
-        }
-      });
-
-      const nextRel  = doc.querySelector('a[rel="next"]');
-      let nextHref   = nextRel ? nextRel.getAttribute('href') : null;
-      if (!nextHref) {
-        const candidate = Array.from(doc.querySelectorAll('a'))
-          .find(a => /\b(След|Next|»|›)\b/i.test(safeNodeText(a) || ''));
-        if (candidate) nextHref = candidate.getAttribute('href');
-      }
-      page = nextHref ? abs(page, nextHref) : null;
-    }
-    return nameToProfile;
-  }
-
-  function compareEvents(a, b) {
-    const sa = dateKey(a.range.start), sb = dateKey(b.range.start);
-    if (sa !== sb) return sa - sb;
-    const ea = dateKey(a.range.end),   eb = dateKey(b.range.end);
-    if (ea !== eb) return ea - eb;
-
-    const ao = (a.order == null) ? Number.POSITIVE_INFINITY : a.order;
-    const bo = (b.order == null) ? Number.POSITIVE_INFINITY : b.order;
-    if (ao !== bo) return ao - bo;
-
-    return (a.episode||'').localeCompare(b.episode||'', 'ru', { sensitivity:'base' });
-  }
-
-  /* ================= СБОРКА HTML ================= */
-  async function buildWrappedHTML() {
-    const nameToProfile = await scrapeAllUsers();
-
-    let all = [];
-    for (const sec of SECTIONS) {
-      const part = await scrapeSection(sec);
-      all = all.concat(part);
-    }
-    all = all.filter(Boolean);
-    all.sort(compareEvents);
-
-    // — ссылки/подсветка только для людей; роли НЕ подсвечиваем и НЕ линкуем
-    function renderOnePerson(lower, { maskOnly }) {
-      const shown = escapeHtml(lower);
-      // mask-only -> всегда красный
-      if (maskOnly) return `<span style="${MISS_STYLE}">${shown}</span>`;
-
-      const href = nameToProfile.get(lower);
-      if (href) return `<a href="${escapeHtml(href)}" rel="nofollow">${shown}</a>`;
-      return `<span style="${MISS_STYLE}">${shown}</span>`;
-    }
-
-    function renderRolesPlain(rolesSet) {
-      const roles = Array.from(rolesSet || []);
-      if (!roles.length) return '';
-      return ` [as ${escapeHtml(roles.join(', '))}]`;
-    }
-
-    function renderParticipants(participantsLower, masksByCharLower, charactersLower, maskKeysLower) {
-      if (!participantsLower?.length) {
-        return `<span style="${MISS_STYLE}">не указаны</span>`;
-      }
-      const charsSet = new Set(charactersLower || []);
-      return participantsLower.map(low => {
-        const maskOnly = maskKeysLower?.has(low) && !charsSet.has(low);
-        const personHTML = renderOnePerson(low, { maskOnly });
-        const rolesTail  = renderRolesPlain(masksByCharLower.get(low)); // роли — plain text
-        return `${personHTML}${rolesTail}`;
-      }).join(', ');
-    }
-
-    const items = all.map(e => {
-      const statusHTML = renderStatus(e.type, e.status);
-      const dateHTML = e.type === 'au'
-        ? (e.dateBad
-            ? `<span style="${MISS_STYLE}">проблема с [au] в названии</span>`
-            : '')
-        : ((!e.dateRaw || e.dateBad)
-            ? `<span style="${MISS_STYLE}">дата не указана/ошибка</span>`
-            : escapeHtml(formatRange(e.range)));
-
-      const url        = escapeHtml(e.url);
-
-      // === NEW: для хронологии удаляем завершающее " [с]" у plot ===
-      const cleanEpisode = e.type === 'plot'
-        ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '')
-        : e.episode;
-      const ttl        = escapeHtml(cleanEpisode);
-
-      // === NEW: ошибка рядом с названием, если для plot не найдено " [с]" ===
-      const plotErrorHTML = (e.type === 'plot' && e.plotBad)
-        ? ` <span style="${MISS_STYLE}">нет " [с]"</span>`
+      // маски (опционально — можно убрать эту строку, если не нужно)
+      const masks = e.masksHtml && e.masksHtml.trim()
+        ? ` / роли: ${e.masksHtml}`
         : '';
 
-      const orderBadge = (e.order!=null) ? ` [${escapeHtml(String(e.order))}]` : '';
-
-      const names = renderParticipants(
-        e.participantsLower, e.masksByCharLower, e.charactersLower, e.maskKeysLower
-      );
-
-      const loc = (e.locationsLower && e.locationsLower.length)
-        ? escapeHtml(e.locationsLower.join(', '))
-        : `<span style="${MISS_STYLE}">локация не указана</span>`;
-
-      const dash = dateHTML ? ' — ' : ' ';
-      return `<p>${statusHTML} ${dateHTML}${dash}<a href="${url}" rel="nofollow">${ttl}</a>${plotErrorHTML}${orderBadge}<br><i>${names}</i> / ${loc}</p>`;
-    });
-
-    const body = items.join('') || `<p><i>— пусто —</i></p>`;
-
-    return `
-<div class="quote-box spoiler-box media-box">
-  <div onclick="toggleSpoiler(this)">Собранная хронология</div>
-  <blockquote>${body}</blockquote>
-</div>`;
-  }
-
-  /* =================== ЗАПУСК ПО КНОПКЕ + ПОДМЕНА #p83 =================== */
-  async function handleBuild(opts) {
-    const btn  = opts?.buttonEl || document.getElementById(BTN_ID);
-    const note = opts?.noteEl   || document.getElementById(NOTE_ID);
-
-    try {
-      const host = document.querySelector(OUT_SEL);
-      if (!host) {
-        console.warn('[FMV] контейнер вывода не найден:', OUT_SEL);
-        return;
+      // badge order: число или ошибка
+      let orderBadge = '';
+      if (e.orderBad) {
+        orderBadge = ` <span style="${MISS_STYLE}">order: неверный формат</span>`;
+      } else if (e.order != null) {
+        orderBadge = ` [${window.escapeHtml(String(e.order))}]`;
       }
 
-      if (btn)  { btn.disabled = true; btn.textContent = 'Собираю…'; }
-      if (note) { note.textContent = 'Готовлю хронологию…'; note.style.opacity = '.85'; note.classList.remove('fmv-note-bad'); }
+      const when = window.escapeHtml(e.when || '');
+      const title = window.escapeHtml(e.title || '');
 
-      const html = await buildWrappedHTML();
-      host.innerHTML = html;
+      return `
+        <div class="ga-row">
+          <div class="ga-line">
+            <span class="ga-num">${i+1}.</span>
+            <a class="ga-link" href="${e.pageUrl}">${title}</a>${orderBadge}
+          </div>
+          <div class="ga-sub">
+            <span class="ga-when">${when}</span>
+            <span class="ga-part"> / ${names}${masks}</span>
+            ${e.location ? ` <span class="ga-loc"> / локация: ${window.escapeHtml(e.location)}</span>` : ''}
+          </div>
+        </div>
+      `;
+    });
 
-      if (btn)  { btn.disabled = false; btn.textContent = 'Пересобрать хронологию'; }
-      if (note) { note.textContent = 'Готово'; note.style.opacity = '1'; }
-    } catch (e) {
-      console.warn('[FMV] ошибка сборки:', e);
-      if (btn)  { btn.disabled = false; btn.textContent = 'Пересобрать хронологию'; }
-      if (note) { note.textContent = 'Ошибка'; note.classList.add('fmv-note-bad'); }
-    }
-  }
-
-  /* ======================== UI: кнопка в p82 ======================== */
-  function ensureStyles() {
-    if (document.getElementById('fmv-chrono-styles')) return;
     const css = `
-      #${WRAP_ID}{ margin:8px 0 0; display:flex; gap:10px; align-items:center; }
-      #${NOTE_ID}{ font-size:90%; opacity:.85; }
-      .fmv-note-bad{ background: rgba(200,0,0,.14); padding: 2px 6px; border-radius: 4px; }
-    `.trim();
-    const style = document.createElement('style');
-    style.id = 'fmv-chrono-styles';
-    style.textContent = css;
-    document.documentElement.appendChild(style);
+      #get-all-output .ga-row{padding:8px 10px;border:1px solid #e1e1e1;border-radius:8px;margin:8px 0;background:#fff}
+      #get-all-output .ga-line{font-weight:700;margin-bottom:2px}
+      #get-all-output .ga-num{opacity:.6;margin-right:6px}
+      #get-all-output .ga-sub{opacity:.9}
+      #get-all-output .ga-link{text-decoration:none}
+      #get-all-output .ga-link:hover{text-decoration:underline}
+    `;
+
+    return `<style>${css}</style>${rows.join('')}`;
   }
 
-  function mountInlineButton() {
-    const host = document.querySelector(SRC_HOST_SEL);
-    if (!host) return false;
-
-    if (document.getElementById(WRAP_ID)) return true;
-
-    const wrap = document.createElement('div');
-    wrap.id = WRAP_ID;
-
-    const btn = document.createElement('a');
-    btn.id = BTN_ID;
-    btn.href = 'javascript:void(0)';
-    btn.className = 'button';
-    btn.textContent = 'Собрать хронологию';
-
-    const note = document.createElement('span');
-    note.id = NOTE_ID;
-
-    wrap.appendChild(btn);
-    wrap.appendChild(note);
-    host.appendChild(wrap);
-
-    btn.addEventListener('click', () => handleBuild({ buttonEl: btn, noteEl: note }));
-
-    return true;
-  }
-
-  /* ============================== INIT ============================== */
-  function init() {
-    ensureStyles();
-    mountInlineButton();
-    window.FMV_buildChronology = handleBuild;
-  }
-
-  /* ============================== HELPERS ============================== */
-  const escapeHtml = (s='') => String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-  const trimSp = (s) => String(s||'').replace(/\s+/g,' ').trim();
-  const abs = (base, href) => { try { return new URL(href, base).href; } catch { return href; } };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-  } else {
-    init();
-  }
 })();

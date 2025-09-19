@@ -36,13 +36,13 @@
   const rawOrder = FMV.readTagText(first, 'order');
 
   // карта id->имя по тем userID, что есть в characters
-  const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
+  const map = await FMV.buildIdToNameMapFromTags(rawChars);
 
   // формируем строки
   const lines = [];
 
   if (rawChars) {
-    const participantsHtml = FMV.renderParticipantsHtml(rawChars, idToNameMap, window.profileLink); // парсим участников
+    const participantsHtml = FMV.renderParticipantsHtml(rawChars, map, window.profileLink); // парсим участников
     lines.push(
       `<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`
     );

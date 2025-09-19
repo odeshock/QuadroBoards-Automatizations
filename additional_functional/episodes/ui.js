@@ -2,9 +2,6 @@
 (function(){
   'use strict';
 
-  // ───────────────── Доступ админам ─────────────────
-  const ALLOWED_GROUPS   = (window.FMV_ACCESS && window.FMV_ACCESS.groups) || ['1'];
-  const ALLOWED_USER_IDS = (window.FMV_ACCESS && window.FMV_ACCESS.users)  || ['2','4'];
 
   function detectCurrentUser(){
     // 1) если заранее задали
@@ -29,8 +26,8 @@
   }
   function isAllowedAdmin(){
     const u = detectCurrentUser();
-    return (u.id && ALLOWED_USER_IDS.includes(String(u.id))) ||
-           (u.group && ALLOWED_GROUPS.includes(String(u.group)));
+    return (u.id && CHRONO_CHECK.AllowedUser.includes(String(u.id))) ||
+           (u.group && CHRONO_CHECK.GroupID.includes(String(u.group)));
   }
 
   if (!window.FMV) window.FMV = {};
@@ -341,10 +338,10 @@
             if (typeof e.stopPropagation === 'function') e.stopPropagation();
         
             const miss = [];
-            if (!haveSubject)      miss.push('заголовок');
-            if (!haveMessage)      miss.push('сообщение');
-            if (!haveParticipants) miss.push('участники');
-            if (!havePlace)        miss.push('локация');
+            if (!haveSubject)      miss.push('Заголовок');
+            if (!haveMessage)      miss.push('Основной текст');
+            if (!haveParticipants) miss.push('Участники');
+            if (!havePlace)        miss.push('Локация');
             alert('Заполните: ' + miss.join(', '));
             return false; // на всякий случай
           }

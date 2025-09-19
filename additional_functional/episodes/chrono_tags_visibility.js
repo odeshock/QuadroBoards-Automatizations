@@ -35,10 +35,7 @@
   const rawOrder = FMV.readTagText(first, 'order');
 
   // карта id->имя (если глобальная есть — возьмём её; иначе с текущей страницы)
-  const idToNameMap =
-    (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size)
-      ? window.__FMV_ID_TO_NAME_MAP__
-      : FMV.idToNameFromPage();
+  const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars, rawMasks);
 
   // ——— ЕДИНАЯ строгая валидация/рендер ———
   const chars = FMV.parseCharactersStrict(rawChars, idToNameMap, window.profileLink);

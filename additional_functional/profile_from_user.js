@@ -8,16 +8,22 @@ function extractUserIdsFromString(s){
 }
 
 function profileLink(id, name) {
-  // если имя не найдено — добавляем пометку
-  const txt = (typeof name === 'string' && name.length)
-    ? name
-    : `user${id} (не найден)`;
+  const noNameHtml = `user${id} (<span class="fmv-missing">не найден</span>)`;
+  const withNameTxt = (typeof name === 'string' && name.length) ? name : null;
 
-  if (!MAKE_NAMES_LINKS) return txt;
+  if (!MAKE_NAMES_LINKS) {
+    // Без ссылок: можно вернуть HTML напрямую
+    return withNameTxt ?? noNameHtml;
+  }
 
+  // Со ссылками: используем innerHTML, чтобы сохранить подсветку
   const a = document.createElement('a');
   a.href = '/profile.php?id=' + encodeURIComponent(id);
-  a.textContent = txt;
+  if (withNameTxt) {
+    a.textContent = withNameTxt;
+  } else {
+    a.innerHTML = noNameHtml;
+  }
   return a.outerHTML;
 }
 

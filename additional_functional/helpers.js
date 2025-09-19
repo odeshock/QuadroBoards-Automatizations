@@ -82,3 +82,58 @@ function escapeHtml(s){
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
   ));
 }
+
+// helpers.js
+window.parseChronoTagsRaw = function(firstNode){
+  const pick = sel => firstNode.querySelector(sel)?.textContent.trim() || '';
+
+  const charsStr = pick('characters');
+  const masksStr = pick('masks');
+
+  const participantsLower = (charsStr ? charsStr.split(/\s*;\s*/) : [])
+    .map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  const masks = {};
+  (masksStr || '').split(/\s*;\s*/).forEach(pair=>{
+    const i = pair.indexOf('=');
+    if (i>0) masks[pair.slice(0,i).trim().toLowerCase()] = pair.slice(i+1).trim();
+  });
+
+  const all = new Set(participantsLower);
+  Object.keys(masks).forEach(k=>all.add(k));
+
+  return {
+    participantsLower: Array.from(all),
+    masks,
+    location: pick('location'),
+    order: pick('order'),
+  };
+};
+
+// Резолвер имён и готового HTML (использует profileLink / getProfileNameById)
+window.resolveChronoData = async function(raw, opts = {}){
+  const out = { ...raw, idToName: new Map(), participantsHtml: '', masksHtml: '' };
+
+  const ids = new Set();
+  for (const tok of raw.participantsLower) { const m = /^user(\d+)$/i.exec(tok); if (m) ids.add(String(+m[1])); }
+  for (const tok of Object.keys(raw.masks||{})) { const m = /^user(\d+)$/i.exec(tok); if (m) ids.add(String(+m[1])); }
+
+  for (const id of ids) {
+    try { out.idToName.set(id, await getProfileNameById(id) || null); }
+    catch { out.idToName.set(id, null); }
+  }
+
+  const renderLeft = (token) => {
+    const m = /^user(\d+)$/i.exec(token);
+    if (!m) return escapeHtml(token);
+    const id = String(+m[1]);
+    const name = out.idToName.get(id) || null;
+    return profileLink(id, name); // ← ГЛАВНОЕ: именно тут появится <a> или (не найден)
+  };
+
+  out.participantsHtml = raw.participantsLower.map(renderLeft).join('; ');
+  out.masksHtml = Object.entries(raw.masks||{}).map(([k,v]) => `${renderLeft(k)}=${escapeHtml(v)}`).join('; ');
+
+  return out;
+};
+

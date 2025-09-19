@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name         chrono_tags_visibility
-// @description  Показывает мета-инфо темы (участники, маски, локация, сортировка) c общей валидацией
+// @name         chrono_tags_visibility (unified characters)
+// @description  Показывает мета-инфо темы (участники, маски, локация, сортировка) из единого <characters>
 // @match        *://*/*
 // @run-at       document-end
 // @grant        none
@@ -9,57 +9,74 @@
 (async function () {
   'use strict';
 
-  // ——— зависимости: общий модуль + profile_from_user ———
+  // ждём зависимости: общий модуль + profile_from_user
   const ok = await waitFor(() =>
     window.FMV &&
+    typeof FMV.readTagText === 'function' &&
     typeof FMV.escapeHtml === 'function' &&
-    typeof FMV.parseCharactersStrict === 'function' &&
-    typeof FMV.parseMasksStrict === 'function' &&
+    typeof FMV.parseOrderStrict === 'function' &&
+    typeof FMV.buildIdToNameMapFromTags === 'function' &&
+    typeof FMV.parseCharactersUnified === 'function' &&
     typeof window.profileLink === 'function'
-  , { timeout: 12000 });
+  , { timeout: 15000 });
   if (!ok) return;
 
-  // ——— первый пост ———
+  // первый пост темы
   const first = await waitFor(() =>
     document.querySelector('.topic .post.topicpost, .post.topicpost, .message:first-of-type')
-  );
+  , { timeout: 15000 });
   if (!first) return;
 
-  // (опц.) фильтр по группам
+  // (опц.) фильтр по группам, если подключён check_group
   if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed()) return;
 
-  // ——— читаем СЫРЫЕ теги ———
-  const rawChars = FMV.readTagText(first, 'characters'); // строка вида "user1;user2"
-  const rawMasks = FMV.readTagText(first, 'masks');      // строка вида "user1=маска;user2=маска"
+  // читаем СЫРЫЕ теги
+  const rawChars = FMV.readTagText(first, 'characters'); // формат: userN; userM=mask; userM=mask; userK
   const rawLoc   = FMV.readTagText(first, 'location');
   const rawOrder = FMV.readTagText(first, 'order');
 
-  // карта id->имя (если глобальная есть — возьмём её; иначе с текущей страницы)
-  const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars, rawMasks);
+  // карта id->имя ровно по тем userID, что есть в characters
+  const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
 
-  // ——— ЕДИНАЯ строгая валидация/рендер ———
-  const chars = FMV.parseCharactersStrict(rawChars, idToNameMap, window.profileLink);
-  const masks = FMV.parseMasksStrict(rawMasks,      idToNameMap, window.profileLink);
+  // единый парсер участников/масок
+  const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
 
+  // формируем строки
   const lines = [];
 
   if (rawChars) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${chars.html}</div>`);
+    if (!uni.ok) {
+      lines.push(
+        `<div class="fmv-row"><span class="fmv-label">Участники:</span>${uni.htmlError}</div>`
+      );
+    } else {
+      lines.push(
+        `<div class="fmv-row"><span class="fmv-label">Участники:</span>${uni.htmlParticipants}</div>`
+      );
+      if (uni.htmlMasks) {
+        lines.push(
+          `<div class="fmv-row"><span class="fmv-label">Маски:</span>${uni.htmlMasks}</div>`
+        );
+      }
+    }
   }
-  if (rawMasks) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${masks.html}</div>`);
-  }
+
   if (rawLoc) {
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${FMV.escapeHtml(rawLoc)}</div>`);
+    lines.push(
+      `<div class="fmv-row"><span class="fmv-label">Локация:</span>${FMV.escapeHtml(rawLoc)}</div>`
+    );
   }
+
   if (rawOrder) {
     const ord = FMV.parseOrderStrict(rawOrder);
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${ord.html}</div>`);
+    lines.push(
+      `<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${ord.html}</div>`
+    );
   }
 
   if (!lines.length) return;
 
-  // ——— вставка блока (перед контентом первого поста) ———
+  // вставка блока (перед контентом первого поста)
   const block = document.createElement('div');
   block.className = 'fmv-meta';
   block.innerHTML = `
@@ -81,7 +98,7 @@
     first.insertBefore(block, first.firstChild);
   }
 
-  // ——— поведение кнопки ———
+  // поведение кнопки
   const btn  = block.querySelector('.fmv-toggle');
   const body = block.querySelector('.fmv-body');
   btn.addEventListener('click', () => {
@@ -90,7 +107,7 @@
     btn.textContent = show ? '▾' : '▸';
   });
 
-  // ——— стили ———
+  // стили
   injectStyle(`
     .fmv-meta{
       margin:8px 0; padding:8px; border:1px solid #d7d7d7;

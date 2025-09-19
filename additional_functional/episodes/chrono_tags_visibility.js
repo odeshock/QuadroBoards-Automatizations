@@ -46,13 +46,11 @@
 
   const lines = [];
 
-  if (charText) {
-    const res = parseCharactersStrict(charText, idToNameMap, window.profileLink);
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${res.html}</div>`);
+  if (rawChars) {
+    lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${chars.html}</div>`);
   }
-  if (maskText) {
-    const res = parseMasksStrict(maskText, idToNameMap, window.profileLink);
-    lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${res.html}</div>`);
+  if (rawMasks) {
+    lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${masks.html}</div>`);
   }
   if (rawLoc) {
     lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${FMV.escapeHtml(rawLoc)}</div>`);

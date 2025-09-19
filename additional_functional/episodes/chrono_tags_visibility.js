@@ -1,9 +1,12 @@
 // ==UserScript==
-// @name         RusFF FMV: chrono (your group detect scheme)
+// @name         RusFF FMV: chrono (split)
 // @namespace    fmv-tools
 // @match        https://testfmvoice.rusff.me/viewtopic.php?id=*
 // @run-at       document-idle
 // @grant        none
+// @require      file:///<путь>/helpers.js
+// @require      file:///<путь>/profile_from_user.js
+// @require      file:///<путь>/check_group.js
 // ==/UserScript==
 
 (function () {

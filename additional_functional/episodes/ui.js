@@ -1,4 +1,4 @@
-// fmv-all-in-one.js — единый виджет + подключатели для создания и редактирования
+// fmv-all-in-one.js — единый виджет + автоподключение
 (function(){
   'use strict';
 
@@ -42,7 +42,6 @@
         return val ? '[FMVplace]' + val + '[/FMVplace]' : '';
       }
       function buildFMVord(val){
-        // целое (может быть отрицательным); пустое = 0
         let n = parseInt(String(val||'').trim(), 10);
         if (Number.isNaN(n)) n = 0;
         return '[FMVord]' + n + '[/FMVord]';
@@ -133,11 +132,14 @@
         const $area = typeof opts.textarea === 'string' ? $(opts.textarea) : opts.textarea;
         if (!$form || !$form.length || !$area || !$area.length) return null;
 
-        // исходный текст и мгновенное скрытие меты при необходимости
+        // исходный текст и решение "монтироваться ли"
         const initialRaw = $area.val() || '';
-        if (opts.showOnlyIfFMVcast && !/\[FMVcast\][\s\S]*?\[\/FMVcast\]/i.test(initialRaw)) {
-          return null;
+        const hasAnyFMV = /\[FMV(?:cast|place|ord)\][\s\S]*?\[\/FMV(?:cast|place|ord)\]/i.test(initialRaw);
+        if (opts.showOnlyIfFMVcast && !hasAnyFMV) {
+          return null; // нет ни одного FMV-тега — не показываем UI
         }
+
+        // мгновенно скрываем мету в textarea (edit)
         if (opts.stripOnMount) {
           $area.val( stripFMV(initialRaw) );
         }
@@ -160,7 +162,7 @@
         const $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">');
         $placeRow.append($placeLabel,$placeInput);
 
-        // Новое поле порядка
+        // поле порядка
         const $ordRow = $('<div class="order-row"/>');
         const $ordLabel = $('<label for="fmv-ord" style="font-weight:600">Для сортировки эпизодов в один день</label>');
         const $ordInput = $('<input type="number" id="fmv-ord" placeholder="0" value="0" step="1">');
@@ -171,7 +173,6 @@
         const $err  =$('<div class="error" style="display:none"></div>');
 
         $area.before($wrap);
-        // порядок: поиск → чипы → локация → порядок → подсказка → ошибки
         $wrap.append($row, $chips, $placeRow, $ordRow, $hint, $err);
 
         let selected=[], knownUsers=[];
@@ -414,32 +415,32 @@
           form: $form,
           textarea: $area,
           prefill: true,
-          showOnlyIfFMVcast: !!showOnlyIfCast,
+          showOnlyIfFMVcast: !!showOnlyIfCast, // ← теперь «любой FMV-тег»
           className: 'fmv--compact',
-          stripOnMount: !!strip   // ← удаляем теги из textarea сразу при монтировании
+          stripOnMount: !!strip
         });
       }
     }
 
-    // СТАРОЕ: создание по /post.php?fid=8|9 (без strip, UI виден всегда)
+    // создание /post.php?fid=8|9 (старое)
     if (/\/post\.php$/i.test(path) && !q.has('action')) {
       const fid = +(q.get('fid')||0);
       if ([8,9].includes(fid)) attachToPage({ strip:false, showOnlyIfCast:false });
     }
 
-    // СТАРОЕ: редактирование первого поста темы /edit.php?topicpost=1 (strip и только если есть FMVcast)
+    // редактирование первого поста /edit.php?topicpost=1 (только если есть FMV-теги)
     if (/\/edit\.php$/i.test(path) && q.get('topicpost') === '1') {
       attachToPage({ strip:true, showOnlyIfCast:true });
     }
 
-    // НОВОЕ: /post.php?action=post&fid=8 — парсим из textarea и удаляем теги
+    // новое: /post.php?action=post&fid=8 — всегда, с очисткой textarea
     if (/\/post\.php$/i.test(path) && q.get('action') === 'post' && +q.get('fid') === 8) {
       attachToPage({ strip:true, showOnlyIfCast:false });
     }
 
-    // НОВОЕ: /edit.php?id=N&action=edit — парсим из textarea и удаляем теги
+    // новое: /edit.php?id=N&action=edit — монтируемся ТОЛЬКО если есть любые FMV-теги
     if (/\/edit\.php$/i.test(path) && q.get('action') === 'edit' && q.has('id')) {
-      attachToPage({ strip:true, showOnlyIfCast:false });
+      attachToPage({ strip:true, showOnlyIfCast:true });
     }
   });
 

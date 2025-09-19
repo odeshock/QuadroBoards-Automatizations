@@ -261,54 +261,44 @@
 
   /* ---------- MНОЖЕСТВЕННЫЕ location/characters/masks ---------- */
   function extractFromFirst(firstNode) {
-    // locations
-    const locSet = new Set();
-    firstNode.querySelectorAll('location').forEach(n => {
-      const raw = safeNodeText(n);
-      if (!raw) return;
-      raw.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase()).forEach(v=>locSet.add(v));
+    // Находим собранный блок chrono_tags_visibility
+    const fmv = firstNode.querySelector('.fmv-body');
+    if (!fmv) return { participantsLower: [], masks: {} };
+  
+    // ---- Участники ----
+    const rowChars = Array.from(fmv.querySelectorAll('.fmv-row')).find(r => {
+      const lab = r.querySelector('.fmv-label');
+      return lab && /Участники:/i.test(lab.textContent || '');
     });
-    const locationsLower = Array.from(locSet);
-
-    // characters
-    const charSet = new Set();
-    firstNode.querySelectorAll('characters').forEach(n => {
-      const raw = safeNodeText(n);
-      if (!raw) return;
-      raw.split(CHAR_SPLIT).map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase()).forEach(v=>charSet.add(v));
+  
+    const participantsLower = rowChars
+      ? (rowChars.textContent || '')
+          .replace(/^\s*Участники:\s*/i, '')
+          .split(/\s*;\s*/)
+          .map(s => s.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+  
+    // ---- Маски ----
+    const rowMasks = Array.from(fmv.querySelectorAll('.fmv-row')).find(r => {
+      const lab = r.querySelector('.fmv-label');
+      return lab && /Маски:/i.test(lab.textContent || '');
     });
-    const charactersLower = Array.from(charSet);
-
-    // masks: "name=role; name=role2"
-    const masksByCharLower = new Map(); // charLower -> Set(rolesLower)
-    firstNode.querySelectorAll('masks').forEach(n => {
-      const raw = safeNodeText(n);
-      if (!raw) return;
-      raw.split(/\s*;\s*/).forEach(pair => {
-        if (!pair) return;
-        const p = pair.indexOf('=');
-        if (p <= 0) return;
-        const k = pair.slice(0, p).trim().toLowerCase();
-        const v = pair.slice(p + 1).trim().toLowerCase();
-        if (!k || !v) return;
-        if (!masksByCharLower.has(k)) masksByCharLower.set(k, new Set());
-        masksByCharLower.get(k).add(v);
+  
+    const masks = {};
+    if (rowMasks) {
+      const maskPairs = (rowMasks.textContent || '')
+        .replace(/^\s*Маски:\s*/i, '')
+        .split(/\s*;\s*/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      maskPairs.forEach(pair => {
+        const [user, mask] = pair.split('=');
+        if (user && mask) masks[user.trim().toLowerCase()] = mask.trim();
       });
-    });
-    const maskKeysLower = new Set(masksByCharLower.keys());
-
-    // объединённый список участников
-    const participantsLower = Array.from(new Set([...charactersLower, ...maskKeysLower]));
-
-    // order
-    let order = null;
-    const orderNode = firstNode.querySelector('order');
-    if (orderNode) {
-      const num = parseInt(safeNodeText(orderNode), 10);
-      if (Number.isFinite(num)) order = num;
     }
-
-    return { locationsLower, charactersLower, participantsLower, masksByCharLower, maskKeysLower, order };
+  
+    return { participantsLower, masks };
   }
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {

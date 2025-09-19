@@ -41,64 +41,71 @@
   // глобальный флаг «делать имена ссылками»
   FMV.makeLinks = () => !!window.MAKE_NAMES_LINKS;
 
-  // ---------- строгие парсеры, единые для всех скриптов ----------
-  // profileLink берём из window.profileLink, но можно передать и параметром
-  FMV.parseCharactersStrict = function(charText, idToNameMap, profileLink = window.profileLink) {
-    const TEMPLATE = /^\s*user\d+(?:\s*;\s*user\d+)*\s*$/i;
-    const human = (charText || '').split(/\s*;\s*/).filter(Boolean).join('; ');
-
-    if (!charText || !TEMPLATE.test(charText)) {
+  // ===== Единый парсер <characters> с масками =====
+  FMV.parseCharactersUnified = function(charsText, idToNameMap, profileLink = window.profileLink) {
+    const raw = String(charsText || '').trim();
+    if (!raw) {
       return {
-        ok: false,
         participantsLower: [],
-        html: `<span class="fmv-missing">Нужен формат userN;userN;userN</span>` +
-              (human ? ' — ' + FMV.escapeHtml(human) : '')
+        masksByCharLower: new Map(),
+        htmlParticipants: '',
+        htmlMasks: '',
+        htmlError: ''
       };
     }
-
-    const ids = (charText.match(/user(\d+)/gi) || [])
-      .map(m => String(Number(m.replace(/^\D+/, ''))));
-
-    const htmlParts = ids.map(id => profileLink(id, idToNameMap.get(id)));
-    const participantsLower = ids.map(id => ('user' + id).toLowerCase());
-
-    return { ok: true, participantsLower, html: htmlParts.join('; ') };
-  };
-
-  FMV.parseMasksStrict = function(maskText, idToNameMap, profileLink = window.profileLink) {
-    const TEMPLATE = /^\s*user\d+\s*=\s*[^;]+(?:\s*;\s*user\d+\s*=\s*[^;]+)*\s*$/i;
-    const human = (maskText || '').split(/\s*;\s*/).filter(Boolean).join('; ');
-
-    if (!maskText || !TEMPLATE.test(maskText)) {
+  
+    // Шаблон: userN или userN=mask, разделитель ;
+    const TEMPLATE = /^\s*user\d+(?:\s*=\s*[^;]+)?(?:\s*;\s*user\d+(?:\s*=\s*[^;]+)?)*\s*$/i;
+    if (!TEMPLATE.test(raw)) {
       return {
-        ok: false,
-        mapLower: new Map(),
-        html: `<span class="fmv-missing">Нужен формат userN=маска;userN=маска</span>` +
-              (human ? ' — ' + FMV.escapeHtml(human) : '')
+        participantsLower: [],
+        masksByCharLower: new Map(),
+        htmlParticipants: '',
+        htmlMasks: '',
+        htmlError: `<span class="fmv-missing">Ошибка формата! ` +
+                   `Нужен вид: userN; userM=маска; userM=маска; …</span>`
       };
     }
-
-    const mapLower = new Map(); // 'user11' -> Set(['ведущий', ...]) (lower)
-    const htmlParts = [];
-
-    maskText.split(';').forEach(pair => {
-      const [left, right] = pair.split('=');
+  
+    const parts = raw.split(/\s*;\s*/).filter(Boolean);
+    const participantsSet = new Set();
+    const masksByCharLower = new Map();
+    const htmlMaskPairs = [];
+    const htmlPeople = [];
+  
+    for (const p of parts) {
+      const [left, right] = p.split('=');
       const id = String(Number((left.match(/user(\d+)/i) || [,''])[1]));
-      const mask = FMV.normSpace(right);
-
-      if (!id || !mask) return;
-
-      htmlParts.push(`${profileLink(id, idToNameMap.get(id))}=${FMV.escapeHtml(mask)}`);
-
-      const k = ('user' + id).toLowerCase();
-      const m = mask.toLowerCase();
-      if (!mapLower.has(k)) mapLower.set(k, new Set());
-      mapLower.get(k).add(m);
-    });
-
-    return { ok: true, mapLower, html: htmlParts.join('; ') };
+      const key = ('user' + id).toLowerCase();
+      participantsSet.add(key);
+  
+      const personHtml = profileLink(id, idToNameMap?.get(id));
+      if (right) {
+        const mask = FMV.normSpace(right);
+        if (!masksByCharLower.has(key)) masksByCharLower.set(key, new Set());
+        masksByCharLower.get(key).add(mask.toLowerCase());
+        htmlMaskPairs.push(`${personHtml}=${FMV.escapeHtml(mask)}`);
+      }
+      htmlPeople.push(personHtml);
+    }
+  
+    const participantsLower = Array.from(participantsSet);
+    const htmlParticipants = participantsLower.map(low => {
+      const roles = Array.from(masksByCharLower.get(low) || []);
+      const id = String(+low.replace(/^user/i,''));
+      const base = profileLink(id, idToNameMap?.get(id));
+      return roles.length ? `${base} [as ${FMV.escapeHtml(roles.join(', '))}]` : base;
+    }).join('; ');
+  
+    return {
+      participantsLower,
+      masksByCharLower,
+      htmlParticipants,
+      htmlMasks: htmlMaskPairs.join('; '),
+      htmlError: ''
+    };
   };
-
+  
   // ---------- строгая проверка <order> ----------
   /** 
    * Проверяет, что значение order — целое число.

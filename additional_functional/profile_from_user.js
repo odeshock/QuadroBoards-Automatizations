@@ -24,7 +24,8 @@ function profileLink(id, name) {
 function replaceUserTokens(s, idToNameMap){
   return escapeHtml(s || '').replace(/user(\d+)/gi, (m, d) => {
     const id = String(Number(d));
-    const name = idToNameMap.has(id) ? idToNameMap.get(id) : undefined;
+    const name = idToNameMap.get(id);
+    if (!name) return `<span class="fmv-missing">user${id} (не найден)</span>`;
     return profileLink(id, name);
   });
 }
@@ -32,11 +33,15 @@ function replaceUserTokens(s, idToNameMap){
 function replaceUserInPairs(s, idToNameMap){
   return (s||'').split(/\s*;\s*/).filter(Boolean).map(pair=>{
     const [left,right] = pair.split('=');
-    if (!right) return replaceUserTokens(left, idToNameMap);
+    if (!right) {
+      // нет знака равенства — считаем ошибкой
+      return `<span class="fmv-missing">${replaceUserTokens(left, idToNameMap)} (ожидалось =маска)</span>`;
+    }
     const replacedLeft = replaceUserTokens(left, idToNameMap);
     return `${replacedLeft}=${escapeHtml(right)}`;
   }).join('; ');
 }
+
 
 // ─────────────── userN → Имя профиля (с кэшем) ───────────────
 const nameCache = new Map();

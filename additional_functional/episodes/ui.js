@@ -94,6 +94,32 @@
         .fmv .chips .chip{ align-items:center; }
         .fmv .chips .chip .mask-input{ margin-left:auto; } /* отталкивает всё справа */
         .fmv .chips .chip .x{ margin-left:8px; }          /* небольшой отступ от поля маски */
+        
+        /* Чипы — выравнивание по центру */
+        .fmv .chips .chip{ align-items:center; }
+        
+        /* Блок с полем и кнопками — в ряд, с зазором; прилипает вправо */
+        .fmv .chips .chip .mask-input{
+          display:flex; align-items:center; gap:8px; margin-left:auto;
+        }
+        
+        /* Поле растягивается, размеры как в теме */
+        .fmv .chips .chip .mask-input input{
+          flex:1; min-width:260px; height:30px;
+          padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
+          background:#efe9dc; color:var(--fmv-text);
+        }
+        
+        /* Кнопки — отдельные, удобные для клика */
+        .fmv .chips .chip .btn{
+          border:1px solid var(--fmv-b); border-radius:6px;
+          background:#fff; padding:6px 10px; cursor:pointer; line-height:1;
+        }
+        .fmv .chips .chip .btn-ok{ background:#e9f6e9; }
+        .fmv .chips .chip .btn-cancel{ background:#f4eeee; }
+        
+        /* Отступ от поля до крестика */
+        .fmv .chips .chip .x{ margin-left:8px; }
 
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
@@ -139,10 +165,11 @@
             const $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
             const $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
 
-            const $maskBox=$('<span class="mask-input"></span>');
-            const $maskInput=$('<input type="text" placeholder="маска (текст)">');
-            const $maskOk=$('<button type="button">Ок</button>');
-            const $maskCancel=$('<button type="button">Отмена</button>');
+            var $maskBox   =$('<span class="mask-input"></span>');
+            var $maskInput =$('<input type="text" placeholder="маска (текст)">');
+            var $maskOk    =$('<button type="button" class="btn btn-ok">Ок</button>');
+            var $maskCancel=$('<button type="button" class="btn btn-cancel">Отмена</button>');
+
             $maskBox.append($maskInput,$maskOk,$maskCancel);
 
             $maskInput.on('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); $maskOk.click(); } });

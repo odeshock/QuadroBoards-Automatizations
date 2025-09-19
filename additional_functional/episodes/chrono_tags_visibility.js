@@ -14,7 +14,7 @@
 
   /*** Настройки ***/
   const DEFAULT_COLLAPSED = true;   // блок по умолчанию свёрнут?
-  const MAKE_NAMES_LINKS  = (window.MAKE_NAMES_LINKS ?? false);  // делать имена ссылками на профили
+  const MAKE_NAMES_LINKS  = (window.MAKE_NAMES_LINKS ?? true);  // делать имена ссылками на профили
   const isFiniteNum = (x) => x !== null && x !== undefined && isFinite(Number(x));
 
 

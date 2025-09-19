@@ -8,7 +8,7 @@ function extractUserIdsFromString(s){
 }
 
 function profileLink(id, name) {
-  const noNameHtml = `user${id} (<span class="fmv-missing">не найден</span>)`;
+  const noNameHtml = `<span class="fmv-missing">user${id}</span> (не найден)`;
   const withNameTxt = (typeof name === 'string' && name.length) ? name : null;
 
   if (!MAKE_NAMES_LINKS) {
@@ -31,7 +31,7 @@ function replaceUserTokens(s, idToNameMap){
   return escapeHtml(s || '').replace(/user(\d+)/gi, (m, d) => {
     const id = String(Number(d));
     const name = idToNameMap.get(id);
-    if (!name) return `<span class="fmv-missing">user${id} (не найден)</span>`;
+    if (!name) return `<span class="fmv-missing">user${id}</span> (не найден)`;
     return profileLink(id, name);
   });
 }

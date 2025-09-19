@@ -175,6 +175,26 @@
           color:#8b8378; font-size:14px; padding:0 2px;
         }
 
+        /* было: justify-content:space-between */
+        .fmv .chips .chip{
+          display:flex;
+          align-items:center;
+          gap:10px;
+          justify-content:flex-start;   /* ← текст не центрируется */
+        }
+        
+        /* когда форма маски закрыта – ссылка уезжает вправо */
+        .fmv .chips .chip .add-mask{ margin-left:auto; }
+        
+        /* когда форма маски открыта – она уезжает вправо */
+        .fmv .chips .chip .mask-input{ display:none; margin-left:auto; }
+        .fmv .chips .chip .mask-input.is-open{
+          display:flex; align-items:center; gap:8px;
+        }
+        
+        /* (остальное оставить как было) */
+        .fmv .chips .chip .x{ margin-left:8px; }
+
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
@@ -203,7 +223,8 @@
         const $chips=$('<div class="chips"/>');
         const $err  =$('<div class="error" style="display:none"></div>');
 
-        $area.before($wrap); $wrap.append($row,$placeRow,$chips,$hint,$err);
+        $area.before($wrap);
+        $wrap.append($row, $chips, $placeRow, $hint, $err); 
 
         let selected=[], knownUsers=[];
 

@@ -1,64 +1,51 @@
-/* ====== FMV unified characters & helpers (new format) ====== */
-(function () {
+// ==UserScript==
+// @name         fmv_common
+// @namespace    fmv
+// @version      1.0.0
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+
+(function() {
+  'use strict';
   const FMV = (window.FMV = window.FMV || {});
 
-  // пригодится внизу — но не перезаписываем, если уже есть
-  FMV.escapeHtml = FMV.escapeHtml || function (s) {
+  // ---------- базовые утилиты ----------
+  FMV.escapeHtml = function (s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   };
-  FMV.normSpace = FMV.normSpace || function (s) {
+
+  FMV.normSpace = function (s) {
     return String(s ?? '').replace(/\s+/g, ' ').trim();
   };
-  FMV.readTagText = FMV.readTagText || function (root, tag) {
+
+  FMV.readTagText = function(root, tag) {
     return FMV.normSpace(root?.querySelector(tag)?.textContent || '');
   };
 
-  // 1) вытащить userID из ЕДИНОГО текста <characters>
-  FMV.extractUserIdsFromTags = function (charsText) {
-    const ids = new Set();
-    String(charsText || '').replace(/user(\d+)/gi, (_, d) => { ids.add(String(Number(d))); return _; });
-    return Array.from(ids);
-  };
-
-  // 2) построить карту id->имя по указанным в <characters> userID
-  FMV.buildIdToNameMapFromTags = async function (charsText) {
-    // если кто-то заранее положил кэш — используем
-    if (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size) {
-      return window.__FMV_ID_TO_NAME_MAP__;
-    }
-    const ids = FMV.extractUserIdsFromTags(charsText);
+  // на странице может не быть карты id->name; это запасной способ набрать её из DOM
+  FMV.idToNameFromPage = function() {
     const map = new Map();
-    if (typeof window.getProfileNameById !== 'function') return map;
-
-    await Promise.all(ids.map(async (id) => {
-      try {
-        const name = await window.getProfileNameById(id);
-        if (name) map.set(id, name);
-      } catch {}
-    }));
+    document.querySelectorAll('.post a[href*="profile.php?id="]').forEach(a=>{
+      const m = a.href.match(/id=(\d+)/);
+      if (!m) return;
+      const id = String(m[1]);
+      const name = FMV.normSpace(a.textContent);
+      if (id && name) map.set(id, name);
+    });
     return map;
   };
 
-  // 3) строгая проверка order (оставляем единую)
-  FMV.parseOrderStrict = FMV.parseOrderStrict || function(orderText){
-    const raw = FMV.normSpace(orderText);
-    if (!raw) return { ok:false, html:'' };
-    if (/^-?\d+$/.test(raw)) return { ok:true, value:parseInt(raw,10), html:FMV.escapeHtml(raw) };
-    return {
-      ok:false,
-      html:`<span class="fmv-missing">Ошибка! Нужен формат целого числа (пример: -3 или 5)</span> — ${FMV.escapeHtml(raw)}`
-    };
-  };
+  // глобальный флаг «делать имена ссылками»
+  FMV.makeLinks = () => !!window.MAKE_NAMES_LINKS;
 
-  // 4) ЕДИНЫЙ ПАРСЕР нового формата <characters>
-  //    "userN; userM=mask; userM=mask; userK"
-  FMV.parseCharactersUnified = function (charsText, idToNameMap, profileLink = window.profileLink) {
+  // ===== Единый парсер <characters> с масками =====
+  FMV.parseCharactersUnified = function(charsText, idToNameMap, profileLink = window.profileLink) {
     const raw = String(charsText || '').trim();
     if (!raw) {
       return {
-        ok:false,
         participantsLower: [],
         masksByCharLower: new Map(),
         htmlParticipants: '',
@@ -66,35 +53,32 @@
         htmlError: ''
       };
     }
-
-    // только user\d+ либо user\d+=не-«;», разделитель «;»
+  
+    // Шаблон: userN или userN=mask, разделитель ;
     const TEMPLATE = /^\s*user\d+(?:\s*=\s*[^;]+)?(?:\s*;\s*user\d+(?:\s*=\s*[^;]+)?)*\s*$/i;
-    const human = raw.split(/\s*;\s*/).filter(Boolean).join('; ');
     if (!TEMPLATE.test(raw)) {
       return {
-        ok:false,
         participantsLower: [],
         masksByCharLower: new Map(),
         htmlParticipants: '',
         htmlMasks: '',
-        htmlError:
-          `<span class="fmv-missing">Аааа! Надо пересобрать всё по шаблону: ` +
-          `userN; userM=маска; userM=маска; userK</span> — ${FMV.escapeHtml(human)}`
+        htmlError: `<span class="fmv-missing">Ошибка формата! ` +
+                   `Нужен вид: userN; userM=маска; userM=маска; …</span>`
       };
     }
-
-    const parts = raw.split(';').map(s => s.trim()).filter(Boolean);
-    const participantsSet = new Set();                 // 'user5', 'user11' …
-    const masksByCharLower = new Map();                // 'user5' -> Set(['mask1','mask2'])
+  
+    const parts = raw.split(/\s*;\s*/).filter(Boolean);
+    const participantsSet = new Set();
+    const masksByCharLower = new Map();
     const htmlMaskPairs = [];
-
-    // собираем участников и пары «масок»
+    const htmlPeople = [];
+  
     for (const p of parts) {
       const [left, right] = p.split('=');
       const id = String(Number((left.match(/user(\d+)/i) || [,''])[1]));
       const key = ('user' + id).toLowerCase();
       participantsSet.add(key);
-
+  
       const personHtml = profileLink(id, idToNameMap?.get(id));
       if (right) {
         const mask = FMV.normSpace(right);
@@ -102,20 +86,18 @@
         masksByCharLower.get(key).add(mask.toLowerCase());
         htmlMaskPairs.push(`${personHtml}=${FMV.escapeHtml(mask)}`);
       }
+      htmlPeople.push(personHtml);
     }
-
+  
     const participantsLower = Array.from(participantsSet);
-
-    // «Участники:» — имя + [as …] если есть маски у этого user
     const htmlParticipants = participantsLower.map(low => {
       const roles = Array.from(masksByCharLower.get(low) || []);
       const id = String(+low.replace(/^user/i,''));
       const base = profileLink(id, idToNameMap?.get(id));
       return roles.length ? `${base} [as ${FMV.escapeHtml(roles.join(', '))}]` : base;
     }).join('; ');
-
+  
     return {
-      ok:true,
       participantsLower,
       masksByCharLower,
       htmlParticipants,
@@ -123,4 +105,62 @@
       htmlError: ''
     };
   };
+  
+  // ---------- строгая проверка <order> ----------
+  /** 
+   * Проверяет, что значение order — целое число.
+   * Возвращает:
+   *   { ok:true, value:number, html:string }  – если корректно
+   *   { ok:false, html:string }               – если ошибка (html с подсветкой)
+   */
+  FMV.parseOrderStrict = function(orderText) {
+    const raw = FMV.normSpace(orderText);
+    if (!raw) return { ok: false, html: '' };
+
+    if (/^-?\d+$/.test(raw)) {
+      return { ok: true, value: parseInt(raw, 10), html: FMV.escapeHtml(raw) };
+    }
+    return {
+      ok: false,
+      html: `<span class="fmv-missing">Нужен формат целого числа (пример: -3 или 5)</span>` +
+            ` — ${FMV.escapeHtml(raw)}`
+    };
+  };
+
+  // --- извлечение userID из сырого текста тегов ---
+  FMV.extractUserIdsFromTags = function (charsText, masksText) {
+    const ids = new Set();
+    const scan = (s) => String(s || '').replace(/user(\d+)/gi, (_, d) => {
+      ids.add(String(Number(d)));
+      return _;
+    });
+    scan(charsText);
+    scan(masksText);
+    return Array.from(ids);
+  };
+  
+  // --- построение карты id -> имя по userID из <characters>/<masks> ---
+  FMV.buildIdToNameMapFromTags = async function (charsText, masksText) {
+    // если есть глобальный кэш — используем его
+    if (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size) {
+      return window.__FMV_ID_TO_NAME_MAP__;
+    }
+  
+    // иначе резолвим только те id, что реально указаны в тегах
+    const ids = FMV.extractUserIdsFromTags(charsText, masksText);
+    const map = new Map();
+  
+    // getProfileNameById — из profile_from_user.js
+    if (typeof window.getProfileNameById !== 'function') return map;
+  
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const name = await window.getProfileNameById(id);
+        if (name) map.set(id, name);
+      } catch { /* no-op */ }
+    }));
+  
+    return map;
+  };
+
 })();

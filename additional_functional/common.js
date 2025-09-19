@@ -99,4 +99,25 @@
     return { ok: true, mapLower, html: htmlParts.join('; ') };
   };
 
+  // ---------- строгая проверка <order> ----------
+  /** 
+   * Проверяет, что значение order — целое число.
+   * Возвращает:
+   *   { ok:true, value:number, html:string }  – если корректно
+   *   { ok:false, html:string }               – если ошибка (html с подсветкой)
+   */
+  FMV.parseOrderStrict = function(orderText) {
+    const raw = FMV.normSpace(orderText);
+    if (!raw) return { ok: false, html: '' };
+
+    if (/^-?\d+$/.test(raw)) {
+      return { ok: true, value: parseInt(raw, 10), html: FMV.escapeHtml(raw) };
+    }
+    return {
+      ok: false,
+      html: `<span class="fmv-missing">Ошибка! Нужен формат целого числа (пример: -3 или 5)</span>` +
+            ` — ${FMV.escapeHtml(raw)}`
+    };
+  };
+
 })();

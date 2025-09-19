@@ -186,7 +186,7 @@
         const $comboLabel = $('<label for="fmv-character" style="font-weight:600">Участники эпизода:</label>');
         const $comboInput=$('<input type="text" id="character-combo" placeholder="Наберите имя персонажа…" autocomplete="off">');
         const $ac=$('<div class="ac-list" role="listbox" aria-label="Варианты персонажей"></div>');
-        const $comboHint  = $('<div class="place-hint">Если что-то не работает, напишите в Приемную.</div>');
+        const $comboHint  = $('<div class="character-hint">Если что-то не работает, напишите в Приемную.</div>');
         $combo.append($comboInput,$ac); $row.append($combo,$comboHint);
 
         const $chips=$('<div class="chips"/>');

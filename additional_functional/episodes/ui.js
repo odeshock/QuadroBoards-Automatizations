@@ -79,38 +79,88 @@
       function injectCSS(){
         if (cssInjected) return; cssInjected=true;
         const css = `
-        :root{--fmv-bg:#f7f4ea;--fmv-b:#d8d1c3;--fmv-chip:#fff;--fmv-radius:10px;--fmv-gap:8px;--fmv-text:#2d2a26;--fmv-muted:#6b6359;}
-        .msg-with-characters.fmv{margin:10px 0;padding:10px;border:1px solid var(--fmv-b);background:var(--fmv-bg);border-radius:var(--fmv-radius)}
-        .fmv .char-row{display:flex;gap:var(--fmv-gap);align-items:flex-start;flex-wrap:wrap}
-        .fmv .combo{position:relative;flex:1 1 480px}
-        .fmv .combo input,.fmv .place-row input,.fmv .order-row input{width:100%;height:36px;padding:8px 10px;border:1px solid var(--fmv-b);border-radius:8px;background:#efe9dc;color:var(--fmv-text);font-size:14px}
-        .fmv .place-row,.fmv .order-row{margin-top:8px}
-        .fmv .place-row label,.fmv .order-row label{display:block;margin-bottom:4px;font-weight:600;color:var(--fmv-text)}
-        .fmv .order-hint{font-size:12.5px;color:var(--fmv-muted);margin-top:4px}
-        .fmv .ac-list{position:absolute;z-index:50;left:0;right:0;background:#fff;border:1px solid var(--fmv-b);border-radius:8px;margin-top:4px;max-height:240px;overflow:auto}
-        .fmv .ac-item{padding:.45em .65em;cursor:pointer;font-size:14px}
-        .fmv .ac-item.active,.fmv .ac-item:hover{background:#f0efe9}
-        .fmv .ac-item .muted{color:var(--fmv-muted)}
-        .fmv .chips .chip{display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:.45em .6em;background:var(--fmv-chip);border:1px solid var(--fmv-b);border-radius:8px;margin:.35em 0;font-size:14px}
-        .fmv .chip .drag{cursor:grab;margin-right:.4em;color:#8b8378}
-        .fmv .chip .name{font-weight:600}
-        .fmv .masks{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--fmv-muted)}
-        .fmv .masks .masks-label{color:var(--fmv-muted);margin-right:2px}
-        .fmv .mask-badge{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--fmv-b);border-radius:999px;background:#efe9dc;font-size:13px;color:var(--fmv-text)}
-        .fmv .mask-badge .mask-remove{border:0;background:none;cursor:pointer;line-height:1;color:#8b8378;font-size:14px;padding:0 2px}
-        .fmv .chip .add-mask{border:0;background:none;color:#2e5aac;cursor:pointer;padding:0;text-decoration:underline;margin-left:auto}
-        .fmv .chip .x{border:0;background:none;font-size:16px;line-height:1;cursor:pointer;color:#8b8378;margin-left:8px}
-        .fmv .chip .mask-input{display:none;margin-left:auto}
-        .fmv .chip .mask-input.is-open{display:flex;align-items:center;gap:8px}
-        .fmv .chip .mask-input input{flex:1;min-width:260px;height:30px;padding:6px 8px;border:1px solid var(--fmv-b);border-radius:6px;background:#efe9dc;color:var(--fmv-text)}
-        .fmv .chip .btn{border:1px solid var(--fmv-b);border-radius:6px;background:#fff;padding:6px 10px;cursor:pointer;line-height:1}
-        .fmv .chip .btn-ok{background:#e9f6e9}.fmv .chip .btn-cancel{background:#f4eeee}
-        .fmv .hint{font-size:13px;color:var(--fmv-muted);margin-top:6px}
-        .fmv .error{color:#b00;margin-top:6px}
-        /* админ-кнопка */
-        .fmv-admin-tools{display:flex;justify-content:flex-end;margin:6px 0 8px}
-        .fmv-admin-tools .fmv-toggle{border:1px solid var(--fmv-b);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+          :root{
+            --fmv-bg:#f7f4ea; --fmv-b:#d8d1c3; --fmv-chip:#fff;
+            --fmv-radius:10px; --fmv-gap:8px; --fmv-text:#2d2a26; --fmv-muted:#6b6359;
+          }
+          
+          /* ↓↓↓ новые строки, чтобы ничего не вылезало по ширине */
+          .msg-with-characters.fmv,
+          .msg-with-characters.fmv * { box-sizing: border-box; }
+          .msg-with-characters.fmv { width:100%; max-width:100%; overflow-x:hidden; }
+          .fmv .combo, .fmv .place-row, .fmv .order-row, .fmv .hint { width:100%; max-width:100%; }
+          .fmv .combo input,
+          .fmv .place-row input,
+          .fmv .order-row input { width:100%; max-width:100%; }
+          /* автокомплит и чипы не должны переползать по X */
+          .fmv .ac-list { left:0; right:0; max-width:100%; }
+          .fmv .chips { max-width:100%; overflow-x:hidden; }
+          .fmv .hint { overflow-wrap:anywhere; }
+          /* ↑↑↑ конец добавок */
+          
+          .msg-with-characters.fmv{margin:10px 0; padding:10px; border:1px solid var(--fmv-b); background:var(--fmv-bg); border-radius:var(--fmv-radius)}
+          .fmv .char-row{display:flex; gap:var(--fmv-gap); align-items:flex-start; flex-wrap:wrap}
+          .fmv .combo{position:relative; flex:1 1 480px}
+          .fmv .combo input,
+          .fmv .place-row input,
+          .fmv .order-row input{
+            height:36px;
+            padding:8px 10px; border:1px solid var(--fmv-b); border-radius:8px;
+            background:#efe9dc; color:var(--fmv-text); font-size:14px;
+          }
+          .fmv .place-row,.fmv .order-row{margin-top:8px}
+          .fmv .place-row label,.fmv .order-row label{display:block; margin-bottom:4px; font-weight:600; color:var(--fmv-text)}
+          .fmv .order-hint{font-size:12.5px; color:var(--fmv-muted); margin-top:4px}
+          
+          .fmv .ac-list{
+            position:absolute; z-index:50; background:#fff;
+            border:1px solid var(--fmv-b); border-radius:8px; margin-top:4px; max-height:240px; overflow:auto
+          }
+          .fmv .ac-item{padding:.45em .65em; cursor:pointer; font-size:14px}
+          .fmv .ac-item.active,.fmv .ac-item:hover{background:#f0efe9}
+          .fmv .ac-item .muted{color:var(--fmv-muted)}
+          
+          .fmv .chips .chip{
+            display:flex; align-items:center; justify-content:flex-start;
+            gap:10px; padding:.45em .6em; background:var(--fmv-chip);
+            border:1px solid var(--fmv-b); border-radius:8px; margin:.35em 0; font-size:14px
+          }
+          .fmv .chip .drag{cursor:grab; margin-right:.4em; color:#8b8378}
+          .fmv .chip .name{font-weight:600}
+          
+          .fmv .masks{display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--fmv-muted)}
+          .fmv .masks .masks-label{ color:var(--fmv-muted); margin-right:2px; }
+          .fmv .mask-badge{
+            display:inline-flex; align-items:center; gap:6px;
+            padding:2px 8px; border:1px solid var(--fmv-b); border-radius:999px;
+            background:#efe9dc; font-size:13px; color:var(--fmv-text);
+          }
+          .fmv .mask-badge .mask-remove{
+            border:0; background:none; cursor:pointer; line-height:1;
+            color:#8b8378; font-size:14px; padding:0 2px;
+          }
+          
+          .fmv .chip .add-mask{border:0; background:none; color:#2e5aac; cursor:pointer; padding:0; text-decoration:underline; margin-left:auto}
+          .fmv .chip .x{border:0; background:none; font-size:16px; line-height:1; cursor:pointer; color:#8b8378; margin-left:8px}
+          
+          .fmv .chip .mask-input{ display:none; margin-left:auto; }
+          .fmv .chip .mask-input.is-open{ display:flex; align-items:center; gap:8px; }
+          .fmv .chip .mask-input input{
+            flex:1; min-width:220px; height:30px;
+            padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
+            background:#efe9dc; color:var(--fmv-text);
+          }
+          .fmv .chip .btn{ border:1px solid var(--fmv-b); border-radius:6px; background:#fff; padding:6px 10px; cursor:pointer; line-height:1; }
+          .fmv .chip .btn-ok{ background:#e9f6e9; }
+          .fmv .chip .btn-cancel{ background:#f4eeee; }
+          
+          .fmv .hint{font-size:13px; color:var(--fmv-muted); margin-top:6px}
+          .fmv .error{color:#b00; margin-top:6px}
+          
+          .fmv-admin-tools{display:flex;justify-content:flex-end;margin:6px 0 8px}
+          .fmv-admin-tools .fmv-toggle{border:1px solid var(--fmv-b);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
         `;
+
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
 

@@ -19,11 +19,12 @@ const MAKE_NAMES_LINKS = (window.MAKE_NAMES_LINKS ?? false);
     a.textContent = txt;
     return a.outerHTML;
   }
-  function replaceUserTokens(s, idToNameMap){
-    return escapeHtml(s||'').replace(/user(\d+)/gi, (m,d)=>{
+   function replaceUserTokens(s, idToNameMap){
+    return escapeHtml(s || '').replace(/user(\d+)/gi, (m, d) => {
       const id = String(Number(d));
-      const nm = idToNameMap.get(id) || ('user'+id);
-      return profileLink(id, nm);
+      // ПЕРЕДАЁМ undefined, если имени нет в карте
+      const name = idToNameMap.has(id) ? idToNameMap.get(id) : undefined;
+      return profileLink(id, name);
     });
   }
   function replaceUserInPairs(s, idToNameMap){

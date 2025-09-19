@@ -105,6 +105,20 @@
       htmlError: ''
     };
   };
+
+    // Готовый HTML "Участники:" с умным фолбэком
+  FMV.renderParticipantsHtml = function (charsText, idToNameMap, profileLink = window.profileLink) {
+    const uni = FMV.parseCharactersUnified(charsText, idToNameMap, profileLink);
+    if (uni && uni.ok) return uni.htmlParticipants;
+  
+    const raw = FMV.escapeHtml(String(charsText ?? ''));
+    const err = (uni && uni.htmlError && uni.htmlError.trim())
+      ? uni.htmlError
+      : `<span class="fmv-missing">Нужен формат userN; userM=маска; userK</span> — ${raw}`;
+  
+    return err;
+  };
+
   
   // ---------- строгая проверка <order> ----------
   /** 

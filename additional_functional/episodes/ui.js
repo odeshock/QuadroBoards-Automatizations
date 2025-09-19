@@ -324,17 +324,17 @@
           });
         }
 
-        // ② submit hook с валидацией и добавлением меты В КОНЕЦ
+        // ② submit hook с валидацией и добавлением меты В КОНЕЦ (без обязательной пустой строки)
         $form.off('submit.fmv.ui').on('submit.fmv.ui', function(e){
           const $subject = $form.find('input[name="req_subject"]');
           const haveSubject = !$subject.length || $.trim($subject.val()||'').length>0;
-
+        
           const rest = stripFMV($area.val() || '');
           const haveMessage = $.trim(rest).length > 0;
-
+        
           const haveParticipants = selected.length > 0;
           const havePlace = $.trim($placeInput.val()||'').length > 0;
-
+        
           if (!(haveSubject && haveMessage && haveParticipants && havePlace)) {
             e.preventDefault();
             const miss = [];
@@ -346,15 +346,15 @@
             setTimeout(() => $err.fadeOut(400), 1800);
             return; // textarea НЕ трогаем
           }
-
-          const meta = metaLine(); // уже валидно — пустой быть не должен
-          // Добавляем В КОНЕЦ, аккуратно с переводами строк
-          let base = rest.replace(/\s+$/,''); // убираем хвостовые пробелы/переводы
-          let sep;
-          if (!base) sep = '';                  // если текста нет — просто мета
-          else if (/\n\n$/.test(base)) sep = ''; // уже есть пустая строка в конце
-          else if (/\n$/.test(base)) sep = '\n'; // есть одна — добавим ещё одну
-          else sep = '\n\n';                    // нет — добавим две
+        
+          const meta = metaLine();
+        
+          // оставляем \n на конце, срезаем только хвостовые пробелы/табуляции
+          let base = rest.replace(/[ \t]+$/, '');
+        
+          // добавляем мету в конец; если последнего \n нет — ставим ровно один
+          const sep = (!base || /\n$/.test(base)) ? '' : '\n';
+        
           $area.val(base + sep + meta);
         });
 

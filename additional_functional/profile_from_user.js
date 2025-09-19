@@ -11,7 +11,7 @@ function profileLink(id, name) {
   // если имя не найдено — добавляем пометку
   const txt = (typeof name === 'string' && name.length)
     ? name
-    : `user${id} (не нашлось)`;
+    : `user${id} (не найден)`;
 
   if (!MAKE_NAMES_LINKS) return txt;
 

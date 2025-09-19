@@ -201,7 +201,6 @@
         $placeRow.append($placeLabel,$placeInput);
 
         const $chips=$('<div class="chips"/>');
-        const $hint =$('<div class="hint">Участники/маски/локация. Сохранится как: [FMVcast]userN;userM=маска…[/FMVcast] + [FMVplace]…[/FMVplace].</div>');
         const $err  =$('<div class="error" style="display:none"></div>');
 
         $area.before($wrap); $wrap.append($row,$placeRow,$chips,$hint,$err);

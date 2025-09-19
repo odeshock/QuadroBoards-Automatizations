@@ -14,6 +14,12 @@
       return;
     }
     // ВАЖНО: показываем виджет ТОЛЬКО если в тексте уже есть FMVcast
-    FMV.UI.attach({ form:$form, textarea:$area, prefill:true, showOnlyIfFMVcast:true });
+    FMV.UI.attach({
+      form: $('#post form, form[action*="edit.php"]').first(),
+      textarea: $('textarea[name="req_message"], #main-reply, .questionary-post textarea').first(),
+      prefill: true,
+      showOnlyIfFMVcast: true,    // показывать только если в тексте есть FMVcast
+      className: 'fmv--compact'
+    });
   }catch(e){ console.error('episode_edit_boot error:', e); }
 })();

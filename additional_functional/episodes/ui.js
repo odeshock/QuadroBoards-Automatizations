@@ -324,22 +324,36 @@
         }
 
         // submit-hook
-        $form.off('submit.fmv.ui').on('submit.fmv.ui',function(e){
-          const $subject=$form.find('input[name="req_subject"]');
-          const haveSubject=!$subject.length || $.trim($subject.val()||'').length>0;
-          const rest=stripFMV($area.val()||''); const haveMessage=$.trim(rest).length>0;
-          const haveParticipants=selected.length>0; const havePlace=$.trim($placeInput.val()||'').length>0;
+        $form.off('submit.fmv.ui').on('submit.fmv.ui', function(e){
+          const $subject = $form.find('input[name="req_subject"]');
+          const haveSubject = !$subject.length || $.trim($subject.val()||'').length>0;
+        
+          const rest = stripFMV($area.val() || '');
+          const haveMessage = $.trim(rest).length > 0;
+        
+          const haveParticipants = selected.length > 0;
+          const havePlace = $.trim($placeInput.val()||'').length > 0;
+        
           if (!(haveSubject && haveMessage && haveParticipants && havePlace)) {
             e.preventDefault();
+            // КЛЮЧЕВОЕ: глушим все остальные обработчики submit на этой форме
+            if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        
             const miss = [];
             if (!haveSubject)      miss.push('заголовок');
             if (!haveMessage)      miss.push('сообщение');
             if (!haveParticipants) miss.push('участники');
             if (!havePlace)        miss.push('локация');
             alert('Заполните: ' + miss.join(', '));
-            return;
+            return false; // на всякий случай
           }
-          const meta=metaLine(); let base=rest.replace(/[ \t]+$/,''); const sep=(!base || /\n$/.test(base))?'':'\n'; $area.val(base+sep+meta);
+        
+          const meta = [ buildFMVcast(selected), buildFMVplace($placeInput.val()), buildFMVord($ordInput.val()) ]
+                        .filter(Boolean).join('');
+          let base = rest.replace(/[ \t]+$/, '');
+          const sep = (!base || /\n$/.test(base)) ? '' : '\n';
+          $area.val(base + sep + meta);
         });
 
         const api={ serialize:()=>metaLine(), stripFMV, mountPoint:$wrap };
@@ -355,6 +369,9 @@
   function onReady(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn,{once:true}); else fn(); }
 
   onReady(function(){
+    if (window.__FMV_BOOTSTRAPPED__) return;
+    window.__FMV_BOOTSTRAPPED__ = true;
+     
     if (!FMV.UI || typeof FMV.UI.attach!=='function') return;
 
     const url=new URL(location.href);

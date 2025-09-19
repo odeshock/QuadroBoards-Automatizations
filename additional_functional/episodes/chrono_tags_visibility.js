@@ -164,10 +164,35 @@
           lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${rendered}</div>`);
         }
       }
-      if (maskText){
-        const pairs = replaceUserInPairs(maskText, idToNameMap);
-        lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${pairs}</div>`);
+      if (maskText) {
+        // строгий шаблон: userN=что-угодно-кроме-«;»;userN=...
+        const TEMPLATE = /^\s*user\d+\s*=\s*[^;]+(?:\s*;\s*user\d+\s*=\s*[^;]+)*\s*$/i;
+      
+        // «человеческий» вид исходного ввода (для показа рядом с ошибкой)
+        const human = maskText.split(/\s*;\s*/).filter(Boolean).join('; ');
+      
+        if (!TEMPLATE.test(maskText)) {
+          // формат неверный — показываем единую ошибку и сам ввод
+          lines.push(
+            `<div class="fmv-row"><span class="fmv-label">Маски:</span> ` +
+            `<span class="fmv-missing">Аааа! Надо пересобрать всё внутри по шаблону: userN=маска;userN=маска</span> — ${escapeHtml(human)}</div>`
+          );
+        } else {
+          // парсим пары в исходном порядке
+          const out = [];
+          for (const pair of maskText.split(';')) {
+            const [left, right] = pair.split('=');
+            const id = String(Number((left.match(/user(\d+)/i) || [,''])[1]));
+            const name = idToNameMap.has(id) ? idToNameMap.get(id) : undefined;
+      
+            // делаем ту же подстановку, что и раньше: имя или "userN (не найден)"
+            const leftRendered = profileLink(id, name); // использует твою функцию профиля :contentReference[oaicite:3]{index=3}
+            out.push(`${leftRendered}=${escapeHtml(right)}`);
+          }
+          lines.push(`<div class="fmv-row"><span class="fmv-label">Маски:</span>${out.join('; ')}</div>`);
+        }
       }
+
       if (locText){
         lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${escapeHtml(locText)}</div>`);
       }

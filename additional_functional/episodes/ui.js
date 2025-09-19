@@ -183,24 +183,26 @@
         const $wrap=$('<div/>',{class:wrapClass});
         const $row =$('<div class="char-row"/>');
         const $combo=$('<div class="combo"/>');
+        const $comboLabel = $('<label for="fmv-character" style="font-weight:600">Участники эпизода:</label>');
         const $comboInput=$('<input type="text" id="character-combo" placeholder="Наберите имя персонажа…" autocomplete="off">');
         const $ac=$('<div class="ac-list" role="listbox" aria-label="Варианты персонажей"></div>');
-        $combo.append($comboInput,$ac); $row.append($combo);
+        const $comboHint  = $('<div class="place-hint">Если что-то не работает, напишите в Приемную.</div>');
+        $combo.append($comboInput,$ac); $row.append($combo,$comboHint);
 
         const $chips=$('<div class="chips"/>');
 
         const $placeRow  =$('<div class="place-row"/>');
         const $placeLabel=$('<label for="fmv-place" style="font-weight:600">Локация:</label>');
         const $placeInput=$('<input type="text" id="fmv-place" placeholder="Укажите локацию">');
-        $placeRow.append($placeLabel,$placeInput);
+        const $placeHint  = $('<div class="place-hint">Лучше указывать в едином формате: Хогвартс, Косая аллея, Лютный переулок, Министерство и т.д.</div>');
+        $placeRow.append($placeLabel,$placeInput,$placeHint);
 
         const $ordRow = $('<div class="order-row"/>');
-        const $ordLabel = $('<label for="fmv-ord" style="font-weight:600">Для сортировки эпизодов в один день</label>');
+        const $ordLabel = $('<label for="fmv-ord" style="font-weight:600">Порядок эпизода:</label>');
         const $ordInput = $('<input type="number" id="fmv-ord" placeholder="0" value="0" step="1">');
-        const $ordHint  = $('<div class="order-hint">Если вы не знаете, для чего это поле — оставьте 0 :)</div>');
+        const $ordHint  = $('<div class="order-hint">Помогает упорядочить эпизоды, которые стоят в один день. Чем больше значение, тем позже эпизод. Лучше оставлять 0.</div>');
         $ordRow.append($ordLabel,$ordInput,$ordHint);
 
-        const $hint=$('<div class="hint">Участники/маски/локация/порядок. Сохранится как: [FMVcast]…[/FMVcast] + [FMVplace]…[/FMVplace] + [FMVord]…[/FMVord].</div>');
         const $err =$('<div class="error" style="display:none"></div>');
 
         $area.before($wrap);

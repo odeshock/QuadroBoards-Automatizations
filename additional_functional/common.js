@@ -51,7 +51,7 @@
       return {
         ok: false,
         participantsLower: [],
-        html: `<span class="fmv-missing">АОшибка! Нужен формат userN;userN;userN</span>` +
+        html: `<span class="fmv-missing">Нужен формат userN;userN;userN</span>` +
               (human ? ' — ' + FMV.escapeHtml(human) : '')
       };
     }
@@ -73,7 +73,7 @@
       return {
         ok: false,
         mapLower: new Map(),
-        html: `<span class="fmv-missing">Ошибка! Нужен формат userN=маска;userN=маска</span>` +
+        html: `<span class="fmv-missing">Нужен формат userN=маска;userN=маска</span>` +
               (human ? ' — ' + FMV.escapeHtml(human) : '')
       };
     }
@@ -115,7 +115,7 @@
     }
     return {
       ok: false,
-      html: `<span class="fmv-missing">Ошибка! Нужен формат целого числа (пример: -3 или 5)</span>` +
+      html: `<span class="fmv-missing">Нужен формат целого числа (пример: -3 или 5)</span>` +
             ` — ${FMV.escapeHtml(raw)}`
     };
   };

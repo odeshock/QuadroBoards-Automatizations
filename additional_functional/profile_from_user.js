@@ -38,12 +38,6 @@ function replaceUserInPairs(s, idToNameMap){
   }).join('; ');
 }
 
-function escapeHtml(s){
-  return (s||'').replace(/[&<>\"']/g, ch => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
-  ));
-}
-
 // ─────────────── userN → Имя профиля (с кэшем) ───────────────
 const nameCache = new Map();
 

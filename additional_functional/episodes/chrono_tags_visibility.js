@@ -145,7 +145,7 @@
       if (charText){
         const normalized = charText.split(/\s*;\s*/).filter(Boolean).join('; ');
         const nice = replaceUserTokens(normalized, idToNameMap);
-        lines.push(`<div class="fmv-row"><span class="fmv-label">Состав:</span>${nice}</div>`);
+        lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${nice}</div>`);
       }
       if (maskText){
         const pairs = replaceUserInPairs(maskText, idToNameMap);
@@ -155,7 +155,7 @@
         lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${escapeHtml(locText)}</div>`);
       }
       if (ordText){
-        lines.push(`<div class="fmv-row"><span class="fmv-label">Порядок:</span>${escapeHtml(ordText)}</div>`);
+        lines.push(`<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${escapeHtml(ordText)}</div>`);
       }
 
       if (lines.length) insertBlock(lines.join('\n'), tags[0]);

@@ -13,6 +13,13 @@
       console.error('FMV.UI.attach не найден — подключите fmv.ui.js');
       return;
     }
-    FMV.UI.attach({ form:$form, textarea:$area, prefill:true, showOnlyIfFMVcast:false });
+    FMV.UI.attach({
+  form: $('#post form, form[action*="post.php"]').first(),
+  textarea: $('textarea[name="req_message"], #main-reply, .questionary-post textarea').first(),
+  prefill: true,
+  showOnlyIfFMVcast: false,
+  className: 'fmv--compact'   // просто добавочный класс, если хочешь отличать темы
+});
+
   }catch(e){ console.error('episode_creation_boot error:', e); }
 })();

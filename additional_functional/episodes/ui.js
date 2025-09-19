@@ -121,6 +121,34 @@
         /* Отступ от поля до крестика */
         .fmv .chips .chip .x{ margin-left:8px; }
 
+        /* Блок с полем и кнопками — по умолчанию скрыт */
+        .fmv .chips .chip .mask-input{
+          display:none;               /* <— скрыто */
+          margin-left:auto;
+        }
+        
+        /* Когда открыт — в ряд, с зазором */
+        .fmv .chips .chip .mask-input.is-open{
+          display:flex;               /* <— показываем */
+          align-items:center;
+          gap:8px;
+        }
+        
+        /* Поле и кнопки оставляем как были */
+        .fmv .chips .chip .mask-input input{
+          flex:1; min-width:260px; height:30px;
+          padding:6px 8px; border:1px solid var(--fmv-b); border-radius:6px;
+          background:#efe9dc; color:var(--fmv-text);
+        }
+        .fmv .chips .chip .btn{
+          border:1px solid var(--fmv-b); border-radius:6px;
+          background:#fff; padding:6px 10px; cursor:pointer; line-height:1;
+        }
+        .fmv .chips .chip .btn-ok{ background:#e9f6e9; }
+        .fmv .chips .chip .btn-cancel{ background:#f4eeee; }
+        .fmv .chips .chip .x{ margin-left:8px; }
+
+
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
@@ -165,17 +193,32 @@
             const $addMask=$('<button class="add-mask" type="button">добавить маску</button>');
             const $remove=$('<button class="x" type="button" aria-label="Удалить">×</button>');
 
-            var $maskBox   =$('<span class="mask-input"></span>');
+            var $maskBox   =$('<span class="mask-input"></span>').hide();
             var $maskInput =$('<input type="text" placeholder="маска (текст)">');
-            var $maskOk    =$('<button type="button" class="btn btn-ok">Ок</button>');
+            var $maskOk=$('<button type="button" class="btn btn-ok">Ок</button>');
             var $maskCancel=$('<button type="button" class="btn btn-cancel">Отмена</button>');
 
             $maskBox.append($maskInput,$maskOk,$maskCancel);
 
             $maskInput.on('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); $maskOk.click(); } });
-            $addMask.on('click', function(){ $maskBox.show(); $maskInput.val('').focus(); });
-            $maskOk.on('click', function(){ const v=$.trim($maskInput.val()); if(!v) return; (item.masks||(item.masks=[])).push(v); renderChips(); });
-            $maskCancel.on('click', function(){ $maskBox.hide(); });
+            $addMask.on('click', function(){
+              
+              // закрыть открытые в этом чипе (на всякий)
+              $chip.find('.mask-input').removeClass('is-open').hide();
+              $maskBox.addClass('is-open').show();
+              $maskInput.val('').focus();
+            });
+            
+            $maskOk.on('click', function(){
+              var v=$.trim($maskInput.val()); if(!v) return;
+              (item.masks||(item.masks=[])).push(v);
+              renderChips(); // после перерендера форма снова скрыта
+            });
+            
+            $maskCancel.on('click', function(){
+              $maskBox.removeClass('is-open').hide();
+            });
+            
             $remove.on('click', function(){ selected.splice(idx,1); renderChips(); });
 
             $chip.append($drag,$name,$masks,$addMask,$maskBox,$remove);

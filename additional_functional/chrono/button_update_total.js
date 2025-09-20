@@ -14,8 +14,8 @@
   }
 
   // разделы
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK?.ForumInfo.length
-    ? window.CHRONO_CHECK?.ForumInfo
+  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
+    ? window.CHRONO_CHECK.ForumInfo
     : [];
 
   let busy = false;
@@ -47,16 +47,9 @@
         // 2) рендер «Собранной хронологии»
         const htmlRaw = renderChrono(events);
         // 3) cp1251-safe (числовые сущности для символов вне ASCII/кириллицы)
-        const html = toCp1251Entities(htmlRaw);
+        const html = FMV.toCp1251Entities(htmlRaw);
 
-        // 4) проверка наличия FMV.replaceComment
-        if (!(window.FMV && typeof FMV.replaceComment === 'function')) {
-          setStatus('Ошибка');
-          setDetails('Не найдена FMV.replaceComment — проверь порядок подключений.');
-          return;
-        }
-
-        // 5) замена комментария
+        // 4) замена комментария
         const res = await FMV.replaceComment(GID, PID, html);
 
         const st = normStatus(res.status);
@@ -69,13 +62,13 @@
         const info  = toPlainShort(res.infoMessage || '');
         const error = toPlainShort(res.errorMessage || '');
         if (info)  lines.push(info);
-        if (error) lines.push(`<span style="color:#b00020">${escapeHtml(error)}</span>`);
+        if (error) lines.push(`<span style="color:#b00020">${FMV.escapeHtml(error)}</span>`);
 
         setDetails(lines.join('<br>'));
 
       } catch (e) {
         setStatus('Ошибка');
-        setDetails(escapeHtmlShort(e?.message || String(e)));
+        setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
       } finally {
         busy = false;
       }
@@ -106,7 +99,7 @@
 
     while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
       n++; seenPages.add(url);
-      const doc = await fetchDoc(url);
+      const doc = await FMV.fetchDoc(url);
 
       // ссылки на темы
       const topics = new Map();
@@ -150,7 +143,7 @@
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
     try {
-      const doc   = await fetchDoc(topicUrl);
+      const doc   = await FMV.fetchDoc(topicUrl);
       const first = firstPostNode(doc);
 
       const rawChars = FMV.readTagText(first, 'characters');
@@ -214,13 +207,13 @@
         ? (e.dateBad ? `[mark]проблема с [au] в названии[/mark]` : '')
         : ((!e.dateRaw || e.dateBad)
             ? `[mark]дата не указана/ошибка[/mark]`
-            : escapeHtml(formatRange(e.range)));
+            : FMV.escapeHtml(formatRange(e.range)));
 
-      const url  = escapeHtml(e.url);
+      const url  = FMV.escapeHtml(e.url);
       const ttl0 = (e.type === 'plot') ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '') : e.episode;
-      const ttl  = escapeHtml(ttl0);
+      const ttl  = FMV.escapeHtml(ttl0);
       const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
-      const ord = (e.order != null) ? ` [порядок: ${escapeHtml(String(e.order))}]` : '';
+      const ord = (e.order != null) ? ` [порядок: ${FMV.escapeHtml(String(e.order))}]` : '';
 
       // рендерим в BB-коде
       const asBB = true;
@@ -242,7 +235,7 @@
         : `[mark]не указаны[/mark]`;
 
       const loc = (e.locationsLower && e.locationsLower.length)
-        ? escapeHtml(e.locationsLower.join(', '))
+        ? FMV.escapeHtml(e.locationsLower.join(', '))
         : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
@@ -266,8 +259,8 @@
       case 'month':       return `${z2(m1)}.${y1}`;
       case 'year':        return String(y1);
       default:
-        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${z2(d2)}.${z2(m2)}.${y2}`;
-        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
+        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${з2(d2)}.${з2(m2)}.${y2}`;
+        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${з2(m2)}.${y1}`;
     }
   }
 
@@ -288,7 +281,7 @@
       single:               /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       dayRangeSameMonth:    /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       crossMonthTailYear:   /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\д{2}|\д{4})$/, // не используется в AU
+      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       monthYear:            /^(\d{1,2})\.(\d{2}|\d{4})$/,
       yearOnly:             /^(\d{4})$/
     };
@@ -359,18 +352,9 @@
     return a ? a.getAttribute('href') : null;
   }
 
+  // утилиты
   function abs(base, href) { try { return new URL(href, base).href; } catch { return href; } }
   function text(node) { return (node && (node.innerText ?? node.textContent) || '').trim(); }
-
-  function escapeHtml(s = '') {
-    return (window.FMV && typeof FMV.escapeHtml === 'function')
-      ? FMV.escapeHtml(s)
-      : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
-  function escapeHtmlShort(s=''){
-    const t = String(s);
-    return escapeHtml(t.length > 500 ? t.slice(0,500) + '…' : t);
-  }
   function normStatus(s) {
     if (s == null) return '';
     if (typeof s === 'string') return s;
@@ -380,23 +364,5 @@
   function toPlainShort(s = '', limit = 200) {
     const t = String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     return t.length > limit ? t.slice(0, limit) + '…' : t;
-  }
-
-  // cp1251-safe: конвертируем все символы вне ASCII/кириллицы в числовые сущности
-  function toCp1251Entities(s) {
-    const keep = /[\u0000-\u007F\u0400-\u045F\u0401\u0451]/; // ASCII + кириллица + Ё/ё
-    let out = '';
-    for (const ch of String(s)) {
-      out += keep.test(ch) ? ch : `&#${ch.codePointAt(0)};`;
-    }
-    return out;
-  }
-
-  async function fetchDoc(url) {
-    // helpers.js уже подключен
-    const html = await fetchHtml(url);
-    return (typeof window.parseHTML === 'function')
-      ? window.parseHTML(html)
-      : new DOMParser().parseFromString(html, 'text/html');
   }
 })();

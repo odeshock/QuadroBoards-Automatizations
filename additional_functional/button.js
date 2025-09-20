@@ -52,6 +52,22 @@
     return false;
   }
 
+  // НОВОЕ: проверка, что мы на нужной теме /viewtopic.php?id=N (p/K/#pM игнорируем)
+  function isOnTopicId(topicId) {
+    if (topicId == null) return true; // проверка не запрошена
+    const want = String(topicId).trim();
+    if (!want) return false;
+
+    try {
+      const u = new URL(location.href);
+      if (!u.pathname.includes('viewtopic.php')) return false;
+      const got = (u.searchParams.get('id') || '').trim();
+      return got === want;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Универсальный конструктор кнопки.
    *
@@ -59,12 +75,13 @@
    * @param {string[]} [opts.allowedGroups=[]]
    * @param {string[]} [opts.allowedForums=[]]
    * @param {string}   [opts.label='Действие']
-   * @param {Function} opts.onClick       async ({statusEl, linkEl, detailsEl, setStatus, setDetails, setLink, wrap}) => void
+   * @param {Function} opts.onClick  async ({statusEl, linkEl, detailsEl, setStatus, setDetails, setLink, wrap}) => void
    * @param {string}   [opts.containerSelector='.ams_info']
    * @param {number}   [opts.order=0]
-   * @param {boolean}  [opts.showStatus=true]   // ← новинка
-   * @param {boolean}  [opts.showDetails=true]  // ← новинка
-   * @param {boolean}  [opts.showLink=true]     // ← новинка
+   * @param {boolean}  [opts.showStatus=true]
+   * @param {boolean}  [opts.showDetails=true]
+   * @param {boolean}  [opts.showLink=true]
+   * @param {string|number|null} [opts.topicId=null]  // НОВОЕ: если задано — рендерить только на /viewtopic.php?id=topicId
    */
   window.createForumButton = async function createForumButton(opts) {
     const {
@@ -77,6 +94,7 @@
       showStatus = true,
       showDetails = true,
       showLink = true,
+      topicId = null,               // НОВОЕ
     } = opts || {};
 
     if (typeof onClick !== 'function') return;
@@ -87,10 +105,16 @@
       ? window.getCurrentGroupId()
       : NaN;
 
+    // строгая проверка группы
     if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) return;
     if (!allowedGroups.map(Number).includes(Number(gid))) return;
+
+    // строгая проверка форума
     if (!Array.isArray(allowedForums) || allowedForums.length === 0) return;
     if (!isAllowedForum(allowedForums)) return;
+
+    // НОВОЕ: строгая проверка нужной темы
+    if (!isOnTopicId(topicId)) return;
 
     const container = await waitFor(containerSelector, 5000).catch(() => null);
     if (!container) return;
@@ -178,8 +202,6 @@
     };
 
     btn.addEventListener('click', async () => {
-      // раньше мы всегда писали "Выполняю…"
-      // теперь делаем это только если showStatus=true
       if (showStatus) setStatus('Выполняю…', '#555');
       if (showDetails) setDetails('');
       if (showLink) setLink(null);
@@ -195,7 +217,6 @@
           wrap
         });
       } catch (err) {
-        // молча глотаем, если статус/детали скрыты; иначе покажем коротко
         if (showStatus) setStatus('✖ Ошибка', 'red');
         if (showDetails) setDetails((err && err.message) ? err.message : String(err));
         console.error('[createForumButton]', err);
@@ -203,4 +224,3 @@
     });
   };
 })();
-

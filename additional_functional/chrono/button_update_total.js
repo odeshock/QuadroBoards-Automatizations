@@ -177,6 +177,14 @@
       const dateBad = isAu ? !auStart : (!hasBracket || range.bad);
       const plotBad = (type === 'plot') ? !/\s\[\s*с\s*\]\s*$/iu.test(String(rawTitle || '')) : false;
 
+      console.log('[title]', {
+  url: topicUrl,
+  rawTitle,
+  titleFromCrumbs,
+  chosen: safeTitle
+});
+
+
       return {
         type, status, url: topicUrl,
         episode, dateRaw, range, dateBad, plotBad,

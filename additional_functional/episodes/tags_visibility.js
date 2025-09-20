@@ -124,8 +124,8 @@
   createForumButton({
     allowedGroups: CHRONO_CHECK?.GroupID || [],
     allowedForums: CHRONO_CHECK?.ForumIDs || [],
-    label: 'Мета-инфо',
-    order: 12,
+    label: BUTTON_LABEL,
+    order: BUTTON_ORDER,
     showStatus: false,   // ← ничего не пишет "Выполняю…"
     showDetails: false,  // ← не рисует <details>
     showLink: false,     // ← не рисует ссылку

@@ -99,6 +99,18 @@
     return block;
   }
 
+  function profileLinkMeta(id, name) {
+    // вызываем твою существующую функцию
+    const html = window.profileLink(String(id), name);
+  
+    // эвристика: в profile_from_user «не найдено» размечается классом fmv-missing
+    // (если когда-то изменишь класс — поменяй условие)
+    const found = typeof html === 'string' && !/\bfmv-missing\b/.test(html);
+  
+    return { html, found };
+  }
+
+
   function isMounted() {
     const wrap = findOwnWrap();
     const next = wrap?.nextElementSibling;

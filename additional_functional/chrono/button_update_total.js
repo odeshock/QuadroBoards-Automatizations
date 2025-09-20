@@ -195,7 +195,7 @@
   const MISS = 'background:#ffe6e6;color:#b00020;border-radius:6px;padding:0 .35em;font-weight:700';
 
   function renderStatus(type, status) {
-    const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','red'] };
+    const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','black'] };
     const mapStat = { on:['active','green'], off:['closed','teal'], archived:['archived','maroon'] };
     const t = mapType[type] || mapType.au;
     const s = mapStat[status] || mapStat.archived;
@@ -245,7 +245,7 @@
         : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `${status}\n${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n[i]${names}[/i]\n${loc}\n\n`;
+      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n[i]${names}[/i]\n${loc}\n\n`;
     });
 
     const body = rows.join('') || ``;

@@ -31,7 +31,7 @@
     allowedForums: FID,
     topicId: TID,
     label: 'Обновить итог',
-    order: 50,
+    order: 1,
     showStatus: false,
     showDetails: false,
     showLink: false,

@@ -243,7 +243,7 @@
         : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n${names} / ${loc}\n`;
+      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n${names} / ${loc}\n\n`;
     });
 
     const body = rows.join('') || ``;

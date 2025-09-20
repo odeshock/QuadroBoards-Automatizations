@@ -478,7 +478,7 @@
     // /post.php?fid=N без action (старое создание)
     if (/\/post\.php$/i.test(path) && !q.has('action')) {
       const fid = +(q.get('fid')||0);
-      const allowed = CHRONO_CHECK.ForumID.map(Number);
+      const allowed = (CHRONO_CHECK.ForumID || []).map(Number);
       if (allowed.includes(fid)) attachToPage({ strip:false, showOnlyIfCast:false });
     }
 
@@ -490,7 +490,7 @@
     // /post.php?action=post&fid=8 — создание, UI всегда (с очисткой textarea)
     if (/\/post\.php$/i.test(path) && q.get('action') === 'post') {
       const fid = +(q.get('fid')||0);
-      const allowed = CHRONO_CHECK.ForumID.map(Number);
+      const allowed = (CHRONO_CHECK.ForumID || []).map(Number);
       if (!fid || allowed.includes(fid)) {
         attachToPage({ strip:true, showOnlyIfCast:false });
       }

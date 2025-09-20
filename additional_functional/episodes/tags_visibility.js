@@ -122,17 +122,25 @@
 
   // ----- кнопка-тумблер -----
   createForumButton({
-    allowedGroups: (CHRONO_CHECK && CHRONO_CHECK.GroupID) || [],
-    allowedForums: (CHRONO_CHECK && CHRONO_CHECK.ForumIDs) || [],
-    label: BUTTON_LABEL,
-    order: BUTTON_ORDER,
-    async onClick() {
-      if (isMounted()) {
-        unmountMetaBlock();
-        localStorage.setItem(topicKey(), '0');
+    allowedGroups: PROFILE_CHECK?.GroupID || [],
+    allowedForums: PROFILE_CHECK?.ForumIDs || [],
+    label: 'Мета-инфо',
+    order: 12,
+    showStatus: false,   // ← ничего не пишет "Выполняю…"
+    showDetails: false,  // ← не рисует <details>
+    showLink: false,     // ← не рисует ссылку
+  
+    async onClick({ wrap }) {
+      // твой тумблер: вставить/удалить блок сразу под wrap
+      if (wrap.nextElementSibling?.classList.contains('fmv-meta')) {
+        wrap.nextElementSibling.remove();
+        localStorage.setItem('fmv:meta:enabled', '0');
       } else {
-        await mountMetaBlock();
-        localStorage.setItem(topicKey(), '1');
+        const block = await buildMetaHtml(); // твоя функция сборки блока
+        if (block) {
+          wrap.parentNode.insertBefore(block, wrap.nextSibling);
+          localStorage.setItem('fmv:meta:enabled', '1');
+        }
       }
     }
   });

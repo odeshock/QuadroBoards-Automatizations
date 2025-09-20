@@ -4,7 +4,7 @@
 
   // ----- настройки кнопки -----
   const BUTTON_LABEL = 'Мета-инфо';
-  const BUTTON_ORDER = 12;
+  const BUTTON_ORDER = 1;
 
   // ----- утилиты -----
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));

@@ -2,7 +2,11 @@
 (() => {
   'use strict';
 
-  // --- мелкие утилиты --------------------------------------------------------
+  // ====== Настройки именно этой кнопки ======
+  const BUTTON_LABEL = 'Мета-инфо';
+  const BUTTON_ORDER = 1;
+
+  // ====== Утилиты ======
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   async function waitFor(fn, { timeout = 10000, interval = 100 } = {}) {
     const t0 = performance.now();
@@ -13,7 +17,6 @@
     return null;
   }
 
-  // ключ для localStorage (привяжем к id темы, если сможем)
   function topicKey() {
     try {
       const u = new URL(location.href);
@@ -31,164 +34,132 @@
     style.textContent = `
       .fmv-meta{
         margin:8px 0; padding:8px; border:1px solid #d7d7d7;
-        background:#f7f7f7; border-radius:6px; position:relative;
+        background:#f7f7f7; border-radius:6px;
       }
       .fmv-row{margin:.25em 0}
       .fmv-label{font-weight:700;margin-right:.25em}
       .fmv-missing{color:#c00;background:#ffe6e6;border-radius:6px;padding:0 .35em;font-weight:700}
-      .fmv-toggle{
-        position:absolute; top:4px; left:4px; background:none; border:none; padding:0; margin:0;
-        color:#aaa; font-size:12px; line-height:1; cursor:pointer; opacity:.3; transition:opacity .2s,color .2s
-      }
-      .fmv-toggle:hover,.fmv-toggle:focus{opacity:1;color:#555;outline:none}
     `;
     document.head.appendChild(style);
   }
 
-  // --- сбор данных и монтирование блока -------------------------------------
-  async function mountMetaBlock() {
-    // ждём зависимости из общего модуля FMV + profileLink (как в исходнике)
+  // найти наш wrap (контейнер кнопки) по order и label
+  function findOwnWrap() {
+    const container = document.querySelector('.ams_info');
+    if (!container) return null;
+    const candidates = Array.from(container.querySelectorAll('div[data-order]'));
+    return candidates.find(el => {
+      const btn = el.querySelector('button.button');
+      const sameOrder = Number(el.dataset.order) === Number(BUTTON_ORDER);
+      const sameLabel = btn && btn.textContent.trim() === BUTTON_LABEL;
+      return sameOrder && sameLabel;
+    }) || null;
+  }
+
+  // ====== Монтаж/демонтаж блока ======
+  async function buildMetaHtml() {
+    // ждём зависимости FMV (как и раньше)
     const ok = await waitFor(() =>
       window.FMV &&
       typeof FMV.readTagText === 'function' &&
       typeof FMV.escapeHtml === 'function' &&
       typeof FMV.parseOrderStrict === 'function' &&
       typeof FMV.buildIdToNameMapFromTags === 'function' &&
-      typeof FMV.parseCharactersUnified === 'function' &&
-      typeof window.profileLink === 'function'
+      typeof FMV.parseCharactersUnified === 'function'
     , { timeout: 15000 });
-    if (!ok) throw new Error('Не готовы зависимости FMV/profileLink');
+    if (!ok) return null;
 
-    // первый пост темы
     const first = await waitFor(() =>
       document.querySelector('.topic .post.topicpost, .post.topicpost, .message:first-of-type')
     , { timeout: 15000 });
-    if (!first) throw new Error('Не найден первый пост темы');
+    if (!first) return null;
 
-    // (если у тебя есть ensureAllowed — поддержим его, как в оригинале)
-    if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed()) {
-      throw new Error('Доступ к виджету ограничён политикой ensureAllowed()');
-    }
+    if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed()) return null;
 
-    // читаем сырые теги
-    const rawChars = FMV.readTagText(first, 'characters'); // userN; userM=mask; ...
+    const rawChars = FMV.readTagText(first, 'characters');
     const rawLoc   = FMV.readTagText(first, 'location');
     const rawOrder = FMV.readTagText(first, 'order');
 
     const map = await FMV.buildIdToNameMapFromTags(rawChars);
 
-    const lines = [];
+    const parts = [];
     if (rawChars) {
       const participantsHtml = FMV.renderParticipantsHtml(rawChars, map, window.profileLink);
-      lines.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`);
+      parts.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`);
     }
     if (rawLoc) {
-      lines.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${FMV.escapeHtml(rawLoc)}</div>`);
+      parts.push(`<div class="fmv-row"><span class="fmv-label">Локация:</span>${FMV.escapeHtml(rawLoc)}</div>`);
     }
     if (rawOrder) {
       const ord = FMV.parseOrderStrict(rawOrder);
-      lines.push(`<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${ord.html}</div>`);
+      parts.push(`<div class="fmv-row"><span class="fmv-label">Для сортировки:</span>${ord.html}</div>`);
     }
 
-    if (!lines.length) throw new Error('Нет данных в тегах characters/location/order');
+    if (!parts.length) return null;
 
-    // соберём блок
     injectStyleOnce();
-
-    // если уже есть старый — удалим (как в исходнике)
-    (first.querySelector('.post-box > .fmv-meta') ||
-     first.querySelector('.post-content + .fmv-meta'))?.remove();
 
     const block = document.createElement('div');
     block.className = 'fmv-meta';
-    block.innerHTML = `
-      <button class="fmv-toggle" aria-label="toggle">▸</button>
-      <div class="fmv-body" style="display:none">${lines.join('\n')}</div>
-    `;
-
-    const postBox   = first.querySelector('.post-box');
-    const contentEl = postBox?.querySelector('.post-content, [id$="-content"]');
-
-    if (postBox && contentEl) {
-      postBox.insertBefore(block, contentEl);
-    } else if (postBox) {
-      postBox.insertBefore(block, postBox.firstChild);
-    } else {
-      first.insertBefore(block, first.firstChild);
-    }
-
-    // поведение маленькой кнопки разворота внутри блока
-    const btn  = block.querySelector('.fmv-toggle');
-    const body = block.querySelector('.fmv-body');
-    btn.addEventListener('click', () => {
-      const show = body.style.display === 'none';
-      body.style.display = show ? '' : 'none';
-      btn.textContent = show ? '▾' : '▸';
-    });
-
+    block.innerHTML = parts.join('\n');
     return block;
   }
 
-  function unmountMetaBlock() {
-    const block = document.querySelector('.fmv-meta');
-    if (block) block.remove();
-  }
-
   function isMounted() {
-    return Boolean(document.querySelector('.fmv-meta'));
+    // блок привязываем как ближайшего соседа под нашим wrap
+    const wrap = findOwnWrap();
+    if (!wrap) return false;
+    const next = wrap.nextElementSibling;
+    return !!(next && next.classList && next.classList.contains('fmv-meta'));
   }
 
-  // --- кнопка-тумблер на базе createForumButton ------------------------------
-  // ВАЖНО: предполагается, что button.js (createForumButton) и check_group.js уже подключены
+  function unmountMetaBlock() {
+    const wrap = findOwnWrap();
+    if (!wrap) return;
+    const next = wrap.nextElementSibling;
+    if (next && next.classList && next.classList.contains('fmv-meta')) next.remove();
+  }
+
+  async function mountMetaBlock() {
+    const wrap = findOwnWrap();
+    if (!wrap) return;
+
+    // если уже есть — обновим (на случай, если теги изменились)
+    unmountMetaBlock();
+
+    const block = await buildMetaHtml();
+    if (!block) return;
+
+    // вставляем СРАЗУ ПОД КНОПКОЙ
+    if (wrap.nextSibling) {
+      wrap.parentNode.insertBefore(block, wrap.nextSibling);
+    } else {
+      wrap.parentNode.appendChild(block);
+    }
+  }
+
+  // ====== Кнопка-тумблер через createForumButton ======
   createForumButton({
-    allowedGroups: (CHRONO_CHECK && CHRONO_CHECK.GroupID) || [],
-    allowedForums: (CHRONO_CHECK && CHRONO_CHECK.ForumIDs) || [],
-    label: 'Мета-инфо',
-    order: 12,
+    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
+    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    label: BUTTON_LABEL,
+    order: BUTTON_ORDER,
 
-    async onClick({ setStatus, setDetails, setLink }) {
-      try {
-        setLink(null);
-
-        // если блок уже смонтирован — выключаем
-        if (isMounted()) {
-          unmountMetaBlock();
-          localStorage.setItem(topicKey(), '0');
-          setStatus('Выключено', 'red');
-          setDetails('Блок «мета-инфо» удалён со страницы.');
-          return;
-        }
-
-        // иначе пробуем включить
-        setStatus('Включаю…', '#555');
-        setDetails('');
-        const block = await mountMetaBlock();
+    async onClick() {
+      if (isMounted()) {
+        unmountMetaBlock();
+        localStorage.setItem(topicKey(), '0');
+      } else {
+        await mountMetaBlock();
         localStorage.setItem(topicKey(), '1');
-        setStatus('Включено', 'green');
-
-        // немного подсветим, что появилось
-        block.style.boxShadow = '0 0 0 2px rgba(0,0,0,.05) inset';
-        setTimeout(() => { block.style.boxShadow = ''; }, 600);
-
-        setDetails('Блок «мета-инфо» добавлен. Нажмите на маленький ▸, чтобы раскрыть содержимое.');
-      } catch (err) {
-        setStatus('✖ Ошибка', 'red');
-        setDetails(err?.message || String(err));
-        console.error('[tags_visibility_button]', err);
       }
     }
   });
 
-  // --- авто-восстановление состояния (по желанию) ----------------------------
-  // Если в прошлый раз было «включено», смонтируем автоматически.
+  // авто-восстановление состояния
   (async () => {
-    try {
-      if (localStorage.getItem(topicKey()) === '1' && !isMounted()) {
-        await mountMetaBlock();
-        // статус обновлять некуда (кнопка ещё не кликалась), так что просто тихо включим
-      }
-    } catch (e) {
-      // не критично
+    if (localStorage.getItem(topicKey()) === '1' && !isMounted()) {
+      await mountMetaBlock();
     }
   })();
 })();

@@ -216,7 +216,7 @@
       const ttl0 = (e.type === 'plot') ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '') : e.episode;
       const ttl  = escapeHtml(ttl0);
       const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
-      const ord = (e.order != null) ? ` [${escapeHtml(String(e.order))}]` : '';
+      const ord = (e.order != null) ? ` [порядок: ${escapeHtml(String(e.order))}]` : '';
 
       // opts.asBB === true → рендерим в BB-коде, иначе в HTML как прежде
       const asBB = true;

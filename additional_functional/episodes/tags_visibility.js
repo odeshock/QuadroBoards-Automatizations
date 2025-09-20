@@ -141,8 +141,8 @@
   // --- кнопка-тумблер на базе createForumButton ------------------------------
   // ВАЖНО: предполагается, что button.js (createForumButton) и check_group.js уже подключены
   createForumButton({
-    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
-    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    allowedGroups: (CHRONO_CHECK && CHRONO_CHECK.GroupID) || [],
+    allowedForums: (CHRONO_CHECK && CHRONO_CHECK.ForumIDs) || [],
     label: 'Мета-инфо',
     order: 12,
 

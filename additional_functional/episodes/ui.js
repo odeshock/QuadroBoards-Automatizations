@@ -138,6 +138,16 @@
 
         .fmv-admin-tools{display:flex;justify-content:flex-end;margin:6px 0 8px}
         .fmv-admin-tools .fmv-toggle{border:1px solid var(--fmv-b);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+
+        /* заголовок блока */
+        .fmv .section-title{
+          font-weight:700;
+          font-size:20px;
+          line-height:1.25;
+          margin:4px 0 12px;
+          color: var(--fmv-text);
+        }
+
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
@@ -164,6 +174,7 @@
         // ── UI ──
         const wrapClass='msg-with-characters fmv '+(opts.className||'');
         const $wrap=$('<div/>',{class:wrapClass});
+        const $title = $('<div class="section-title">Для автоматического сбора хронологии</div>');
 
         // поиск/добавление участника
         const $row  = $('<div class="char-row"/>');
@@ -192,7 +203,7 @@
         $ordRow.append($ordLabel, $ordInput, $ordHint);
 
         $area.before($wrap);
-        $wrap.append($row, $chips, $placeRow, $ordRow);
+        $wrap.append($title, $row, $chips, $placeRow, $ordRow);
 
         let selected=[], knownUsers=[];
 

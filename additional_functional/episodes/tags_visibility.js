@@ -122,8 +122,8 @@
 
   // ----- кнопка-тумблер -----
   createForumButton({
-    allowedGroups: PROFILE_CHECK?.GroupID || [],
-    allowedForums: PROFILE_CHECK?.ForumIDs || [],
+    allowedGroups: CHRONO_CHECK?.GroupID || [],
+    allowedForums: CHRONO_CHECK?.ForumIDs || [],
     label: 'Мета-инфо',
     order: 12,
     showStatus: false,   // ← ничего не пишет "Выполняю…"

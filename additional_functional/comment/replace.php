@@ -3,23 +3,17 @@
   'use strict';
 
   /**
-   * Заменяет комментарий поста с учётом проверки группы.
-   * @param {Array<string|number>} allowedGroups
-   * @param {string|number} postId
-   * @param {string} newText
+   * Заменяет текст комментария у поста.
+   * @param {Array<number|string>} allowedGroups  Разрешённые ID групп
+   * @param {number|string} postId                ID поста
+   * @param {string} newText                      Новый текст (HTML/BBcode)
    * @returns {Promise<{
-   *   ok: boolean,
-   *   status: string,
-   *   postId: string,
-   *   oldText?: string,
-   *   newText: string,
-   *   httpStatus?: number,
-   *   infoMessage?: string,
-   *   errorMessage?: string
+   *   ok:boolean, status:string, postId:string, oldText?:string, newText:string,
+   *   httpStatus?:number, infoMessage?:string, errorMessage?:string
    * }>}
    */
   async function replaceComment(allowedGroups, postId, newText) {
-    // --- проверка группы ---
+    // --- 0) проверка группы (готовая функция getCurrentGroupId) ---
     const gid = (typeof window.getCurrentGroupId === 'function')
       ? window.getCurrentGroupId()
       : null;
@@ -37,14 +31,24 @@
     }
 
     const PID = String(Number(postId));
-    const editUrl = `/edit.php?id=${encodeURIComponent(PID)}&action=edit`;
+    const editUrl = `/edit.php?id=${encodeURIComponent(PID)}`;
 
     try {
-      // --- грузим форму редактирования ---
-      const doc  = await fetchCP1251Doc(editUrl);
-      const form = doc.querySelector('form[action*="edit.php"]');
-      if (!form) {
-        const msg = 'Форма редактирования не найдена';
+      // --- 1) грузим страницу редактирования ТОЛЬКО по /edit.php?id=PID ---
+      let doc, form, msgField;
+      try {
+        doc = await fetchCP1251Doc(editUrl); // helper из helpers.js
+        // поле сообщения (как в твоём шаблоне)
+        msgField = doc.querySelector(
+          'textarea#main-reply[name="req_message"], textarea[name="req_message"]'
+        );
+        if (msgField) {
+          form = msgField.closest('form');
+        }
+      } catch {}
+
+      if (!form || !msgField) {
+        const msg = 'Форма редактирования не найдена по адресу edit.php';
         console.error('[replaceComment]', msg);
         return {
           ok: false,
@@ -55,20 +59,22 @@
         };
       }
 
-      // --- старый текст ---
-      const msgField = form.querySelector('[name="req_message"], textarea[name="message"]');
-      const oldText  = String(msgField?.value || '').trim();
+      // --- 2) старый текст ---
+      const oldText = String(msgField.value || '').trim();
 
-      // --- новый текст ---
-      if (msgField) msgField.value = newText;
+      // --- 3) подставляем новый текст ---
+      msgField.value = newText;
 
-      // --- сериализация и отправка ---
-      const submitName = [...form.elements].find(
-        el => el.type === 'submit' && (el.name === 'submit' || /Отправ/i.test(el.value || ''))
-      )?.name || 'submit';
-      const body = serializeFormCP1251_SelectSubmit(form, submitName);
+      // --- 4) сериализация формы и POST (готовые helpers) ---
+      const submitName =
+        [...form.elements].find(el =>
+          el.type === 'submit' &&
+          (el.name || /Отправ|Сохран|Submit|Save/i.test(el.value || ''))
+        )?.name || 'submit';
 
-      const { res, text } = await fetchCP1251Text(editUrl, {
+      const body = serializeFormCP1251_SelectSubmit(form, submitName); // helper
+
+      const { res, text } = await fetchCP1251Text(editUrl, {           // helper
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -77,13 +83,13 @@
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
 
-      // --- разбор ответа (как в create) ---
-      const infoMessage  = extractInfoMessage(text);
-      const errorMessage = extractErrorMessage(text);
-      const status       = classifyResult(text);
+      // --- 5) анализ ответа (как в create) ---
+      const infoMessage  = extractInfoMessage(text);  // из common.js
+      const errorMessage = extractErrorMessage(text); // из common.js
+      const status       = classifyResult(text);      // из common.js
 
       if (res.ok && status === 'ok') {
-        console.info(`[replaceComment] ✅ #${PID} обновлён. ${infoMessage || ''}`);
+        console.info(`[replaceComment] ✅ #${PID} обновлён.${infoMessage ? ' ' + infoMessage : ''}`);
         return {
           ok: true,
           status,
@@ -94,7 +100,9 @@
           infoMessage
         };
       } else {
-        console.error(`[replaceComment] ✖ #${PID} не обновлён. ${errorMessage || infoMessage || ''}`);
+        console.error(`[replaceComment] ✖ #${PID} не обновлён. Статус: ${status || 'server'}`);
+        if (errorMessage) console.error(errorMessage);
+        else if (infoMessage) console.info(infoMessage);
         return {
           ok: false,
           status: status || 'server',
@@ -120,7 +128,8 @@
     }
   }
 
-  // экспорт
+  // экспорт под FMV
   window.FMV = window.FMV || {};
   window.FMV.replaceComment = replaceComment;
+
 })();

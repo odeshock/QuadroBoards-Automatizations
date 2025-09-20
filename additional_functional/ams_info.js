@@ -53,11 +53,11 @@
       if (!isAllowedGroup || !isAllowedForum) return;
 
       // === Вставляем div ===
-      let bodies = document.querySelectorAll('.topic .post-body .post-box .post-content');
+      let bodies = document.querySelectorAll('.topicpost .post-body .post-box .post-content');
       if (!bodies.length) {
         try {
-          await waitFor('.topic .post-body .post-box .post-content', 5000);
-          bodies = document.querySelectorAll('.topic .post-body .post-box .post-content');
+          await waitFor('.topicpost .post-body .post-box .post-content', 5000);
+          bodies = document.querySelectorAll('.topicpost .post-body .post-box .post-content');
         } catch { return; }
       }
 

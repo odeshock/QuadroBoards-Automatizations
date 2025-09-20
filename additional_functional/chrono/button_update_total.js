@@ -229,8 +229,7 @@
               : missingUser(hasId ? `user${idStr}` : String(low), asBB);
             const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length
-              ? (asBB ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`
-                      : ` [as ${FMV.escapeHtml(roles.join(', '))}]`)
+              ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`
               : '';
 
       return `${display}${tail}`;

@@ -68,32 +68,52 @@ function serializeFormCP1251(form){
   return pairs.join('&');
 }
 
-/* ===== fetchHtml (новая версия с корректной декодировкой) ===== */
+// --- helpers.js ---
+// Универсальный загрузчик HTML с корректной детекцией кодировки
 async function fetchHtml(url) {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const buf = await res.arrayBuffer();
 
-  // сначала декодируем как UTF-8, чтобы прочитать <meta charset=...>
-  let utf8 = new TextDecoder('utf-8').decode(buf);
+  // 1) charset из HTTP-заголовка имеет высший приоритет
+  const ct = res.headers.get('content-type') || '';
+  const hdrCharset = (ct.match(/charset=([\w-]+)/i) || [])[1]?.toLowerCase();
+  if (hdrCharset && hdrCharset !== 'utf-8') {
+    try { return new TextDecoder(hdrCharset).decode(buf); } catch { /* пойдём дальше */ }
+  }
 
-  // charset из HTTP-заголовка
-  const hdr = res.headers.get('content-type') || '';
-  const hdrCharset = (hdr.match(/charset=([\w-]+)/i) || [])[1]?.toLowerCase() || '';
-
-  // charset из <meta ... charset=...> или <meta http-equiv="Content-Type" content="...; charset=...">
+  // 2) предварительно декодируем как UTF-8, чтобы прочитать <meta charset=...>
+  const utf8 = new TextDecoder('utf-8').decode(buf);
   const mMeta = utf8.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i)
              || utf8.match(/<meta[^>]+content=["'][^"']*charset\s*=\s*([\w-]+)/i);
   const metaCharset = (mMeta && mMeta[1] || '').toLowerCase();
 
-  const declared = metaCharset || hdrCharset;
-
-  // если явно объявлено — используем ровно её
-  if (declared && declared !== 'utf-8') {
-    try { return new TextDecoder(declared).decode(buf); } catch { /* игнор, падать не будем */ }
+  if (!hdrCharset && metaCharset && metaCharset !== 'utf-8') {
+    try { return new TextDecoder(metaCharset).decode(buf); } catch { /* пойдём к эвристике */ }
   }
 
-  // иначе всегда UTF-8 (без «угадывания» cp1251)
+  // 3) эвристика UTF-8 vs CP1251
+  const cp = new TextDecoder('windows-1251').decode(buf);
+
+  // «моджибейки» для UTF-8, ошибочно прочитанного как 8-битная кодировка
+  const mojibake = /[ÂÃÐÑ][\u0080-\u00FF]?/g;
+
+  // счётчики для выбора
+  const score = s => {
+    const mixed = (s.match(/\b(?:[A-Za-z]+[А-Яа-яЁё]+|[А-Яа-яЁё]+[A-Za-z]+)[A-Za-zА-Яа-яЁё]*\b/g) || []).length;
+    const bad   = (s.match(mojibake) || []).length + (s.match(/\uFFFD/g) || []).length;
+    return { mixed, bad };
+  };
+
+  const su = score(utf8);
+  const sc = score(cp);
+
+  // если cp показывает классические «Ã/Â/Ð/Ñ» — остаёмся на UTF-8;
+  // если у UTF-8 больше «битых» и смешанных слов — берём CP1251.
+  if (sc.bad > su.bad + 3) return utf8;
+  if (su.bad > sc.bad + 3 || su.mixed > sc.mixed + 1) return cp;
+
+  // по умолчанию — UTF-8 (современные форумы в основном на нём)
   return utf8;
 }
 

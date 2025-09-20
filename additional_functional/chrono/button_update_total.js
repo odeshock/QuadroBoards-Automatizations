@@ -216,15 +216,27 @@
       const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
       const ord = (e.order != null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
+      // opts.asBB === true → рендерим в BB-коде, иначе в HTML как прежде
+      const asBB = true;
+      
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
-            const id   = String(+low.replace(/^user/i, ''));
-            const base = window.profileLink(id, e.idToNameMap?.get(id));
+            const idStr = String(+String(low).replace(/^user/i, '')); // "user4" -> "4"
+            const hasId = idStr !== '0' && /^\d+$/.test(idStr);
+            const display = hasId
+              ? userLink(idStr, e.idToNameMap?.get(idStr), asBB)
+              : missingUser(String(low), asBB);
+      
             const roles = Array.from(e.masksByCharLower.get(low) || []);
-            const tail  = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
-            return `${base}${tail}`;
-          }).join(', ')
-        : `[mark]не указаны[/mark]`;
+            const tail  = roles.length
+              ? (asBB ? ` [i]as ${FMV.escapeHtml(roles.join(', '))}[/i]`
+                      : ` [as ${FMV.escapeHtml(roles.join(', '))}]`)
+              : '';
+
+      return `${display}${tail}`;
+    }).join(', ')
+  : (asBB ? `[mark]не указаны[/mark]` : `<mark>не указаны</mark>`);
+
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))

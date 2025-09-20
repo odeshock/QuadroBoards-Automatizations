@@ -223,6 +223,8 @@
       
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
+            const idStr = String(+String(low).replace(/^user/i, '')); // "user4" -> "4"
+            const hasId = idStr !== '0' && /^\d+$/.test(idStr);
             const known = hasId && e.idToNameMap?.has(idStr);
             const display = known
               ? userLink(idStr, e.idToNameMap.get(idStr), asBB)

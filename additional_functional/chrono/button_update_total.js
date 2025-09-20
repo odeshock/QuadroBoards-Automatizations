@@ -166,7 +166,7 @@
       const { dateRaw, episode, hasBracket } = parseTitle(safeTitle);
       const isAu  = (type === 'au');
       const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
-      const auStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));
+      const auStart = /^\s*\[\s*(?:a|а)\s*(?:u|у)\s*\]/i.test(safeTitle);
       const dateBad = isAu ? !auStart : (!hasBracket || range.bad);
       const plotBad = (type === 'plot') ? !/\s\[\s*с\s*\]\s*$/iu.test(String(rawTitle || '')) : false;
 

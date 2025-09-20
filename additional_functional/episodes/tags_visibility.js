@@ -2,15 +2,16 @@
 (() => {
   'use strict';
 
+  // ----- настройки кнопки -----
   const BUTTON_LABEL = 'Мета-инфо';
   const BUTTON_ORDER = 12;
-  
-  // ====== Утилиты ======
+
+  // ----- утилиты -----
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   async function waitFor(fn, { timeout = 10000, interval = 100 } = {}) {
     const t0 = performance.now();
     while (performance.now() - t0 < timeout) {
-      try { const v = fn(); if (v) return v; } catch (_) {}
+      try { const v = fn(); if (v) return v; } catch {}
       await sleep(interval);
     }
     return null;
@@ -37,34 +38,29 @@
       }
       .fmv-row{margin:.25em 0}
       .fmv-label{font-weight:700;margin-right:.25em}
-      .fmv-missing{color:#c00;background:#ffe6e6;border-radius:6px;padding:0 .35em;font-weight:700}
     `;
     document.head.appendChild(style);
   }
 
-  // найти наш wrap (контейнер кнопки) по order и label
+  // найти контейнер именно этой кнопки
   function findOwnWrap() {
     const container = document.querySelector('.ams_info');
     if (!container) return null;
-    const candidates = Array.from(container.querySelectorAll('div[data-order]'));
-    return candidates.find(el => {
+    return Array.from(container.querySelectorAll('div[data-order]')).find(el => {
       const btn = el.querySelector('button.button');
-      const sameOrder = Number(el.dataset.order) === Number(BUTTON_ORDER);
-      const sameLabel = btn && btn.textContent.trim() === BUTTON_LABEL;
-      return sameOrder && sameLabel;
+      return Number(el.dataset.order) === BUTTON_ORDER &&
+             btn && btn.textContent.trim() === BUTTON_LABEL;
     }) || null;
   }
 
-  // ====== Монтаж/демонтаж блока ======
+  // ----- сбор данных и построение блока -----
   async function buildMetaHtml() {
-    // ждём зависимости FMV (как и раньше)
     const ok = await waitFor(() =>
       window.FMV &&
       typeof FMV.readTagText === 'function' &&
       typeof FMV.escapeHtml === 'function' &&
       typeof FMV.parseOrderStrict === 'function' &&
-      typeof FMV.buildIdToNameMapFromTags === 'function' &&
-      typeof FMV.parseCharactersUnified === 'function'
+      typeof FMV.buildIdToNameMapFromTags === 'function'
     , { timeout: 15000 });
     if (!ok) return null;
 
@@ -80,8 +76,8 @@
     const rawOrder = FMV.readTagText(first, 'order');
 
     const map = await FMV.buildIdToNameMapFromTags(rawChars);
-
     const parts = [];
+
     if (rawChars) {
       const participantsHtml = FMV.renderParticipantsHtml(rawChars, map, window.profileLink);
       parts.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`);
@@ -97,7 +93,6 @@
     if (!parts.length) return null;
 
     injectStyleOnce();
-
     const block = document.createElement('div');
     block.className = 'fmv-meta';
     block.innerHTML = parts.join('\n');
@@ -105,45 +100,32 @@
   }
 
   function isMounted() {
-    // блок привязываем как ближайшего соседа под нашим wrap
     const wrap = findOwnWrap();
-    if (!wrap) return false;
-    const next = wrap.nextElementSibling;
-    return !!(next && next.classList && next.classList.contains('fmv-meta'));
+    const next = wrap?.nextElementSibling;
+    return !!(next && next.classList.contains('fmv-meta'));
   }
 
   function unmountMetaBlock() {
     const wrap = findOwnWrap();
-    if (!wrap) return;
-    const next = wrap.nextElementSibling;
-    if (next && next.classList && next.classList.contains('fmv-meta')) next.remove();
+    const next = wrap?.nextElementSibling;
+    if (next && next.classList.contains('fmv-meta')) next.remove();
   }
 
   async function mountMetaBlock() {
     const wrap = findOwnWrap();
     if (!wrap) return;
-
-    // если уже есть — обновим (на случай, если теги изменились)
-    unmountMetaBlock();
-
+    unmountMetaBlock();                       // убираем старый
     const block = await buildMetaHtml();
     if (!block) return;
-
-    // вставляем СРАЗУ ПОД КНОПКОЙ
-    if (wrap.nextSibling) {
-      wrap.parentNode.insertBefore(block, wrap.nextSibling);
-    } else {
-      wrap.parentNode.appendChild(block);
-    }
+    wrap.parentNode.insertBefore(block, wrap.nextSibling);
   }
 
-  // ====== Кнопка-тумблер через createForumButton ======
+  // ----- кнопка-тумблер -----
   createForumButton({
     allowedGroups: (CHRONO_CHECK && CHRONO_CHECK.GroupID) || [],
     allowedForums: (CHRONO_CHECK && CHRONO_CHECK.ForumIDs) || [],
     label: BUTTON_LABEL,
     order: BUTTON_ORDER,
-
     async onClick() {
       if (isMounted()) {
         unmountMetaBlock();

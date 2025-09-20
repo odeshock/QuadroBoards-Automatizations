@@ -170,6 +170,9 @@
         /* (оставляем общий верхний зазор секции) */
         .fmv .place-row, .fmv .order-row { margin-top: 8px; }
 
+        .fmv .chip .name { font-weight: 600; }
+        .fmv .chip .name .name-code { font-weight: 400; color: var(--fmv-muted); }
+
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
       }
@@ -234,7 +237,12 @@
           selected.forEach(function(item, idx){
             const $chip=$('<div class="chip" draggable="true" data-idx="'+idx+'"/>');
             $chip.append('<span class="drag" title="Перетащите для изменения порядка">↕</span>');
-            $chip.append($('<span class="name"/>').text(item.name+' ('+item.code+')'));
+            
+            const $name = $('<span class="name"/>');
+            $name.append(document.createTextNode(item.name + ' '));
+            $name.append($('<span class="name-code"/>').text('(' + item.code + ')'));
+            $chip.append($name);
+
 
             const $masks=$('<span class="masks"/>');
             if (item.masks?.length){

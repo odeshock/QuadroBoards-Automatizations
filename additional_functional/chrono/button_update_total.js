@@ -14,9 +14,7 @@
   }
 
   // разделы (можно переопределить через CHRONO_CHECK.Sections)
-  const SECTIONS = window.CHRONO_CHECK?.Sections || window.CHRONO_CHECK?.ForumInfo || [
-    { id: 8, type: 'au', status: 'on' }
-  ];
+  const SECTIONS = window.CHRONO_CHECK?.ForumInfo || [];
 
   let busy = false;
 
@@ -25,7 +23,7 @@
     allowedForums: FID,
     topicId: TID,
     label: 'обновить итог',
-    order: 50,
+    order: 1,
 
     showStatus: true,
     showDetails: true,

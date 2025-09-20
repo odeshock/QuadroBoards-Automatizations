@@ -139,6 +139,16 @@
         .fmv-admin-tools{display:flex;justify-content:flex-end;margin:6px 0 8px}
         .fmv-admin-tools .fmv-toggle{border:1px solid var(--fmv-b);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
 
+        /* заголовок блока */
+        .fmv .section-title{
+          font-weight:700;
+          font-size:14px;
+          text-align: center;
+          line-height:1.25;
+          margin:4px 0 12px;
+          color: var(--fmv-text);
+        }
+
         /* делаем «колонку» с равным шагом и без внутренних margin */
         .fmv .combo,
         .fmv .place-row,

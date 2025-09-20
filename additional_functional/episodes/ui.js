@@ -217,7 +217,7 @@
         const $placeRow   = $('<div class="place-row"/>');
         const $placeLabel = $('<label for="fmv-place" style="font-weight:600">Локация:</label>');
         const $placeInput = $('<input type="text" id="fmv-place" placeholder="Укажите локацию">');
-        const $placeHint  = $('<div class="hint">Лучше указывать в едином формате: Хогвартс, Косая аллея, Лютный переулок, Министерство и т.д.</div>');
+        const $placeHint  = $('<div class="hint">Лучше указывать в едином формате: Хогвартс, Косой переулок, Лютный переулок, Министерство и т.д.</div>');
         $placeRow.append($placeLabel, $placeInput, $placeHint);
 
         // порядок в день

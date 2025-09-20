@@ -1,12 +1,26 @@
-// ===== FMV common (unified characters + users loader) =====
-(function () {
+/*
+ * common.js — универсальный парсер characters/masks с выводом в HTML (дефолт) и BB-код (по флагу opts.asBB)
+ *
+ * Публичные функции:
+ *   - FMV.parseCharactersUnified(charsText, idToNameMap, profileLink = window?.profileLink, opts)
+ *       -> { ok, participantsLower, masksByCharLower, participants, masks, error,
+ *            htmlParticipants, htmlMasks, htmlError, bbParticipants, bbMasks, bbError }
+ *   - FMV.renderParticipantsHtml(charsText, idToNameMap, profileLink = window?.profileLink, opts)
+ *       -> строка (HTML или BB)
+ *
+ * Обратная совместимость:
+ *   htmlParticipants/htmlMasks/htmlError сохранены. Добавлены bbParticipants/bbMasks/bbError.
+ */
+
+(function (global) {
   'use strict';
 
-  const FMV = (window.FMV = window.FMV || {});
+  const FMV = (global.FMV = global.FMV || {});
 
-  /* ---------- tiny utils ---------- */
-  FMV.escapeHtml = FMV.escapeHtml || function (s) {
-    return String(s ?? '')
+  // ===== БАЗОВЫЕ УТИЛИТЫ =====
+  FMV.escapeHtml = FMV.escapeHtml || function escapeHtml(str) {
+    const s = String(str ?? '');
+    return s
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -14,311 +28,245 @@
       .replace(/'/g, '&#039;');
   };
 
-  FMV.normSpace = FMV.normSpace || function (s) {
-    return String(s ?? '').replace(/\s+/g, ' ').trim();
+  FMV.normSpace = FMV.normSpace || function normSpace(str) {
+    return String(str ?? '').replace(/[\s\u00A0]+/g, ' ').trim();
   };
 
-  /** Читает текст тега <tag> из узла (без дублирования пробелов) */
-  FMV.readTagText = FMV.readTagText || function (root, tag) {
-    if (!root) return '';
-    const el = root.querySelector(tag);
-    return FMV.normSpace(el ? (el.textContent ?? '') : '');
-  };
+  // Нормализация токена участника к нижнему регистру
+  function toKey(tok) {
+    return FMV.normSpace(tok).toLowerCase();
+  }
 
-  /** Быстрый сбор имени из ссылок на текущей странице (подстраховка) */
-  FMV.idToNameFromPage = FMV.idToNameFromPage || function () {
-    const map = new Map();
-    document.querySelectorAll('a[href*="profile.php?id="]').forEach(a => {
-      const m = a.href.match(/profile\.php\?id=(\d+)/i);
-      const name = FMV.normSpace(a.textContent || '');
-      if (m && name && !map.has(m[1])) map.set(m[1], name);
-    });
-    return map;
-  };
+  // Линк на профиль (HTML/BB). Можно подменить через profileLink/bbProfileLink в opts
+  function renderPersonTok(id, displayName, { asBB, profileLink, bbProfileLink }) {
+    const safeName = FMV.escapeHtml(displayName || (id ? 'user' + id : ''));
 
-  /* ---------- order ---------- */
-  /** Строгая проверка order: целое число; отдаёт ok, value и готовый html */
-  FMV.parseOrderStrict = FMV.parseOrderStrict || function (orderText) {
-    const raw = FMV.normSpace(orderText);
-    if (!raw) return { ok: false, html: '' };
-    if (/^-?\d+$/.test(raw)) {
-      return { ok: true, value: parseInt(raw, 10), html: FMV.escapeHtml(raw) };
-    }
-    return {
-      ok: false,
-      html:
-        `<span class="fmv-missing">Ошибка! Нужен формат целого числа (пример: -3 или 5)</span>` +
-        ` — ${FMV.escapeHtml(raw)}`
-    };
-  };
-
-  /* ---------- characters: извлечение id и карта имён ---------- */
-
-  /** Вытягивает все userID из строки characters (формат: userN[=mask]; …) */
-  FMV.extractUserIdsFromTags = FMV.extractUserIdsFromTags || function (charsText) {
-    const ids = new Set();
-    String(charsText || '').replace(/user(\d+)/gi, (_, d) => {
-      ids.add(String(Number(d)));
-      return _;
-    });
-    return Array.from(ids);
-  };
-
-  /**
-   * Строит Map id->name по userID, указанным в characters.
-   * Использует window.getProfileNameById(id) из profile_from_user, если доступно.
-   * Если функция недоступна — вернёт пустую Map (а UI покажет "не найден").
-   * Уважает глобальный кэш window.__FMV_ID_TO_NAME_MAP__ если он есть.
-   */
-  FMV.buildIdToNameMapFromTags = FMV.buildIdToNameMapFromTags || async function (charsText) {
-    if (window.__FMV_ID_TO_NAME_MAP__ instanceof Map && window.__FMV_ID_TO_NAME_MAP__.size) {
-      return window.__FMV_ID_TO_NAME_MAP__;
-    }
-    const ids = FMV.extractUserIdsFromTags(charsText);
-    const map = new Map();
-
-    if (typeof window.getProfileNameById !== 'function') return map;
-
-    await Promise.all(ids.map(async (id) => {
-      try {
-        const name = await window.getProfileNameById(id);
-        if (name) map.set(id, name);
-      } catch { /* ignore */ }
-    }));
-
-    return map;
-  };
-
-  /* ---------- characters: единый парсер ---------- */
-
-  /**
-   * Разбирает unified-строку characters:
-   *   "userN; userM=mask1; userM=mask2; userK"
-   * Возвращает:
-   *   ok                     — успешность
-   *   participantsLower      — ['user5','user6', ...]
-   *   masksByCharLower       — Map<'user5', Set(['mask1','mask2'])>
-   *   htmlParticipants       — "<a ...>Имя</a> [as mask1, mask2]; <a ...>Имя</a>"
-   *   htmlMasks              — "<a ...>Имя</a>=mask; ..."
-   *   htmlError              — HTML ошибки формата (если не ок)
-   */
-  FMV.parseCharactersUnified = FMV.parseCharactersUnified || function (charsText, idToNameMap, profileLink = window.profileLink) {
-    const raw = String(charsText || '').trim();
-    if (!raw) {
-      return {
-        ok: false,
-        participantsLower: [],
-        masksByCharLower: new Map(),
-        htmlParticipants: '',
-        htmlMasks: '',
-        htmlError: ''
-      };
-    }
-
-    // Строгий шаблон: user\d+ или user\d+=не-«;», разделённые «;»
-    const TEMPLATE = /^\s*user\d+(?:\s*=\s*[^;]+)?(?:\s*;\s*user\d+(?:\s*=\s*[^;]+)?)*\s*$/i;
-    if (!TEMPLATE.test(raw)) {
-      return {
-        ok: false,
-        participantsLower: [],
-        masksByCharLower: new Map(),
-        htmlParticipants: '',
-        htmlMasks: '',
-        htmlError:
-          `<span class="fmv-missing">Ошибка формата! ` +
-          `Нужен вид: userN; userM=маска; userM=маска; …</span>`
-      };
-    }
-
-    const parts = raw.split(/\s*;\s*/).filter(Boolean);
-    const participantsSet   = new Set();
-    const masksByCharLower  = new Map();
-    const htmlMaskPairs     = [];
-
-    for (const p of parts) {
-      const [left, right] = p.split('=');
-      const id = String(Number((left.match(/user(\d+)/i) || [,''])[1]));
-      const key = ('user' + id).toLowerCase();
-      participantsSet.add(key);
-
-      const personHtml = (typeof profileLink === 'function')
-        ? profileLink(id, idToNameMap?.get(id))
-        : FMV.escapeHtml(`user${id}`);
-
-      if (right) {
-        const mask = FMV.normSpace(right);
-        if (!masksByCharLower.has(key)) masksByCharLower.set(key, new Set());
-        masksByCharLower.get(key).add(mask.toLowerCase());
-        htmlMaskPairs.push(`${personHtml}=${FMV.escapeHtml(mask)}`);
+    if (!asBB) {
+      if (typeof profileLink === 'function') {
+        try { return String(profileLink(id, displayName)); } catch (_) {}
       }
+      // дефолтная ссылка HTML
+      return `<a href="/profile.php?id=${id}">${safeName}</a>`;
     }
 
-    const participantsLower = Array.from(participantsSet);
+    // BB-версия
+    if (typeof bbProfileLink === 'function') {
+      try { return String(bbProfileLink(id, displayName)); } catch (_) {}
+    }
+    return `[url=/profile.php?id=${id}]${safeName}[/url]`;
+  }
 
-    const htmlParticipants = participantsLower.map(tok => {
-      const roles = Array.from(masksByCharLower.get(tok) || []);
-    
-      // пытаемся распознать user<ID>, если не получилось — это произвольное имя
-      const m = /^user(\d+)$/i.exec(String(tok).trim());
-      const id = m ? m[1] : null;
-      const found = id && idToNameMap?.has(id);
-      const displayName = found ? (idToNameMap.get(id) || `user${id}`) : String(tok);
-    
-      const tail = roles.length
-        ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`
-        : '';
-    
-      if (found) {
-        // есть профиль
-        const link = (typeof profileLink === 'function')
-          ? profileLink(id, displayName)
-          : `<a href="/profile.php?id=${id}">${FMV.escapeHtml(displayName)}</a>`;
-        return `${link}${tail}`;
+  function renderMissingTok(name, { asBB }) {
+    const safe = FMV.escapeHtml(String(name || 'не найден'));
+    return asBB
+      ? `[i][color=gray]${safe}[/color][/i]`
+      : `<span class="fmv-missing" data-found="0">${safe}</span>`;
+  }
+
+  // Разбор одной части: "user123" либо "user123=маска"
+  function parsePart(partRaw) {
+    const part = FMV.normSpace(partRaw);
+    if (!part) return null;
+
+    const eqIdx = part.indexOf('=');
+    if (eqIdx === -1) {
+      return { left: part, right: null };
+    }
+    const left = FMV.normSpace(part.slice(0, eqIdx));
+    const right = FMV.normSpace(part.slice(eqIdx + 1));
+    return { left, right };
+  }
+
+  function extractUserIdFromLeft(left) {
+    // поддержим формы: user123 / USER123 / User123
+    const m = /(?:^|\b)user(\d+)(?:\b|$)/i.exec(left);
+    return m ? String(Number(m[1])) : null;
+  }
+
+  function partsFromCharsText(charsText) {
+    // Разделители — точка с запятой или перевод строки/запятая; допускаем смешанное
+    const raw = String(charsText ?? '')
+      .replace(/\r\n?/g, '\n')
+      .split(/[;\n,]/);
+    const parts = [];
+    for (const chunk of raw) {
+      const p = parsePart(chunk);
+      if (p) parts.push(p);
+    }
+    return parts;
+  }
+
+  // Преобразовать Map<string, Set<string>> в plain-объект для удобного чтения/логирования
+  function mapSetToPlain(map) {
+    const out = Object.create(null);
+    for (const [k, set] of map.entries()) {
+      out[k] = Array.from(set.values());
+    }
+    return out;
+  }
+
+  // ===== ОСНОВНАЯ ФУНКЦИЯ =====
+  FMV.parseCharactersUnified = function (
+    charsText,
+    idToNameMap,
+    profileLink = (typeof window !== 'undefined' ? window.profileLink : undefined),
+    opts
+  ) {
+    try {
+      const asBB = !!(opts && opts.asBB);
+      const bbProfileLink = opts && opts.bbProfileLink;
+
+      // нормализуем карту: допускаем Map<string,string> или обычный объект {id: name}
+      let idMapGet = null;
+      if (idToNameMap && typeof idToNameMap.get === 'function') {
+        idMapGet = (id) => idToNameMap.get(id);
+      } else if (idToNameMap && typeof idToNameMap === 'object') {
+        idMapGet = (id) => idToNameMap[id];
       } else {
-        // произвольное слово или неизвестный user<ID>
-        return `<span class="fmv-missing" data-found="0">${FMV.escapeHtml(displayName)}${tail}</span>`;
+        idMapGet = () => undefined;
       }
-    }).join('; ');
 
+      const parts = partsFromCharsText(charsText);
+      const participantsSet = new Set(); // ключи (lowercased) — user123 или произвольный токен
+      const masksByCharLower = new Map(); // key -> Set(maskLower)
 
-    return {
-      ok: true,
-      participantsLower,
-      masksByCharLower,
-      htmlParticipants,
-      htmlMasks: htmlMaskPairs.join('; '),
-      htmlError: ''
-    };
+      // предварительный проход: соберём участников и маски
+      for (const p of parts) {
+        const leftKey = toKey(p.left);
+        if (!leftKey) continue;
+        participantsSet.add(leftKey);
+
+        const uid = extractUserIdFromLeft(p.left);
+        if (p.right && uid) {
+          const maskLower = toKey(p.right);
+          if (!masksByCharLower.has(leftKey)) masksByCharLower.set(leftKey, new Set());
+          if (maskLower) masksByCharLower.get(leftKey).add(maskLower);
+        }
+      }
+
+      // Списки для вывода
+      const participantsLower = Array.from(participantsSet.values());
+
+      function buildOne(tok, fmt) {
+        // tok: уже lowercased
+        const m = /user(\d+)/i.exec(tok);
+        const id = m ? String(Number(m[1])) : null;
+        const roles = Array.from(masksByCharLower.get(tok) || []);
+
+        let found = false, displayName = tok;
+        if (id) {
+          const name = idMapGet(id);
+          if (name) { found = true; displayName = String(name); } else { displayName = `user${id}`; }
+        }
+
+        const rolesTail = roles.length ? ` [as ${FMV.escapeHtml(roles.join(', '))}]` : '';
+
+        if (found) {
+          if (fmt === 'bb') {
+            return `${renderPersonTok(id, displayName, { asBB: true, profileLink, bbProfileLink })}${rolesTail}`;
+          }
+          // html
+          const link = typeof profileLink === 'function'
+            ? String(profileLink(id, displayName))
+            : `<a href="/profile.php?id=${id}">${FMV.escapeHtml(displayName)}</a>`;
+          return `${link}${rolesTail}`;
+        }
+
+        // not found — исходный токен как есть (или user{id} без имени)
+        const miss = renderMissingTok(displayName, { asBB: fmt === 'bb' });
+        return `${miss}${rolesTail}`;
+      }
+
+      const htmlParticipants = participantsLower.map(tok => buildOne(tok, 'html')).join('; ');
+      const bbParticipants   = participantsLower.map(tok => buildOne(tok, 'bb')).join('; ');
+
+      // mask-pairs (только для тех, у кого есть права часть)
+      const htmlMaskPairs = [];
+      const bbMaskPairs = [];
+      for (const p of parts) {
+        if (!p.right) continue;
+        const leftKey = toKey(p.left);
+        const uid = extractUserIdFromLeft(p.left);
+        const rawMask = FMV.normSpace(p.right);
+        const escMask = FMV.escapeHtml(rawMask);
+        if (uid) {
+          const name = idMapGet(uid) || `user${uid}`;
+          const personHtml = (typeof profileLink === 'function')
+            ? String(profileLink(uid, name))
+            : `<a href="/profile.php?id=${uid}">${FMV.escapeHtml(name)}</a>`;
+          const personBB = renderPersonTok(uid, name, { asBB: true, profileLink, bbProfileLink });
+          htmlMaskPairs.push(`${personHtml}=${escMask}`);
+          bbMaskPairs.push(`${personBB}=${escMask}`);
+        } else {
+          // левая часть не распарсилась как user{id} — выводим как «missing»/сырой
+          const missHtml = `<span class="fmv-missing" data-found="0">${FMV.escapeHtml(p.left)}</span>`;
+          const missBB = renderMissingTok(p.left, { asBB: true });
+          htmlMaskPairs.push(`${missHtml}=${escMask}`);
+          bbMaskPairs.push(`${missBB}=${escMask}`);
+        }
+      }
+
+      const result = {
+        ok: true,
+        participantsLower,
+        masksByCharLower, // Map для удобства использования в коде
+        masksByCharLowerPlain: mapSetToPlain(masksByCharLower), // plain-object для сериализации/логирования
+
+        // Универсальные строки под запрос
+        participants: (asBB ? bbParticipants : htmlParticipants),
+        masks:        (asBB ? bbMaskPairs.join('; ') : htmlMaskPairs.join('; ')),
+        error: '',
+
+        // HTML-совместимость
+        htmlParticipants,
+        htmlMasks: htmlMaskPairs.join('; '),
+        htmlError: '',
+
+        // BB-выводы
+        bbParticipants,
+        bbMasks: bbMaskPairs.join('; '),
+        bbError: ''
+      };
+
+      return result;
+    } catch (err) {
+      const raw = FMV.escapeHtml(String(charsText ?? ''));
+      const msg = (err && err.message) ? String(err.message) : 'internal error';
+      return {
+        ok: false,
+        participantsLower: [],
+        masksByCharLower: new Map(),
+        masksByCharLowerPlain: {},
+        participants: `[color=red]Ошибка: ${FMV.escapeHtml(msg)}[/color] — ${raw}`,
+        masks: `[color=red]Ошибка: ${FMV.escapeHtml(msg)}[/color]`,
+        error: msg,
+        htmlParticipants: `<span class="fmv-error">Ошибка: ${FMV.escapeHtml(msg)}</span> — ${raw}`,
+        htmlMasks: `<span class="fmv-error">Ошибка: ${FMV.escapeHtml(msg)}</span>`,
+        htmlError: msg,
+        bbParticipants: `[color=red]Ошибка: ${FMV.escapeHtml(msg)}[/color] — ${raw}`,
+        bbMasks: `[color=red]Ошибка: ${FMV.escapeHtml(msg)}[/color]`,
+        bbError: msg
+      };
+    }
   };
 
-  /* ---------- удобный рендер для «Участники:» ---------- */
-  FMV.renderParticipantsHtml = FMV.renderParticipantsHtml || function (charsText, idToNameMap, profileLink = window.profileLink) {
-    const uni = FMV.parseCharactersUnified(charsText, idToNameMap, profileLink);
-    if (uni && uni.ok) return uni.htmlParticipants;
+  // Обёртка: рендер участников одной строкой
+  FMV.renderParticipantsHtml = function (
+    charsText,
+    idToNameMap,
+    profileLink = (typeof window !== 'undefined' ? window.profileLink : undefined),
+    opts
+  ) {
+    const uni = FMV.parseCharactersUnified(charsText, idToNameMap, profileLink, opts);
+    if (uni && uni.ok) return uni.participants;
 
     const raw = FMV.escapeHtml(String(charsText ?? ''));
-    const err = (uni && uni.htmlError && uni.htmlError.trim())
-      ? uni.htmlError
-      : `<span class="fmv-missing">Аааа! Нужен формат: userN; userM=маска; userK</span> — ${raw}`;
-
-    return err;
+    if (opts && opts.asBB) {
+      const msg = uni && (uni.error || uni.bbError) ? (uni.error || uni.bbError) : 'Ошибка в characters';
+      return `[color=red]${FMV.escapeHtml(msg)}[/color] — ${raw}`;
+    }
+    const msg = uni && (uni.error || uni.htmlError) ? (uni.error || uni.htmlError) : 'Ошибка в characters';
+    return `<span class="fmv-error">${FMV.escapeHtml(msg)}</span> — ${raw}`;
   };
 
-  /* ---------- users loader (moved to common) ---------- */
-
-  /**
-   * FMV.fetchUsers({ force?:boolean, maxPages?:number, batchSize?:number })
-   * Возвращает $.Deferred().promise() с массивом:
-   *   [{ id:Number, code:'user<ID>', name:String }, ...] — 이미 отсортирован по name и без дублей
-   */
-  FMV.fetchUsers = FMV.fetchUsers || function (opts) {
-    opts = opts || {};
-    var force    = !!opts.force;
-    var maxPages = opts.maxPages || 50;   // защитный лимит
-    var batch    = opts.batchSize || 5;   // параллельная пачка
-
-    var CACHE_KEY = 'fmv_users_cache_v1';
-    var TTL_MS    = 30 * 60 * 1000;
-
-    function readCache(){
-      try{
-        var raw = sessionStorage.getItem(CACHE_KEY);
-        if(!raw) return null;
-        var obj = JSON.parse(raw);
-        if(!obj || !obj.time || !obj.data) return null;
-        if(Date.now() - obj.time > TTL_MS) return null;
-        return obj.data;
-      }catch(_){ return null; }
-    }
-    function writeCache(list){
-      try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(), data:list})); }catch(_){}
-    }
-    function fetchHtmlCompat(url){
-      if (typeof window.fetchHtml === 'function') {
-        var d=$.Deferred();
-        Promise.resolve(window.fetchHtml(url)).then(function(txt){ d.resolve(txt); }, function(e){ d.reject(e||'fetchHtml failed'); });
-        return d.promise();
-      }
-      // fallback на jQuery
-      return $.get(url, undefined, undefined, 'html');
-    }
-    function parseUserList(html){
-      var doc = document.implementation.createHTMLDocument('');
-      doc.documentElement.innerHTML = html;
-      var anchors = doc.querySelectorAll('a[href*="profile.php?id="]');
-      var users = [];
-      anchors.forEach(function(a){
-        var name = FMV.normSpace(a.textContent || '');
-        var m = (a.getAttribute('href')||'').match(/profile\.php\?id=(\d+)/);
-        if (!m) return;
-        var id = +m[1];
-        users.push({ id: id, code: 'user'+id, name: name });
-      });
-      var pageLinks = doc.querySelectorAll('a[href*="userlist.php"]');
-      var pages = [1];
-      var baseHref = 'userlist.php';
-      pageLinks.forEach(function(a){
-        var href = a.getAttribute('href') || '';
-        if (href) baseHref = href;
-        var u = new URL(href, location.origin);
-        var p = +(u.searchParams.get('p') || 0);
-        if (p) pages.push(p);
-      });
-      var last = Math.max.apply(null, pages);
-      return { users: users, last: last, base: baseHref };
-    }
-    function urlForPage(baseHref, p){
-      var u = new URL(baseHref, location.origin);
-      if (p > 1) u.searchParams.set('p', String(p));
-      else u.searchParams.delete('p');
-      return u.pathname + (u.search || '');
-    }
-    function uniqSort(list){
-      var map = {};
-      (list||[]).forEach(function(u){ map[u.code] = u; });
-      var out = Object.keys(map).map(function(k){ return map[k]; });
-      out.sort(function(a,b){ return a.name.localeCompare(b.name,'ru',{sensitivity:'base'}) });
-      return out;
-    }
-
-    var cached = !force && readCache();
-    if (cached) return $.Deferred().resolve(cached).promise();
-
-    var d=$.Deferred();
-    fetchHtmlCompat('/userlist.php').then(function(html1){
-      var first = parseUserList(html1);
-      var all   = first.users.slice();
-      var last  = Math.min(first.last || 1, maxPages);
-
-      var pages=[]; for (var p=2; p<=last; p++) pages.push(p);
-
-      function runBatch(start){
-        if (start >= pages.length) {
-          var list = uniqSort(all);
-          writeCache(list);
-          d.resolve(list);
-          return;
-        }
-        var chunk = pages.slice(start, start+batch);
-        $.when.apply($, chunk.map(function(p){
-          var url = urlForPage(first.base, p);
-          return fetchHtmlCompat(url).then(function(htmlN){
-            var part = parseUserList(htmlN);
-            all = all.concat(part.users);
-          });
-        })).always(function(){ runBatch(start+batch); });
-      }
-
-      runBatch(0);
-    }, function(err){
-      d.reject(err || 'Не удалось загрузить список участников');
-    });
-
-    return d.promise();
-  };
-
-  FMV.invalidateUsersCache = FMV.invalidateUsersCache || function () {
-    try { sessionStorage.removeItem('fmv_users_cache_v1'); } catch (_) {}
-  };
-
-})();
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));

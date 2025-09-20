@@ -68,13 +68,44 @@ function serializeFormCP1251(form){
   return pairs.join('&');
 }
 
+/* ===== fetchHtml (новая версия с корректной декодировкой) ===== */
 async function fetchHtml(url){
   const res = await fetch(url, { credentials:'include' });
   if (!res.ok) throw new Error('HTTP '+res.status);
+
   const buf = await res.arrayBuffer();
-  let html = new TextDecoder('windows-1251').decode(buf);
-  if (!/[А-Яа-яЁё]/.test(html)) html = new TextDecoder('utf-8').decode(buf);
-  return html;
+
+  // 1) сначала пробуем UTF-8 — чтобы корректно прочитать <meta charset=...>
+  let utf8 = new TextDecoder('utf-8').decode(buf);
+
+  // charset из заголовка и из <meta>
+  const hdr = res.headers.get('content-type') || '';
+  const hdrCharset = (hdr.match(/charset=([\w-]+)/i) || [])[1]?.toLowerCase();
+
+  const mMeta =
+    utf8.match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i) ||
+    utf8.match(/<meta[^>]+content=["'][^"']*charset\s*=\s*([\w-]+)/i);
+  const metaCharset = (mMeta && mMeta[1] || '').toLowerCase();
+
+  const declared = metaCharset || hdrCharset;
+
+  // 2) если кодировка явно объявлена — декодируем ею
+  if (declared && declared !== 'utf-8') {
+    try { return new TextDecoder(declared).decode(buf); } catch { /* эвристика ниже */ }
+  }
+
+  // 3) эвристика UTF-8 vs Windows-1251: выбираем более «правдоподобный» вариант
+  const cp1251 = new TextDecoder('windows-1251').decode(buf);
+
+  const count = s => ({
+    cyr: (s.match(/[А-Яа-яЁё]/g) || []).length,
+    nonAscii: (s.match(/[^\u0000-\u007F]/g) || []).length
+  });
+  const u = count(utf8);
+  const c = count(cp1251);
+
+  // если cp1251 даёт заметно больше кириллицы — берём его, иначе остаёмся на UTF-8
+  return (c.cyr > u.cyr + 2) ? cp1251 : utf8;
 }
 
 function escapeHtml(s){
@@ -128,7 +159,7 @@ window.resolveChronoData = async function(raw, opts = {}){
     if (!m) return escapeHtml(token);
     const id = String(+m[1]);
     const name = out.idToName.get(id) || null;
-    return profileLink(id, name); // ← ГЛАВНОЕ: именно тут появится <a> или (не найден)
+    return profileLink(id, name); // ← тут появится <a> или (не найден)
   };
 
   out.participantsHtml = raw.participantsLower.map(renderLeft).join('; ');

@@ -15,8 +15,7 @@
 
   // разделы
   const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-    ? window.CHRONO_CHECK.ForumInfo
-    : [];
+    ? window.CHRONO_CHECK.ForumInfo : [];
 
   let busy = false;
 
@@ -24,8 +23,8 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'обновить хроно',
-    order: 1,
+    label: 'обновить итог',
+    order: 50,
 
     showStatus: true,
     showDetails: true,
@@ -44,9 +43,11 @@
 
         // 1) сбор
         const events = await collectEvents();
-        // 2) рендер
+
+        // 2) рендер «Собранной хронологии»
         const htmlRaw = renderChrono(events);
-        // 3) cp1251-safe
+
+        // 3) cp1251-safe (числовые сущности для символов вне ASCII/кириллицы)
         const html = FMV.toCp1251Entities(htmlRaw);
 
         // 4) публикация
@@ -62,7 +63,7 @@
         const info  = toPlainShort(res.infoMessage || '');
         const error = toPlainShort(res.errorMessage || '');
         if (info)  lines.push(info);
-        if (error) lines.push(`<span style="color:#b00020">${escapeHtml(error)}</span>`);
+        if (error) lines.push(`<span style="color:#b00020">${FMV.escapeHtml(error)}</span>`);
 
         setDetails(lines.join('<br>'));
 
@@ -78,7 +79,6 @@
   /* ===================== СБОРКА и РЕНДЕР ===================== */
 
   const MAX_PAGES_PER_SECTION = 50;
-  const TMAX = [9999, 12, 31];
 
   async function collectEvents() {
     const seenTopics = new Set(); // дедуп по теме (id:<ID> или url:<URL>)
@@ -87,6 +87,7 @@
       const part = await scrapeSection(sec, seenTopics);
       all = all.concat(part);
     }
+    // сортировка уже на основе новых правил
     return all.filter(Boolean).sort(compareEvents);
   }
 
@@ -95,7 +96,7 @@
     const seenPages = new Set();
     const out  = [];
     let n = 0;
-    let lastSig = '';
+    let lastSig = ''; // сигнатура набора тем на странице
 
     while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
       n++; seenPages.add(url);
@@ -114,14 +115,15 @@
         topics.set(m[1], { url: href, title });
       });
 
-      // STOP #1: страница без прогресса
+      // STOP #1: страница без прогресса (повтор сигнатуры)
       const sig = Array.from(topics.keys()).sort().join(',');
       if (sig && sig === lastSig) break;
       lastSig = sig;
 
       for (const [tid, { url: turl, title }] of topics) {
         const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
-        if (seenTopics.has(key)) continue;
+        if (seenTopics.has(key)) continue; // глобальная дедупликация
+
         const row = await scrapeTopic(turl, title, section.type, section.status);
         if (row) {
           seenTopics.add(key);
@@ -131,7 +133,9 @@
 
       const next = findNextPage(doc);
       const nextUrl = next ? abs(url, next) : null;
-      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; } // STOP #2
+
+      // STOP #2: нет next или «следующая» указывает на уже посещённую
+      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
       url = nextUrl;
     }
     return out;
@@ -154,38 +158,64 @@
       const participantsLower = uni.ok ? uni.participantsLower : [];
       const masksByCharLower  = uni.ok ? uni.masksByCharLower  : new Map();
       const locationsLower    = rawLoc ? rawLoc.split(/\s*[,;]\s*/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
-      const order             = ord.ok ? ord.value : null;
+      const order             = ord.ok ? ord.value : 0; // по правилам: нет — значит 0
 
       const titleFromCrumbs = topicTitleFromCrumbs(doc);
       const safeTitle = rawTitle || titleFromCrumbs || '';
-      const { dateRaw, episode, hasBracket } = parseTitle(safeTitle);
-      const isAu  = (type === 'au');
-      const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
-      const auStart = /^\s*\[\s*(?:a|а)\s*(?:u|у)\s*\]/i.test(safeTitle);
-      const dateBad = isAu ? !auStart : (!hasBracket || range.bad);
-      const plotBad = (type === 'plot') ? !/\s\[\s*с\s*\]\s*$/iu.test(String(rawTitle || '')) : false;
+      const { dateRaw, episode } = parseTitle(safeTitle);
+
+      const parsed = parseDateFlexible(dateRaw); // НОВЫЙ разбор дат
 
       return {
         type, status, url: topicUrl,
-        episode, dateRaw, range, dateBad, plotBad,
+        episode, dateRaw,
+        hasDate: parsed.hasDate,
+        dateDisplay: parsed.display,
+        startSort: parsed.startSort, // [y, m||0, d||0]
+        endSort: parsed.endSort,     // [y, m||0, d||0]
         locationsLower, participantsLower, masksByCharLower, order,
         idToNameMap
       };
     } catch { return null; }
   }
 
-  function compareEvents(a, b) {
-    const A = a?.range?.start || TMAX;
-    const B = b?.range?.start || TMAX;
+  /* ===================== СОРТИРОВКА ПО НОВЫМ ПРАВИЛАМ ===================== */
+
+  function compareTriples(aArr, bArr) {
+    // aArr/bArr вида [y, m, d]
     for (let i = 0; i < 3; i++) {
-      const d = (A[i] ?? 9999) - (B[i] ?? 9999);
-      if (d) return d;
+      const da = (aArr[i] ?? 0) - (bArr[i] ?? 0);
+      if (da) return da;
     }
-    const ao = (a.order == null) ? 1e9 : a.order;
-    const bo = (b.order == null) ? 1e9 : b.order;
-    if (ao !== bo) return ao - bo;
-    return String(a.episode || '').localeCompare(String(b.episode || ''), 'ru', { sensitivity: 'base' });
+    return 0;
   }
+
+  function compareEvents(a, b) {
+    const aHas = !!a.hasDate, bHas = !!b.hasDate;
+    if (aHas !== bHas) return aHas ? -1 : 1; // 1) сначала с датой
+
+    if (aHas && bHas) {
+      // 2) по дате начала
+      const s = compareTriples(a.startSort, b.startSort);
+      if (s) return s;
+
+      // 3) по дате конца (если нет конца — равен началу)
+      const e = compareTriples(a.endSort, b.endSort);
+      if (e) return e;
+    }
+
+    // 4) по order (дефолт 0)
+    const ao = a.order ?? 0;
+    const bo = b.order ?? 0;
+    if (ao !== bo) return ao - bo;
+
+    // 5) по title (lowercase, алфавит по 'ru')
+    const at = String(a.episode || '').toLowerCase();
+    const bt = String(b.episode || '').toLowerCase();
+    return at.localeCompare(bt, 'ru', { sensitivity: 'base' });
+  }
+
+  /* ===================== РЕНДЕР ===================== */
 
   function renderStatus(type, status) {
     const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','black'] };
@@ -199,17 +229,14 @@
     const rows = events.map(e => {
       const status = renderStatus(e.type, e.status);
 
-      const dateHTML = e.type === 'au'
-        ? (e.dateBad ? `[mark]проблема с [au] в названии[/mark]` : '')
-        : ((!e.dateRaw || e.dateBad)
-            ? `[mark]дата не указана/ошибка[/mark]`
-            : escapeHtml(formatRange(e.range)));
+      // дата: показываем нормализованный текст; если нет — пометка (кроме AU можно оставить пусто, но решено подсветить)
+      const dateHTML = e.hasDate
+        ? FMV.escapeHtml(e.dateDisplay)
+        : `[mark]дата не указана[/mark]`;
 
-      const url  = escapeHtml(e.url);
-      const ttl0 = (e.type === 'plot') ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '') : e.episode;
-      const ttl  = escapeHtml(ttl0);
-      const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
-      const ord = (e.order != null) ? ` [порядок: ${escapeHtml(String(e.order))}]` : '';
+      const url  = FMV.escapeHtml(e.url);
+      const ttl  = FMV.escapeHtml(e.episode || '');
+      const ord  = ` [порядок: ${FMV.escapeHtml(String(e.order ?? 0))}]`;
 
       const asBB = true;
 
@@ -222,121 +249,212 @@
             const display = known
               ? userLink(idKey, e.idToNameMap.get(idKey), asBB)
               : missingUser(hasId ? `user${idKey}` : String(low), asBB);
-
             const roles = Array.from(e.masksByCharLower.get(low) || []);
-            const tail  = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
+            const tail  = roles.length ? ` [as ${FMV.escapeHtml(roles.join(', '))}]` : '';
             return `${display}${tail}`;
           }).join(', ')
         : `[mark]не указаны[/mark]`;
 
       const loc = (e.locationsLower && e.locationsLower.length)
-        ? escapeHtml(e.locationsLower.join(', '))
+        ? FMV.escapeHtml(e.locationsLower.join(', '))
         : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n[i]${names}[/i]\n${loc}\n\n`;
+      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${ord}\n[i]${names}[/i]\n${loc}\n\n`;
     });
 
     const body = rows.join('') || ``;
     return `[media="Собранная хронология"]${body}[/media]`;
   }
 
-  /* ===================== ВСПОМОГАТЕЛЬНОЕ ===================== */
+  /* ===================== НОВЫЙ РАЗБОР ДАТ ===================== */
+  // Правила:
+  // - yy → 19yy если > 30; иначе 20yy
+  // - одиночная дата → формат показа: dd.mm.yyyy / mm.yyyy / yyyy
+  // - диапазон → dd.mm.yyyy-dd.mm.yyyy / mm.yyyy-mm.yyyy / yyyy-yyyy
+  // - для сортировки «нулевые» m=0/d=0, если они отсутствуют
+  // Поддерживаемые записи внутри [дата]: см. описание пользователя.
 
-  const z2 = n => String(n).padStart(2, '0');
+  const DASH_RX = /[\u2012-\u2015\u2212—–−]/g; // разные тире
 
-  function formatRange(r) {
-    const [y1, m1, d1] = r.start, [y2, m2, d2] = r.end;
-    switch (r.kind) {
-      case 'single':      return `${z2(d1)}.${z2(m1)}.${y1}`;
-      case 'day-range':   return `${z2(d1)}-${z2(d2)}.${z2(m1)}.${y1}`;
-      case 'cross-month': return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
-      case 'month':       return `${z2(m1)}.${y1}`;
-      case 'year':        return String(y1);
-      default:
-        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${z2(d2)}.${z2(m2)}.${y2}`;
-        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
+  function toYYYY(n) {
+    // n: 2- или 4-значный год
+    const num = Number(n);
+    if (!Number.isFinite(num)) return null;
+    if (String(n).length === 2) {
+      return num > 30 ? 1900 + num : 2000 + num;
     }
+    return num;
   }
 
-  function isValidDate(y, m, d) {
-    if (!Number.isFinite(y) || y < 0)   return false;
-    if (!Number.isFinite(m) || m < 1)   return false;
-    if (!Number.isFinite(d) || d < 1)   return false;
-    return d <= new Date(y, m, 0).getDate();
+  function pad2(x) { return String(x).padStart(2, '0'); }
+
+  function daysInMonth(y, m) {
+    if (!y || !m) return 31;
+    return new Date(y, m, 0).getDate();
   }
 
-  function parseDateRange(src) {
-    let txt = String(src || '').trim();
-    if (!txt) return { start: TMAX, end: TMAX, kind: 'unknown', bad: true };
+  function parseDateFlexible(raw) {
+    let s = String(raw || '').trim();
+    if (!s) return { hasDate: false, display: '', startSort: [0,0,0], endSort: [0,0,0] };
 
-    txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
+    // нормализуем тире и пробелы вокруг
+    s = s.replace(DASH_RX, '-').replace(/\s*-\s*/g, '-');
 
-    const P = {
-      single:               /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      dayRangeSameMonth:    /^(\d{1,2})-(\д{1,2})\.(\д{1,2})\.(\д{2}|\д{4})$/, // <-- кириллица в \d была ошибкой, см. строку ниже!
-      crossMonthTailYear:   /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      monthYear:            /^(\d{1,2})\.(\d{2}|\d{4})$/,
-      yearOnly:             /^(\d{4})$/
-    };
-    // Исправленный шаблон для dayRangeSameMonth:
-    P.dayRangeSameMonth = /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/;
+    const parts = s.split('-').slice(0, 2); // максимум две части
+    if (parts.length === 1) {
+      const one = parseToken(parts[0]);
+      if (!one || !one.y) return { hasDate: false, display: '', startSort: [0,0,0], endSort: [0,0,0] };
 
-    const toI = x => parseInt(x, 10);
-    const fixY = y => String(y).length === 2 ? (y >= 70 ? 1900 + y : 2000 + y) : y;
-    const clamp = (y, m, d) => [Math.max(0, y), Math.min(Math.max(1, m), 12), Math.min(Math.max(1, d), 31)];
-
-    let m = txt.match(P.single);
-    if (m) {
-      const d = toI(m[1]), mo = toI(m[2]), y = fixY(toI(m[3]));
-      if (!isValidDate(y, mo, d)) return { start:TMAX, end:TMAX, kind:'single', bad:true };
-      const a = clamp(y, mo, d); return { start:a, end:a.slice(), kind:'single', bad:false };
+      const start = one;
+      const disp = displaySingle(start);
+      return {
+        hasDate: true,
+        display: disp,
+        startSort: [start.y, start.m ?? 0, start.d ?? 0],
+        endSort: [start.y, start.m ?? 0, start.d ?? 0]
+      };
     }
 
-    m = txt.match(P.dayRangeSameMonth);
-    if (m) {
-      const d1=toI(m[1]), d2=toI(m[2]), mo=toI(m[3]), y=fixY(toI(m[4]));
-      if (!isValidDate(y, mo, d1) || !isValidDate(y, mo, d2)) return { start:TMAX, end:TMAX, kind:'day-range', bad:true };
-      return { start:clamp(y, mo, d1), end:clamp(y, mo, d2), kind:'day-range', bad:false };
+    // диапазон
+    const rightRaw = parts[1];
+    const leftRaw  = parts[0];
+
+    const R0 = parseToken(rightRaw); // должен дать хотя бы год
+    if (!R0 || !R0.y) return { hasDate: false, display: '', startSort: [0,0,0], endSort: [0,0,0] };
+
+    let L0 = parseToken(leftRaw, R0); // можно использовать контекст справа (y/m)
+
+    // если левая часть оказалась «numSolo», определить по контексту
+    if (!L0 || !L0.y) {
+      // если это «рядом» с R0:
+      // - R0: ymd → L0: dd → dd.mm.y
+      // - R0: my  → L0: mm → mm.y
+      // - R0: y   → L0: y
+      const leftNum = onlyNum(leftRaw);
+      if (leftNum != null) {
+        if (R0.d != null && R0.m != null) {
+          L0 = { y: R0.y, m: R0.m, d: leftNum };
+        } else if (R0.m != null) {
+          L0 = { y: R0.y, m: leftNum };
+        } else {
+          // оба — годы
+          L0 = { y: toYYYY(leftNum) };
+        }
+      }
     }
 
-    m = txt.match(P.crossMonthTailYear);
-    if (m) {
-      const d1=toI(m[1]), mo1=toI(m[2]), d2=toI(m[3]), mo2=toI(m[4]), y=fixY(toI(m[5]));
-      if (!isValidDate(y, mo1, d1) || !isValidDate(y, mo2, d2)) return { start:TMAX, end:TMAX, kind:'cross-month', bad:true };
-      return { start:clamp(y, mo1, d1), end:clamp(y, mo2, d2), kind:'cross-month', bad:false };
+    // если левая «dd.mm», а справа только год — добавим год слева
+    if (L0 && L0.y == null && L0.d != null && L0.m != null && R0.y) {
+      L0.y = R0.y;
+    }
+    // если левая «dd», а справа «mm.y» → добавим месяц и год слева
+    if (L0 && L0.y == null && L0.d != null && L0.m == null && R0.m != null && R0.y) {
+      L0.m = R0.m; L0.y = R0.y;
     }
 
-    m = txt.match(P.crossYearBothYears);
-    if (m) {
-      const d1=toI(m[1]), mo1=toI(m[2]), y1=fixY(toI(m[3]));
-      const d2=toI(m[4]), mo2=toI(m[5]), y2=fixY(toI(m[6]));
-      if (!isValidDate(y1, mo1, d1) || !isValidDate(y2, mo2, d2)) return { start:TMAX, end:TMAX, kind:'cross-year', bad:true };
-      return { start:[y1,mo1,d1], end:[y2,mo2,d2], kind:'cross-year', bad:false };
+    // валидация (если есть день — должен укладываться в месяц)
+    if (L0 && L0.d != null) {
+      if (!(L0.m && L0.y && L0.d >= 1 && L0.d <= daysInMonth(L0.y, L0.m))) {
+        return { hasDate: false, display: '', startSort: [0,0,0], endSort: [0,0,0] };
+      }
+    }
+    if (R0 && R0.d != null) {
+      if (!(R0.m && R0.y && R0.d >= 1 && R0.d <= daysInMonth(R0.y, R0.m))) {
+        return { hasDate: false, display: '', startSort: [0,0,0], endSort: [0,0,0] };
+      }
     }
 
-    m = txt.match(P.monthYear);
-    if (m) {
-      const mo=toI(m[1]), y=fixY(toI(m[2]));
-      if (!(mo>=1 && mo<=12)) return { start:TMAX, end:TMAX, kind:'month', bad:true };
-      return { start:[y,mo,1], end:[y,mo,28], kind:'month', bad:false };
-    }
+    const start = L0;
+    const end   = R0;
 
-    m = txt.match(P.yearOnly);
-    if (m) {
-      const y=toI(m[1]);
-      return { start:[y,1,1], end:[y,12,31], kind:'year', bad:false };
-    }
+    // финальная нормализация сорт-ключей: отсутствующие m/d → 0
+    const ss = [start.y, start.m ?? 0, start.d ?? 0];
+    const ee = [end.y   ?? start.y, (end.m ?? 0), (end.d ?? 0)];
 
-    return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
+    const disp = displayRange(start, end);
+    return { hasDate: true, display: disp, startSort: ss, endSort: ee };
   }
+
+  // попробуем разобрать кусок даты
+  // Возвращает объект из {y, m?, d?} или null
+  function parseToken(tok) {
+    const t = String(tok || '').trim();
+
+    // dd.mm.yyyy / dd.mm.yy
+    let m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (m) {
+      const d = +m[1], mo = +m[2], y = toYYYY(m[3]);
+      if (!(mo >= 1 && mo <= 12)) return null;
+      if (!(d >= 1 && d <= daysInMonth(y, mo))) return null;
+      return { y, m: mo, d };
+    }
+
+    // dd.mm  (год возьмём из второй части при диапазоне)
+    m = t.match(/^(\d{1,2})\.(\d{1,2})$/);
+    if (m) {
+      const d = +m[1], mo = +m[2];
+      if (!(mo >= 1 && mo <= 12)) return null;
+      if (!(d >= 1 && d <= 31)) return null; // проверим финально после подстановки года
+      return { d, m: mo };
+    }
+
+    // mm.yyyy / mm.yy
+    m = t.match(/^(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (m) {
+      const mo = +m[1], y = toYYYY(m[2]);
+      if (!(mo >= 1 && mo <= 12)) return null;
+      return { y, m: mo };
+    }
+
+    // yyyy / yy
+    m = t.match(/^(\d{2}|\d{4})$/);
+    if (m) {
+      const y = toYYYY(m[1]);
+      return { y };
+    }
+
+    // только число (dd или mm) — разберём на этапе слияния с контекстом
+    m = t.match(/^(\d{1,2})$/);
+    if (m) {
+      const v = +m[1];
+      return { numSolo: v };
+    }
+
+    return null;
+  }
+
+  function onlyNum(t) {
+    const m = String(t||'').trim().match(/^(\d{1,2})$/);
+    return m ? +m[1] : null;
+  }
+
+  function displaySingle(a) {
+    if (a.d != null) return `${pad2(a.d)}.${pad2(a.m)}.${a.y}`;
+    if (a.m != null) return `${pad2(a.m)}.${a.y}`;
+    return String(a.y);
+  }
+
+  function displayRange(a, b) {
+    const bothHaveDay = (a.d != null) && (b.d != null);
+    const bothHaveMon = (a.m != null) && (b.m != null);
+
+    if (bothHaveDay) {
+      return `${pad2(a.d)}.${pad2(a.m)}.${a.y}-${pad2(b.d)}.${pad2(b.m)}.${b.y}`;
+    }
+    if (bothHaveMon) {
+      return `${pad2(a.m)}.${a.y}-${pad2(b.m)}.${b.y}`;
+    }
+    return `${a.y}-${b.y}`;
+  }
+
+  /* ===================== УТИЛИТЫ ===================== */
 
   function parseTitle(text) {
     const m = String(text || '').match(/^\s*\[(.+?)\]\s*(.+)$/s);
     return m
-      ? { dateRaw: m[1].trim(), episode: String(m[2]).replace(/\s+/g,' ').trim(), hasBracket: true }
-      : { dateRaw: '',          episode: String(text).replace(/\s+/g,' ').trim(), hasBracket: false };
+      ? { dateRaw: m[1].trim(), episode: String(m[2]).replace(/\s+/g,' ').trim() }
+      : { dateRaw: '',          episode: String(text).replace(/\s+/g,' ').trim() };
   }
 
   function firstPostNode(doc) {
@@ -349,10 +467,8 @@
     return a ? a.getAttribute('href') : null;
   }
 
-  // утилиты
   function abs(base, href) { try { return new URL(href, base).href; } catch { return href; } }
   function text(node) { return (node && (node.innerText ?? node.textContent) || '').trim(); }
-  function escapeHtml(s = '') { return (typeof FMV.escapeHtml === 'function') ? FMV.escapeHtml(s) : String(s); }
   function normStatus(s) {
     if (s == null) return '';
     if (typeof s === 'string') return s;

@@ -161,7 +161,9 @@
       const locationsLower    = rawLoc ? rawLoc.split(/\s*[,;]\s*/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
       const order             = ord.ok ? ord.value : null;
 
-      const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
+      const titleFromCrumbs = topicTitleFromCrumbs(doc);
+      const safeTitle = titleFromCrumbs || rawTitle || '';
+      const { dateRaw, episode, hasBracket } = parseTitle(safeTitle);
       const isAu  = (type === 'au');
       const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
       const auStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));

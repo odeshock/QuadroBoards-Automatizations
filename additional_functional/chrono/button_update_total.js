@@ -1,31 +1,31 @@
-// button_update_complete.init.js
+// button_update_complete.js
 (() => {
   'use strict';
 
-  /* ───────── входные параметры из CHRONO_CHECK ───────── */
-  const GID  = (window.CHRONO_CHECK?.GroupID      || []).map(Number);  // группы
-  const FID  = (window.CHRONO_CHECK?.AmsForumID   || []).map(String);  // форумы AMS
-  const TID  = String(window.CHRONO_CHECK?.ChronoTopicID || '').trim(); // нужная тема
-  const PID  = String(window.CHRONO_CHECK?.TotalChronoPostID || '').trim(); // пост для замены
+  /* ===================== CHRONO_CHECK входные ===================== */
+  const GID = (window.CHRONO_CHECK?.GroupID || []).map(Number);
+  const FID = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
+  const TID = String(window.CHRONO_CHECK?.ChronoTopicID || '').trim();
+  const PID = String(window.CHRONO_CHECK?.TotalChronoPostID || '').trim();
 
-  // Разделы (форумы) для обхода — можно задать в CHRONO_CHECK.Sections.
-  // Формат элемента: { id: <forumId>, type: 'personal'|'plot'|'au', status: 'on'|'off'|'archived' }
+  // перечень секций (форумов), которые обходим при сборке.
+  // можно переопределить в CHRONO_CHECK.Sections
+  // формат: { id: <forumId>, type: 'personal'|'plot'|'au', status: 'on'|'off'|'archived' }
   const SECTIONS = Array.isArray(window.CHRONO_CHECK?.Sections) && window.CHRONO_CHECK.Sections.length
     ? window.CHRONO_CHECK.Sections
     : [
-        // дефолт из исходного файла; добавляй по мере необходимости
+        // добавь сюда свои форумы при необходимости
         { id: 8, type: 'au', status: 'on' }
       ];
 
-  const MAX_PAGES_PER_SECTION = 50;
-
-  // Грубая проверка входных — иначе кнопку не рисуем вовсе
   if (!GID.length || !FID.length || !TID || !PID) {
-    console.warn('[button_update_complete] Нужны CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
+    console.warn('[button_update_complete] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
     return;
   }
 
-  /* ───────── кнопка: рисуем только при совпадении группы/форума/темы ───────── */
+  /* ===================== КНОПКА ===================== */
+  let busy = false;
+
   createForumButton({
     allowedGroups: GID,
     allowedForums: FID,
@@ -37,90 +37,99 @@
     showLink: false,
 
     async onClick() {
+      if (busy) return;
+      busy = true;
       try {
+        // 1) собрать события
         const events = await collectEvents();
-        const html   = renderChrono(events);
+        // 2) отрендерить «Собранную хронологию»
+        const html = renderChrono(events);
 
+        // 3) убедиться, что FMV.replaceComment загружена
+        if (!(window.FMV && typeof FMV.replaceComment === 'function')) {
+          console.error('[update_complete] FMV.replaceComment не найдена — проверь порядок подключений.');
+          return;
+        }
+
+        // 4) заменить комментарий
         const res = await FMV.replaceComment(GID, PID, html);
+        const st  = res.status;
+
         if (res.ok) {
-          console.info(`[update_complete] ✅ Итоговый комментарий #${PID} обновлён.`);
-          if (res.infoMessage)  console.info(res.infoMessage);
+          console.info(`[update_complete] ✅ Комментарий #${PID} обновлён. Статус: ${st}`);
+          if (res.infoMessage) console.info(res.infoMessage);
         } else {
-          console.error(`[update_complete] ✖ Не удалось обновить #${PID}. Статус: ${res.status}`);
+          console.error(`[update_complete] ✖ Не удалось обновить #${PID}. Статус: ${st}`);
           if (res.errorMessage) console.error(res.errorMessage);
-          if (res.infoMessage)  console.info(res.infoMessage);
+          else if (res.infoMessage) console.info(res.infoMessage);
         }
       } catch (e) {
-        console.error('[update_complete] Ошибка:', e);
+        console.error('[update_complete] Ошибка выполнения:', e);
+      } finally {
+        busy = false;
       }
     }
   });
 
-  /* ───────────────────── сборка «как у тебя заведено» ───────────────────── */
+  /* ===================== СБОРКА «как заведено» ===================== */
+  const MAX_PAGES_PER_SECTION = 50;
+  const TMAX = [9999, 12, 31];
 
-  // общий сборщик: обойти все разделы -> собрать события -> отсортировать
   async function collectEvents() {
     let all = [];
     for (const sec of SECTIONS) {
-      const chunk = await scrapeSection(sec);
-      all = all.concat(chunk);
+      const part = await scrapeSection(sec);
+      all = all.concat(part);
     }
     return all.filter(Boolean).sort(compareEvents);
   }
 
-  // обходим форум (viewforum.php?id=...), собираем темы и вызываем scrapeTopic
   async function scrapeSection(section) {
-    let page = `${location.origin}/viewforum.php?id=${section.id}`;
+    let url = abs(location.href, `/viewforum.php?id=${section.id}`);
     const seen = new Set();
     const out  = [];
-    let count  = 0;
+    let n = 0;
 
-    while (page && !seen.has(page) && count < MAX_PAGES_PER_SECTION) {
-      count++; seen.add(page);
+    while (url && !seen.has(url) && n < MAX_PAGES_PER_SECTION) {
+      n++; seen.add(url);
+      const doc = await fetchDoc(url);
 
-      const doc = await fetchDoc(page);
-
-      // собрать ссылки на темы (без RSS/Atom)
+      // ссылки на темы
       const topics = new Map();
       doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
-        const href = abs(page, a.getAttribute('href'));
-        const m    = href.match(/viewtopic\.php\?id=(\d+)/i);
+        const href = abs(url, a.getAttribute('href'));
+        const m = href.match(/viewtopic\.php\?id=(\d+)/i);
+        const title = text(a);
         if (!m) return;
-        const id    = m[1];
-        const title = safeText(a);
         if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        if (!topics.has(id)) topics.set(id, { url: href, title });
+        topics.set(m[1], { url: href, title });
       });
 
-      // по каждой теме — снять первый пост и распарсить
-      for (const { url, title } of topics.values()) {
-        const row = await scrapeTopic(url, title, section.type, section.status);
+      for (const { url: turl, title } of topics.values()) {
+        const row = await scrapeTopic(turl, title, section.type, section.status);
         if (row) out.push(row);
       }
 
-      // пагинация форума
       const next = findNextPage(doc);
-      page = next ? abs(page, next) : null;
+      url = next ? abs(url, next) : null;
     }
-
     return out;
   }
 
-  // разбираем конкретную тему: тянем первый пост, читаем characters/location/order, парсим название, строим объект события
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
     try {
       const doc   = await fetchDoc(topicUrl);
       const first = firstPostNode(doc);
 
-      // метки из первого поста
-      const rawChars = FMV.readTagText(first, 'characters'); // unified
+      // теги из первого поста
+      const rawChars = FMV.readTagText(first, 'characters');
       const rawLoc   = FMV.readTagText(first, 'location');
       const rawOrder = FMV.readTagText(first, 'order');
 
-      // карта id->имя по userN
+      // карта userN -> имя
       const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
 
-      // единый парсер characters (даёт и роли через masksByCharLower)
+      // унифицированный разбор персонажей
       const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
       const ord = FMV.parseOrderStrict(rawOrder);
 
@@ -129,12 +138,12 @@
       const locationsLower    = rawLoc ? rawLoc.split(/\s*[,;]\s*/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
       const order             = ord.ok ? ord.value : null;
 
-      // заголовок «[даты] название»
+      // заголовок: [даты] название
       const { dateRaw, episode, hasBracket } = parseTitle(rawTitle);
 
-      // type 'au' — особый случай: дата в [] не требуется; для plot — требуем хвост " [с]"
-      const isAu    = (type === 'au');
-      const range   = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
+      // специфика типов
+      const isAu  = (type === 'au');
+      const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);
       const auStart = /^\s*\[\s*au\s*\]/i.test(String(rawTitle || ''));
       const dateBad = isAu ? !auStart : (!hasBracket || range.bad);
       const plotBad = (type === 'plot') ? !/\s\[\s*с\s*\]\s*$/iu.test(String(rawTitle || '')) : false;
@@ -151,26 +160,22 @@
     }
   }
 
-  /* ─────────────── сортировка событий (дата → order → название) ─────────────── */
   function compareEvents(a, b) {
-    // по возрастанию начала диапазона (TMAX уходит в конец)
     const A = a?.range?.start || TMAX;
     const B = b?.range?.start || TMAX;
     for (let i = 0; i < 3; i++) {
       const d = (A[i] ?? 9999) - (B[i] ?? 9999);
       if (d) return d;
     }
-    // затем по order (если есть)
     const ao = (a.order == null) ? 1e9 : a.order;
     const bo = (b.order == null) ? 1e9 : b.order;
     if (ao !== bo) return ao - bo;
-
-    // затем по названию
     return String(a.episode || '').localeCompare(String(b.episode || ''), 'ru', { sensitivity: 'base' });
   }
 
-  /* ─────────────── рендер «Собранная хронология» ─────────────── */
+  /* ===================== РЕНДЕР ===================== */
   const MISS = 'background:#ffe6e6;color:#b00020;border-radius:6px;padding:0 .35em;font-weight:700';
+
   function renderStatus(type, status) {
     const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','red'] };
     const mapStat = { on:['active','green'], off:['closed','teal'], archived:['archived','maroon'] };
@@ -180,35 +185,31 @@
   }
 
   function renderChrono(events) {
-    const items = events.map(e => {
+    const rows = events.map(e => {
       const status = renderStatus(e.type, e.status);
 
-      // дата
       const dateHTML = e.type === 'au'
         ? (e.dateBad ? `<span style="${MISS}">проблема с [au] в названии</span>` : '')
         : ((!e.dateRaw || e.dateBad)
             ? `<span style="${MISS}">дата не указана/ошибка</span>`
             : escapeHtml(formatRange(e.range)));
 
-      // заголовок
       const url  = escapeHtml(e.url);
       const ttl0 = (e.type === 'plot') ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '') : e.episode;
       const ttl  = escapeHtml(ttl0);
       const plotErr = (e.type === 'plot' && e.plotBad) ? ` <span style="${MISS}">нет " [с]"</span>` : '';
       const ord = (e.order != null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
-      // участники: userN → ссылка/бейдж + роли [as ...]
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
             const id   = String(+low.replace(/^user/i, ''));
-            const base = window.profileLink(id, e.idToNameMap?.get(id)); // profile_from_user даёт .fmv-missing для ненайденных
+            const base = window.profileLink(id, e.idToNameMap?.get(id));
             const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
             return `${base}${tail}`;
           }).join(', ')
         : `<span style="${MISS}">не указаны</span>`;
 
-      // локация
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))
         : `<span style="${MISS}">локация не указана</span>`;
@@ -217,7 +218,7 @@
       return `<p>${status} ${dateHTML}${dash}<a href="${url}" rel="noopener" target="_blank">${ttl}</a>${plotErr}${ord}<br><i>${names}</i> / ${loc}</p>`;
     });
 
-    const body = items.join('') || `<p><i>— пусто —</i></p>`;
+    const body = rows.join('') || `<p><i>— пусто —</i></p>`;
     return `
 <div class="quote-box spoiler-box media-box">
   <div onclick="toggleSpoiler(this)">Собранная хронология</div>
@@ -225,9 +226,8 @@
 </div>`;
   }
 
-  /* ─────────────── парсинг дат (как в исходном) ─────────────── */
-  const TMAX = [9999, 12, 31];
-  const z2   = (n) => String(n).padStart(2, '0');
+  /* ===================== ПАРСИНГ ДАТ И ВСПОМОГАТЕЛЬНОЕ ===================== */
+  const z2 = n => String(n).padStart(2, '0');
 
   function formatRange(r) {
     const [y1, m1, d1] = r.start, [y2, m2, d2] = r.end;
@@ -254,7 +254,6 @@
     let txt = String(src || '').trim();
     if (!txt) return { start: TMAX, end: TMAX, kind: 'unknown', bad: true };
 
-    // нормализуем дефисы и пробелы вокруг
     txt = txt.replace(/[\u2012-\u2015\u2212—–−]+/g, '-').replace(/\s*-\s*/g, '-');
 
     const P = {
@@ -266,96 +265,90 @@
       yearOnly:             /^(\d{4})$/
     };
 
-    const toI = (x) => parseInt(x, 10);
-    const fixY = (y) => String(y).length === 2 ? (y >= 70 ? 1900 + y : 2000 + y) : y;
+    const toI = x => parseInt(x, 10);
+    const fixY = y => String(y).length === 2 ? (y >= 70 ? 1900 + y : 2000 + y) : y;
     const clamp = (y, m, d) => [Math.max(0, y), Math.min(Math.max(1, m), 12), Math.min(Math.max(1, d), 31)];
 
     let m = txt.match(P.single);
     if (m) {
       const d = toI(m[1]), mo = toI(m[2]), y = fixY(toI(m[3]));
-      if (!isValidDate(y, mo, d)) return { start: TMAX, end: TMAX, kind: 'single', bad: true };
-      const a = clamp(y, mo, d); return { start: a, end: a.slice(), kind: 'single', bad: false };
+      if (!isValidDate(y, mo, d)) return { start:TMAX, end:TMAX, kind:'single', bad:true };
+      const a = clamp(y, mo, d); return { start:a, end:a.slice(), kind:'single', bad:false };
     }
 
     m = txt.match(P.dayRangeSameMonth);
     if (m) {
-      const d1 = toI(m[1]), d2 = toI(m[2]), mo = toI(m[3]), y = fixY(toI(m[4]));
-      if (!isValidDate(y, mo, d1) || !isValidDate(y, mo, d2)) return { start: TMAX, end: TMAX, kind: 'day-range', bad: true };
-      return { start: clamp(y, mo, d1), end: clamp(y, mo, d2), kind: 'day-range', bad: false };
+      const d1=toI(m[1]), d2=toI(m[2]), mo=toI(m[3]), y=fixY(toI(m[4]));
+      if (!isValidDate(y, mo, d1) || !isValidDate(y, mo, d2)) return { start:TMAX, end:TMAX, kind:'day-range', bad:true };
+      return { start:clamp(y, mo, d1), end:clamp(y, mo, d2), kind:'day-range', bad:false };
     }
 
     m = txt.match(P.crossMonthTailYear);
     if (m) {
-      const d1 = toI(m[1]), mo1 = toI(m[2]), d2 = toI(m[3]), mo2 = toI(m[4]), y = fixY(toI(m[5]));
-      if (!isValidDate(y, mo1, d1) || !isValidDate(y, mo2, d2)) return { start: TMAX, end: TMAX, kind: 'cross-month', bad: true };
-      return { start: clamp(y, mo1, d1), end: clamp(y, mo2, d2), kind: 'cross-month', bad: false };
+      const d1=toI(m[1]), mo1=toI(m[2]), d2=toI(m[3]), mo2=toI(m[4]), y=fixY(toI(m[5]));
+      if (!isValidDate(y, mo1, d1) || !isValidDate(y, mo2, d2)) return { start:TMAX, end:TMAX, kind:'cross-month', bad:true };
+      return { start:clamp(y, mo1, d1), end:clamp(y, mo2, d2), kind:'cross-month', bad:false };
     }
 
     m = txt.match(P.crossYearBothYears);
     if (m) {
-      const d1 = toI(m[1]), mo1 = toI(m[2]), y1 = fixY(toI(m[3]));
-      const d2 = toI(m[4]), mo2 = toI(m[5]), y2 = fixY(toI(m[6]));
-      if (!isValidDate(y1, mo1, d1) || !isValidDate(y2, mo2, d2)) return { start: TMAX, end: TMAX, kind: 'cross-year', bad: true };
-      return { start: clamp(y1, mo1, d1), end: clamp(y2, mo2, d2), kind: 'cross-year', bad: false };
+      const d1=toI(m[1]), mo1=toI(m[2]), y1=fixY(toI(m[3]));
+      const d2=toI(m[4]), mo2=toI(m[5]), y2=fixY(toI(m[6]));
+      if (!isValidDate(y1, mo1, d1) || !isValidDate(y2, mo2, d2)) return { start:TMAX, end:TMAX, kind:'cross-year', bad:true };
+      return { start:[y1,mo1,d1], end:[y2,mo2,d2], kind:'cross-year', bad:false };
     }
 
     m = txt.match(P.monthYear);
     if (m) {
-      const mo = toI(m[1]), y = fixY(toI(m[2]));
-      if (!Number.isFinite(mo) || mo < 1 || mo > 12) return { start: TMAX, end: TMAX, kind: 'month', bad: true };
-      return { start: [y, mo, 1], end: [y, mo, 28], kind: 'month', bad: false };
+      const mo=toI(m[1]), y=fixY(toI(m[2]));
+      if (!(mo>=1 && mo<=12)) return { start:TMAX, end:TMAX, kind:'month', bad:true };
+      return { start:[y,mo,1], end:[y,mo,28], kind:'month', bad:false };
     }
 
     m = txt.match(P.yearOnly);
     if (m) {
-      const y = toI(m[1]);
-      return { start: [y, 1, 1], end: [y, 12, 31], kind: 'year', bad: false };
+      const y=toI(m[1]);
+      return { start:[y,1,1], end:[y,12,31], kind:'year', bad:false };
     }
 
-    return { start: TMAX, end: TMAX, kind: 'unknown', bad: true };
+    return { start:TMAX, end:TMAX, kind:'unknown', bad:true };
   }
 
-  // парсинг заголовка темы: "[даты] Название"
-  const TITLE_RE = /^\s*\[(.+?)\]\s*(.+)$/s;
   function parseTitle(text) {
-    const m = String(text || '').match(TITLE_RE);
+    const m = String(text || '').match(/^\s*\[(.+?)\]\s*(.+)$/s);
     return m
-      ? { dateRaw: m[1].trim(), episode: String(m[2]).replace(/\s+/g, ' ').trim(), hasBracket: true }
-      : { dateRaw: '',          episode: String(text).replace(/\s+/g, ' ').trim(), hasBracket: false };
+      ? { dateRaw: m[1].trim(), episode: String(m[2]).replace(/\s+/g,' ').trim(), hasBracket: true }
+      : { dateRaw: '',          episode: String(text).replace(/\s+/g,' ').trim(), hasBracket: false };
   }
 
-  /* ─────────────── вспомогательные мелочи ─────────────── */
   function firstPostNode(doc) {
     return doc.querySelector('.post.topicpost .post-content') ||
            doc.querySelector('.post.topicpost') || doc;
   }
 
   function findNextPage(doc) {
-    // типичная пагинация punBB: ссылка «След.» или стрелка
     const a = doc.querySelector('a[rel="next"], a[href*="&p="]:not([rel="prev"])');
     return a ? a.getAttribute('href') : null;
   }
 
   function abs(base, href) { try { return new URL(href, base).href; } catch { return href; } }
-  function safeText(node) { return (node && (node.innerText ?? node.textContent) || '').trim(); }
+  function text(node) { return (node && (node.innerText ?? node.textContent) || '').trim(); }
+  function escapeHtml(s = '') {
+    return (window.FMV && typeof FMV.escapeHtml === 'function')
+      ? FMV.escapeHtml(s)
+      : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
 
   async function fetchDoc(url) {
-    // если проект предоставляет ускорители — пользуемся
+    // если есть твои хелперы — используем
     if (typeof window.fetchHtml === 'function') {
       const html = await window.fetchHtml(url);
       return (typeof window.parseHTML === 'function')
         ? window.parseHTML(html)
         : new DOMParser().parseFromString(html, 'text/html');
     }
-    // fallback
     const res = await fetch(url, { credentials: 'include' });
     const html = await res.text();
     return new DOMParser().parseFromString(html, 'text/html');
   }
-
-  const escapeHtml = (s = '') =>
-    (window.FMV && FMV.escapeHtml) ? FMV.escapeHtml(s) :
-    String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-             .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-
 })();

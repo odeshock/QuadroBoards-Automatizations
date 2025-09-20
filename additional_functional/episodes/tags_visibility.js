@@ -123,7 +123,7 @@
   // ----- кнопка-тумблер -----
   createForumButton({
     allowedGroups: CHRONO_CHECK?.GroupID || [],
-    allowedForums: CHRONO_CHECK?.ForumIDs || [],
+    allowedForums: CHRONO_CHECK?.ForumID || [],
     label: BUTTON_LABEL,
     order: BUTTON_ORDER,
     showStatus: false,   // ← ничего не пишет "Выполняю…"

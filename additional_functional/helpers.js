@@ -137,3 +137,39 @@ window.resolveChronoData = async function(raw, opts = {}){
   return out;
 };
 
+/**
+ * userLink – вывод ссылки на профиль в HTML или BB-коде
+ * @param {string|number} id   – числовой ID пользователя
+ * @param {string}        name – отображаемое имя (если есть)
+ * @param {boolean}       asBB – true → вернуть BB-код, false → HTML
+ * @returns {string}
+ */
+export function userLink(id, name = '', asBB = false) {
+  const uid   = String(id);
+  const label = name || `user${uid}`;
+
+  if (asBB) {
+    // BB-код
+    return `[url=/profile.php?id=${uid}]${label}[/url]`;
+  }
+
+  // HTML через штатную profileLink, если она определена
+  if (typeof window.profileLink === 'function') {
+    return window.profileLink(uid, label);
+  }
+
+  // запасной вариант простая <a>
+  return `<a href="/profile.php?id=${uid}">${label}</a>`;
+}
+
+/**
+ * missingUser – оформление «не найденного» пользователя
+ * @param {string} token – исходное имя/токен (например user11)
+ * @param {boolean} asBB – true → BB-код, false → HTML
+ */
+export function missingUser(token, asBB = false) {
+  const raw = String(token);
+  return asBB
+    ? `[i][color=#b00020]${raw}[/color][/i]`
+    : `<span class="fmv-missing" data-found="0">${raw}</span>`;
+}

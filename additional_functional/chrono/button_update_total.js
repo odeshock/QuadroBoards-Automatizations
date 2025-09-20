@@ -129,13 +129,21 @@
         topics.set(m[1], { url: href, title });
       });
 
+      // --- STOP #1: страница без прогресса (тот же набор тем)
+      const sig = Array.from(topics.keys()).sort().join(',');
+      if (sig && sig === lastSig) break;
+      lastSig = sig;
+      
       for (const { url: turl, title } of topics.values()) {
         const row = await scrapeTopic(turl, title, section.type, section.status);
         if (row) out.push(row);
       }
 
       const next = findNextPage(doc);
-      url = next ? abs(url, next) : null;
+      const nextUrl = next ? abs(url, next) : null;
+      // --- STOP #2: «следующая» указывает на уже посещённую страницу
+      if (!nextUrl || seen.has(nextUrl)) { url = null; break; }
+      url = nextUrl;
     }
     return out;
   }

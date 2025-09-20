@@ -19,6 +19,17 @@
    *   httpStatus?:number, infoMessage?:string, errorMessage?:string
    * }>}
    */
+  // ✅ безопасные заглушки, если common.js не дал ошибокую функцию
+  if (typeof window.extractErrorMessage !== 'function') {
+    window.extractErrorMessage = () => '';
+  }
+  if (typeof window.extractInfoMessage !== 'function') {
+    window.extractInfoMessage = () => '';
+  }
+  if (typeof window.classifyResult !== 'function') {
+    window.classifyResult = () => 'ok';
+  }
+
   async function replaceComment(allowedGroups, postId, newText) {
     // 0) Проверка группы
     const gid = (typeof window.getCurrentGroupId === 'function')

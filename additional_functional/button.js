@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  // Ждём DOM и нужный контейнер
+  // ждём DOM и нужный контейнер
   const waitFor = (selector, timeout = 8000) =>
     new Promise((resolve, reject) => {
       const node = document.querySelector(selector);
@@ -26,34 +26,45 @@
     await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
   }
 
-  // Проверка форума по crumbs → /viewforum.php?id=...
+  // проверка форума по ссылкам на viewforum.php
   function isAllowedForum(forumIds) {
+    const allow = (forumIds || []).map(String);
     const crumbs = document.querySelector('.crumbs') ||
                    document.querySelector('#pun-crumbs') ||
                    document.querySelector('.pun_crumbs') ||
                    document.querySelector('.container .crumbs');
-    if (!crumbs) return false;
 
-    return Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
+    const matchIn = (root) => Array.from(root.querySelectorAll('a[href]')).some(a => {
       try {
         const u = new URL(a.getAttribute('href'), location.href);
-        return u.pathname.endsWith('/viewforum.php') &&
-               forumIds.includes(u.searchParams.get('id'));
+        if (!u.pathname.includes('viewforum.php')) return false;
+        const id = (u.searchParams.get('id') || '').trim();
+        return id && allow.includes(id);
       } catch { return false; }
     });
+
+    if (crumbs && matchIn(crumbs)) return true;
+    if (matchIn(document)) return true;
+
+    const bodyForumId = document.body?.dataset?.forumId;
+    if (bodyForumId && allow.includes(String(bodyForumId))) return true;
+
+    return false;
   }
 
   /**
-   * Универсальный конструктор кнопки с сортировкой по order
-   * и встроенной ссылкой рядом со статусом.
+   * Универсальный конструктор кнопки.
    *
    * @param {Object}   opts
-   * @param {string[]} [opts.allowedGroups=[]]  допустимые groupId (числа/строки)
-   * @param {string[]} [opts.allowedForums=[]]  допустимые forumId (строки)
-   * @param {string}   [opts.label='Действие']  текст на кнопке
-   * @param {Function} opts.onClick             async ({statusEl, linkEl, detailsEl, setStatus, setDetails}) => void
+   * @param {string[]} [opts.allowedGroups=[]]
+   * @param {string[]} [opts.allowedForums=[]]
+   * @param {string}   [opts.label='Действие']
+   * @param {Function} opts.onClick       async ({statusEl, linkEl, detailsEl, setStatus, setDetails, setLink, wrap}) => void
    * @param {string}   [opts.containerSelector='.ams_info']
-   * @param {number}   [opts.order=0]           порядок вывода кнопок (меньше = выше)
+   * @param {number}   [opts.order=0]
+   * @param {boolean}  [opts.showStatus=true]   // ← новинка
+   * @param {boolean}  [opts.showDetails=true]  // ← новинка
+   * @param {boolean}  [opts.showLink=true]     // ← новинка
    */
   window.createForumButton = async function createForumButton(opts) {
     const {
@@ -62,14 +73,16 @@
       label = 'Действие',
       onClick,
       containerSelector = '.ams_info',
-      order = 0
+      order = 0,
+      showStatus = true,
+      showDetails = true,
+      showLink = true,
     } = opts || {};
 
     if (typeof onClick !== 'function') return;
 
     await waitAmsReady();
 
-    // получаем groupId через подключённый check_group.js
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()
       : NaN;
@@ -90,56 +103,67 @@
     btn.className = 'button';
     btn.textContent = label;
 
-    const status = document.createElement('span');
-    status.style.marginLeft = '10px';
-    status.style.fontSize = '14px';
-    status.style.color = '#555';
+    // статус (опционально)
+    const status = showStatus ? document.createElement('span') : null;
+    if (status) {
+      status.style.marginLeft = '10px';
+      status.style.fontSize = '14px';
+      status.style.color = '#555';
+    }
 
-    // встроенная ссылка рядом со статусом
-    const link = document.createElement('a');
-    link.className = 'fmv-action-link';
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.style.marginLeft = '10px';
-    link.style.fontSize = '14px';
-    link.style.display = 'none'; // по умолчанию скрыта
+    // встроенная ссылка рядом со статусом (опционально)
+    const link = showLink ? document.createElement('a') : null;
+    if (link) {
+      link.className = 'fmv-action-link';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.style.marginLeft = '10px';
+      link.style.fontSize = '14px';
+      link.style.display = 'none';
+    }
 
-    // блок деталей
-    const details = document.createElement('details');
-    details.style.marginTop = '6px';
-    const summary = document.createElement('summary');
-    summary.textContent = 'Показать детали';
-    summary.style.cursor = 'pointer';
-    const pre = document.createElement('pre');
-    pre.style.whiteSpace = 'pre-wrap';
-    pre.style.margin = '6px 0 0';
-    pre.style.fontSize = '12px';
-    details.appendChild(summary);
-    details.appendChild(pre);
+    // блок деталей (опционально)
+    const details = showDetails ? document.createElement('details') : null;
+    let pre = null;
+    if (details) {
+      details.style.marginTop = '6px';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Показать детали';
+      summary.style.cursor = 'pointer';
+      pre = document.createElement('pre');
+      pre.style.whiteSpace = 'pre-wrap';
+      pre.style.margin = '6px 0 0';
+      pre.style.fontSize = '12px';
+      details.appendChild(summary);
+      details.appendChild(pre);
+    }
 
-    // добавляем элементы в обёртку
+    // собираем wrap
     wrap.appendChild(btn);
-    wrap.appendChild(status);
-    wrap.appendChild(link);     // <-- ССЫЛКА РЯДОМ СО СТАТУСОМ
-    wrap.appendChild(details);
+    if (status) wrap.appendChild(status);
+    if (link) wrap.appendChild(link);
+    if (details) wrap.appendChild(details);
 
     container.appendChild(br);
 
-    // вставляем по order
+    // вставка по order
     const siblings = Array.from(container.querySelectorAll('div[data-order]'));
     const next = siblings.find(el => Number(el.dataset.order) > Number(order));
     if (next) container.insertBefore(wrap, next);
     else container.appendChild(wrap);
 
-    // helpers для обновления
+    // helpers
     const setStatus = (text, color = '#555') => {
+      if (!status) return;
       status.textContent = text;
       status.style.color = color;
     };
     const setDetails = (text = '') => {
+      if (!pre) return;
       pre.textContent = String(text || '');
     };
     const setLink = (url, text = 'Открыть') => {
+      if (!link) return;
       if (url) {
         link.href = url;
         link.textContent = text;
@@ -151,25 +175,30 @@
       }
     };
 
-    // обработчик клика
     btn.addEventListener('click', async () => {
-      setStatus('Выполняю…', '#555');
-      setDetails('');
-      setLink(null);
+      // раньше мы всегда писали "Выполняю…"
+      // теперь делаем это только если showStatus=true
+      if (showStatus) setStatus('Выполняю…', '#555');
+      if (showDetails) setDetails('');
+      if (showLink) setLink(null);
+
       try {
         await onClick({
-          statusEl: status,
-          linkEl: link,
-          detailsEl: pre,
+          statusEl: status || null,
+          linkEl: link || null,
+          detailsEl: pre || null,
           setStatus,
           setDetails,
-          setLink
+          setLink,
+          wrap
         });
       } catch (err) {
-        setStatus('✖ Ошибка', 'red');
-        setDetails((err && err.message) ? err.message : String(err));
+        // молча глотаем, если статус/детали скрыты; иначе покажем коротко
+        if (showStatus) setStatus('✖ Ошибка', 'red');
+        if (showDetails) setDetails((err && err.message) ? err.message : String(err));
         console.error('[createForumButton]', err);
       }
     });
   };
 })();
+

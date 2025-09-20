@@ -189,14 +189,12 @@
     return String(a.episode || '').localeCompare(String(b.episode || ''), 'ru', { sensitivity: 'base' });
   }
 
-  const MISS = 'background:#ffe6e6;color:#b00020;border-radius:6px;padding:0 .35em;font-weight:700';
-
   function renderStatus(type, status) {
     const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','red'] };
     const mapStat = { on:['active','green'], off:['closed','teal'], archived:['archived','maroon'] };
     const t = mapType[type] || mapType.au;
     const s = mapStat[status] || mapStat.archived;
-    return `[<span style="color:${t[1]}">${t[0]}</span> / <span style="color:${s[1]}">${s[0]}</span>]`;
+    return `[[color=${t[1]}]${t[0]}[/color] / [color=color:${s[1]}]${s[0]}[/color]]`;
   }
 
   function renderChrono(events) {
@@ -204,15 +202,15 @@
       const status = renderStatus(e.type, e.status);
 
       const dateHTML = e.type === 'au'
-        ? (e.dateBad ? `<span style="${MISS}">проблема с [au] в названии</span>` : '')
+        ? (e.dateBad ? `[mark]проблема с [au] в названии[/mark]` : '')
         : ((!e.dateRaw || e.dateBad)
-            ? `<span style="${MISS}">дата не указана/ошибка</span>`
+            ? `[mark]дата не указана/ошибка[/mark]`
             : escapeHtml(formatRange(e.range)));
 
       const url  = escapeHtml(e.url);
       const ttl0 = (e.type === 'plot') ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '') : e.episode;
       const ttl  = escapeHtml(ttl0);
-      const plotErr = (e.type === 'plot' && e.plotBad) ? ` <span style="${MISS}">нет " [с]"</span>` : '';
+      const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
       const ord = (e.order != null) ? ` [${escapeHtml(String(e.order))}]` : '';
 
       const names = (e.participantsLower && e.participantsLower.length)
@@ -223,22 +221,18 @@
             const tail  = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
             return `${base}${tail}`;
           }).join(', ')
-        : `<span style="${MISS}">не указаны</span>`;
+        : `[mark]не указаны[/mark]`;
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))
-        : `<span style="${MISS}">локация не указана</span>`;
+        : `[mark]>локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `<p>${status} ${dateHTML}${dash}<a href="${url}" rel="noopener" target="_blank">${ttl}</a>${plotErr}${ord}<br><i>${names}</i> / ${loc}</p>`;
+      return `${status} ${dateHTML}${dash}[url="${url}"]${ttl}[/url]${plotErr}${ord}\n[i]${names}[/i] / ${loc}\n`;
     });
 
-    const body = rows.join('') || `<p><i>— пусто —</i></p>`;
-    return `
-<div class="quote-box spoiler-box media-box">
-  <div onclick="toggleSpoiler(this)">Собранная хронология</div>
-  <blockquote>${body}</blockquote>
-</div>`;
+    const body = rows.join('') || ``;
+    return `[media="Собранная хронология"]${body}[/media]`;
   }
 
   /* ===================== ВСПОМОГАТЕЛЬНОЕ ===================== */

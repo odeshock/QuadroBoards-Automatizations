@@ -24,8 +24,8 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'обновить итог',
-    order: 50,
+    label: 'обновить хроно',
+    order: 1,
 
     showStatus: true,
     showDetails: true,
@@ -44,12 +44,12 @@
 
         // 1) сбор
         const events = await collectEvents();
-        // 2) рендер «Собранной хронологии»
+        // 2) рендер
         const htmlRaw = renderChrono(events);
-        // 3) cp1251-safe (числовые сущности для символов вне ASCII/кириллицы)
+        // 3) cp1251-safe
         const html = FMV.toCp1251Entities(htmlRaw);
 
-        // 4) замена комментария
+        // 4) публикация
         const res = await FMV.replaceComment(GID, PID, html);
 
         const st = normStatus(res.status);
@@ -62,7 +62,7 @@
         const info  = toPlainShort(res.infoMessage || '');
         const error = toPlainShort(res.errorMessage || '');
         if (info)  lines.push(info);
-        if (error) lines.push(`<span style="color:#b00020">${FMV.escapeHtml(error)}</span>`);
+        if (error) lines.push(`<span style="color:#b00020">${escapeHtml(error)}</span>`);
 
         setDetails(lines.join('<br>'));
 
@@ -95,7 +95,7 @@
     const seenPages = new Set();
     const out  = [];
     let n = 0;
-    let lastSig = ''; // сигнатура набора тем на странице
+    let lastSig = '';
 
     while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
       n++; seenPages.add(url);
@@ -109,21 +109,19 @@
         const title = text(a);
         if (!m) return;
         if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        // игнор якорей на конкретные сообщения (#p123)
-        if (/#p\d+$/i.test(href)) return;
-        // игнор ссылок, где «заголовок» похож на дату/время (последний пост)
-        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(title)) return;
+        if (/#p\d+$/i.test(href)) return; // якоря на конкретные сообщения
+        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(title)) return; // «заголовок»-дата
         topics.set(m[1], { url: href, title });
       });
 
-      // STOP #1: страница без прогресса (тот же набор тем)
+      // STOP #1: страница без прогресса
       const sig = Array.from(topics.keys()).sort().join(',');
       if (sig && sig === lastSig) break;
       lastSig = sig;
 
       for (const [tid, { url: turl, title }] of topics) {
         const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
-        if (seenTopics.has(key)) continue; // глобальная дедупликация
+        if (seenTopics.has(key)) continue;
         const row = await scrapeTopic(turl, title, section.type, section.status);
         if (row) {
           seenTopics.add(key);
@@ -133,9 +131,7 @@
 
       const next = findNextPage(doc);
       const nextUrl = next ? abs(url, next) : null;
-
-      // STOP #2: нет next или «следующая» указывает на уже посещённую
-      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
+      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; } // STOP #2
       url = nextUrl;
     }
     return out;
@@ -207,15 +203,14 @@
         ? (e.dateBad ? `[mark]проблема с [au] в названии[/mark]` : '')
         : ((!e.dateRaw || e.dateBad)
             ? `[mark]дата не указана/ошибка[/mark]`
-            : FMV.escapeHtml(formatRange(e.range)));
+            : escapeHtml(formatRange(e.range)));
 
-      const url  = FMV.escapeHtml(e.url);
+      const url  = escapeHtml(e.url);
       const ttl0 = (e.type === 'plot') ? e.episode.replace(/\s\[\s*с\s*\]\s*$/iu, '') : e.episode;
-      const ttl  = FMV.escapeHtml(ttl0);
+      const ttl  = escapeHtml(ttl0);
       const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
-      const ord = (e.order != null) ? ` [порядок: ${FMV.escapeHtml(String(e.order))}]` : '';
+      const ord = (e.order != null) ? ` [порядок: ${escapeHtml(String(e.order))}]` : '';
 
-      // рендерим в BB-коде
       const asBB = true;
 
       const names = (e.participantsLower && e.participantsLower.length)
@@ -226,16 +221,16 @@
             const known = !!(idKey && e.idToNameMap?.has(idKey));
             const display = known
               ? userLink(idKey, e.idToNameMap.get(idKey), asBB)
-              : missingUser(hasId ? `user${idKey}` : String(low), asBB); // → [mark]user11[/mark]
+              : missingUser(hasId ? `user${idKey}` : String(low), asBB);
 
             const roles = Array.from(e.masksByCharLower.get(low) || []);
-            const tail  = roles.length ? ` [as ${FMV.escapeHtml(roles.join(', '))}]` : '';
+            const tail  = roles.length ? ` [as ${escapeHtml(roles.join(', '))}]` : '';
             return `${display}${tail}`;
           }).join(', ')
         : `[mark]не указаны[/mark]`;
 
       const loc = (e.locationsLower && e.locationsLower.length)
-        ? FMV.escapeHtml(e.locationsLower.join(', '))
+        ? escapeHtml(e.locationsLower.join(', '))
         : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
@@ -259,8 +254,8 @@
       case 'month':       return `${z2(m1)}.${y1}`;
       case 'year':        return String(y1);
       default:
-        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${з2(d2)}.${з2(m2)}.${y2}`;
-        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${з2(m2)}.${y1}`;
+        if (y1 !== y2) return `${z2(d1)}.${z2(m1)}.${y1}-${z2(d2)}.${z2(m2)}.${y2}`;
+        return `${z2(d1)}.${z2(m1)}-${z2(d2)}.${z2(m2)}.${y1}`;
     }
   }
 
@@ -279,12 +274,14 @@
 
     const P = {
       single:               /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      dayRangeSameMonth:    /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      dayRangeSameMonth:    /^(\d{1,2})-(\д{1,2})\.(\д{1,2})\.(\д{2}|\д{4})$/, // <-- кириллица в \d была ошибкой, см. строку ниже!
       crossMonthTailYear:   /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       monthYear:            /^(\d{1,2})\.(\d{2}|\d{4})$/,
       yearOnly:             /^(\d{4})$/
     };
+    // Исправленный шаблон для dayRangeSameMonth:
+    P.dayRangeSameMonth = /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/;
 
     const toI = x => parseInt(x, 10);
     const fixY = y => String(y).length === 2 ? (y >= 70 ? 1900 + y : 2000 + y) : y;
@@ -355,6 +352,7 @@
   // утилиты
   function abs(base, href) { try { return new URL(href, base).href; } catch { return href; } }
   function text(node) { return (node && (node.innerText ?? node.textContent) || '').trim(); }
+  function escapeHtml(s = '') { return (typeof FMV.escapeHtml === 'function') ? FMV.escapeHtml(s) : String(s); }
   function normStatus(s) {
     if (s == null) return '';
     if (typeof s === 'string') return s;

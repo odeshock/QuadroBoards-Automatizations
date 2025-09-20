@@ -14,9 +14,7 @@
   }
 
   // разделы (можно переопределить через CHRONO_CHECK.Sections)
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.Sections) && window.CHRONO_CHECK.Sections.length
-    ? window.CHRONO_CHECK.Sections
-    : [{ id: 8, type: 'au', status: 'on' }];
+  const SECTIONS = CHRONO_CHECK?.ForumInfo || [];
 
   let busy = false;
 

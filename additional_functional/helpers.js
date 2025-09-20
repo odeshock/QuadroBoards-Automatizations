@@ -144,7 +144,7 @@ window.resolveChronoData = async function(raw, opts = {}){
  * @param {boolean}       asBB – true → вернуть BB-код, false → HTML
  * @returns {string}
  */
-export function userLink(id, name = '', asBB = false) {
+function userLink(id, name = '', asBB = false) {
   const uid   = String(id);
   const label = name || `user${uid}`;
 
@@ -167,7 +167,7 @@ export function userLink(id, name = '', asBB = false) {
  * @param {string} token – исходное имя/токен (например user11)
  * @param {boolean} asBB – true → BB-код, false → HTML
  */
-export function missingUser(token, asBB = false) {
+function missingUser(token, asBB = false) {
   const raw = String(token);
   return asBB
     ? `[i][color=#b00020]${raw}[/color][/i]`

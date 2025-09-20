@@ -3,7 +3,7 @@
   'use strict';
 
   // ----- настройки кнопки -----
-  const BUTTON_LABEL = 'Мета-инфо';
+  const BUTTON_LABEL = 'Показать скрытые теги';
   const BUTTON_ORDER = 1;
 
   // ----- утилиты -----

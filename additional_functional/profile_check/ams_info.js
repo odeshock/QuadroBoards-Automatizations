@@ -20,30 +20,47 @@
     try {
       await ready;
 
-      // 1) Проверка группы
-      const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
-      const groupId = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
-      if (!PROFILE_CHECK.GroupID.includes(groupId)) return;
+      // === Переменные для настроек и проверок ===
+      const bodyGroup  = Number(document.body?.dataset?.groupId || NaN);
+      const groupId    = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
 
-      // 2) Проверка форума
-      const crumbs = document.querySelector('.crumbs') || document.querySelector('#pun-crumbs') ||
-                     document.querySelector('.pun_crumbs') || document.querySelector('.container .crumbs');
-      if (!crumbs) return;
-      const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
+      // объединяем списки для удобства
+      const allowedGroups = [
+        ...(PROFILE_CHECK.GroupID || []),
+        ...(CHRONO_CHECK.GroupID || [])
+      ];
+      const allowedForums = [
+        ...(PROFILE_CHECK.ForumIDs || []),
+        ...(CHRONO_CHECK.ForumID || [])
+      ];
+
+      const isAllowedGroup = allowedGroups.includes(groupId);
+
+      const crumbs = document.querySelector('.crumbs') ||
+                     document.querySelector('#pun-crumbs') ||
+                     document.querySelector('.pun_crumbs') ||
+                     document.querySelector('.container .crumbs');
+
+      const isAllowedForum = crumbs && Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
           return u.pathname.endsWith('/viewforum.php') &&
-                 PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
+                 allowedForums.includes(u.searchParams.get('id'));
         } catch { return false; }
       });
-      if (!inAllowedForum) return;
 
-      // 3) Вставляем div. Всё остальное выносится в create.js
+      // === Используем переменные ===
+      if (!isAllowedGroup || !isAllowedForum) return;
+
+      // === Вставляем div ===
       let bodies = document.querySelectorAll('.topic .post-body .post-box .post-content');
       if (!bodies.length) {
-        try { await waitFor('.topic .post-body .post-box .post-content', 5000); bodies = document.querySelectorAll('.topic .post-body .post-box .post-content'); }
-        catch { return; }
+        try {
+          await waitFor('.topic .post-body .post-box .post-content', 5000);
+          bodies = document.querySelectorAll('.topic .post-body .post-box .post-content');
+        } catch { return; }
       }
+
       const target = bodies[bodies.length - 1];
       if (!target || target.querySelector('.ams_info')) return;
 
@@ -54,7 +71,6 @@
       target.appendChild(document.createElement('br'));
       target.appendChild(infoDiv);
 
-      // ams_info.js — ПОСЛЕ appendChild(infoDiv):
       window.__ams_ready = true;
       window.dispatchEvent(new CustomEvent('ams:ready', { detail: { node: infoDiv } }));
       if (typeof window.__amsReadyResolve === 'function') window.__amsReadyResolve(infoDiv);

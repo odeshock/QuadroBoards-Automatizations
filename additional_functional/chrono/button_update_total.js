@@ -229,8 +229,8 @@
       
             const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length
-              ? (asBB ? ` [i]as ${FMV.escapeHtml(roles.join(', '))}[/i]`
-                      : ` [as ${FMV.escapeHtml(roles.join(', '))}]`)
+              ? (asBB ? ` [i][as ${FMV.escapeHtml(roles.join(', '))}][/i]`
+                      : ` <i>[as ${FMV.escapeHtml(roles.join(', '))}]</i>`)
               : '';
 
       return `${display}${tail}`;

@@ -20,6 +20,7 @@
     allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
     allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
     label: 'Установить плашку',
+    order: 1,
 
     async onClick({ setStatus, setDetails }) {
       // 1) Контекст: arg1 (из заголовка темы), userId/arg2 (из ссылки профиля)

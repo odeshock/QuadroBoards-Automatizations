@@ -155,14 +155,31 @@
 
     const participantsLower = Array.from(participantsSet);
 
-    const htmlParticipants = participantsLower.map(low => {
-      const roles = Array.from(masksByCharLower.get(low) || []);
-      const id    = String(+low.replace(/^user/i,''));
-      const base  = (typeof profileLink === 'function')
-        ? profileLink(id, idToNameMap?.get(id))
-        : FMV.escapeHtml(`user${id}`);
-      return roles.length ? `${base} [as ${FMV.escapeHtml(roles.join(', '))}]` : base;
+    const htmlParticipants = participantsLower.map(tok => {
+      const roles = Array.from(masksByCharLower.get(tok) || []);
+    
+      // пытаемся распознать user<ID>, если не получилось — это произвольное имя
+      const m = /^user(\d+)$/i.exec(String(tok).trim());
+      const id = m ? m[1] : null;
+      const found = id && idToNameMap?.has(id);
+      const displayName = found ? (idToNameMap.get(id) || `user${id}`) : String(tok);
+    
+      const tail = roles.length
+        ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`
+        : '';
+    
+      if (found) {
+        // есть профиль
+        const link = (typeof profileLink === 'function')
+          ? profileLink(id, displayName)
+          : `<a href="/profile.php?id=${id}">${FMV.escapeHtml(displayName)}</a>`;
+        return `${link}${tail}`;
+      } else {
+        // произвольное слово или неизвестный user<ID>
+        return `<span class="fmv-missing" data-found="0">${FMV.escapeHtml(displayName)}${tail}</span>`;
+      }
     }).join('; ');
+
 
     return {
       ok: true,

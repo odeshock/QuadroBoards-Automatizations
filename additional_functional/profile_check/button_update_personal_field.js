@@ -1,61 +1,35 @@
+// button_update_personal_field.init.js
 (() => {
   'use strict';
 
-  // ----- локальные утилиты -----
-  const waitFor = (selector, timeout = 8000) =>
-    new Promise((resolve, reject) => {
-      const node = document.querySelector(selector);
-      if (node) return resolve(node);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
+  // Настраиваем параметры и вызываем уже подключённую createForumButton (из button.js)
+  createForumButton({
+    // какие группы и форумы допускать — ПЕРЕДАЁМ ПАРАМЕТРАМИ
+    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
+    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    label: 'Установить плашку',
 
-  const ready = new Promise(res => {
-    if (document.readyState === 'complete' || document.readyState === 'interactive') res();
-    else document.addEventListener('DOMContentLoaded', res, { once: true });
-  });
+    // Вся бизнес-логика — внутри onClick
+    async onClick({ statusEl }) {
+      // 1) Готовим контекст (как в твоём исходном файле)
+      const waitFor = (selector, timeout = 5000) =>
+        new Promise((resolve, reject) => {
+          const n0 = document.querySelector(selector);
+          if (n0) return resolve(n0);
+          const obs = new MutationObserver(() => {
+            const n = document.querySelector(selector);
+            if (n) { obs.disconnect(); resolve(n); }
+          });
+          obs.observe(document.documentElement, { childList: true, subtree: true });
+          setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
+        });
 
-  (async () => {
-    try {
-      await ready;
-  
-      // дожидаемся AMS, как в примере
-      if (!window.__ams_ready) {
-        await new Promise(resolve =>
-          window.addEventListener('ams:ready', () => resolve(), { once: true })
-        );
-      }
-  
-      // проверка наличия ams блока и прав/форумов — по аналогии
-      const amsDiv = document.querySelector('div.ams_info');
-      if (!amsDiv) return;
-  
-      const bodyGroup = Number(document.body?.dataset?.groupId || NaN);
-      const groupId = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
-      if (!PROFILE_CHECK.GroupID.includes(groupId)) return;
-  
-      const crumbs = document.querySelector('.crumbs') || document.querySelector('#pun-crumbs') ||
-                     document.querySelector('.pun_crumbs') || document.querySelector('.container .crumbs');
-      if (!crumbs) return;
-      const inAllowedForum = Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
-        try {
-          const u = new URL(a.getAttribute('href'), location.href);
-          return u.pathname.endsWith('/viewforum.php') &&
-                 PROFILE_CHECK.ForumIDs.includes(u.searchParams.get('id'));
-        } catch { return false; }
-      });
-      if (!inAllowedForum) return;
-  
-      // arg1 из заголовка темы (как в примере)
+      // arg1 — из заголовка темы
       const nameSpan = document.querySelector('#pun-main h1 span');
       const arg1 = nameSpan ? nameSpan.textContent.trim().toLowerCase() : '';
-      if (!arg1) return;
-  
-      // userId и arg2 — 1-в-1 с примером
+      if (!arg1) { statusEl.textContent = '✖ не найдено имя темы (arg1)'; statusEl.style.color = 'red'; return; }
+
+      // userId/arg2 — из ссылки на профиль
       let profLink =
         document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
@@ -63,108 +37,55 @@
       if (!profLink) {
         try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
-      if (!profLink) return;
-      const idMatch = profLink.href.match(/profile\.php\?id=(\d+)/i);
-      if (!idMatch) return;
-      const userId = idMatch[1];
-      const arg2 = `usr${userId}`;
-  
-      // готовим поле и шаблон
-      const fieldId = PROFILE_CHECK.PPageFieldID;                 // что обновляем
-      const rawTemplate = PROFILE_CHECK.PPageFieldTemplate;       // откуда берём значение
-  
-      // заменяем "ID" в шаблоне на arg2
-      const applyTemplate = (tpl, idToken) => {
-        // строгая замена слова ID (можно ослабить при необходимости)
-        return String(tpl).replace(/\bID\b/g, idToken);
-      };
-      const fieldValue = applyTemplate(rawTemplate, arg2);
-  
-      // куда добавляем
-      let bodies = document.querySelectorAll('.ams_info');
-      if (!bodies.length) {
-        try { await waitFor('.ams_info', 5000); bodies = document.querySelectorAll('.ams_info'); }
-        catch { return; }
-      }
-      const target = bodies[bodies.length - 1];
-      if (!target || target.querySelector('.fmv-update-personal-field')) return;
-  
-      // узлы UI
-      const br = document.createElement('br');
-      const wrap = document.createElement('div');
-      wrap.className = 'fmv-update-personal-field';
-  
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'button';
-      btn.textContent = 'Установить плашку';
-  
-      const statusSpan = document.createElement('span');
-      statusSpan.style.marginLeft = '10px';
-      statusSpan.style.fontSize = '14px';
-      statusSpan.style.color = '#555';
-  
-      const details = document.createElement('details');
-      details.style.marginTop = '6px';
-      const summary = document.createElement('summary');
-      summary.textContent = 'Показать детали';
-      summary.style.cursor = 'pointer';
-      const pre = document.createElement('pre');
-      pre.style.whiteSpace = 'pre-wrap';
-      pre.style.margin = '6px 0 0';
-      pre.style.fontSize = '12px';
-      details.appendChild(summary);
-      details.appendChild(pre);
-  
-      // обработчик нажатия
-      btn.addEventListener('click', async () => {
-        statusSpan.textContent = 'Обновляем…';
-        statusSpan.style.color = '#555';
-        pre.textContent = '';
-  
-        if (typeof window.FMVreplaceFieldData !== 'function') {
-          statusSpan.textContent = '✖ функция обновления не найдена';
-          statusSpan.style.color = 'red';
-          pre.textContent = 'Ожидалась window.FMVreplaceFieldData(fieldId, value, userId)';
-          return;
-        }
-  
-        try {
-          const res = await window.FMVreplaceFieldData(userId, fieldId, fieldValue);
-          // ожидаем контракт в стиле {status, httpStatus, serverMessage, details, fieldId, userId, value}
-          switch (res?.status) {
-            case 'updated': statusSpan.textContent = '✔ обновлено'; statusSpan.style.color = 'green'; break;
-            case 'nochange':statusSpan.textContent = 'ℹ изменения не внесены'; statusSpan.style.color = 'red'; break;
-            case 'error':   statusSpan.textContent = '✖ ошибка'; statusSpan.style.color = 'red'; break;
-            default:        statusSpan.textContent = '❔ не удалось подтвердить'; statusSpan.style.color = '#b80';
-          }
-          const lines = [];
-          if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
-          if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
-          if (res?.fieldId ?? fieldId) lines.push('Поле: ' + (res?.fieldId ?? fieldId));
-          if (res?.userId ?? userId)   lines.push('Пользователь: ' + (res?.userId ?? userId));
-          // показываем фактическое значение, которое пытались записать
-          lines.push('Значение (template→arg2):\n' + fieldValue);
-          if (res?.details)       lines.push('Details: ' + res.details);
-          pre.textContent = lines.join('\n');
-        } catch (err) {
-          statusSpan.textContent = '✖ сеть/транспорт';
-          statusSpan.style.color = 'red';
-          pre.textContent = (err && err.message) ? err.message : String(err);
-        }
-      });
-  
-      wrap.appendChild(btn);
-      wrap.appendChild(statusSpan);
-      wrap.appendChild(details);
-      target.appendChild(br);
-      target.appendChild(br);
-      target.appendChild(wrap);
-  
-      console.log('[FMV injector] кнопка обновления поля добавлена');
-    } catch (e) {
-      console.log('[FMV injector] error:', e);
-    }
-  })();
-})();
+      const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
+      const userId = idMatch ? idMatch[1] : '';
+      const arg2 = userId ? `usr${userId}` : '';
+      if (!userId) { statusEl.textContent = '✖ не найден userId'; statusEl.style.color = 'red'; return; }
 
+      // 2) Готовим поле и значение по шаблону (как в исходнике)
+      const fieldId = PROFILE_CHECK.PPageFieldID;
+      const rawTemplate = PROFILE_CHECK.PPageFieldTemplate;
+      const fieldValue = String(rawTemplate).replace(/\bID\b/g, arg2);
+
+      // 3) Вызываем твою функцию обновления поля
+      if (typeof window.FMVreplaceFieldData !== 'function') {
+        statusEl.textContent = '✖ функция обновления не найдена (FMVreplaceFieldData)';
+        statusEl.style.color = 'red';
+        return;
+      }
+
+      statusEl.textContent = 'Обновляем…';
+      statusEl.style.color = '#555';
+
+      try {
+        // контракт: FMVreplaceFieldData(userId, fieldId, value)
+        const res = await window.FMVreplaceFieldData(userId, fieldId, fieldValue);
+
+        // статус
+        switch (res?.status) {
+          case 'updated':  statusEl.textContent = '✔ обновлено'; break;
+          case 'nochange': statusEl.textContent = 'ℹ изменений нет'; break;
+          case 'error':    statusEl.textContent = '✖ ошибка'; break;
+          default:         statusEl.textContent = '❔ неизвестный результат';
+        }
+        statusEl.style.color = res?.status === 'updated' ? 'green' :
+                               res?.status === 'nochange' ? 'red' :
+                               res?.status === 'error' ? 'red' : '#b80';
+
+        // при желании можно логнуть детали в консоль
+        console.log('[update personal field]', {
+          httpStatus: res?.httpStatus,
+          serverMessage: res?.serverMessage,
+          fieldId: res?.fieldId ?? fieldId,
+          userId: res?.userId ?? userId,
+          valueTried: fieldValue,
+          details: res?.details
+        });
+      } catch (err) {
+        statusEl.textContent = '✖ сеть/транспорт';
+        statusEl.style.color = 'red';
+        console.error(err);
+      }
+    }
+  });
+})();

@@ -4,19 +4,27 @@
 
   /**
    * Заменяет текст комментария у поста.
+   * Использует только /edit.php?id=PID
+   *
+   * Требует подключённых helpers/common:
+   *  - fetchCP1251Doc, fetchCP1251Text, serializeFormCP1251_SelectSubmit
+   *  - classifyResult, extractInfoMessage, extractErrorMessage
+   *  - getCurrentGroupId (из check_group.js)
+   *
    * @param {Array<number|string>} allowedGroups  Разрешённые ID групп
    * @param {number|string} postId                ID поста
-   * @param {string} newText                      Новый текст (HTML/BBcode)
+   * @param {string} newText                      Новый текст (BBCode/HTML как нужно форуму)
    * @returns {Promise<{
    *   ok:boolean, status:string, postId:string, oldText?:string, newText:string,
    *   httpStatus?:number, infoMessage?:string, errorMessage?:string
    * }>}
    */
   async function replaceComment(allowedGroups, postId, newText) {
-    // --- 0) проверка группы (готовая функция getCurrentGroupId) ---
+    // 0) Проверка группы
     const gid = (typeof window.getCurrentGroupId === 'function')
       ? window.getCurrentGroupId()
       : null;
+
     const allow = new Set((allowedGroups || []).map(x => String(Number(x))));
     if (!gid || !allow.has(String(Number(gid)))) {
       const msg = `Нет доступа по группе (текущая группа: ${gid})`;
@@ -34,38 +42,57 @@
     const editUrl = `/edit.php?id=${encodeURIComponent(PID)}`;
 
     try {
-      // --- 1) грузим страницу редактирования ТОЛЬКО по /edit.php?id=PID ---
-      let doc, form, msgField;
+      // 1) Грузим страницу редактирования (ТОЛЬКО /edit.php?id=PID)
+      console.log(`[replaceComment] → GET ${editUrl}`);
+      let doc, form, msgField, pageHtml = '';
       try {
-        doc = await fetchCP1251Doc(editUrl); // helper из helpers.js
-        // поле сообщения (как в твоём шаблоне)
+        doc = await fetchCP1251Doc(editUrl); // helper
+        pageHtml = doc.documentElement ? doc.documentElement.outerHTML : '';
+
+        // Основное поле твоего шаблона:
         msgField = doc.querySelector(
           'textarea#main-reply[name="req_message"], textarea[name="req_message"]'
         );
-        if (msgField) {
-          form = msgField.closest('form');
-        }
-      } catch {}
-
-      if (!form || !msgField) {
-        const msg = 'Форма редактирования не найдена по адресу edit.php';
-        console.error('[replaceComment]', msg);
+        if (msgField) form = msgField.closest('form');
+      } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        console.error('[replaceComment] Транспортная ошибка при GET:', msg);
         return {
           ok: false,
-          status: 'noform',
+          status: 'transport',
           postId: PID,
           newText,
           errorMessage: msg
         };
       }
 
-      // --- 2) старый текст ---
+      if (!form || !msgField) {
+        // Формы нет — разберём сообщение, которое отдал форум (например, «нет прав»)
+        const infoMessage  = pageHtml ? extractInfoMessage(pageHtml)  : '';
+        const errorMessage = pageHtml ? extractErrorMessage(pageHtml) : '';
+        const status       = pageHtml ? (classifyResult(pageHtml) || 'noform') : 'noform';
+
+        console.error(`[replaceComment] ✖ Форма редактирования не найдена по edit.php (статус: ${status}).`);
+        if (errorMessage) console.error(errorMessage);
+        else if (infoMessage) console.info(infoMessage);
+
+        return {
+          ok: false,
+          status,
+          postId: PID,
+          newText,
+          infoMessage,
+          errorMessage
+        };
+      }
+
+      // 2) Старый текст
       const oldText = String(msgField.value || '').trim();
 
-      // --- 3) подставляем новый текст ---
+      // 3) Подставляем новый текст
       msgField.value = newText;
 
-      // --- 4) сериализация формы и POST (готовые helpers) ---
+      // 4) Сериализация формы и POST
       const submitName =
         [...form.elements].find(el =>
           el.type === 'submit' &&
@@ -74,6 +101,7 @@
 
       const body = serializeFormCP1251_SelectSubmit(form, submitName); // helper
 
+      console.log(`[replaceComment] → POST ${editUrl}`);
       const { res, text } = await fetchCP1251Text(editUrl, {           // helper
         method: 'POST',
         credentials: 'include',
@@ -83,10 +111,10 @@
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
 
-      // --- 5) анализ ответа (как в create) ---
-      const infoMessage  = extractInfoMessage(text);  // из common.js
-      const errorMessage = extractErrorMessage(text); // из common.js
-      const status       = classifyResult(text);      // из common.js
+      // 5) Разбор ответа (как в create)
+      const infoMessage  = extractInfoMessage(text);
+      const errorMessage = extractErrorMessage(text);
+      const status       = classifyResult(text);
 
       if (res.ok && status === 'ok') {
         console.info(`[replaceComment] ✅ #${PID} обновлён.${infoMessage ? ' ' + infoMessage : ''}`);
@@ -117,7 +145,7 @@
 
     } catch (err) {
       const msg = err && err.message ? err.message : String(err);
-      console.error('[replaceComment] Транспортная ошибка:', msg);
+      console.error('[replaceComment] Ошибка выполнения:', msg);
       return {
         ok: false,
         status: 'transport',

@@ -69,7 +69,7 @@
       if (!form || !msgField) {
         // Формы нет — разберём сообщение, которое отдал форум (например, «нет прав»)
         const infoMessage  = pageHtml ? extractInfoMessage(pageHtml)  : '';
-        const errorMessage = pageHtml ? extractErrorMessage(pageHtml) : '';
+        const errorMessage = '';
         const status       = pageHtml ? (classifyResult(pageHtml) || 'noform') : 'noform';
 
         console.error(`[replaceComment] ✖ Форма редактирования не найдена по edit.php (статус: ${status}).`);

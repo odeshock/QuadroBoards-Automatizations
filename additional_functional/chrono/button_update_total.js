@@ -57,6 +57,26 @@
         // 4) замена комментария
         const res = await FMV.replaceComment(GID, PID, html);
 
+        // ▸ нормализуем статус в строку (на случай объекта)
+        function normStatus(s) { ... }
+        
+        function toPlainShort(s = '', limit = 200) { ... }
+        
+        const st = normStatus(res.status);
+        const success = !!res.ok || st === 'ok';
+        setStatus(success ? 'Готово' : 'Ошибка');
+        
+        const lines = [];
+        lines.push(`<b>Статус:</b> ${success ? 'ok' : st || 'unknown'}`);
+        
+        const info  = toPlainShort(res.infoMessage || '');
+        const error = toPlainShort(res.errorMessage || '');
+        if (info)  lines.push(info);
+        if (error) lines.push(`<span style="color:#b00020">${error}</span>`);
+        
+        setDetails(lines.join('<br>'));
+
+
         // 5) статус и компактные детали
         setStatus(res.ok ? 'Готово' : 'Ошибка');
 

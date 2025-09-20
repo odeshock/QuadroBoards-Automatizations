@@ -2,6 +2,9 @@
 (() => {
   'use strict';
 
+  const BUTTON_LABEL = 'Мета-инфо';
+  const BUTTON_ORDER = 12;
+  
   // ====== Утилиты ======
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   async function waitFor(fn, { timeout = 10000, interval = 100 } = {}) {
@@ -138,8 +141,8 @@
   createForumButton({
     allowedGroups: (CHRONO_CHECK && CHRONO_CHECK.GroupID) || [],
     allowedForums: (CHRONO_CHECK && CHRONO_CHECK.ForumIDs) || [],
-    label: 'Мета-инфо',
-    order: 1,
+    label: BUTTON_LABEL,
+    order: BUTTON_ORDER,
 
     async onClick() {
       if (isMounted()) {

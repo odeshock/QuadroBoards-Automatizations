@@ -38,6 +38,7 @@
       }
       .fmv-row{margin:.25em 0}
       .fmv-label{font-weight:700;margin-right:.25em}
+      .fmv-missing{color:#c00;background:#ffe6e6;border-radius:6px;padding:0 .25em;font-weight:700}
     `;
     document.head.appendChild(style);
   }
@@ -53,6 +54,42 @@
     }) || null;
   }
 
+  // ---- рендер участников через profileLinkMeta (подсветка не найденных) ----
+  function renderParticipantsWithMeta(rawChars, map) {
+    const parsed = FMV.parseCharactersUnified(rawChars);
+    const items = Array.isArray(parsed?.items) ? parsed.items : [];
+
+    const parts = items.map((it) => {
+      const id = it?.id != null ? String(it.id) : null;
+      const knownName = id ? (map.get(id) || null) : null;
+
+      // используем обновлённый profile_from_user
+      let headHtml;
+      if (id) {
+        const meta = (typeof window.profileLinkMeta === 'function')
+          ? window.profileLinkMeta(id, knownName)
+          : { html: window.profileLink(id, knownName), found: !!knownName };
+
+        if (meta.found) {
+          headHtml = meta.html;
+        } else {
+          const rawText = it?.text ?? knownName ?? `user${id}`;
+          headHtml = `<span class="fmv-missing">${FMV.escapeHtml(String(rawText))}</span>`;
+        }
+      } else {
+        const rawText = it?.text ?? it?.name ?? it?.label ?? '';
+        headHtml = `<span class="fmv-missing">${FMV.escapeHtml(String(rawText))}</span>`;
+      }
+
+      const masks = Array.isArray(it?.masks) && it.masks.length
+        ? ` [${it.masks.join(', ')}]`
+        : '';
+      return headHtml + masks;
+    });
+
+    return parts.join('; ');
+  }
+
   // ----- сбор данных и построение блока -----
   async function buildMetaHtml() {
     const ok = await waitFor(() =>
@@ -60,7 +97,9 @@
       typeof FMV.readTagText === 'function' &&
       typeof FMV.escapeHtml === 'function' &&
       typeof FMV.parseOrderStrict === 'function' &&
-      typeof FMV.buildIdToNameMapFromTags === 'function'
+      typeof FMV.buildIdToNameMapFromTags === 'function' &&
+      typeof FMV.parseCharactersUnified === 'function' &&
+      typeof window.profileLink === 'function'
     , { timeout: 15000 });
     if (!ok) return null;
 
@@ -79,7 +118,7 @@
     const parts = [];
 
     if (rawChars) {
-      const participantsHtml = FMV.renderParticipantsHtml(rawChars, map, window.profileLink);
+      const participantsHtml = renderParticipantsWithMeta(rawChars, map);
       parts.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`);
     }
     if (rawLoc) {
@@ -126,17 +165,16 @@
     allowedForums: CHRONO_CHECK?.ForumID || [],
     label: BUTTON_LABEL,
     order: BUTTON_ORDER,
-    showStatus: false,   // ← ничего не пишет "Выполняю…"
-    showDetails: false,  // ← не рисует <details>
-    showLink: false,     // ← не рисует ссылку
-  
+    showStatus: false,
+    showDetails: false,
+    showLink: false,
+
     async onClick({ wrap }) {
-      // твой тумблер: вставить/удалить блок сразу под wrap
       if (wrap.nextElementSibling?.classList.contains('fmv-meta')) {
         wrap.nextElementSibling.remove();
         localStorage.setItem('fmv:meta:enabled', '0');
       } else {
-        const block = await buildMetaHtml(); // твоя функция сборки блока
+        const block = await buildMetaHtml();
         if (block) {
           wrap.parentNode.insertBefore(block, wrap.nextSibling);
           localStorage.setItem('fmv:meta:enabled', '1');

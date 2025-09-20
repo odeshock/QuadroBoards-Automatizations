@@ -478,7 +478,7 @@
     // /post.php?fid=N без action (старое создание)
     if (/\/post\.php$/i.test(path) && !q.has('action')) {
       const fid = +(q.get('fid')||0);
-      const allowed = CHRONO_CHECK.ForumID).map(Number);
+      const allowed = CHRONO_CHECK.ForumID.map(Number);
       if (allowed.includes(fid)) attachToPage({ strip:false, showOnlyIfCast:false });
     }
 

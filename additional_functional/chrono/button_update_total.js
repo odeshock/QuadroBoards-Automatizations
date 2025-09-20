@@ -229,8 +229,8 @@
       
             const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length
-              ? (asBB ? ` [i][as ${FMV.escapeHtml(roles.join(', '))}][/i]`
-                      : ` <i>[as ${FMV.escapeHtml(roles.join(', '))}]</i>`)
+              ? (asBB ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`
+                      : ` [as ${FMV.escapeHtml(roles.join(', '))}]`)
               : '';
 
       return `${display}${tail}`;
@@ -243,7 +243,7 @@
         : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n${names} / ${loc}\n\n`;
+      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n[i]${names} / ${loc}[/i]\n\n`;
     });
 
     const body = rows.join('') || ``;

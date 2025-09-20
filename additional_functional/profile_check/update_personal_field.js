@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  // небольшая утилита ожидания — локально для поиска profile-ссылки
+  // небольшая локальная утилита для ожидания появления узла
   const waitFor = (selector, timeout = 5000) =>
     new Promise((resolve, reject) => {
       const n0 = document.querySelector(selector);
@@ -15,17 +15,19 @@
       setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
     });
 
-  // вызов универсальной кнопки — все допуски и лейбл передаём параметрами
+  // выносим всю механику в универсальную кнопку
   createForumButton({
+    // передаём правила доступа параметрами (ничего не объединяем внутри)
     allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
     allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
     label: 'Установить плашку',
-    order: 1,
+    order: 10, // при необходимости расстановки — можно менять
 
     async onClick({ setStatus, setDetails }) {
-      // 1) Контекст: arg1 (из заголовка темы), userId/arg2 (из ссылки профиля)
+      // 1) Контекст: arg1 из заголовка темы, userId/arg2 из ссылки на профиль
       const nameSpan = document.querySelector('#pun-main h1 span');
       const arg1 = nameSpan ? nameSpan.textContent.trim().toLowerCase() : '';
+      if (!arg1) { setStatus('✖ не найдено имя темы (arg1)', 'red'); setDetails('Ожидался #pun-main h1 span'); return; }
 
       let profLink =
         document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
@@ -37,11 +39,9 @@
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       const userId = idMatch ? idMatch[1] : '';
       const arg2 = userId ? `usr${userId}` : '';
-
-      if (!arg1) { setStatus('✖ не найдено имя темы (arg1)', 'red'); setDetails('Ожидался #pun-main h1 span'); return; }
       if (!userId) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
 
-      // 2) Поле и значение: шаблон с подстановкой ID → arg2
+      // 2) Поле и значение: берём из PROFILE_CHECK и подставляем ID → arg2
       const fieldId = PROFILE_CHECK.PPageFieldID;
       const rawTemplate = PROFILE_CHECK.PPageFieldTemplate;
       const fieldValue = String(rawTemplate).replace(/\bID\b/g, arg2);
@@ -55,8 +55,8 @@
       // 3) Вызов обновления
       setStatus('Обновляю…', '#555');
       setDetails('');
-
       try {
+        // контракт: FMVreplaceFieldData(userId, fieldId, value)
         const res = await window.FMVreplaceFieldData(userId, fieldId, fieldValue);
 
         // статусы
@@ -73,10 +73,9 @@
         if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
         lines.push('Поле: ' + (res?.fieldId ?? fieldId));
         lines.push('Пользователь: ' + (res?.userId ?? userId));
-        lines.push('Значение: ' + fieldValue);
+        lines.push('Значение (template→arg2): ' + fieldValue);
         if (res?.details)       lines.push('Details: ' + res.details);
         setDetails(lines.join('\n') || 'Нет дополнительных данных');
-
       } catch (err) {
         setStatus('✖ сеть/транспорт', 'red');
         setDetails((err && err.message) ? err.message : String(err));
@@ -85,4 +84,3 @@
     }
   });
 })();
-

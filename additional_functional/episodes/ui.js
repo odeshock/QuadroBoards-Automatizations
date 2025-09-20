@@ -90,7 +90,7 @@
           background:#efe9dc; color:var(--fmv-text); font-size:14px;
         }
         .fmv .place-row,.fmv .order-row{margin-top:8px; width:100%; max-width:100%}
-        .fmv .place-row label,.fmv .order-row label{display:block; margin-bottom:4px; font-weight:600; color:var(--fmv-text)}
+        .fmv .order-row label{display:block; margin-bottom:4px; font-weight:600; color:var(--fmv-text)}
         .fmv .order-hint,.fmv .hint{font-size:12.5px; color:var(--fmv-muted); margin-top:4px; overflow-wrap:anywhere}
 
         .fmv .ac-list{
@@ -148,6 +148,35 @@
           margin:4px 0 12px;
           color: var(--fmv-text);
         }
+
+        /* когда список чипсов пуст — не занимаем места */
+        .fmv .chips:empty { display: none; }
+        
+        /* чуть выровняем вертикальный ритм (опционально) */
+        .fmv .char-row { margin-bottom: 8px; }
+        .fmv .chips { margin: 8px 0; }
+        .fmv .place-row { margin-top: 8px; }
+
+        /* делаем «колонку» с равным шагом и без внутренних margin */
+        .fmv .combo,
+        .fmv .place-row,
+        .fmv .order-row {
+          display: grid;
+          grid-template-columns: 1fr;
+          row-gap: 8px;             /* вот этим управляем расстоянием между label ↔ input ↔ hint */
+        }
+        
+        .fmv .place-row label,
+        .fmv .order-row label,
+        .fmv .combo label,
+        .fmv .place-row .hint,
+        .fmv .order-row .order-hint,
+        .fmv .combo .hint {
+          margin: 0;                /* убираем наследованные отступы, чтобы они не «схлопывались» */
+        }
+        
+        /* (оставляем общий верхний зазор секции) */
+        .fmv .place-row, .fmv .order-row { margin-top: 8px; }
 
         `;
         const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);

@@ -14,7 +14,9 @@
   }
 
   // разделы (можно переопределить через CHRONO_CHECK.Sections)
-  const SECTIONS = CHRONO_CHECK?.ForumInfo || [];
+  const SECTIONS = window.CHRONO_CHECK?.Sections || window.CHRONO_CHECK?.ForumInfo || [
+    { id: 8, type: 'au', status: 'on' }
+  ];
 
   let busy = false;
 
@@ -100,23 +102,24 @@
   const TMAX = [9999, 12, 31];
 
   async function collectEvents() {
+    const seenTopics = new Set();               // дедуп по теме (ID или URL без якоря)
     let all = [];
     for (const sec of SECTIONS) {
-      const part = await scrapeSection(sec);
+      const part = await scrapeSection(sec, seenTopics);
       all = all.concat(part);
     }
     return all.filter(Boolean).sort(compareEvents);
   }
 
-  async function scrapeSection(section) {
+  async function scrapeSection(section, seenTopics) {
     let url = abs(location.href, `/viewforum.php?id=${section.id}`);
-    const seen = new Set();
+    const seenPages = new Set();
     const out  = [];
     let n = 0;
     let lastSig = '';
 
-    while (url && !seen.has(url) && n < MAX_PAGES_PER_SECTION) {
-      n++; seen.add(url);
+    while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
+      n++; seenPages.add(url);
       const doc = await fetchDoc(url);
 
       // ссылки на темы
@@ -138,16 +141,22 @@
       const sig = Array.from(topics.keys()).sort().join(',');
       if (sig && sig === lastSig) break;
       lastSig = sig;
-      
-      for (const { url: turl, title } of topics.values()) {
+
+      // сами темы
+      for (const [tid, { url: turl, title }] of topics) {
+        const key = tid || turl.replace(/#.*$/, '');
+        if (seenTopics.has(key)) continue;     // дедуп между страницами и разделами
         const row = await scrapeTopic(turl, title, section.type, section.status);
-        if (row) out.push(row);
+        if (row) {
+          seenTopics.add(key);
+          out.push(row);
+        }
       }
 
       const next = findNextPage(doc);
       const nextUrl = next ? abs(url, next) : null;
       // --- STOP #2: «следующая» указывает на уже посещённую страницу
-      if (!nextUrl || seen.has(nextUrl)) { url = null; break; }
+      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
       url = nextUrl;
     }
     return out;
@@ -162,7 +171,7 @@
       const rawLoc   = FMV.readTagText(first, 'location');
       const rawOrder = FMV.readTagText(first, 'order');
 
-      const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
+      const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars); // common.js ✔
 
       const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
       const ord = FMV.parseOrderStrict(rawOrder);
@@ -172,7 +181,7 @@
       const locationsLower    = rawLoc ? rawLoc.split(/\s*[,;]\s*/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
       const order             = ord.ok ? ord.value : null;
 
-      const titleFromCrumbs = topicTitleFromCrumbs(doc);
+      const titleFromCrumbs = topicTitleFromCrumbs(doc);                 // helpers ✔
       const safeTitle = rawTitle || titleFromCrumbs || '';
       const { dateRaw, episode, hasBracket } = parseTitle(safeTitle);
       const isAu  = (type === 'au');
@@ -180,14 +189,6 @@
       const auStart = /^\s*\[\s*(?:a|а)\s*(?:u|у)\s*\]/i.test(safeTitle);
       const dateBad = isAu ? !auStart : (!hasBracket || range.bad);
       const plotBad = (type === 'plot') ? !/\s\[\s*с\s*\]\s*$/iu.test(String(rawTitle || '')) : false;
-
-      console.log('[title]', {
-  url: topicUrl,
-  rawTitle,
-  titleFromCrumbs,
-  chosen: safeTitle
-});
-
 
       return {
         type, status, url: topicUrl,
@@ -239,24 +240,22 @@
 
       // opts.asBB === true → рендерим в BB-коде, иначе в HTML как прежде
       const asBB = true;
-      
+
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
-            const idStr = String(+String(low).replace(/^user/i, '')); // "user4" -> "4"
-            const hasId = idStr !== '0' && /^\d+$/.test(idStr);
-            const known = hasId && e.idToNameMap?.has(idStr);
+            const raw = String(low);
+            const idNum = parseInt(raw.replace(/^user/i, ''), 10);
+            const hasId = Number.isFinite(idNum) && idNum > 0;
+            const idKey = hasId ? String(idNum) : null;
+            const known = !!(idKey && e.idToNameMap?.has(idKey));
             const display = known
-              ? userLink(idStr, e.idToNameMap.get(idStr), asBB)
-              : missingUser(hasId ? `user${idStr}` : String(low), asBB);
-            const roles = Array.from(e.masksByCharLower.get(low) || []);
-            const tail  = roles.length
-              ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`
-              : '';
-
-      return `${display}${tail}`;
-    }).join(', ')
-  : (asBB ? `[mark]не указаны[/mark]` : `<mark>не указаны</mark>`);
-
+              ? userLink(idKey, e.idToNameMap.get(idKey), asBB)
+              : missingUser(hasId ? `user${idKey}` : raw, asBB); // → [mark]user11[/mark]
+            const roles = Array.from(e.masksByCharLower.get(raw) || []);
+            const tail  = roles.length ? ` [as ${FMV.escapeHtml(roles.join(', '))}]` : '';
+            return `${display}${tail}`;
+          }).join(', ')
+        : (asBB ? `[mark]не указаны[/mark]` : `<mark>не указаны</mark>`);
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))
@@ -305,9 +304,9 @@
       single:               /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       dayRangeSameMonth:    /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       crossMonthTailYear:   /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\д{4})-(\д{1,2})\.(\д{1,2})\.(\д{2}|\д{4})$/,
-      monthYear:            /^(\д{1,2})\.(\д{2}|\д{4})$/,
-      yearOnly:             /^(\д{4})$/
+      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      monthYear:            /^(\d{1,2})\.(\d{2}|\d{4})$/,
+      yearOnly:             /^(\d{4})$/
     };
 
     const toI = x => parseInt(x, 10);
@@ -351,7 +350,7 @@
     }
 
     m = txt.match(P.yearOnly);
-    if (m) { // <-- тут была кириллическая "м"
+    if (m) {
       const y=toI(m[1]);
       return { start:[y,1,1], end:[y,12,31], kind:'year', bad:false };
     }
@@ -388,15 +387,11 @@
     return escapeHtml(t.length > 500 ? t.slice(0,500) + '…' : t);
   }
 
+  // Используем существующий fetchHtml из helpers; DOMParser оставим как универсальный парсер
   async function fetchDoc(url) {
-    if (typeof window.fetchHtml === 'function') {
-      const html = await window.fetchHtml(url);
-      return (typeof window.parseHTML === 'function')
-        ? window.parseHTML(html)
-        : new DOMParser().parseFromString(html, 'text/html');
-    }
-    const res = await fetch(url, { credentials: 'include' });
-    const html = await res.text();
-    return new DOMParser().parseFromString(html, 'text/html');
+    const html = await fetchHtml(url);                           // helpers ✔
+    return (typeof window.parseHTML === 'function')
+      ? window.parseHTML(html)
+      : new DOMParser().parseFromString(html, 'text/html');
   }
 })();

@@ -2,10 +2,6 @@
 (() => {
   'use strict';
 
-  // ====== Настройки именно этой кнопки ======
-  const BUTTON_LABEL = 'Мета-инфо';
-  const BUTTON_ORDER = 1;
-
   // ====== Утилиты ======
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   async function waitFor(fn, { timeout = 10000, interval = 100 } = {}) {
@@ -140,10 +136,10 @@
 
   // ====== Кнопка-тумблер через createForumButton ======
   createForumButton({
-    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
-    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
-    label: BUTTON_LABEL,
-    order: BUTTON_ORDER,
+    allowedGroups: (CHRONO_CHECK && CHRONO_CHECK.GroupID) || [],
+    allowedForums: (CHRONO_CHECK && CHRONO_CHECK.ForumIDs) || [],
+    label: 'Мета-инфо',
+    order: 1,
 
     async onClick() {
       if (isMounted()) {

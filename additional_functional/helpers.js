@@ -170,7 +170,7 @@ function userLink(id, name = '', asBB = false) {
 function missingUser(token, asBB = false) {
   const raw = String(token);
   return asBB
-    ? `[i][color=#b00020]${raw}[/color][/i]`
+    ? `[mark]${raw}[/mark]`
     : `<span class="fmv-missing" data-found="0">${raw}</span>`;
 }
 

@@ -70,7 +70,14 @@
       // 5) первичный разбор ответа
       const infoMessage  = extractInfoMessage(text) || '';
       const errorMessage = extractErrorMessage(text) || '';
-      const statusRaw    = classifyResult(text);
+      const statusText = classifyResult(text) || 'unknown';
+
+      // если HTTP-ответ успешный, но наш анализ ничего не нашёл,
+      // считаем обновление успешным
+      if (res.ok && statusText === 'unknown') {
+        console.log('[replaceComment] POST успешен, но нет сигнатур — принимаем как ok');
+        statusText = 'ok';
+      }
       let   statusText   =
         (typeof statusRaw === 'string') ? statusRaw :
         (statusRaw && (statusRaw.status || statusRaw.code || (statusRaw.ok ? 'ok' : 'server'))) || 'unknown';

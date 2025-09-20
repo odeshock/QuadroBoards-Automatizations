@@ -13,10 +13,10 @@
     return;
   }
 
-  // разделы (можно переопределить через CHRONO_CHECK.Sections)
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.Sections) && window.CHRONO_CHECK.Sections.length
-    ? window.CHRONO_CHECK.Sections
-    : [{ id: 8, type: 'au', status: 'on' }];
+  // разделы (можно переопределить через CHRONO_CHECK.ForumInfo)
+  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
+    ? window.CHRONO_CHECK.ForumInfo
+    : [];
 
   let busy = false;
 

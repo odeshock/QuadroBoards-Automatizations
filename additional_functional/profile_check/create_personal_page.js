@@ -42,7 +42,7 @@
       // --- остальные аргументы из PROFILE_CHECK
       const arg3 = PROFILE_CHECK.PPageTemplate;
       const arg4 = '';
-      const arg5 = PROFILE_CHECK.PPageGroupIDs;
+      const arg5 = PROFILE_CHECK.PPageGroupID;
       const arg6 = '0';
 
       if (typeof window.FMVcreatePersonalPage !== 'function') {

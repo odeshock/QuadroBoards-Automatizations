@@ -1,8 +1,8 @@
-// universal_button.js
+// button.js
 (() => {
   'use strict';
 
-  // Ждём, пока готов DOM и .ams_info
+  // ожидание DOM/элементов
   const waitFor = (selector, timeout = 8000) =>
     new Promise((resolve, reject) => {
       const node = document.querySelector(selector);
@@ -26,13 +26,14 @@
     await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
   }
 
-  // Проверка форума
+  // проверка форума по crumbs → /viewforum.php?id=...
   function isAllowedForum(forumIds) {
     const crumbs = document.querySelector('.crumbs') ||
                    document.querySelector('#pun-crumbs') ||
                    document.querySelector('.pun_crumbs') ||
                    document.querySelector('.container .crumbs');
     if (!crumbs) return false;
+
     return Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
       try {
         const u = new URL(a.getAttribute('href'), location.href);
@@ -44,35 +45,45 @@
 
   /**
    * Универсальный конструктор кнопки.
-   * @param {Object} opts
-   * @param {string[]} opts.allowedGroups - список groupId (числа или строки)
-   * @param {string[]} opts.allowedForums - список forumId (строки)
-   * @param {string}   opts.label         - текст кнопки
-   * @param {Function} opts.onClick       - async ({statusEl}) => void
-   * @param {string}   [opts.containerSelector='.ams_info']
+   * Ничего не объединяет автоматически — все допуски передаёшь параметрами.
+   *
+   * @param {Object}   opts
+   * @param {string[]} [opts.allowedGroups=[]]   список groupId (числа или строки); сравнение по числу
+   * @param {string[]} [opts.allowedForums=[]]   список forumId (строки)
+   * @param {string}   [opts.label='Действие']   текст на кнопке
+   * @param {Function} opts.onClick              async ({statusEl, detailsEl, setStatus, setDetails}) => void
+   * @param {string}   [opts.containerSelector='.ams_info']  куда вставлять
    */
-  window.createForumButton = async function(opts) {
+  window.createForumButton = async function createForumButton(opts) {
     const {
       allowedGroups = [],
       allowedForums = [],
       label = 'Действие',
       onClick,
-      containerSelector = '.ams_info'
-    } = opts;
+      containerSelector = '.ams_info',
+    } = opts || {};
+
+    if (typeof onClick !== 'function') return;
 
     await waitAmsReady();
 
-    const groupId = getCurrentGroupId(); // Функция уже подключена из check_group.js
-    if (allowedGroups.length && !allowedGroups.map(Number).includes(Number(groupId))) return;
+    // группа — берём готовую функцию из check_group.js (не дублируем!)
+    const gid = typeof window.getCurrentGroupId === 'function'
+      ? window.getCurrentGroupId()
+      : NaN;
+
+    if (allowedGroups.length && !allowedGroups.map(Number).includes(Number(gid))) return;
     if (allowedForums.length && !isAllowedForum(allowedForums)) return;
 
-    const container = await waitFor(containerSelector, 5000);
+    const container = await waitFor(containerSelector, 5000).catch(() => null);
     if (!container) return;
 
     // --- UI ---
+    const br = document.createElement('br');
     const wrap = document.createElement('div');
-    const btn  = document.createElement('button');
-    btn.type   = 'button';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = 'button';
     btn.textContent = label;
 
@@ -81,20 +92,41 @@
     status.style.fontSize = '14px';
     status.style.color = '#555';
 
+    const details = document.createElement('details');
+    details.style.marginTop = '6px';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Показать детали';
+    summary.style.cursor = 'pointer';
+    const pre = document.createElement('pre');
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.margin = '6px 0 0';
+    pre.style.fontSize = '12px';
+    details.appendChild(summary);
+    details.appendChild(pre);
+
     wrap.appendChild(btn);
     wrap.appendChild(status);
-    container.appendChild(document.createElement('br'));
+    wrap.appendChild(details);
+    container.appendChild(br);
     container.appendChild(wrap);
 
+    const setStatus = (text, color = '#555') => {
+      status.textContent = text;
+      status.style.color = color;
+    };
+    const setDetails = (text = '') => {
+      pre.textContent = String(text || '');
+    };
+
     btn.addEventListener('click', async () => {
-      status.textContent = 'Выполняю…';
-      status.style.color = '#555';
+      setStatus('Выполняю…', '#555');
+      setDetails('');
       try {
-        await onClick({ statusEl: status });
-      } catch (e) {
-        status.textContent = '✖ Ошибка';
-        status.style.color = 'red';
-        console.error(e);
+        await onClick({ statusEl: status, detailsEl: pre, setStatus, setDetails });
+      } catch (err) {
+        setStatus('✖ Ошибка', 'red');
+        setDetails((err && err.message) ? err.message : String(err));
+        console.error('[createForumButton]', err);
       }
     });
   };

@@ -127,6 +127,10 @@
         const title = text(a);
         if (!m) return;
         if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
+        // игнор: ссылки на конкретное сообщение/якорь (#p123 и т.п.)
+        if (/#p\d+$/i.test(href)) return;
+        // игнор: ссылки, где «заголовок» похож на дату/время
+        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(title)) return;
         topics.set(m[1], { url: href, title });
       });
 
@@ -169,7 +173,7 @@
       const order             = ord.ok ? ord.value : null;
 
       const titleFromCrumbs = topicTitleFromCrumbs(doc);
-      const safeTitle = titleFromCrumbs || rawTitle || '';
+      const safeTitle = rawTitle || titleFromCrumbs || '';
       const { dateRaw, episode, hasBracket } = parseTitle(safeTitle);
       const isAu  = (type === 'au');
       const range = isAu ? { start: TMAX, end: TMAX, kind: 'unknown', bad: false } : parseDateRange(dateRaw);

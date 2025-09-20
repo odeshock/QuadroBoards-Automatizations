@@ -118,7 +118,12 @@
     const parts = [];
 
     if (rawChars) {
-      const participantsHtml = renderParticipantsWithMeta(rawChars, map);
+      const participantsHtml = FMV.renderParticipantsHtml(
+        rawChars,
+        map,
+        (id, name) => window.profileLink(id, name) // profileLink вернёт <span class="fmv-missing">…</span> если не найден
+      );
+
       parts.push(`<div class="fmv-row"><span class="fmv-label">Участники:</span>${participantsHtml}</div>`);
     }
     if (rawLoc) {

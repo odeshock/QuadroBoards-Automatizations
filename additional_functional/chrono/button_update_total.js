@@ -223,12 +223,10 @@
       
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
-            const idStr = String(+String(low).replace(/^user/i, '')); // "user4" -> "4"
-            const hasId = idStr !== '0' && /^\d+$/.test(idStr);
-            const display = hasId
-              ? userLink(idStr, e.idToNameMap?.get(idStr), asBB)
-              : missingUser(String(low), asBB);
-      
+            const known = hasId && e.idToNameMap?.has(idStr);
+            const display = known
+              ? userLink(idStr, e.idToNameMap.get(idStr), asBB)
+              : missingUser(hasId ? `user${idStr}` : String(low), asBB);
             const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length
               ? (asBB ? ` [as ${FMV.escapeHtml(roles.join(', '))}]`

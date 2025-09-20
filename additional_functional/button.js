@@ -87,8 +87,10 @@
       ? window.getCurrentGroupId()
       : NaN;
 
-    if (allowedGroups.length && !allowedGroups.map(Number).includes(Number(gid))) return;
-    if (allowedForums.length && !isAllowedForum(allowedForums)) return;
+    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) return;
+    if (!allowedGroups.map(Number).includes(Number(gid))) return;
+    if (!Array.isArray(allowedForums) || allowedForums.length === 0) return;
+    if (!isAllowedForum(allowedForums)) return;
 
     const container = await waitFor(containerSelector, 5000).catch(() => null);
     if (!container) return;

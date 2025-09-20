@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  // ожидание DOM/элементов
+  // Ждём DOM и нужный контейнер
   const waitFor = (selector, timeout = 8000) =>
     new Promise((resolve, reject) => {
       const node = document.querySelector(selector);
@@ -26,7 +26,7 @@
     await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
   }
 
-  // проверка форума
+  // Проверка форума по crumbs → /viewforum.php?id=...
   function isAllowedForum(forumIds) {
     const crumbs = document.querySelector('.crumbs') ||
                    document.querySelector('#pun-crumbs') ||
@@ -44,13 +44,14 @@
   }
 
   /**
-   * Универсальный конструктор кнопки с поддержкой порядка отображения.
+   * Универсальный конструктор кнопки с сортировкой по order
+   * и встроенной ссылкой рядом со статусом.
    *
    * @param {Object}   opts
    * @param {string[]} [opts.allowedGroups=[]]  допустимые groupId (числа/строки)
    * @param {string[]} [opts.allowedForums=[]]  допустимые forumId (строки)
    * @param {string}   [opts.label='Действие']  текст на кнопке
-   * @param {Function} opts.onClick             async ({statusEl, detailsEl, setStatus, setDetails}) => void
+   * @param {Function} opts.onClick             async ({statusEl, linkEl, detailsEl, setStatus, setDetails}) => void
    * @param {string}   [opts.containerSelector='.ams_info']
    * @param {number}   [opts.order=0]           порядок вывода кнопок (меньше = выше)
    */
@@ -68,7 +69,7 @@
 
     await waitAmsReady();
 
-    // используем функцию getCurrentGroupId из check_group.js
+    // получаем groupId через подключённый check_group.js
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()
       : NaN;
@@ -79,7 +80,7 @@
     const container = await waitFor(containerSelector, 5000).catch(() => null);
     if (!container) return;
 
-    // --- UI элементов ---
+    // ---------- UI ----------
     const br = document.createElement('br');
     const wrap = document.createElement('div');
     wrap.dataset.order = order;
@@ -94,6 +95,16 @@
     status.style.fontSize = '14px';
     status.style.color = '#555';
 
+    // встроенная ссылка рядом со статусом
+    const link = document.createElement('a');
+    link.className = 'fmv-action-link';
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.style.marginLeft = '10px';
+    link.style.fontSize = '14px';
+    link.style.display = 'none'; // по умолчанию скрыта
+
+    // блок деталей
     const details = document.createElement('details');
     details.style.marginTop = '6px';
     const summary = document.createElement('summary');
@@ -106,17 +117,21 @@
     details.appendChild(summary);
     details.appendChild(pre);
 
+    // добавляем элементы в обёртку
     wrap.appendChild(btn);
     wrap.appendChild(status);
+    wrap.appendChild(link);     // <-- ССЫЛКА РЯДОМ СО СТАТУСОМ
     wrap.appendChild(details);
+
     container.appendChild(br);
 
-    // === вставка с учётом order ===
+    // вставляем по order
     const siblings = Array.from(container.querySelectorAll('div[data-order]'));
     const next = siblings.find(el => Number(el.dataset.order) > Number(order));
     if (next) container.insertBefore(wrap, next);
     else container.appendChild(wrap);
 
+    // helpers для обновления
     const setStatus = (text, color = '#555') => {
       status.textContent = text;
       status.style.color = color;
@@ -124,12 +139,32 @@
     const setDetails = (text = '') => {
       pre.textContent = String(text || '');
     };
+    const setLink = (url, text = 'Открыть') => {
+      if (url) {
+        link.href = url;
+        link.textContent = text;
+        link.style.display = 'inline';
+      } else {
+        link.style.display = 'none';
+        link.textContent = '';
+        link.removeAttribute('href');
+      }
+    };
 
+    // обработчик клика
     btn.addEventListener('click', async () => {
       setStatus('Выполняю…', '#555');
       setDetails('');
+      setLink(null);
       try {
-        await onClick({ statusEl: status, detailsEl: pre, setStatus, setDetails });
+        await onClick({
+          statusEl: status,
+          linkEl: link,
+          detailsEl: pre,
+          setStatus,
+          setDetails,
+          setLink
+        });
       } catch (err) {
         setStatus('✖ Ошибка', 'red');
         setDetails((err && err.message) ? err.message : String(err));

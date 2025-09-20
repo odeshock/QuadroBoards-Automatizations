@@ -1,4 +1,4 @@
-// button_update_complete.js
+// button_update_total.js
 (() => {
   'use strict';
 
@@ -9,12 +9,14 @@
   const PID = String(window.CHRONO_CHECK?.TotalChronoPostID || '').trim();
 
   if (!GID.length || !FID.length || !TID || !PID) {
-    console.warn('[button_update_complete] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
+    console.warn('[button_update_total] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
     return;
   }
 
-  // разделы (можно переопределить через CHRONO_CHECK.Sections)
-  const SECTIONS = window.CHRONO_CHECK?.ForumInfo || [];
+  // разделы
+  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK?.ForumInfo.length
+    ? window.CHRONO_CHECK?.ForumInfo
+    : [];
 
   let busy = false;
 
@@ -23,7 +25,7 @@
     allowedForums: FID,
     topicId: TID,
     label: 'обновить итог',
-    order: 1,
+    order: 50,
 
     showStatus: true,
     showDetails: true,
@@ -43,33 +45,19 @@
         // 1) сбор
         const events = await collectEvents();
         // 2) рендер «Собранной хронологии»
-        const html = renderChrono(events);
+        const htmlRaw = renderChrono(events);
+        // 3) cp1251-safe (числовые сущности для символов вне ASCII/кириллицы)
+        const html = toCp1251Entities(htmlRaw);
 
-        // 3) проверка наличия FMV.replaceComment
+        // 4) проверка наличия FMV.replaceComment
         if (!(window.FMV && typeof FMV.replaceComment === 'function')) {
           setStatus('Ошибка');
           setDetails('Не найдена FMV.replaceComment — проверь порядок подключений.');
           return;
         }
 
-        // 4) замена комментария
+        // 5) замена комментария
         const res = await FMV.replaceComment(GID, PID, html);
-
-        // ▸ нормализуем статус в строку (на случай объекта)
-        function normStatus(s) {
-          if (s == null) return '';
-          if (typeof s === 'string') return s;
-          if (typeof s === 'object') {
-            return String(s.status || s.code || (s.ok ? 'ok' : 'unknown'));
-          }
-          return String(s);
-        }
-
-        // ▸ убираем HTML и укорачиваем
-        function toPlainShort(s = '', limit = 200) {
-          const t = String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-          return t.length > limit ? t.slice(0, limit) + '…' : t;
-        }
 
         const st = normStatus(res.status);
         const success = !!res.ok || st === 'ok';
@@ -94,13 +82,13 @@
     }
   });
 
-  /* ===================== СБОРКА и РЕНДЕР (HTML) ===================== */
+  /* ===================== СБОРКА и РЕНДЕР ===================== */
 
   const MAX_PAGES_PER_SECTION = 50;
   const TMAX = [9999, 12, 31];
 
   async function collectEvents() {
-    const seenTopics = new Set();               // дедуп по теме (ID или URL без якоря)
+    const seenTopics = new Set(); // дедуп по теме (id:<ID> или url:<URL>)
     let all = [];
     for (const sec of SECTIONS) {
       const part = await scrapeSection(sec, seenTopics);
@@ -114,7 +102,7 @@
     const seenPages = new Set();
     const out  = [];
     let n = 0;
-    let lastSig = '';
+    let lastSig = ''; // сигнатура набора тем на странице
 
     while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
       n++; seenPages.add(url);
@@ -128,22 +116,21 @@
         const title = text(a);
         if (!m) return;
         if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        // игнор: ссылки на конкретное сообщение/якорь (#p123 и т.п.)
+        // игнор якорей на конкретные сообщения (#p123)
         if (/#p\d+$/i.test(href)) return;
-        // игнор: ссылки, где «заголовок» похож на дату/время
+        // игнор ссылок, где «заголовок» похож на дату/время (последний пост)
         if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(title)) return;
         topics.set(m[1], { url: href, title });
       });
 
-      // --- STOP #1: страница без прогресса (тот же набор тем)
+      // STOP #1: страница без прогресса (тот же набор тем)
       const sig = Array.from(topics.keys()).sort().join(',');
       if (sig && sig === lastSig) break;
       lastSig = sig;
 
-      // сами темы
       for (const [tid, { url: turl, title }] of topics) {
-        const key = tid || turl.replace(/#.*$/, '');
-        if (seenTopics.has(key)) continue;     // дедуп между страницами и разделами
+        const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
+        if (seenTopics.has(key)) continue; // глобальная дедупликация
         const row = await scrapeTopic(turl, title, section.type, section.status);
         if (row) {
           seenTopics.add(key);
@@ -153,7 +140,8 @@
 
       const next = findNextPage(doc);
       const nextUrl = next ? abs(url, next) : null;
-      // --- STOP #2: «следующая» указывает на уже посещённую страницу
+
+      // STOP #2: нет next или «следующая» указывает на уже посещённую
       if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
       url = nextUrl;
     }
@@ -169,7 +157,7 @@
       const rawLoc   = FMV.readTagText(first, 'location');
       const rawOrder = FMV.readTagText(first, 'order');
 
-      const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars); // common.js ✔
+      const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
 
       const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
       const ord = FMV.parseOrderStrict(rawOrder);
@@ -179,7 +167,7 @@
       const locationsLower    = rawLoc ? rawLoc.split(/\s*[,;]\s*/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
       const order             = ord.ok ? ord.value : null;
 
-      const titleFromCrumbs = topicTitleFromCrumbs(doc);                 // helpers ✔
+      const titleFromCrumbs = topicTitleFromCrumbs(doc);
       const safeTitle = rawTitle || titleFromCrumbs || '';
       const { dateRaw, episode, hasBracket } = parseTitle(safeTitle);
       const isAu  = (type === 'au');
@@ -210,8 +198,6 @@
     return String(a.episode || '').localeCompare(String(b.episode || ''), 'ru', { sensitivity: 'base' });
   }
 
-  const MISS = 'background:#ffe6e6;color:#b00020;border-radius:6px;padding:0 .35em;font-weight:700';
-
   function renderStatus(type, status) {
     const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','black'] };
     const mapStat = { on:['active','green'], off:['closed','teal'], archived:['archived','maroon'] };
@@ -236,24 +222,24 @@
       const plotErr = (e.type === 'plot' && e.plotBad) ? ` [mark]нет " [с]"[/mark]` : '';
       const ord = (e.order != null) ? ` [порядок: ${escapeHtml(String(e.order))}]` : '';
 
-      // opts.asBB === true → рендерим в BB-коде, иначе в HTML как прежде
+      // рендерим в BB-коде
       const asBB = true;
 
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
-            const raw = String(low);
-            const idNum = parseInt(raw.replace(/^user/i, ''), 10);
+            const idNum = parseInt(String(low).replace(/^user/i, ''), 10);
             const hasId = Number.isFinite(idNum) && idNum > 0;
             const idKey = hasId ? String(idNum) : null;
             const known = !!(idKey && e.idToNameMap?.has(idKey));
             const display = known
               ? userLink(idKey, e.idToNameMap.get(idKey), asBB)
-              : missingUser(hasId ? `user${idKey}` : raw, asBB); // → [mark]user11[/mark]
-            const roles = Array.from(e.masksByCharLower.get(raw) || []);
+              : missingUser(hasId ? `user${idKey}` : String(low), asBB); // → [mark]user11[/mark]
+
+            const roles = Array.from(e.masksByCharLower.get(low) || []);
             const tail  = roles.length ? ` [as ${FMV.escapeHtml(roles.join(', '))}]` : '';
             return `${display}${tail}`;
           }).join(', ')
-        : (asBB ? `[mark]не указаны[/mark]` : `<mark>не указаны</mark>`);
+        : `[mark]не указаны[/mark]`;
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))
@@ -302,7 +288,7 @@
       single:               /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       dayRangeSameMonth:    /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       crossMonthTailYear:   /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
+      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\д{2}|\д{4})$/, // не используется в AU
       monthYear:            /^(\d{1,2})\.(\d{2}|\d{4})$/,
       yearOnly:             /^(\d{4})$/
     };
@@ -375,6 +361,7 @@
 
   function abs(base, href) { try { return new URL(href, base).href; } catch { return href; } }
   function text(node) { return (node && (node.innerText ?? node.textContent) || '').trim(); }
+
   function escapeHtml(s = '') {
     return (window.FMV && typeof FMV.escapeHtml === 'function')
       ? FMV.escapeHtml(s)
@@ -384,10 +371,30 @@
     const t = String(s);
     return escapeHtml(t.length > 500 ? t.slice(0,500) + '…' : t);
   }
+  function normStatus(s) {
+    if (s == null) return '';
+    if (typeof s === 'string') return s;
+    if (typeof s === 'object') return String(s.status || s.code || (s.ok ? 'ok' : 'unknown'));
+    return String(s);
+  }
+  function toPlainShort(s = '', limit = 200) {
+    const t = String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return t.length > limit ? t.slice(0, limit) + '…' : t;
+  }
 
-  // Используем существующий fetchHtml из helpers; DOMParser оставим как универсальный парсер
+  // cp1251-safe: конвертируем все символы вне ASCII/кириллицы в числовые сущности
+  function toCp1251Entities(s) {
+    const keep = /[\u0000-\u007F\u0400-\u045F\u0401\u0451]/; // ASCII + кириллица + Ё/ё
+    let out = '';
+    for (const ch of String(s)) {
+      out += keep.test(ch) ? ch : `&#${ch.codePointAt(0)};`;
+    }
+    return out;
+  }
+
   async function fetchDoc(url) {
-    const html = await fetchHtml(url);                           // helpers ✔
+    // helpers.js уже подключен
+    const html = await fetchHtml(url);
     return (typeof window.parseHTML === 'function')
       ? window.parseHTML(html)
       : new DOMParser().parseFromString(html, 'text/html');

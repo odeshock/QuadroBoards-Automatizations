@@ -142,7 +142,8 @@
         /* заголовок блока */
         .fmv .section-title{
           font-weight:700;
-          font-size:20px;
+          font-size:14px;
+          text-align: center;
           line-height:1.25;
           margin:4px 0 12px;
           color: var(--fmv-text);

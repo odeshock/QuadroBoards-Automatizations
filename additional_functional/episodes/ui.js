@@ -382,27 +382,56 @@
           $area.val(base + sep + meta);
         });
 
-        // ── admin toggle (ручной режим) ──
+        // ── admin toggle (ручной режим) — создаём один раз и переиспользуем ──
         if (isAllowedAdmin()) {
-          const $tools = $('<div class="fmv-admin-tools"><button type="button" class="fmv-toggle">Режим ручного редактирования</button></div>');
+          // ищем/создаём один общий контейнер для этой формы
+          let $tools = $form.data('fmvAdminTools');
+          if (!$tools || !$tools.length) {
+            $tools = $(
+              '<div class="fmv-admin-tools">' +
+                '<button type="button" class="fmv-toggle">Режим ручного редактирования</button>' +
+              '</div>'
+            );
+            $form.data('fmvAdminTools', $tools);
+          }
+          // размещаем кнопку перед текущим $wrap
           $wrap.before($tools);
+        
           const $btn = $tools.find('.fmv-toggle');
-
-          function toRaw(){
-            const meta = metaLine();
-            const base = stripFMV($area.val()||'').replace(/[ \t]+$/, '');
+        
+          // важно: каждый раз при новом attach() снимаем старый обработчик
+          $btn.off('click.fmv');
+        
+          const toRaw = () => {
+            const meta = [buildFMVcast(selected), buildFMVplace($placeInput.val()), buildFMVord($ordInput.val())]
+              .filter(Boolean).join('');
+            const base = stripFMV($area.val() || '').replace(/[ \t]+$/, '');
             const sep  = (!base || /\n$/.test(base)) ? '' : '\n';
             $area.val(base + (meta ? sep + meta : ''));
-
+        
+            // удаляем только UI и наш сабмит-хук, кнопку НЕ трогаем
             $wrap.remove();
             $form.off('submit.fmv.ui').removeData('fmvBoundUI');
-            $btn.data('raw',true).text('Вернуться к удобной форме');
-          }
-          function toUI(){
-            const api2 = FMV.UI.attach({ form:$form, textarea:$area, prefill:true, showOnlyIfFMVcast:false, className:'fmv--compact', stripOnMount:true });
-            $btn.data('raw',false).text('Режим ручного редактирования');
-          }
-          $btn.on('click', function(){ ($btn.data('raw') ? toUI : toRaw)(); });
+        
+            $btn.data('raw', true).text('Вернуться к удобной форме');
+          };
+        
+          const toUI = () => {
+            // повторно монтируем UI; внутри attach() этот же блок снова
+            // привяжет обработчик к той же кнопке, но уже с новыми замыканиями
+            FMV.UI.attach({
+              form: $form,
+              textarea: $area,
+              prefill: true,
+              showOnlyIfFMVcast: false,
+              className: 'fmv--compact',
+              stripOnMount: true
+            });
+            $btn.data('raw', false).text('Режим ручного редактирования');
+          };
+        
+          // биндим актуальный обработчик для ТЕКУЩЕГО $wrap
+          $btn.on('click.fmv', () => ($btn.data('raw') ? toUI() : toRaw()));
         }
 
         const api={ serialize:()=>[buildFMVcast(selected), buildFMVplace($placeInput.val()), buildFMVord($ordInput.val())].filter(Boolean).join(''),

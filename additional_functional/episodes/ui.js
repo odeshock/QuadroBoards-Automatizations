@@ -199,7 +199,7 @@
         const $ordRow   = $('<div class="order-row"/>');
         const $ordLabel = $('<label for="fmv-ord" style="font-weight:600">Для сортировки эпизодов в один день</label>');
         const $ordInput = $('<input type="number" id="fmv-ord" placeholder="0" value="0" step="1">');
-        const $ordHint  = $('<div class="order-hint">Если вы не знаете, для чего это поле — оставьте 0 :)</div>');
+        const $ordHint  = $('<div class="order-hint">Помогает упорядочить эпизоды, которые стоят в один день. Чем больше значение, тем позже эпизод. Лучше оставлять 0.</div>');
         $ordRow.append($ordLabel, $ordInput, $ordHint);
 
         $area.before($wrap);
@@ -341,7 +341,7 @@
             e.preventDefault();
             if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
             if (typeof e.stopPropagation === 'function') e.stopPropagation();
-            const miss=[]; if(!haveSubject)miss.push('заголовок'); if(!haveMessage)miss.push('сообщение'); if(!haveParticipants)miss.push('участники'); if(!havePlace)miss.push('локация');
+            const miss=[]; if(!haveSubject)miss.push('Заголовок'); if(!haveMessage)miss.push('Основной текст'); if(!haveParticipants)miss.push('Участники'); if(!havePlace)miss.push('Локация');
             alert('Заполните: ' + miss.join(', '));
             return false;
           }

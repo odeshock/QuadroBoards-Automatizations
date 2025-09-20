@@ -31,7 +31,8 @@
       ];
       const allowedForums = [
         ...(PROFILE_CHECK.ForumIDs || []),
-        ...(CHRONO_CHECK.ForumID || [])
+        ...(CHRONO_CHECK.ForumID || []),
+        ...(CHRONO_CHECK.AmsForumID || []),
       ];
 
       const isAllowedGroup = allowedGroups.includes(groupId);

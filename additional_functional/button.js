@@ -26,7 +26,7 @@
     await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
   }
 
-  // проверка форума по crumbs → /viewforum.php?id=...
+  // проверка форума
   function isAllowedForum(forumIds) {
     const crumbs = document.querySelector('.crumbs') ||
                    document.querySelector('#pun-crumbs') ||
@@ -44,15 +44,15 @@
   }
 
   /**
-   * Универсальный конструктор кнопки.
-   * Ничего не объединяет автоматически — все допуски передаёшь параметрами.
+   * Универсальный конструктор кнопки с поддержкой порядка отображения.
    *
    * @param {Object}   opts
-   * @param {string[]} [opts.allowedGroups=[]]   список groupId (числа или строки); сравнение по числу
-   * @param {string[]} [opts.allowedForums=[]]   список forumId (строки)
-   * @param {string}   [opts.label='Действие']   текст на кнопке
-   * @param {Function} opts.onClick              async ({statusEl, detailsEl, setStatus, setDetails}) => void
-   * @param {string}   [opts.containerSelector='.ams_info']  куда вставлять
+   * @param {string[]} [opts.allowedGroups=[]]  допустимые groupId (числа/строки)
+   * @param {string[]} [opts.allowedForums=[]]  допустимые forumId (строки)
+   * @param {string}   [opts.label='Действие']  текст на кнопке
+   * @param {Function} opts.onClick             async ({statusEl, detailsEl, setStatus, setDetails}) => void
+   * @param {string}   [opts.containerSelector='.ams_info']
+   * @param {number}   [opts.order=0]           порядок вывода кнопок (меньше = выше)
    */
   window.createForumButton = async function createForumButton(opts) {
     const {
@@ -61,13 +61,14 @@
       label = 'Действие',
       onClick,
       containerSelector = '.ams_info',
+      order = 0
     } = opts || {};
 
     if (typeof onClick !== 'function') return;
 
     await waitAmsReady();
 
-    // группа — берём готовую функцию из check_group.js (не дублируем!)
+    // используем функцию getCurrentGroupId из check_group.js
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()
       : NaN;
@@ -78,9 +79,10 @@
     const container = await waitFor(containerSelector, 5000).catch(() => null);
     if (!container) return;
 
-    // --- UI ---
+    // --- UI элементов ---
     const br = document.createElement('br');
     const wrap = document.createElement('div');
+    wrap.dataset.order = order;
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -108,7 +110,12 @@
     wrap.appendChild(status);
     wrap.appendChild(details);
     container.appendChild(br);
-    container.appendChild(wrap);
+
+    // === вставка с учётом order ===
+    const siblings = Array.from(container.querySelectorAll('div[data-order]'));
+    const next = siblings.find(el => Number(el.dataset.order) > Number(order));
+    if (next) container.insertBefore(wrap, next);
+    else container.appendChild(wrap);
 
     const setStatus = (text, color = '#555') => {
       status.textContent = text;

@@ -113,6 +113,7 @@
     const seen = new Set();
     const out  = [];
     let n = 0;
+    let lastSig = '';
 
     while (url && !seen.has(url) && n < MAX_PAGES_PER_SECTION) {
       n++; seen.add(url);

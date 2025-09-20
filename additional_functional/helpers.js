@@ -150,7 +150,7 @@ function userLink(id, name = '', asBB = false) {
 
   if (asBB) {
     // BB-код
-    return `[url=/profile.php?id=${uid}]${label}[/url]`;
+    return `[url=${SITE_URL}/profile.php?id=${uid}]${label}[/url]`;
   }
 
   // HTML через штатную profileLink, если она определена

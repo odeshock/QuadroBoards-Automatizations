@@ -58,32 +58,33 @@
         const res = await FMV.replaceComment(GID, PID, html);
 
         // ▸ нормализуем статус в строку (на случай объекта)
-        function normStatus(s) { ... }
-        
-        function toPlainShort(s = '', limit = 200) { ... }
-        
+        function normStatus(s) {
+          if (s == null) return '';
+          if (typeof s === 'string') return s;
+          if (typeof s === 'object') {
+            return String(s.status || s.code || (s.ok ? 'ok' : 'unknown'));
+          }
+          return String(s);
+        }
+
+        // ▸ убираем HTML и укорачиваем
+        function toPlainShort(s = '', limit = 200) {
+          const t = String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          return t.length > limit ? t.slice(0, limit) + '…' : t;
+        }
+
         const st = normStatus(res.status);
         const success = !!res.ok || st === 'ok';
         setStatus(success ? 'Готово' : 'Ошибка');
-        
+
         const lines = [];
         lines.push(`<b>Статус:</b> ${success ? 'ok' : st || 'unknown'}`);
-        
+
         const info  = toPlainShort(res.infoMessage || '');
         const error = toPlainShort(res.errorMessage || '');
         if (info)  lines.push(info);
-        if (error) lines.push(`<span style="color:#b00020">${error}</span>`);
-        
-        setDetails(lines.join('<br>'));
+        if (error) lines.push(`<span style="color:#b00020">${escapeHtml(error)}</span>`);
 
-
-        // 5) статус и компактные детали
-        setStatus(res.ok ? 'Готово' : 'Ошибка');
-
-        const lines = [];
-        lines.push(`<b>Статус:</b> ${String(res.status)}`);
-        if (res.infoMessage)  lines.push(escapeHtmlShort(res.infoMessage));
-        if (res.errorMessage) lines.push(`<span style="color:#b00020">${escapeHtmlShort(res.errorMessage)}</span>`);
         setDetails(lines.join('<br>'));
 
       } catch (e) {
@@ -95,7 +96,7 @@
     }
   });
 
-  /* ===================== СБОРКА и РЕНДЕР ===================== */
+  /* ===================== СБОРКА и РЕНДЕР (HTML) ===================== */
 
   const MAX_PAGES_PER_SECTION = 50;
   const TMAX = [9999, 12, 31];
@@ -189,12 +190,14 @@
     return String(a.episode || '').localeCompare(String(b.episode || ''), 'ru', { sensitivity: 'base' });
   }
 
+  const MISS = 'background:#ffe6e6;color:#b00020;border-radius:6px;padding:0 .35em;font-weight:700';
+
   function renderStatus(type, status) {
     const mapType = { personal:['personal','black'], plot:['plot','black'], au:['au','red'] };
     const mapStat = { on:['active','green'], off:['closed','teal'], archived:['archived','maroon'] };
     const t = mapType[type] || mapType.au;
     const s = mapStat[status] || mapStat.archived;
-    return `[[color=${t[1]}]${t[0]}[/color] / [color=color:${s[1]}]${s[0]}[/color]]`;
+    return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]]`;
   }
 
   function renderChrono(events) {
@@ -225,10 +228,10 @@
 
       const loc = (e.locationsLower && e.locationsLower.length)
         ? escapeHtml(e.locationsLower.join(', '))
-        : `[mark]>локация не указана[/mark]`;
+        : `[mark]локация не указана[/mark]`;
 
       const dash = dateHTML ? ' — ' : ' ';
-      return `${status} ${dateHTML}${dash}[url="${url}"]${ttl}[/url]${plotErr}${ord}\n[i]${names}[/i] / ${loc}\n`;
+      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${plotErr}${ord}\n[i]${names}[/i] / ${loc}\n`;
     });
 
     const body = rows.join('') || ``;
@@ -270,9 +273,9 @@
       single:               /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       dayRangeSameMonth:    /^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
       crossMonthTailYear:   /^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})-(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/,
-      monthYear:            /^(\d{1,2})\.(\d{2}|\d{4})$/,
-      yearOnly:             /^(\d{4})$/
+      crossYearBothYears:   /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\д{4})-(\д{1,2})\.(\д{1,2})\.(\д{2}|\д{4})$/,
+      monthYear:            /^(\д{1,2})\.(\д{2}|\д{4})$/,
+      yearOnly:             /^(\д{4})$/
     };
 
     const toI = x => parseInt(x, 10);
@@ -316,7 +319,7 @@
     }
 
     m = txt.match(P.yearOnly);
-    if (м) {
+    if (m) { // <-- тут была кириллическая "м"
       const y=toI(m[1]);
       return { start:[y,1,1], end:[y,12,31], kind:'year', bad:false };
     }

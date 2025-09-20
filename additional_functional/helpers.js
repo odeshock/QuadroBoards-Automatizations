@@ -237,3 +237,31 @@ function topicTitleFromCrumbs(doc) {
   }
   return '';
 }
+
+/* === helpers: общие утилиты для всех скриптов (НОВОЕ) === */
+(function () {
+  'use strict';
+  window.FMV = window.FMV || {};
+
+  // короткий escaper для сообщений/логов
+  FMV.escapeHtmlShort = FMV.escapeHtmlShort || function (s = '', limit = 500) {
+    const t = String(s);
+    const cut = t.length > limit ? t.slice(0, limit) + '…' : t;
+    return (typeof FMV.escapeHtml === 'function') ? FMV.escapeHtml(cut) : cut;
+  };
+
+  // загрузчик документа через fetchHtml (+ DOMParser fallback)
+  FMV.fetchDoc = FMV.fetchDoc || async function (url) {
+    const html = await fetchHtml(url);
+    if (typeof window.parseHTML === 'function') return window.parseHTML(html);
+    return new DOMParser().parseFromString(html, 'text/html');
+  };
+
+  // cp1251-safe: заменяет все символы вне ASCII/кириллицы на &#NNNN;
+  FMV.toCp1251Entities = FMV.toCp1251Entities || function (s) {
+    const keep = /[\u0000-\u007F\u0400-\u045F\u0401\u0451]/; // ASCII + кириллица + Ё/ё
+    let out = '';
+    for (const ch of String(s)) out += keep.test(ch) ? ch : `&#${ch.codePointAt(0)};`;
+    return out;
+  };
+})();

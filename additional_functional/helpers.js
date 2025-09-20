@@ -173,3 +173,27 @@ function missingUser(token, asBB = false) {
     ? `[i][color=#b00020]${raw}[/color][/i]`
     : `<span class="fmv-missing" data-found="0">${raw}</span>`;
 }
+
+function topicTitleFromCrumbs(doc) {
+  // обычно: <p class="container crumbs"> … <a>FMV</a> <em>»</em> <a>АУ</a> <em>»</em> Тест заголовка</p>
+  const p =
+    doc.querySelector('#pun-crumbs1 .crumbs') ||
+    doc.querySelector('.section .crumbs, .container.crumbs, .crumbs');
+
+  if (!p) return '';
+
+  // берём ПОСЛЕДНИЙ содержательный текстовый фрагмент
+  for (let i = p.childNodes.length - 1; i >= 0; i--) {
+    const n = p.childNodes[i];
+    if (!n) continue;
+
+    if (n.nodeType === 3) { // текстовый узел
+      const t = n.nodeValue.replace(/\s+/g, ' ').trim();
+      if (t) return t;
+    } else if (n.nodeType === 1 && n.tagName !== 'A' && n.tagName !== 'EM') {
+      const t = n.textContent.replace(/\s+/g, ' ').trim();
+      if (t) return t;
+    }
+  }
+  return '';
+}

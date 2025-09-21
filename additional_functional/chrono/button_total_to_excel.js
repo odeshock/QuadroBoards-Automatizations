@@ -20,7 +20,7 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'выгрузить excel',
+    label: 'выгрузить хроно в excel',
     order: 2,
     showStatus: true,
     showDetails: true,

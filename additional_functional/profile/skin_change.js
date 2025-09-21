@@ -1,8 +1,9 @@
+/* ===== константы (общие) ===== */
 const IP_ROWS = 1;         // сколько строк видно без скролла
-const IP_GAP  = 8;         // зазор между элементами, px
+const IP_GAP  = 8;         // зазор между элементами (px)
 const IP_REQUIRED = true;  // выбор обязателен (если есть варианты)
 
-/* ===== служебные ===== */
+/* ===== утилиты ===== */
 function isProfileFieldsPage() {
   try {
     const u = new URL(location.href);
@@ -14,7 +15,7 @@ function isProfileFieldsPage() {
   } catch { return false; }
 }
 
-const STYLE_ID = 'ip-style-sep-wh-col';
+const STYLE_ID = 'ip-style-unified';
 function injectStylesOnce() {
   if (document.getElementById(STYLE_ID)) return;
   const st = document.createElement('style');
@@ -23,15 +24,12 @@ function injectStylesOnce() {
     .ip-hidden{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;}
     .ip-box{position:relative;z-index:1000;display:block;max-width:100%;border:1px solid #ccc;border-radius:10px;background:#fff;padding:6px;}
     .ip-box,.ip-scroll,.ip-grid,.ip-btn,.ip-btn *{pointer-events:auto;}
-    /* rows/gap задаются константами, высота скроллера зависит от ip-h */
-    .ip-scroll{
-      overflow-y:auto; -webkit-overflow-scrolling:touch;
-      height: calc(var(--ip-rows,1) * var(--ip-h,44px) + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));
-    }
-    /* ширина колонки — отдельная переменная (--ip-col); по умолчанию = --ip-w */
-    .ip-grid{display:grid;grid-template-columns:repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));gap:var(--ip-gap,8px);align-content:start;}
-    /* кнопка: независимые ширина и высота */
-    .ip-btn{position:relative;overflow:hidden;width:var(--ip-w,44px);height:var(--ip-h,44px);border:2px solid #d0d0d0;border-radius:10px;background:#fff;padding:0;cursor:pointer;touch-action:manipulation;}
+    .ip-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;
+      height: calc(var(--ip-rows,1) * var(--ip-h,44px) + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));}
+    .ip-grid{display:grid;grid-template-columns:repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
+      gap:var(--ip-gap,8px);align-content:start;}
+    .ip-btn{position:relative;overflow:hidden;width:var(--ip-w,44px);height:var(--ip-h,44px);
+      border:2px solid #d0d0d0;border-radius:10px;background:#fff;padding:0;cursor:pointer;touch-action:manipulation;}
     .ip-btn[selected]{border-color:#0b74ff;box-shadow:0 0 0 3px rgba(11,116,255,.15);}
     .ip-slot{position:relative;width:100%;height:100%;}
     .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
@@ -50,54 +48,92 @@ function resolveFieldBySuffix(suffix) {
   );
 }
 
-// thumb может быть: HTML-строка, URL-строка, DOM-узел
-function createThumbSlot(item) {
+// очищаем у <a.modal-link> все атрибуты кроме class
+function normalizeModalLinkAttrs(html) {
+  const t = document.createElement('template');
+  t.innerHTML = String(html ?? '');
+  t.content.querySelectorAll('a.modal-link').forEach(a => {
+    Array.from(a.attributes).forEach(attr => {
+      if (attr.name !== 'class') a.removeAttribute(attr.name);
+    });
+  });
+  return t.innerHTML.trim();
+}
+
+// перед сабмитом: добавить data-reveal-id всем <a.modal-link>, id="usrN" — первой
+function prepareModalLinkAttrs(html) {
+  const t = document.createElement('template');
+  t.innerHTML = String(html ?? '');
+  const anchors = t.content.querySelectorAll('a.modal-link');
+  if (anchors.length) {
+    anchors.forEach(a => a.setAttribute('data-reveal-id', 'character'));
+    const u = new URL(location.href);
+    const n = u.searchParams.get('id');
+    if (n && /^\d+$/.test(n)) anchors[0].setAttribute('id', `usr${n}`);
+  }
+  return t.innerHTML.trim();
+}
+
+// превью: если строка выглядит как HTML — innerHTML, иначе <img src="...">
+function createThumbSlot(htmlOrUrl) {
   const slot = document.createElement('div');
   slot.className = 'ip-slot';
-  const t = item && item.thumb;
-
-  if (t instanceof Node) { slot.appendChild(t.cloneNode(true)); return slot; }
-  if (typeof t === 'string') {
-    const s = t.trim();
-    if (s.startsWith('<') && s.endsWith('>')) { slot.innerHTML = s; return slot; }
-    const img = document.createElement('img'); img.src = s; img.alt=''; img.loading='lazy'; slot.appendChild(img); return slot;
+  const s = String(htmlOrUrl ?? '').trim();
+  if (s.startsWith('<') && s.endsWith('>')) {
+    slot.innerHTML = s;
+  } else if (s) {
+    const img = document.createElement('img');
+    img.src = s; img.alt = ''; img.loading = 'lazy';
+    slot.appendChild(img);
   }
-  return slot; // пустой
+  return slot;
+}
+
+// ключ по строке (для data-атрибутов/подсветки)
+function keyFor(str) {
+  const s = String(str ?? '');
+  let h = 5381; for (let i=0;i<s.length;i++) h=((h<<5)+h)^s.charCodeAt(i);
+  return 'k' + (h>>>0).toString(36);
 }
 
 /* ===== основная функция =====
-   image_set: [{thumb, value}, ...]  (может быть пустым/отсутствовать)
-   fieldSuffix: '5'  → fld5 / form[fld5]
-   opts: { btnWidth?:number, btnHeight?:number, gridColSize?:number }
+   image_set: массив СТРОК (HTML или URL). Каждая строка = и превью, и значение.
+   fieldSuffix: '5' -> fld5 / form[fld5]
+   opts: { btnWidth?:number, btnHeight?:number, gridColSize?:number, modalLinkMode?:boolean }
 */
 function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (!isProfileFieldsPage()) return;
   injectStylesOnce();
 
-  const IMAGES = Array.isArray(image_set) ? image_set : [];
-  const hasImages = IMAGES.length > 0;
+  const modalLinkMode = !!opts.modalLinkMode;
+
+  const RAW = Array.isArray(image_set) ? image_set : [];
+  const ITEMS = RAW.map(s => String(s ?? ''));
+  const hasItems = ITEMS.length > 0;
 
   const input = resolveFieldBySuffix(fieldSuffix);
   if (!input) { console.warn('[imagePicker] field not found:', fieldSuffix); return; }
   if (input.dataset.ipApplied === '1') return;
   input.dataset.ipApplied = '1';
 
-  // стили инстанса
+  // размеры инстанса
   const w = Number.isFinite(opts.btnWidth)  ? Math.max(1, opts.btnWidth)  : 44;
   const h = Number.isFinite(opts.btnHeight) ? Math.max(1, opts.btnHeight) : 44;
   const col = Number.isFinite(opts.gridColSize) ? Math.max(1, opts.gridColSize) : w;
 
-  // прячем вход
+  // спрятать input
   input.classList.add('ip-hidden');
 
-  const allowed = new Set(IMAGES.map(i => (i && i.value != null ? String(i.value) : '')));
+  // нормализованные строки для хранения/сравнения
+  const NORMS = ITEMS.map(v => modalLinkMode ? normalizeModalLinkAttrs(v) : v);
+  const allowed = new Set(NORMS);
+  const keyByNorm = new Map(NORMS.map(n => [n, keyFor(n)]));
 
-  // UI (если есть элементы)
+  // UI
   let grid = null;
-  if (hasImages) {
+  if (hasItems) {
     const box = document.createElement('div');
     box.className = 'ip-box';
-    // задаём переменные инстанса
     box.style.setProperty('--ip-rows', String(IP_ROWS));
     box.style.setProperty('--ip-gap',  `${IP_GAP}px`);
     box.style.setProperty('--ip-w',    `${w}px`);
@@ -114,14 +150,17 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     scroll.addEventListener('pointerdown', e => e.stopPropagation());
     scroll.addEventListener('click', e => e.stopPropagation());
 
-    IMAGES.forEach(it => {
-      const v = (it && it.value != null) ? String(it.value) : '';
+    NORMS.forEach((norm, idx) => {
       const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'ip-btn'; btn.dataset.v = v;
-      btn.appendChild(createThumbSlot(it));
-      const pick = (e) => { e.preventDefault(); e.stopPropagation(); setValue(v); };
+      btn.type = 'button'; btn.className = 'ip-btn'; btn.dataset.key = keyByNorm.get(norm);
+      // превью: показываем нормализованную (если modalLinkMode) или исходную строку
+      const display = modalLinkMode ? norm : ITEMS[idx];
+      btn.appendChild(createThumbSlot(display));
+
+      const pick = (e) => { e.preventDefault(); e.stopPropagation(); setValue(norm); };
       btn.addEventListener('pointerdown', pick);
       btn.addEventListener('click', pick);
+
       g.appendChild(btn);
     });
 
@@ -131,18 +170,20 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   }
 
   // подсветка
-  function highlight(v) {
+  function highlight(normStr) {
     if (!grid) return;
+    const key = keyByNorm.get(String(normStr)) || '';
     grid.querySelectorAll('.ip-btn').forEach(b => b.removeAttribute('selected'));
-    const esc = (window.CSS && CSS.escape) ? CSS.escape(String(v)) : String(v);
-    const btn = grid.querySelector(`.ip-btn[data-v="${esc}"]`);
-    if (btn) btn.setAttribute('selected', '');
+    if (key) {
+      const btn = grid.querySelector(`.ip-btn[data-key="${key}"]`);
+      if (btn) btn.setAttribute('selected', '');
+    }
   }
 
-  // установка значения без рекурсии
+  // установка значения (norm), без рекурсии
   let internal = false;
-  function setValue(val) {
-    const v = (val == null ? '' : String(val));
+  function setValue(normVal) {
+    const v = String(normVal ?? '');
     if (input.value !== v) {
       internal = true;
       input.value = v;
@@ -154,33 +195,35 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   }
 
   // инициализация
-  const firstVal = hasImages ? (IMAGES[0].value == null ? '' : String(IMAGES[0].value)) : '';
-  const current  = (input.value == null ? '' : String(input.value));
-  let initial    = hasImages
-    ? (allowed.has(current) ? current : (IP_REQUIRED ? firstVal : ''))
+  const currentNorm = modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '');
+  const firstNorm   = hasItems ? NORMS[0] : '';
+  const initialNorm = hasItems
+    ? (allowed.has(currentNorm) ? currentNorm : (IP_REQUIRED ? firstNorm : ''))
     : '';
+  input.dataset.ipInitial = initialNorm;
+  setValue(initialNorm);
 
-  input.dataset.ipInitial = initial;
-  setValue(initial);
-
-  // синхронизация на внешние изменения
+  // синхронизация внешних изменений
   if (!input.dataset.ipSynced) {
-    input.addEventListener('input',  () => { if (!internal) highlight(input.value ?? ''); });
-    input.addEventListener('change', () => { if (!internal) highlight(input.value ?? ''); });
+    input.addEventListener('input',  () => { if (!internal) highlight(modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '')); });
+    input.addEventListener('change', () => { if (!internal) highlight(modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '')); });
     input.dataset.ipSynced = '1';
   }
 
-  // валидация перед submit
+  // перед submit
   const form = input.closest('form');
   if (form && !form.dataset.ipSubmitHooked) {
     form.addEventListener('submit', () => {
-      const cur = (input.value == null ? '' : String(input.value));
-      if (!hasImages) { setValue(''); return; }
-      if (!allowed.has(cur)) {
-        const fallback = input.dataset.ipInitial ?? (IP_REQUIRED ? firstVal : '');
-        setValue(fallback);
+      let curNorm = modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '');
+      if (!hasItems) { setValue(''); return; }
+      if (!allowed.has(curNorm)) {
+        const fallback = input.dataset.ipInitial ?? (IP_REQUIRED ? firstNorm : '');
+        curNorm = String(fallback);
+        setValue(curNorm);
       }
-      if (IP_REQUIRED && hasImages && input.value === '') setValue(firstVal);
+      if (modalLinkMode) {
+        input.value = prepareModalLinkAttrs(curNorm);
+      }
     }, true);
     form.dataset.ipSubmitHooked = '1';
   }

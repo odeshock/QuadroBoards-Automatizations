@@ -9,9 +9,23 @@
   const SITE_URL   = (window.SITE_URL || location.origin).replace(/\/+$/, '');
 
   if (!GID.length || !FID.length || !TID || !TARGET_PID) return;
-  if (typeof window.createForumButton !== 'function')  return;
-  if (typeof window.collectChronoByUser !== 'function') return;
-  if (!window.FMV?.replaceComment || !window.FMV?.toCp1251Entities) return;
+
+  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
+    ? window.CHRONO_CHECK.ForumInfo
+    : [];
+
+  // === новые константы карт типов и статусов ===
+  const MAP_TYPE = window.CHRONO_CHECK?.EpisodeMapType || {
+    personal: ['personal', 'black'],
+    plot:     ['plot',     'black'],
+    au:       ['au',       'black']
+  };
+
+  const MAP_STAT = window.CHRONO_CHECK?.EpisodeMapStat || {
+    on:       ['active',   'green'],
+    off:      ['closed',   'teal'],
+    archived: ['archived', 'maroon']
+  };
 
   const lc = s => String(s || '').trim();
 
@@ -38,7 +52,9 @@
     const ownerMasks = (ep.masks && ep.masks.length) ? ` [as ${ep.masks.join(', ')}]` : '';
     const head = headDate ? `${headDate} — ${linkTitle}${ownerMasks}` : `${linkTitle}${ownerMasks}`;
 
-    const meta = `[${lc(ep.type)} / ${lc(ep.status)} / ${Number(ep.order) || 0}]`;
+    const status = renderStatus(e.type, e.status);
+    const ord = `${FMV.escapeHtml(String(e.order ?? 0))}]`;
+    const meta = `[${status} / ${ord}]`;
     const ppl  = fmtParticipants(ep.participants || []);
     const out = [head, meta];
     if (ppl) out.push(ppl);

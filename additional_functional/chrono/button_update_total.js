@@ -24,20 +24,26 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'обновить итог',
-    order: 50,
-
+    label: 'обновить общее хроно',
+    order: 1,
+  
     showStatus: true,
     showDetails: true,
-    showLink: false,
-
+  
+    showLink: true,
+    linkText: 'Открыть ссылку',
+    linkHref: OPEN_URL,
+    // (если твоя версия createForumButton не знает linkText/linkHref —
+    // ниже есть runtime-обновление через api.setLink)
+  
     async onClick(api) {
       if (busy) return;
       busy = true;
-
-      const setStatus  = (api && typeof api.setStatus  === 'function') ? api.setStatus  : (()=>{});
-      const setDetails = (api && typeof api.setDetails === 'function') ? api.setDetails : (()=>{});
-
+  
+      const setStatus  = api?.setStatus  || (()=>{});
+      const setDetails = api?.setDetails || (()=>{});
+      if (api?.setLink) api.setLink(OPEN_URL, 'Открыть ссылку'); // ✅
+  
       try {
         setStatus('Выполняю…');
         setDetails('');

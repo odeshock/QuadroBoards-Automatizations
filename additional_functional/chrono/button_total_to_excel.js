@@ -86,7 +86,7 @@
           };
         });
 
-        setStatus('Формирую .xlsx…');
+        setStatus('Формирую файл…');
         const { blob, filename } = buildXLSX(rows);
 
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }

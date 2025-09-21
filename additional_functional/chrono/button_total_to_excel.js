@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  // === входные ===
+  /* ===== входные ===== */
   const GID = (window.CHRONO_CHECK?.GroupID || []).map(Number);
   const FID = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
   const TID = String(window.CHRONO_CHECK?.ChronoTopicID || '').trim();
@@ -14,12 +14,6 @@
     return;
   }
 
-  // разделы (можно переопределить через CHRONO_CHECK.ForumInfo)
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-    ? window.CHRONO_CHECK.ForumInfo
-    : []; // по умолчанию пусто — пользователь сам задаёт
-
-  // blob-url результата (чтобы ревокать при повторном клике)
   let lastBlobUrl = '';
 
   createForumButton({
@@ -27,209 +21,314 @@
     allowedForums: FID,
     topicId: TID,
     label: 'выгрузить Excel',
-    order: 2,
-  
+    order: 56,
+
     showStatus: true,
     showDetails: true,
-  
-    // ⬅️ было: showLink: false
-    showLink: true,
-  
+    showLink: true,          // <a> создаётся; видимость контролируем setLink('', '')
+    linkText: 'скачать',
+    linkHref: '',
+
     async onClick(api) {
       const setStatus  = api?.setStatus  || (()=>{});
       const setDetails = api?.setDetails || (()=>{});
-  
-      // ✦ прячем ссылку в начале
-      if (api?.setLink) api.setLink('', '');
-  
+      const setLink    = api?.setLink    || (()=>{});
+
+      // скрыть линк на время работы
+      setLink('', '');
+
       try {
-        setStatus('Собираю…');
+        setStatus('Загружаю комментарий…');
         setDetails('');
-  
-        const events = await collectEvents();
-  
+
+        /* 1) тянем страницу с постом и находим сам пост */
+        const doc = await FMV.fetchDoc(OPEN_URL);
+        const post = findPostNode(doc, PID);
+        if (!post) throw new Error(`Не нашёл пост #${PID}`);
+
+        /* 2) выдёргиваем «медиаблок» с хронологией (или берём весь контент поста) */
+        const content = post.querySelector('.post-content, .postmsg, .entry-content, .content, .post-body, .post') || post;
+        const media = findChronoBlock(content) || content;
+
+        /* 3) размечаем строки (header / participants / location) и разбираем по шаблону */
+        setStatus('Парсю…');
+        const events = parseChronoFromRendered(media);
+
+        /* 4) готовим Excel (HTML-XLS) */
         setStatus('Формирую файл…');
         const { blob, filename } = buildXls(events);
-  
+
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }
         lastBlobUrl = URL.createObjectURL(blob);
-  
-        // ✦ показываем ссылку ТОЛЬКО при успехе
+
+        /* 5) успех — показываем ссылку */
         setStatus('Готово');
-        api?.setLink?.(lastBlobUrl, 'скачать');
-  
-        // добавить атрибут download
+        setLink(lastBlobUrl, 'скачать');
+
+        // дать имя через download=
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
-  
-        const secList = SECTIONS.map(s => s.id + (s.type ? `/${s.type}` : '')).join(', ');
-        setDetails(`<b>Эпизодов:</b> ${events.length}<br><b>Разделы:</b> ${FMV.escapeHtml(secList)}<br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
-  
-      } catch (e) {
+
+        setDetails(`<b>Строк:</b> ${events.length}<br><b>Источник:</b> <a href="${FMV.escapeHtml(OPEN_URL)}" target="_blank">комментарий</a><br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
+
+      } catch (err) {
         setStatus('Ошибка');
-        setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
-        // ✦ на ошибке — скрыть ссылку
-        api?.setLink?.('', '');
+        setDetails(FMV.escapeHtmlShort(err?.message || String(err)));
+        setLink('', '');
       }
     }
   });
 
-  /* ===================== СБОРКА (как в «итоге») ===================== */
+  /* ===================== ПОИСК ПОСТА / БЛОКА ===================== */
 
-  const MAX_PAGES_PER_SECTION = 50;
-
-  async function collectEvents() {
-    const seenTopics = new Set();
-    let all = [];
-    for (const sec of SECTIONS) {
-      const part = await scrapeSection(sec, seenTopics);
-      all = all.concat(part);
-    }
-    return all.filter(Boolean).sort(compareEvents);
+  function findPostNode(doc, pid) {
+    const id = `p${pid}`;
+    let node = doc.getElementById(id);
+    if (node) return node;
+    // иногда якорь <a name="p123">
+    const a = doc.querySelector(`a[name="${id}"]`);
+    if (a) return a.closest('.post') || a.closest('.blockpost') || a.parentElement;
+    // fallback: любой узел, чей id начинается с p{pid}
+    node = doc.querySelector(`[id^="p${pid}"]`);
+    return node;
   }
 
-  async function scrapeSection(section, seenTopics) {
-    let url = abs(location.href, `/viewforum.php?id=${section.id}`);
-    const seenPages = new Set();
-    const out  = [];
-    let n = 0;
-    let lastSig = '';
+  function findChronoBlock(root) {
+    // блок с заголовком «Собранная хронология»
+    const candidates = Array.from(root.querySelectorAll('*'))
+      .filter(n => /Собранная\s+хронология/i.test(n.textContent || ''));
+    // выбираем ближайший «контейнер» с множеством <br> и ссылок
+    for (const n of candidates) {
+      const box = n.closest('.quotebox, .media, .codebox, .content, .post, div, section') || n;
+      const brs = box.querySelectorAll('br').length;
+      const links = box.querySelectorAll('a[href]').length;
+      if (brs >= 3 && links >= 1) return box;
+    }
+    return null;
+  }
 
-    while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
-      n++; seenPages.add(url);
-      const doc = await FMV.fetchDoc(url);
+  /* ===================== РАЗБОР С РЕНДЕРЕННОГО HTML ===================== */
 
-      const topics = new Map();
-      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
-        const href = abs(url, a.getAttribute('href'));
-        const m = href.match(/viewtopic\.php\?id=(\d+)/i);
-        const title = txt(a);
-        if (!m) return;
-        if (/^\s*(RSS|Atom)\s*$/i.test(title)) return;
-        if (/#p\d+$/i.test(href)) return;
-        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(title)) return;
-        topics.set(m[1], { url: href, title });
+  function parseChronoFromRendered(container) {
+    // плоская раскладка: узлы и маркеры BR
+    const flat = [];
+    (function walk(node){
+      for (const ch of node.childNodes) {
+        if (ch.nodeType === 1) { // element
+          const tag = ch.tagName;
+          if (tag === 'BR') { flat.push({t:'br'}); continue; }
+          if (/^(P|DIV|SECTION|UL|OL|LI|H\d)$/i.test(tag)) { flat.push({t:'br'}); walk(ch); flat.push({t:'br'}); continue; }
+          flat.push({t:'el', el: ch});
+          if (ch.firstChild) walk(ch);
+        } else if (ch.nodeType === 3) { // text
+          const txt = ch.nodeValue;
+          if (txt) flat.push({t:'text', node: ch});
+        }
+      }
+    })(container);
+
+    // все ссылки на viewtopic — это заголовки эпизодов
+    const headLinks = Array.from(container.querySelectorAll('a[href*="viewtopic.php?id="]'));
+
+    const events = [];
+    for (const a of headLinks) {
+      // найдём «линию» вокруг ссылки: от предыдущего BR до следующего BR
+      const idx = flat.findIndex(x => x.t === 'el' && x.el === a);
+      if (idx < 0) continue;
+
+      const headStart = findBoundary(flat, idx, -1);
+      const headEnd   = findBoundary(flat, idx, +1);
+
+      const headNodes = flat.slice(headStart+1, headEnd)  // узлы первой строки
+                            .filter(x => x.t !== 'br');
+
+      // вторая строка (участники): от headEnd до следующего BR
+      const pStart = headEnd;
+      const pEnd   = findBoundary(flat, pStart, +1);
+      const partNodes = flat.slice(pStart+1, pEnd).filter(x => x.t !== 'br');
+
+      // третья строка (локация): от pEnd до следующего BR
+      const lStart = pEnd;
+      const lEnd   = findBoundary(flat, lStart, +1);
+      const locNodes = flat.slice(lStart+1, lEnd).filter(x => x.t !== 'br');
+
+      const header = parseHeaderLine(headNodes, a);
+      const { participantsHtml, masksHtml } = parseParticipants(partNodes);
+      const location = cleanLocation(textFromNodes(locNodes));
+
+      events.push({
+        type: header.type,
+        status: header.status,
+        title: header.title,
+        href: header.href,
+        dateStart: header.dateStart,
+        dateEnd: header.dateEnd,
+        order: header.order,
+        participantsHtml,
+        masksHtml,
+        location
       });
+    }
+    return events;
+  }
 
-      const sig = Array.from(topics.keys()).sort().join(',');
-      if (sig && sig === lastSig) break;
-      lastSig = sig;
+  function findBoundary(flat, i, dir) {
+    for (let k = i; k >= 0 && k < flat.length; k += dir) {
+      if (k !== i && flat[k].t === 'br') return k;
+    }
+    // если не нашли — край
+    return dir < 0 ? -1 : flat.length;
+  }
 
-      for (const [tid, { url: turl, title }] of topics) {
-        const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
-        if (seenTopics.has(key)) continue;
+  function textFromNodes(nodes) {
+    return nodes.map(x => {
+      if (x.t === 'text') return x.node.nodeValue;
+      if (x.t === 'el') return x.el.tagName === 'A' ? x.el.textContent : x.el.textContent;
+      return '';
+    }).join('').replace(/\s+/g,' ').trim();
+  }
 
-        const row = await scrapeTopic(turl, title, section.type || 'au', section.status || 'on');
-        if (row) { seenTopics.add(key); out.push(row); }
+  function parseHeaderLine(nodes, a) {
+    // общий текст первой строки (без ссылок тоже берём — они в nodes)
+    const fullText = nodes.map(x => x.t==='text' ? x.node.nodeValue : (x.t==='el' ? x.el.textContent : ''))
+                          .join('').replace(/\s+/g,' ').trim();
+
+    // [Тип / Статус]
+    let type = '', status = '';
+    const mTS = fullText.match(/^\s*\[([^\]]+)\]/);
+    if (mTS) {
+      const pair = mTS[1].split('/').map(s => s.trim().toLowerCase());
+      type   = pair[0] || '';
+      status = pair[1] || '';
+    }
+
+    // дата: между ] и длинным тире (если оно есть)
+    let afterTS = fullText.replace(/^\s*\[[^\]]+\]\s*/,'');   // после [type/status]
+    let datePart = '';
+    const mdash = afterTS.match(/\s[—-]\s/); // ' — ' или ' - '
+    if (mdash) {
+      datePart = afterTS.slice(0, mdash.index).trim();
+    } else {
+      // для au даты нет — пусто
+      datePart = '';
+    }
+
+    // порядок
+    const mOrd = fullText.match(/\[\s*порядок:\s*(\d+)\s*\]/i);
+    const order = mOrd ? parseInt(mOrd[1], 10) : 0;
+
+    // название — текст линка; ссылка — href
+    const title = (a.textContent || '').trim();
+    const href  = a.href;
+
+    // разбивка даты на начало/конец
+    let dateStart = '', dateEnd = '';
+    if (datePart) {
+      const norm = datePart.replace(/[\u2012-\u2015\u2212—–−]/g, '-').replace(/\s*-\s*/g, '-');
+      const duo  = norm.split('-').slice(0,2);
+      if (duo.length === 1) {
+        dateStart = duo[0];
+        dateEnd   = ''; // по правилу ниже при выгрузке продублируем
+      } else {
+        dateStart = duo[0];
+        dateEnd   = duo[1];
+      }
+    }
+    // если дата конца не указана — дублируем начало
+    if (dateStart && !dateEnd) dateEnd = dateStart;
+
+    // убрать «подсказки» типа [mark]…[/mark] из заголовка мы и так не тащим — берём чистый текст ссылки
+
+    return { type, status, title, href, dateStart, dateEnd, order };
+  }
+
+  function parseParticipants(nodes) {
+    // перебираем узлы до <br>, выделяем «записи», разделённые запятыми верхнего уровня
+    const parts = [];
+    let cur = null;
+
+    function pushCur() { if (cur) { parts.push(cur); cur = null; } }
+
+    for (const x of nodes) {
+      if (x.t === 'text') {
+        const t = x.node.nodeValue;
+        if (!t) continue;
+        // запятая — разделитель
+        if (/^\s*,\s*$/.test(t)) { pushCur(); continue; }
+        // маски вида ' [as ...]'
+        const m = t.match(/\[\s*as\s+([^\]]+)\]/i);
+        if (m && cur) {
+          const masks = m[1].split(/\s*,\s*/).filter(Boolean);
+          cur.masks.push(...masks);
+        }
+        // голый текст имени (редкий случай) — заведём участника
+        if (!m && /\S/.test(t) && !cur) {
+          cur = { name: t.trim(), href: '', masks: [] };
+        }
+        continue;
       }
 
-      const next = findNextPage(doc);
-      const nextUrl = next ? abs(url, next) : null;
-      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
-      url = nextUrl;
+      if (x.t === 'el') {
+        const el = x.el;
+        if (el.tagName === 'A') {
+          // новый участник с ссылкой
+          pushCur();
+          cur = { name: (el.textContent||'').trim(), href: el.href || '', masks: [] };
+          continue;
+        }
+        // «пропавший» участник (span/mark)
+        if (/^(SPAN|MARK)$/i.test(el.tagName)) {
+          const name = (el.textContent||'').trim();
+          if (name) { pushCur(); cur = { name, href:'', masks: [] }; }
+          continue;
+        }
+        // прочие узлы игнорим (em/strong и т.п.)
+      }
     }
-    return out;
+    pushCur();
+
+    // преобразуем в HTML для ячеек (с переносами строк)
+    const participantsHtml = parts
+      .map(p => p.href ? `<a href="${FMV.escapeHtml(p.href)}">${FMV.escapeHtml(p.name)}</a>` : FMV.escapeHtml(p.name))
+      .join('<br>');
+
+    const masksHtml = parts
+      .filter(p => p.masks.length)
+      .map(p => `${FMV.escapeHtml(p.name)} — ${FMV.escapeHtml(p.masks.join(', '))}`)
+      .join('<br>');
+
+    return { participantsHtml, masksHtml };
   }
 
-  async function scrapeTopic(topicUrl, rawTitle, type, status) {
-    try {
-      const doc   = await FMV.fetchDoc(topicUrl);
-      const first = firstPostNode(doc);
-
-      const rawChars = FMV.readTagText(first, 'characters');
-      const rawLoc   = FMV.readTagText(first, 'location');
-      const rawOrder = FMV.readTagText(first, 'order');
-
-      const idToNameMap = await FMV.buildIdToNameMapFromTags(rawChars);
-
-      const uni = FMV.parseCharactersUnified(rawChars, idToNameMap, window.profileLink);
-      const participantsLower = uni.ok ? uni.participantsLower : [];
-      const masksByCharLower  = uni.ok ? uni.masksByCharLower  : new Map();
-
-      const ordParsed = FMV.parseOrderStrict(rawOrder);
-      const order     = ordParsed.ok ? ordParsed.value : 0;
-
-      const titleFromCrumbs = topicTitleFromCrumbs(doc);
-      const safeTitle = rawTitle || titleFromCrumbs || '';
-      const { dateRaw, episode } = parseTitle(safeTitle);
-      const parsed = parseDateFlexible(dateRaw);
-
-      const locationsLower = rawLoc ? rawLoc.split(/\s*[,;]\s*/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
-
-      return {
-        type, status, url: topicUrl,
-        episode, dateRaw,
-        hasDate: parsed.hasDate,
-        dateDisplay: parsed.display,
-        startSort: parsed.startSort,   // [y, m||0, d||0]
-        endSort:   parsed.endSort,     // [y, m||0, d||0]
-        locationsLower, participantsLower, masksByCharLower, order,
-        idToNameMap
-      };
-    } catch { return null; }
+  function cleanLocation(s) {
+    const t = String(s || '').trim();
+    if (!t) return '';
+    if (/^локац/i.test(t) && /не\s+указан/i.test(t)) return '';
+    if (/^не\s+указан/i.test(t)) return '';
+    return t;
   }
 
-  /* ===================== СОРТИРОВКА (те же правила) ===================== */
-
-  const cmp3 = (a,b)=> (a[0]-b[0]) || (a[1]-b[1]) || (a[2]-b[2]);
-
-  function compareEvents(a, b) {
-    const aHas = !!a.hasDate, bHas = !!b.hasDate;
-    if (aHas !== bHas) return aHas ? -1 : 1;
-
-    if (aHas && bHas) {
-      const s = cmp3(a.startSort, b.startSort);
-      if (s) return s;
-      const e = cmp3(a.endSort, b.endSort);
-      if (e) return e;
-    }
-
-    const ao = a.order ?? 0, bo = b.order ?? 0;
-    if (ao !== bo) return ao - bo;
-
-    const at = String(a.episode || '').toLowerCase();
-    const bt = String(b.episode || '').toLowerCase();
-    return at.localeCompare(bt, 'ru', { sensitivity: 'base' });
-  }
-
-  /* ===================== XLS (Excel-совместимый) ===================== */
+  /* ===================== EXCEL (HTML-XLS) ===================== */
 
   function buildXls(events) {
+    // колонки: Тип, Статус, Тема, Дата начала, Дата конца, Порядок, Участники, Маски, Локация
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-    const rowsHtml = events.map(e => {
-      const [sy, sm, sd] = e.startSort || [0,0,0];
-      const [ey, em, ed] = e.endSort   || [0,0,0];
-      const participants = (e.participantsLower && e.participantsLower.length)
-        ? e.participantsLower.map(low => {
-            const idNum  = parseInt(String(low).replace(/^user/i, ''), 10);
-            const hasId  = Number.isFinite(idNum) && idNum > 0;
-            const idKey  = hasId ? String(idNum) : null;
-            const known  = !!(idKey && e.idToNameMap?.has(idKey));
-            const name   = known ? (e.idToNameMap.get(idKey) || `user${idKey}`) : String(low);
-            const roles  = Array.from(e.masksByCharLower.get(low) || []);
-            const tail   = roles.length ? ` [as ${roles.join(', ')}]` : '';
-            return `${name}${tail}`;
-          }).join(', ')
-        : '';
-
-      const locs = (e.locationsLower && e.locationsLower.length) ? e.locationsLower.join(', ') : '';
+    const rows = events.map(e => {
+      const topicLink = e.href
+        ? `<a href="${esc(e.href)}">${esc(e.title)}</a>`
+        : esc(e.title);
 
       return `<tr>
         <td>${esc(e.type)}</td>
         <td>${esc(e.status)}</td>
-        <td>${esc(e.episode || '')}</td>
-        <td>${esc(e.hasDate ? e.dateDisplay : '')}</td>
-        <td>${esc(sy||'')}</td>
-        <td>${esc(sm||'')}</td>
-        <td>${esc(sd||'')}</td>
-        <td>${esc(ey||'')}</td>
-        <td>${esc(em||'')}</td>
-        <td>${esc(ed||'')}</td>
+        <td>${topicLink}</td>
+        <td>${esc(e.dateStart || '')}</td>
+        <td>${esc(e.dateEnd || (e.dateStart || ''))}</td>
         <td>${esc(e.order ?? 0)}</td>
-        <td>${esc(participants)}</td>
-        <td>${esc(locs)}</td>
-        <td>${esc(e.url)}</td>
+        <td>${e.participantsHtml || ''}</td>
+        <td>${e.masksHtml || ''}</td>
+        <td>${esc(e.location || '')}</td>
       </tr>`;
     }).join('');
 
@@ -238,25 +337,25 @@
 <html lang="ru"><head><meta charset="utf-8">
 <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
 <style>
-  table{border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:12px}
+  table{border-collapse:collapse;font-size:12px;font-family:Inter,Arial,sans-serif}
   th,td{border:1px solid #ccc;padding:4px 6px;vertical-align:top}
-  th{background:#f2f2f2}
+  th{background:#f5f5f5}
+  a{color:#1155cc;text-decoration:underline}
 </style>
 </head><body>
 <table>
   <thead><tr>
     <th>Тип</th>
     <th>Статус</th>
-    <th>Название</th>
-    <th>Дата (текст)</th>
-    <th>Год начала</th><th>Месяц начала</th><th>День начала</th>
-    <th>Год конца</th><th>Месяц конца</th><th>День конца</th>
+    <th>Тема</th>
+    <th>Дата начала</th>
+    <th>Дата конца</th>
     <th>Порядок</th>
     <th>Участники</th>
-    <th>Локации</th>
-    <th>Ссылка</th>
+    <th>Маски</th>
+    <th>Локация</th>
   </tr></thead>
-  <tbody>${rowsHtml}</tbody>
+  <tbody>${rows}</tbody>
 </table>
 </body></html>`;
 
@@ -265,116 +364,4 @@
     return { blob, filename };
   }
 
-  /* ===================== ДАТЫ: парсер (как в «итоге») ===================== */
-
-  const DOTS_RX  = /[.\u2024\u2219\u00B7\u2027\u22C5·∙•]/g;
-  const DASH_RX  = /[\u2012-\u2015\u2212—–−]/g;
-
-  function normalizeDateStr(s){
-    return String(s||'')
-      .replace(DASH_RX, '-')
-      .replace(DOTS_RX, '.')
-      .replace(/\s*-\s*/g, '-')
-      .trim();
-  }
-
-  function parseDateFlexible(raw) {
-    let s = normalizeDateStr(raw);
-    if (!s) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-
-    const parts = s.split('-').slice(0,2);
-
-    // одиночная
-    if (parts.length === 1) {
-      const one = parseToken(parts[0]);
-      if (!one || !one.y) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-      const key = [one.y, one.m ?? 0, one.d ?? 0];
-      return { hasDate:true, display:FMV.displaySingle(one), startSort:key, endSort:key };
-    }
-
-    // диапазон
-    const leftRaw  = parts[0].trim();
-    const rightRaw = parts[1].trim();
-
-    const R0 = parseToken(rightRaw);
-    if (!R0 || !R0.y) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-
-    let L0 = parseToken(leftRaw);
-
-    // одиночное число слева → день/месяц/год по контексту
-    const solo = leftRaw.match(/^\d{1,2}$/);
-    if (solo) {
-      const v = +solo[0];
-      if (R0.d != null && R0.m != null)      L0 = { y:R0.y, m:R0.m, d:v };
-      else if (R0.m != null)                 L0 = { y:R0.y, m:v };
-      else                                   L0 = { y: FMV.toYYYY(v) };
-    }
-
-    // dd.mm слева без года → год как справа
-    if (L0 && L0.y == null && L0.d != null && L0.m != null && R0.y) L0.y = R0.y;
-
-    const okDay = o => (o.d==null) || (o.y && o.m && o.d>=1 && o.d<=FMV.daysInMonth(o.y,o.m));
-    if (!okDay(L0) || !okDay(R0)) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-
-    const startKey = [L0.y, L0.m ?? 0, L0.d ?? 0];
-    const endKey   = [R0.y ?? L0.y, R0.m ?? 0, R0.d ?? 0];
-    return { hasDate:true, display:FMV.displayRange(L0,R0), startSort:startKey, endSort:endKey };
-  }
-
-  // порядок: full date → month+year → dd.mm → year
-  function parseToken(t) {
-    const s = normalizeDateStr(t);
-
-    // dd.mm.yyyy / dd.mm.yy
-    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) {
-      const d  = +m[1], mo = +m[2], y = FMV.toYYYY(m[3]);
-      if (mo<1 || mo>12) return null;
-      if (d<1 || d>FMV.daysInMonth(y,mo)) return null;
-      return { y, m: mo, d };
-    }
-
-    // mm.yyyy / mm.yy (приоритетно над dd.mm)
-    m = s.match(/^(\d{1,2})\.(\d{2}|\d{4})$/);
-    if (m) {
-      const mo = +m[1], y = FMV.toYYYY(m[2]);
-      if (mo>=1 && mo<=12) return { y, m: mo };
-    }
-
-    // dd.mm (без года)
-    m = s.match(/^(\d{1,2})\.(\d{1,2})$/);
-    if (m) {
-      const d = +m[1], mo = +m[2];
-      if (mo>=1 && mo<=12 && d>=1 && d<=31) return { m: mo, d };
-      return null;
-    }
-
-    // yyyy / yy
-    m = s.match(/^(\d{2}|\d{4})$/);
-    if (m) return { y: FMV.toYYYY(m[1]) };
-
-    return null;
-  }
-
-  /* ===================== МЕЛОЧИ ===================== */
-
-  function parseTitle(text) {
-    const m = String(text || '').match(/^\s*\[(.+?)\]\s*(.+)$/s);
-    return m
-      ? { dateRaw: m[1].trim(), episode: String(m[2]).replace(/\s+/g,' ').trim() }
-      : { dateRaw: '',          episode: String(text).replace(/\s+/g,' ').trim() };
-  }
-
-  function firstPostNode(doc) {
-    return doc.querySelector('.post.topicpost .post-content') ||
-           doc.querySelector('.post.topicpost') || doc;
-  }
-
-  function findNextPage(doc) {
-    const a = doc.querySelector('a[rel="next"], a[href*="&p="]:not([rel="prev"])');
-    return a ? a.getAttribute('href') : null;
-  }
-
-  const abs = (base, href)=>{ try { return new URL(href, base).href; } catch { return href; } };
-  const txt = node => (node && (node.innerText ?? node.textContent) || '').trim();
 })();

@@ -56,7 +56,7 @@
         setStatus('Выполняю…');
         setDetails('');
 
-        const episodes = await collectEpisodesFromForums({ sections: SECTIONS });
+        const episodes = await collectEpisodesFromForums();
 
         const html = FMV.toCp1251Entities(renderChronoFromEpisodes(episodes));
         const res  = await FMV.replaceComment(GID, PID, html);

@@ -6,6 +6,18 @@ function findChronoRendered(root) {
 }
 
 function renderStatus(type, status) {
+  const MAP_TYPE = window.CHRONO_CHECK?.EpisodeMapType || {
+    personal: ['personal', 'black'],
+    plot:     ['plot',     'black'],
+    au:       ['au',       'black']
+  };
+
+  const MAP_STAT = window.CHRONO_CHECK?.EpisodeMapStat || {
+    on:       ['active',   'green'],
+    off:      ['closed',   'teal'],
+    archived: ['archived', 'maroon']
+  };
+  
   const t = MAP_TYPE[type] || MAP_TYPE.au;
   const s = MAP_STAT[status] || MAP_STAT.archived;
   return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]`;

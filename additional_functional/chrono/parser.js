@@ -194,8 +194,7 @@ function cleanLocation(s) {
 async function collectEpisodesFromForums(opts = {}) {
   // разделы: либо из opts.sections, либо автообнаружение по текущему документу
   let SECTIONS = Array.isArray(opts.sections) && opts.sections.length ? opts.sections.slice() : [];
-
-  if (!SECTIONS) {
+  if (!SECTIONS.length) {
     // авто: собрать все уникальные forum-id из текущей страницы
     const ids = new Set();
     document.querySelectorAll('a[href*="viewforum.php?id="]').forEach(a => {
@@ -547,8 +546,8 @@ async function collectChronoByUser(opts = {}) {
 
   // получаем эпизоды с учётом sections
   const episodes = await collectEpisodesFromForums({
-    sections: sections,
-    maxPagesPerSection: maxPagesPerSection
+    sections: SECTIONS,
+    maxPagesPerSection
   });
 
   const byUser = Object.create(null);

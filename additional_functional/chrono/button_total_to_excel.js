@@ -27,56 +27,49 @@
     allowedForums: FID,
     topicId: TID,
     label: 'выгрузить Excel',
-    order: 55,
-
+    order: 2,
+  
     showStatus: true,
     showDetails: true,
-    showLink: false,            // ссылку покажем только при успехе
-
+  
+    // ⬅️ было: showLink: false
+    showLink: true,
+  
     async onClick(api) {
-      if (!SECTIONS.length) {
-        api?.setStatus?.('Ошибка');
-        api?.setDetails?.('Нет разделов для обхода (CHRONO_CHECK.ForumInfo пуст).');
-        return;
-      }
-
       const setStatus  = api?.setStatus  || (()=>{});
       const setDetails = api?.setDetails || (()=>{});
-
-      // спрячем/очистим линк в начале
-      if (api?.setLinkVisible) api.setLinkVisible(false);
-      if (api?.setLink)        api.setLink('', '');
-
+  
+      // ✦ прячем ссылку в начале
+      if (api?.setLink) api.setLink('', '');
+  
       try {
         setStatus('Собираю…');
         setDetails('');
-
-        // 1) сбор и сортировка по тем же правилам
+  
         const events = await collectEvents();
-        const total  = events.length;
-
-        // 2) конвертация в таблицу
+  
         setStatus('Формирую файл…');
         const { blob, filename } = buildXls(events);
-
-        // 3) подготовить blob-url
+  
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }
         lastBlobUrl = URL.createObjectURL(blob);
-
-        // 4) показать ссылку «скачать» только при успехе
+  
+        // ✦ показываем ссылку ТОЛЬКО при успехе
         setStatus('Готово');
-        if (api?.setLink)        api.setLink(lastBlobUrl, 'скачать');
-        if (api?.setLinkVisible) api.setLinkVisible(true);
-
-        // детали
+        api?.setLink?.(lastBlobUrl, 'скачать');
+  
+        // добавить атрибут download
+        const a = api?.wrap?.querySelector('a.fmv-action-link');
+        if (a) a.setAttribute('download', filename);
+  
         const secList = SECTIONS.map(s => s.id + (s.type ? `/${s.type}` : '')).join(', ');
-        setDetails(`<b>Эпизодов:</b> ${total}<br><b>Разделы:</b> ${FMV.escapeHtml(secList)}<br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
-
+        setDetails(`<b>Эпизодов:</b> ${events.length}<br><b>Разделы:</b> ${FMV.escapeHtml(secList)}<br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
+  
       } catch (e) {
         setStatus('Ошибка');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
-        if (api?.setLinkVisible) api.setLinkVisible(false);
-        if (api?.setLink)        api.setLink('', '');
+        // ✦ на ошибке — скрыть ссылку
+        api?.setLink?.('', '');
       }
     }
   });

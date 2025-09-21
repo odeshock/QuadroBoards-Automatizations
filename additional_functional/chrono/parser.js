@@ -20,7 +20,7 @@ function renderStatus(type, status) {
   
   const t = MAP_TYPE[type] || MAP_TYPE.au;
   const s = MAP_STAT[status] || MAP_STAT.archived;
-  return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]`;
+  return `[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]`;
 }
 
 // --- parseParagraph: делим <p> на 4 логические строки по <br> ---

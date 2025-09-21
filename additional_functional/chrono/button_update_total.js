@@ -249,13 +249,14 @@
 
   const DASH_RX = /[\u2012-\u2015\u2212—–−]/g;
 
-  function toYYYY(n) {
+  function toYYYY(n){
     const num = Number(n);
     if (!Number.isFinite(num)) return null;
     return String(n).length === 2 ? (num > 30 ? 1900 + num : 2000 + num) : num;
   }
   const pad2 = x => String(x).padStart(2,'0');
-  const daysInMonth = (y,m)=> new Date(y, m, 0).getDate();
+  function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+  
 
   function parseDateFlexible(raw) {
     let s = String(raw || '').trim();
@@ -340,18 +341,15 @@
     return null;
   }
 
-  function displaySingle(a) {
-    if (a.d != null) return `${pad2(a.d)}.${pad2(a.m)}.${a.y}`;
-    if (a.m != null) return `${pad2(a.m)}.${a.y}`;
-    return String(a.y);
-  }
-  function displayRange(a, b) {
-    const bothDay = (a.d != null) && (b.d != null);
-    const bothMon = (a.m != null) && (b.m != null);
-    if (bothDay) return `${pad2(a.d)}.${pad2(a.m)}.${a.y}-${pad2(b.d)}.${pad2(b.m)}.${b.y}`;
-    if (bothMon) return `${pad2(a.m)}.${a.y}-${pad2(b.m)}.${b.y}`;
+  function displaySingle(a){ return a.d!=null ? `${String(a.d).padStart(2,'0')}.${String(a.m).padStart(2,'0')}.${a.y}`
+                          : a.m!=null ? `${String(a.m).padStart(2,'0')}.${a.y}` : String(a.y); }
+  
+  function displayRange(a,b){
+    if (a.d!=null && b.d!=null) return `${String(a.d).padStart(2,'0')}.${String(a.m).padStart(2,'0')}.${a.y}-${String(b.d).padStart(2,'0')}.${String(b.m).padStart(2,'0')}.${b.y}`;
+    if (a.m!=null && b.m!=null) return `${String(a.m).padStart(2,'0')}.${a.y}-${String(b.m).padStart(2,'0')}.${b.y}`;
     return `${a.y}-${b.y}`;
   }
+
 
   /* ===================== УТИЛИТЫ ===================== */
 

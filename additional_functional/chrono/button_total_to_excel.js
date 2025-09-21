@@ -149,42 +149,47 @@
   
   // --- parseHeaderNew: 1-я строка (дата — тема), 2-я строка ([тип / статус / порядок]) ---
   function parseHeaderNew(dateTitleNodes, metaNodes, linkEl) {
-    // ТЕМА: только текст внутри <a>
+    // ТЕМА: только текст из <a>
     const title = (linkEl?.textContent || '').trim();
   
-    // ДАТА: берём <strong> из первой строки; если его нет — всё до " — "
+    // 1-я строка как временный DOM
     const wrap = document.createElement('div');
     dateTitleNodes.forEach(n => wrap.appendChild(n.cloneNode(true)));
-    let datePart = (wrap.querySelector('strong')?.textContent || '').trim();
-    if (!datePart) {
-      const t = (wrap.textContent || '').trim();
-      const pos = t.indexOf(' — ');
-      if (pos >= 0) datePart = t.slice(0, pos).trim();
-    }
-    if (/дата\s+не\s+указан/i.test(datePart)) datePart = '';
+    const l1Text = (wrap.textContent || '').replace(/\s+/g, ' ').trim();
   
+    // --- ДАТА: только если реально дата ---
     let dateStart = '', dateEnd = '';
-    if (datePart) {
-      const norm = datePart
-        .replace(/[\u2012-\u2015\u2212—–−]/g, '-') // все «длинные тире» -> '-'
-        .replace(/\s*-\s*/g, '-');                 // убрать пробелы вокруг '-'
+  
+    // (а) strong приоритетнее
+    let datePart = (wrap.querySelector('strong')?.textContent || '').trim();
+  
+    if (!datePart) {
+      // (б) искать дату только В НАЧАЛЕ строки
+      const m = l1Text.match(/^\s*(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\.\d{4}|\d{4})(?:\s*[-—–]\s*(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\.\d{4}|\d{4}))?/);
+      if (m) {
+        dateStart = m[1];
+        dateEnd   = m[2] || '';
+      }
+    } else {
+      // распарсить диапазон из strong, если он есть
+      const norm = datePart.replace(/[\u2012-\u2015\u2212—–−]/g, '-').replace(/\s*-\s*/g, '-');
       const duo = norm.split('-').slice(0, 2).map(s => s.trim());
-      if (duo.length === 1) { dateStart = duo[0]; }
-      else { dateStart = duo[0]; dateEnd = duo[1]; }
+      dateStart = duo[0] || '';
+      dateEnd   = duo[1] || '';
     }
   
-    // МЕТА: [тип / статус / порядок] во второй строке
+    // если встречается "дата не указана" — пусто
+    if (/дата\s+не\s+указан/i.test(datePart || '')) { dateStart = ''; dateEnd = ''; }
+  
+    // --- МЕТА: [тип / статус / порядок] — 2-я строка
     const metaText = textFromNodes(metaNodes);
     let type = '', status = '', order = 0;
-    const m = metaText.match(/\[([^\]]+)\]/);
-    if (m) {
-      const parts = m[1].split('/').map(s => s.trim());
+    const box = metaText.match(/\[([^\]]+)\]/);
+    if (box) {
+      const parts = box[1].split('/').map(s => s.trim());
       type   = (parts[0] || '').toLowerCase();
       status = (parts[1] || '').toLowerCase();
-      if (parts[2]) {
-        const n = parseInt(parts[2], 10);
-        if (Number.isFinite(n)) order = n;
-      }
+      if (parts[2]) { const n = parseInt(parts[2], 10); if (Number.isFinite(n)) order = n; }
     }
   
     return { type, status, order, dateStart, dateEnd, title };

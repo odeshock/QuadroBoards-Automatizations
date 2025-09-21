@@ -304,18 +304,27 @@ async function collectEpisodesFromForums(opts = {}) {
     return String(a.title||'').toLowerCase()
       .localeCompare(String(b.title||'').toLowerCase(), 'ru', { sensitivity:'base' });
   }
-  function normalizeEpisodeTitle(type, rawTitle, dateRaw) {
-    const title = String(rawTitle || '');
-    if (type === 'plot') {
-      const suffRx = /\s\[(?:с|c)\]\s*$/i;
-      return { title: title.replace(suffRx, '').trimEnd() };
-    }
-    if (type === 'au') {
-      const cleaned = title.replace(/^[\uFEFF\u00A0\s]*\[\s*au\s*\]\s*/i, '');
-      return { title: cleaned };
-    }
-    return { title };
+  function normalizeEpisodeTitle(type, rawTitle) {
+  const title = String(rawTitle || '');
+  let ok = true; // <-- флажок
+
+  if (type === 'plot') {
+    // должен присутствовать [c] или [с] (латиница/кириллица) где угодно
+    const hasC = /\[\s*[cс]\s*\]/i.test(title);
+    if (!hasC) ok = false;
+    return { title: title.replace(/\[\s*[cс]\s*\]/ig, '').trim(), ok };
   }
+
+  if (type === 'au') {
+    const hasAu = /\[\s*au\s*\]/i.test(title);
+    if (!hasAu) ok = false;
+    return { title: title.replace(/\[\s*au\s*\]/ig, '').trim(), ok };
+  }
+
+  return { title, ok }; // для прочих типов всегда true
+}
+
+  
 
   // ==== скрапперы ====
   async function scrapeSection(section, seenTopics) {
@@ -376,6 +385,8 @@ async function collectEpisodesFromForums(opts = {}) {
       const { dateRaw, episode } = parseTitle(safeTitle);
       const parsed = parseDateFlexible(dateRaw);
 
+      const norm = normalizeEpisodeTitle(type, episode || '');
+
       const rawChars = FMV.readTagText(first, 'characters');
       const rawLoc   = FMV.readTagText(first, 'location');
       const rawOrder = FMV.readTagText(first, 'order');
@@ -426,7 +437,7 @@ async function collectEpisodesFromForums(opts = {}) {
         order:     Number(order) || 0,
         location:  locationsLower.join(', '),
         participants,
-
+        isTitleNormalized: norm.ok,
         __hasDate: parsed.hasDate,
         __startSort: parsed.startSort,
         __endSort:   parsed.endSort

@@ -216,12 +216,31 @@ async function collectEpisodesFromForums(opts = {}) {
     return (a?.textContent || '').trim();
   }
 
-  // [дата] Заголовок
+  // [дата] Заголовок — но только если внутри скобок действительно дата
   function parseTitle(str) {
-    const m = String(str || '').match(/^\s*\[(.+?)\]\s*(.+)$/s);
-    return m
-      ? { dateRaw: m[1].trim(), episode: String(m[2]).replace(/\s+/g,' ').trim() }
-      : { dateRaw: '',          episode: String(str).replace(/\s+/g,' ').trim() };
+    const s = String(str || '').trim();
+  
+    // Есть ли вообще ведущие скобки?
+    const m = s.match(/^\s*\[(.*?)\]\s*(.*)$/s);
+    if (m) {
+      const inner = (m[1] || '').trim(); // то, что было внутри []
+      const rest  = (m[2] || '').trim();
+  
+      // Проверим, что inner — дата (или диапазон дат)
+      const d = parseDateFlexible(inner); // ваша функция разбора дат
+      if (d && d.hasDate) {
+        return {
+          dateRaw: inner,
+          episode: rest.replace(/\s+/g, ' ')
+        };
+      }
+      // иначе это не дата (например, [AU]) → не трогаем заголовок
+    }
+  
+    return {
+      dateRaw: '',
+      episode: s.replace(/\s+/g, ' ')
+    };
   }
 
   // ---- парсинг дат ----
@@ -305,24 +324,24 @@ async function collectEpisodesFromForums(opts = {}) {
       .localeCompare(String(b.title||'').toLowerCase(), 'ru', { sensitivity:'base' });
   }
   function normalizeEpisodeTitle(type, rawTitle) {
-  const title = String(rawTitle || '');
-  let ok = true; // <-- флажок
-
-  if (type === 'plot') {
-    // должен присутствовать [c] или [с] (латиница/кириллица) где угодно
-    const hasC = /\[\s*[cс]\s*\]/i.test(title);
-    if (!hasC) ok = false;
-    return { title: title.replace(/\[\s*[cс]\s*\]/ig, '').trim(), ok };
-  }
-
-  if (type === 'au') {
-    const hasAu = /\[\s*au\s*\]/i.test(title);
-    if (!hasAu) ok = false;
-    return { title: title.replace(/\[\s*au\s*\]/ig, '').trim(), ok };
-  }
-
-  return { title, ok }; // для прочих типов всегда true
+    const title = String(rawTitle || '');
+    let ok = true;
+  
+    if (type === 'plot') {
+      const rx = /\[\s*[cс]\s*\]/i;                 // [c] или [с]
+      ok = rx.test(title);
+      return { title: title.replace(/\[\s*[cс]\s*\]/ig, '').trim(), ok };
+    }
+  
+    if (type === 'au') {
+      const rx = /\[\s*au\s*\]/i;                   // [au] в любой позиции
+      ok = rx.test(title);
+      return { title: title.replace(/\[\s*au\s*\]/ig, '').trim(), ok };
+    }
+  
+    return { title, ok };
 }
+
 
   
 

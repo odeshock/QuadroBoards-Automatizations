@@ -180,12 +180,8 @@ function cleanLocation(s) {
  *   - respectAccess: флаг для внешних проверок доступа (пробрасывается как есть)
  */
 async function collectEpisodesFromForums(opts = {}) {
-  // ==== входные условия (минимум) ====
-  const GID = (opts.groupIds ?? window.CHRONO_CHECK?.GroupID ?? []).map(Number);
-  const respectAccess = opts.respectAccess !== false;
-
   // разделы: либо из opts.sections, либо автообнаружение по текущему документу
-  let SECTIONS = Array.isArray(opts.sections) && opts.sections.length ? opts.sections.slice() : null;
+  let SECTIONS = Array.isArray(opts.sections) && opts.sections.length ? opts.sections.slice() : [];
 
   if (!SECTIONS) {
     // авто: собрать все уникальные forum-id из текущей страницы
@@ -516,23 +512,38 @@ async function collectEpisodesFromForums(opts = {}) {
  *   participants: Array<{ id:string, name:string, masks:string[] }>
  * }
  */
+/**
+ * Собирает словарь по пользователям на основе collectEpisodesFromForums.
+ * Учитывает только участников со ссылкой на профиль (есть p.id).
+ *
+ * @param {Object} [opts]
+ * @param {Array<number|string>} [opts.groupIds] - допустимые группы; по умолчанию CHRONO_CHECK.GroupID
+ * @param {boolean} [opts.respectAccess=true]    - выполнять проверки доступа (если есть хелперы)
+ * @param {Array<{id:string|number,type?:string,status?:string}>} [opts.sections] - список разделов
+ * @param {number} [opts.maxPagesPerSection]     - лимит страниц на раздел
+ *
+ * @returns {Promise<Object>} { "<userId>": { name: string, episodes: Episode[] } }
+ */
 async function collectChronoByUser(opts = {}) {
   if (typeof collectEpisodesFromForums !== 'function') {
     throw new Error('collectEpisodesFromForums недоступна');
   }
 
-  const GID = (opts.groupIds ?? window.CHRONO_CHECK?.GroupID ?? []).map(Number);
-  const respectAccess = opts.respectAccess !== false;
+  let SECTIONS = Array.isArray(opts.sections) && opts.sections.length ? opts.sections.slice() : [];
+  const maxPagesPerSection =
+    Number.isFinite(+opts.maxPagesPerSection) ? +opts.maxPagesPerSection : undefined;
 
-  // получаем список эпизодов (без topicId; источник определяется внутри collectEpisodesFromForums)
+  // получаем эпизоды с учётом sections
   const episodes = await collectEpisodesFromForums({
     groupIds: GID,
-    respectAccess
+    respectAccess,
+    sections,
+    maxPagesPerSection
   });
 
   const byUser = Object.create(null);
 
-  // гарантируем стабильный порядок
+  // стабилизируем порядок
   episodes.forEach((e, i) => { if (!Number.isFinite(e.order)) e.order = i; });
 
   for (const ep of episodes) {
@@ -563,7 +574,9 @@ async function collectChronoByUser(opts = {}) {
         order:     Number(ep.order || 0),
         location:  ep.location  || '',
         masks:     self.masks || [],
-        participants: others
+        participants: others,
+        // если нужно использовать дальше: пробросим валидность названия
+        isTitleNormalized: !!ep.isTitleNormalized
       };
 
       if (!byUser[self.id]) {

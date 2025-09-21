@@ -151,3 +151,10 @@ function parseParticipants(nodes) {
 
   return { participants, masksLines };
 }
+function cleanLocation(s) {
+  const t=String(s||'').trim();
+  if (!t) return '';
+  if (/^локац/i.test(t) && /не\s+указан/i.test(t)) return '';
+  if (/^не\s+указан/i.test(t)) return '';
+  return t;
+}

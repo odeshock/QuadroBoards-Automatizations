@@ -1,10 +1,10 @@
-/* ===== Константы пикера ===== */
-const IP_ROWS = 1;       // сколько строк видно без скролла
-const IP_SIZE = 44;      // размер кнопки-иконки (px)
-const IP_GAP  = 8;       // зазор между кнопками (px)
-const IP_REQUIRED = true; // выбор обязателен (если есть варианты)
+/* ===== константы пикера ===== */
+const IP_ROWS = 1;        // сколько строк видно без скролла
+const IP_SIZE = 44;       // размер кнопки (px)
+const IP_GAP  = 8;        // зазор между кнопками (px)
+const IP_REQUIRED = true; // выбор обязателен, если есть варианты
 
-/* ===== Служебные ===== */
+/* ===== служебные ===== */
 function isProfileFieldsPage() {
   try {
     const u = new URL(location.href);
@@ -32,9 +32,12 @@ function injectStylesOnce() {
     .ip-box,.ip-scroll,.ip-grid,.ip-btn,.ip-btn *{pointer-events:auto;}
     .ip-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;height: calc(var(--ip-rows) * var(--ip-size) + (var(--ip-rows) - 1) * var(--ip-gap));}
     .ip-grid{display:grid;grid-template-columns:repeat(auto-fill,var(--ip-size));gap:var(--ip-gap);align-content:start;}
-    .ip-btn{width:var(--ip-size);height:var(--ip-size);border:2px solid #d0d0d0;border-radius:10px;background:#fff;padding:0;cursor:pointer;touch-action:manipulation;}
+    .ip-btn{position:relative;overflow:hidden;width:var(--ip-size);height:var(--ip-size);border:2px solid #d0d0d0;border-radius:10px;background:#fff;padding:0;cursor:pointer;touch-action:manipulation;}
     .ip-btn[selected]{border-color:#0b74ff;box-shadow:0 0 0 3px rgba(11,116,255,.15);}
-    .ip-btn img{width:100%;height:100%;display:block;object-fit:contain;}
+    .ip-slot{position:relative;width:100%;height:100%;}
+    .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
+    /* чтобы вложенные элементы превью не перехватывали клики */
+    .ip-slot *{pointer-events:none;}
   `;
   document.head.appendChild(st);
 }
@@ -49,7 +52,40 @@ function resolveFieldBySuffix(suffix) {
   );
 }
 
-/* ===== Основная функция ===== */
+// создаём содержимое кнопки по item.thumb:
+//  - HTML-строка → вставляем как разметку
+//  - URL/строка без угловых скобок → <img>
+//  - DOM-узел → клонируем и вставляем
+function createThumbSlot(item) {
+  const slot = document.createElement('div');
+  slot.className = 'ip-slot';
+  const t = item && item.thumb;
+
+  if (t instanceof Node) {
+    slot.appendChild(t.cloneNode(true));
+    return slot;
+  }
+  if (typeof t === 'string') {
+    const trimmed = t.trim();
+    if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+      // HTML-фрагмент
+      slot.innerHTML = trimmed;
+      return slot;
+    } else {
+      // считаем, что это URL картинки
+      const img = document.createElement('img');
+      img.src = t;
+      img.alt = '';
+      img.loading = 'lazy';
+      slot.appendChild(img);
+      return slot;
+    }
+  }
+  // fallback (пусто)
+  return slot;
+}
+
+/* ===== основная функция ===== */
 function applyImagePicker(image_set, fieldSuffix) {
   if (!isProfileFieldsPage()) return;
   injectStylesOnce();
@@ -62,13 +98,13 @@ function applyImagePicker(image_set, fieldSuffix) {
   if (input.dataset.ipApplied === '1') return;
   input.dataset.ipApplied = '1';
 
-  // прячем исходный input
+  // спрятать исходный input
   input.classList.add('ip-hidden');
 
   // допустимые значения
   const allowed = new Set(IMAGES.map(i => (i && i.value != null ? String(i.value) : '')));
 
-  // контейнеры (UI рисуем только если есть изображения)
+  // UI (только если есть элементы)
   let grid = null;
   if (hasImages) {
     const box = document.createElement('div');
@@ -92,11 +128,8 @@ function applyImagePicker(image_set, fieldSuffix) {
       btn.className = 'ip-btn';
       btn.dataset.v = v;
 
-      const img = document.createElement('img');
-      img.src = it.thumb;
-      img.alt = '';
-      img.loading = 'lazy';
-      btn.appendChild(img);
+      // содержимое кнопки — из thumb (HTML/URL/DOM)
+      btn.appendChild(createThumbSlot(it));
 
       const pick = (e) => { e.preventDefault(); e.stopPropagation(); setValue(v); };
       btn.addEventListener('pointerdown', pick);
@@ -141,7 +174,7 @@ function applyImagePicker(image_set, fieldSuffix) {
   if (hasImages) {
     if (!allowed.has(current)) initial = IP_REQUIRED ? firstVal : '';
   } else {
-    initial = ''; // нет картинок — всегда пустая строка
+    initial = ''; // нет элементов → пустая строка
   }
 
   input.dataset.ipInitial = initial;
@@ -164,23 +197,10 @@ function applyImagePicker(image_set, fieldSuffix) {
         const fallback = input.dataset.ipInitial ?? (IP_REQUIRED ? firstVal : '');
         setValue(fallback);
       }
-      if (IP_REQUIRED && hasImages && input.value === '') {
-        setValue(firstVal);
-      }
+      if (IP_REQUIRED && hasImages && input.value === '') setValue(firstVal);
     }, true);
     form.dataset.ipSubmitHooked = '1';
   }
 
-  // контроллер (по желанию)
-  return {
-    set: setValue,
-    destroy: () => {
-      input.classList.remove('ip-hidden');
-      const box = input.nextElementSibling;
-      if (box && box.classList.contains('ip-box')) box.remove();
-      delete input.dataset.ipApplied;
-      delete input.dataset.ipInitial;
-      delete input.dataset.ipSynced;
-    }
-  };
+  return { set: setValue };
 }

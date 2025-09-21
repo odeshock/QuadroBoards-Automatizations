@@ -57,7 +57,7 @@
 
     const metaStatus = renderStatus(ep.type, ep.status);
     const metaOrder  = `${FMV.escapeHtml(String(ep.order ?? 0))}`;
-    const meta = `${metaStatus} [${metaOrder}]`;
+    const meta = `[${metaStatus} / ${metaOrder}]`;
 
     const ppl = fmtParticipants(ep.participants || []);
     const out = [head, meta];

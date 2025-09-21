@@ -17,19 +17,6 @@
     ? window.CHRONO_CHECK.ForumInfo
     : [];
 
-  // === новые константы карт типов и статусов ===
-  const MAP_TYPE = window.CHRONO_CHECK?.EpisodeMapType || {
-    personal: ['personal', 'black'],
-    plot:     ['plot',     'black'],
-    au:       ['au',       'black']
-  };
-
-  const MAP_STAT = window.CHRONO_CHECK?.EpisodeMapStat || {
-    on:       ['active',   'green'],
-    off:      ['closed',   'teal'],
-    archived: ['archived', 'maroon']
-  };
-
   let busy = false;
 
   createForumButton({

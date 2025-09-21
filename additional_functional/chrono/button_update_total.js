@@ -265,8 +265,8 @@
       const status = renderStatus(e.type, e.status);
   
       const dateHTML = (e.type === 'au')
-        ? (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : '')
-        : (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : `[mark]дата не указана[/mark]`);
+        ? (e.hasDate ? '[b]${FMV.escapeHtml(e.dateDisplay)}[/b]' : '')
+        : (e.hasDate ? '[b]FMV.escapeHtml(e.dateDisplay)[/b]' : `[mark]дата не указана[/mark]`);
   
       const url = FMV.escapeHtml(e.url);
   

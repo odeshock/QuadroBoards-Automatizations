@@ -40,40 +40,57 @@
     async onClick(api) {
       if (busy) return;
       busy = true;
-  
+    
       const setStatus  = api?.setStatus  || (()=>{});
       const setDetails = api?.setDetails || (()=>{});
-      if (api?.setLink) api.setLink(OPEN_URL, 'Открыть ссылку'); // ✅
-  
+    
+      // Спрячем ссылку на время выполнения (если API позволяет)
+      if (api?.setLinkVisible) api.setLinkVisible(false);
+      if (api?.setLink)        api.setLink('', ''); // очистим, чтобы не мигала от прошлого раза
+    
       try {
         setStatus('Выполняю…');
         setDetails('');
-
+    
+        // ... сбор, рендер, публикация ...
         const events = await collectEvents();
-        const htmlRaw = renderChrono(events);
-        const html = FMV.toCp1251Entities(htmlRaw);
-
-        const res = await FMV.replaceComment(GID, PID, html);
-
+        const html   = FMV.toCp1251Entities(renderChrono(events));
+        const res    = await FMV.replaceComment(GID, PID, html);
+    
         const st = normStatus(res.status);
         const success = !!res.ok || st === 'ok';
+    
         setStatus(success ? 'Готово' : 'Ошибка');
-
+    
+        // Показать ссылку ТОЛЬКО при успехе
+        if (success) {
+          if (api?.setLink)        api.setLink(OPEN_URL, 'Открыть ссылку');
+          if (api?.setLinkVisible) api.setLinkVisible(true);
+        } else {
+          if (api?.setLinkVisible) api.setLinkVisible(false);
+          if (api?.setLink)        api.setLink('', '');
+        }
+    
+        // детали как раньше...
         const lines = [];
-        lines.push(`Статус: ${success ? 'ok' : st || 'unknown'}`);
+        lines.push(`<b>Статус:</b> ${success ? 'ok' : st || 'unknown'}`);
         const info  = toPlainShort(res.infoMessage || '');
         const error = toPlainShort(res.errorMessage || '');
         if (info)  lines.push(info);
         if (error) lines.push(`<span style="color:#b00020">${FMV.escapeHtml(error)}</span>`);
         setDetails(lines.join('<br>'));
-
+    
       } catch (e) {
         setStatus('Ошибка');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
+        // на ошибке ссылки нет
+        if (api?.setLinkVisible) api.setLinkVisible(false);
+        if (api?.setLink)        api.setLink('', '');
       } finally {
         busy = false;
       }
     }
+
   });
 
   /* ===================== СБОРКА ===================== */

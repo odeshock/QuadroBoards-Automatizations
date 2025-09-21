@@ -317,32 +317,36 @@ async function collectEpisodesFromForums(opts = {}) {
     return String(a.title||'').toLowerCase()
       .localeCompare(String(b.title||'').toLowerCase(), 'ru', { sensitivity:'base' });
   }
-  function normalizeEpisodeTitle(type, rawTitle) {
+  function normalizeEpisodeTitle(type, rawTitle, hasDateForType) {
     const title = String(rawTitle || '').trim();
     let ok = true;
   
     if (type === 'plot') {
-      // "... [c]" или "... [с]" в конце (c — латиница, с — кириллица)
-      const rx = /\s\[\s*(?:c|с)\s*\]$/i;
-      ok = rx.test(title);
+      // Требуем: валидная дата есть И суффикс "... [c]" или "... [с]" в самом конце
+      const suffixRx = /\s\[\s*(?:c|с)\s*\]$/i; // лат. c или кир. с
+      const hasSuffix = suffixRx.test(title);
+      ok = !!hasDateForType && hasSuffix;
+  
       return {
-        title: ok ? title.replace(rx, '').trim() : title,
+        title: hasSuffix ? title.replace(suffixRx, '').trim() : title,
         ok
       };
     }
   
     if (type === 'au') {
-      // Разрешаем только начало "[au] " или "[AU] " — строго оба символа в нижнем или в верхнем регистре
-      const rx = /^(?:\[\s*au\s*\]\s+|\[\s*AU\s*\]\s+)/;
-      ok = rx.test(title);
+      // Требуем: начало либо "[au] ", либо "[AU] " (смешанный регистр не допускаем)
+      const prefixRx = /^(?:\[\s*au\s*\]\s+|\[\s*AU\s*\]\s+)/;
+      const hasPrefix = prefixRx.test(title);
+      ok = hasPrefix;
+  
       return {
-        title: ok ? title.replace(rx, '').trim() : title,
+        title: hasPrefix ? title.replace(prefixRx, '').trim() : title,
         ok
       };
     }
   
     return { title, ok };
-  }  
+  }
 
   // ==== скрапперы ====
   async function scrapeSection(section, seenTopics) {

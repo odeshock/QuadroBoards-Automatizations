@@ -165,77 +165,66 @@
   }
 
   function parseParticipants(nodes) {
-    // 1) расплющим DOM в последовательность токенов
+    // расплющим DOM в токены "link" и "text"
     const toks = [];
-    (function flat(arr){
-      Array.from(arr).forEach(n => {
-        if (n.nodeType === 3) {
-          toks.push({ t:'text', v: n.nodeValue || '' });
-        } else if (n.nodeType === 1) {
-          if (n.tagName === 'A') {
-            toks.push({ t:'link', name: (n.textContent||'').trim(), href: n.href || '' });
-          } else {
-            flat(n.childNodes);
-          }
+    (function flat(nl){
+      Array.from(nl).forEach(n => {
+        if (n.nodeType === 3) toks.push({ t:'text', v:n.nodeValue || '' });
+        else if (n.nodeType === 1) {
+          if (n.tagName === 'A') toks.push({ t:'link', name:(n.textContent||'').trim(), href:n.href||'' });
+          else flat(n.childNodes);
         }
       });
     })(nodes);
   
-    const list = [];               // [{name, href}]
-    const maskMap = new Map();     // name -> [mask, ...]
-    let cur = null;
-    const commit = () => { if (cur) { list.push(cur); cur = null; } };
+    const participants = [];            // {name, href}
+    const maskMap = new Map();          // name -> [mask,...]
+    let lastName = null;
+  
+    const addMask = (name, list) => {
+      if (!name || !list || !list.length) return;
+      if (!maskMap.has(name)) maskMap.set(name, []);
+      maskMap.get(name).push(...list);
+    };
   
     for (const tk of toks) {
-      if (tk.t === 'link') {               // новый участник по ссылке
-        commit();
-        cur = { name: tk.name, href: tk.href };
+      if (tk.t === 'link') {
+        const name = tk.name;
+        participants.push({ name, href: tk.href });
+        lastName = name;
         continue;
       }
   
       if (tk.t === 'text') {
         let t = tk.v || '';
+        // если встречаем "не указаны" — обе колонки пустые
+        if (/\bне\s*указан/i.test(t)) return { participants: [], masksLines: [] };
   
-        // если явно "не указаны" — возвращаем пусто
-        if (/не\s*указан/i.test(t)) return { participants: [], masksLines: [] };
-  
-        // вытащим все [as маска1, маска2]
-        t.replace(/\[\s*as\s*([^\]]+)\]/ig, (_m, group) => {
-          if (cur) {
-            group.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean).forEach(msk => {
-              if (!maskMap.has(cur.name)) maskMap.set(cur.name, []);
-              maskMap.get(cur.name).push(msk);
-            });
-          }
-          return '';
+        // вытащить маски и привязать к последнему участнику
+        t = t.replace(/\[\s*as\s*([^\]]+)\]/ig, (_m, g) => {
+          const arr = g.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+          addMask(lastName, arr);
+          return ''; // удалить из текста
         });
   
-        // запятые считаем разделителями участников без ссылок
-        if (/,/.test(t)) {
-          t.split(',').forEach((seg, idx) => {
-            const s = seg.trim();
-            if (s) { commit(); cur = { name: s, href: '' }; }
-            // после запятой — завершить текущего
-            commit();
-          });
-        } else {
-          const s = t.trim();
-          if (s && !/^[–—-]+$/.test(s) && !cur) {
-            cur = { name: s, href: '' };    // «user11» и т.п.
-          }
-        }
+        // оставшиеся имена (без масок) через запятую
+        t.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
+          if (/^[–—-]+$/.test(name)) return;                 // мусорные тире
+          if (/^\[.*\]$/.test(name)) return;                 // остаточные скобки
+          participants.push({ name, href: '' });
+          lastName = name;
+        });
       }
     }
-    commit();
   
-    // 2) соберём строки для колонки "Маски" — по маске на строку
+    // собрать строки для колонки "Маски" (по одной маске в строке)
     const masksLines = [];
-    for (const p of list) {
+    for (const p of participants) {
       const arr = maskMap.get(p.name);
       if (arr && arr.length) arr.forEach(msk => masksLines.push(`${p.name} — ${msk}`));
     }
   
-    return { participants: list, masksLines };
+    return { participants, masksLines };
   }
   
   function textFromNodes(nodes) {

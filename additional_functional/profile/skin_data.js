@@ -1,0 +1,25 @@
+const icons_set = [
+  { thumb: 'https://static.thenounproject.com/png/2185221-200.png', value: '1' },
+  { thumb: 'https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png', value: '2' },
+  { thumb: 'https://i.pinimg.com/474x/c2/72/cb/c272cbe4f31c5a8d96f8b95256924e95.jpg', value: '3' },
+];
+
+const plashka_set = [
+  {
+    value: 'hp-01',
+    thumb: `<a class="modal-link">
+        <img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka">
+        <wrds style="color:#ffffff;font-family:Blue April;font-size:9px;letter-spacing:1.2px;opacity:0.8;">
+          я не подарок, но и ты не шаверма
+        </wrds></a>
+    `
+  },
+  {
+    value: 'hp-02',
+    thumb: `<a class="modal-link"><img src="https://cdn-icons-png.flaticon.com/256/86/86500.png"><wrds style="font-size:10px">ещё вариант</wrds></a>`
+  }
+];
+
+
+applyImagePicker(icons_set, '5');
+applyImagePicker(plashka_set, '3');

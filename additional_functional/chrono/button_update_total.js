@@ -319,40 +319,39 @@
 
   function parseToken(t) {
     const s = String(t || '').trim();
-
-    // dd.mm.yyyy / dd.mm.yy
+  
+    // 1) Полная дата: dd.mm.yyyy / dd.mm.yy
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
-      const d = +m[1], mo = +m[2], y = toYYYY(m[3]);
-      if (!(mo>=1 && mo<=12)) return null;
-      if (!(d>=1 && d<=daysInMonth(y,mo))) return null;
+      const d  = +m[1], mo = +m[2], y = toYYYY(m[3]);
+      if (!(mo >= 1 && mo <= 12)) return null;
+      if (!(d >= 1 && d <= daysInMonth(y, mo))) return null;
       return { y, m: mo, d };
     }
-
-    // dd.mm
-    m = s.match(/^(\d{1,2})\.(\d{1,2})$/);
-    if (m) {
-      const d = +m[1], mo = +m[2];
-      if (!(mo>=1 && mo<=12)) return null;
-      if (!(d>=1 && d<=31)) return null;
-      return { m: mo, d };
-    }
-
-    // mm.yyyy / mm.yy
+  
+    // 2) Месяц + год: mm.yyyy / mm.yy  (ставим ПЕРЕД dd.mm!)
     m = s.match(/^(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const mo = +m[1], y = toYYYY(m[2]);
-      if (!(mo>=1 && mo<=12)) return null;
-      return { y, m: mo };
+      if (mo >= 1 && mo <= 12) return { y, m: mo };
+      // если «месяц» оказался 00/0 — точно не mm.yy → продолжаем ниже (в dd.mm не зайдём)
     }
-
-    // yyyy / yy
+  
+    // 3) День + месяц без года: dd.mm   (используется в диапазонах слева)
+    m = s.match(/^(\d{1,2})\.(\d{1,2})$/);
+    if (m) {
+      const d = +m[1], mo = +m[2];
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return { m: mo, d };
+      return null; // здесь уже точно dd.mm и оно невалидно
+    }
+  
+    // 4) Год: yyyy / yy
     m = s.match(/^(\d{2}|\d{4})$/);
     if (m) {
       const y = toYYYY(m[1]);
       return { y };
     }
-
+  
     return null;
   }
 

@@ -111,54 +111,69 @@
     }).filter(Boolean);
   }
 
+  // --- parseParagraph: делим <p> на 4 логические строки по <br> ---
   function parseParagraph(p) {
-    const dateTitleNodes = [], metaNodes = [], partNodes = [], locNodes = [];
-    let mode = 'dateTitle';  // первая строка
+    const lines = [[], [], [], []]; // 0: дата+тема, 1: мета, 2: участники, 3: локация (+ всё остальное)
+    let i = 0;
     for (const node of p.childNodes) {
-      if (node.nodeType === 1 && node.tagName === 'BR') {
-        if (mode === 'dateTitle') mode = 'meta';
-        else if (mode === 'meta') mode = 'part';
-        else mode = 'loc';
-        continue;
-      }
-      if (mode === 'dateTitle') dateTitleNodes.push(node);
-      else if (mode === 'meta') metaNodes.push(node);
-      else if (mode === 'part') partNodes.push(node);
-      else locNodes.push(node);
+      if (node.nodeType === 1 && node.tagName === 'BR') { i = Math.min(i + 1, 3); continue; }
+      lines[i].push(node);
     }
+    const dateTitleNodes = lines[0];
+    const metaNodes      = lines[1];
+    const partNodes      = lines[2];
+    const locNodes       = lines[3];
   
-    const a = p.querySelector('a[href*="viewtopic.php?id="]');
+    // ссылка темы — только <a href*="viewtopic.php?id="> из первой строки
+    const tmp = document.createElement('div');
+    dateTitleNodes.forEach(n => tmp.appendChild(n.cloneNode(true)));
+    const a = tmp.querySelector('a[href*="viewtopic.php?id="]') || p.querySelector('a[href*="viewtopic.php?id="]');
+  
     const { type, status, order, dateStart, dateEnd, title } =
-      parseHeader(dateTitleNodes, metaNodes, a);
-
+      parseHeaderNew(dateTitleNodes, metaNodes, a);
+  
     const { participants, masksLines } = parseParticipants(partNodes);
     const location = cleanLocation(textFromNodes(locNodes));
   
+    const start = (type === 'au') ? '' : (dateStart || '');
+    const end   = (type === 'au') ? '' : (dateEnd   || start || '');
+  
     return {
-      type, status, title, href: a?.href || '',
-      dateStart, dateEnd, order,
-      participants,
-      masksLines,
-      location
+      type, status,
+      title, href: a?.href || '',
+      dateStart: start, dateEnd: end,
+      order: Number.isFinite(order) ? order : 0,
+      participants, masksLines, location
     };
   }
-
-  function parseHeader(dateNodes, metaNodes, linkEl) {
-    const dateTitleText = textFromNodes(dateNodes);
   
-    // --- Дата
-    let [datePart/*, _titleJunk */] = dateTitleText.split(/\s+—\s+/, 2).map(s => s?.trim() || '');
-    let dateStart = '', dateEnd = '';
-    if (datePart && !/дата\s+не\s+указан/i.test(datePart)) {
-      const duo = datePart.replace(/[–—−]/g,'-').split('-').map(s=>s.trim());
-      dateStart = duo[0] || '';
-      dateEnd   = duo[1] || '';
-    }
-  
-    // --- Тема: ТОЛЬКО текст внутри <a>
+  // --- parseHeaderNew: 1-я строка (дата — тема), 2-я строка ([тип / статус / порядок]) ---
+  function parseHeaderNew(dateTitleNodes, metaNodes, linkEl) {
+    // ТЕМА: только текст внутри <a>
     const title = (linkEl?.textContent || '').trim();
   
-    // --- Мета: [тип / статус / порядок]
+    // ДАТА: берём <strong> из первой строки; если его нет — всё до " — "
+    const wrap = document.createElement('div');
+    dateTitleNodes.forEach(n => wrap.appendChild(n.cloneNode(true)));
+    let datePart = (wrap.querySelector('strong')?.textContent || '').trim();
+    if (!datePart) {
+      const t = (wrap.textContent || '').trim();
+      const pos = t.indexOf(' — ');
+      if (pos >= 0) datePart = t.slice(0, pos).trim();
+    }
+    if (/дата\s+не\s+указан/i.test(datePart)) datePart = '';
+  
+    let dateStart = '', dateEnd = '';
+    if (datePart) {
+      const norm = datePart
+        .replace(/[\u2012-\u2015\u2212—–−]/g, '-') // все «длинные тире» -> '-'
+        .replace(/\s*-\s*/g, '-');                 // убрать пробелы вокруг '-'
+      const duo = norm.split('-').slice(0, 2).map(s => s.trim());
+      if (duo.length === 1) { dateStart = duo[0]; }
+      else { dateStart = duo[0]; dateEnd = duo[1]; }
+    }
+  
+    // МЕТА: [тип / статус / порядок] во второй строке
     const metaText = textFromNodes(metaNodes);
     let type = '', status = '', order = 0;
     const m = metaText.match(/\[([^\]]+)\]/);
@@ -166,12 +181,14 @@
       const parts = m[1].split('/').map(s => s.trim());
       type   = (parts[0] || '').toLowerCase();
       status = (parts[1] || '').toLowerCase();
-      if (parts[2]) order = parseInt(parts[2],10) || 0;
+      if (parts[2]) {
+        const n = parseInt(parts[2], 10);
+        if (Number.isFinite(n)) order = n;
+      }
     }
   
     return { type, status, order, dateStart, dateEnd, title };
   }
-
 
   function parseParticipants(nodes) {
     // расплющим DOM в токены "link" и "text"

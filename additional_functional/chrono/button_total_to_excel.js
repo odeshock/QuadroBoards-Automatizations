@@ -128,7 +128,9 @@
     }
   
     const a = p.querySelector('a[href*="viewtopic.php?id="]');
-    const { type, status, order, dateStart, dateEnd, title } = parseHeader(dateTitleNodes, metaNodes, a);
+    const { type, status, order, dateStart, dateEnd, title } =
+      parseHeader(dateTitleNodes, metaNodes, a);
+
     const { participants, masksLines } = parseParticipants(partNodes);
     const location = cleanLocation(textFromNodes(locNodes));
   
@@ -143,10 +145,9 @@
 
   function parseHeader(dateNodes, metaNodes, linkEl) {
     const dateTitleText = textFromNodes(dateNodes);
-    // отделяем дату и название по " — "
-    let [datePart, titlePart] = dateTitleText.split(/\s+—\s+/, 2).map(s => s?.trim() || '');
-    if (!titlePart && linkEl) titlePart = (linkEl.textContent || '').trim();
   
+    // --- Дата
+    let [datePart/*, _titleJunk */] = dateTitleText.split(/\s+—\s+/, 2).map(s => s?.trim() || '');
     let dateStart = '', dateEnd = '';
     if (datePart && !/дата\s+не\s+указан/i.test(datePart)) {
       const duo = datePart.replace(/[–—−]/g,'-').split('-').map(s=>s.trim());
@@ -154,19 +155,23 @@
       dateEnd   = duo[1] || '';
     }
   
+    // --- Тема: ТОЛЬКО текст внутри <a>
+    const title = (linkEl?.textContent || '').trim();
+  
+    // --- Мета: [тип / статус / порядок]
     const metaText = textFromNodes(metaNodes);
-    // [тип / статус / порядок]
     let type = '', status = '', order = 0;
     const m = metaText.match(/\[([^\]]+)\]/);
     if (m) {
       const parts = m[1].split('/').map(s => s.trim());
-      type = (parts[0] || '').toLowerCase();
+      type   = (parts[0] || '').toLowerCase();
       status = (parts[1] || '').toLowerCase();
       if (parts[2]) order = parseInt(parts[2],10) || 0;
     }
   
-    return { type, status, order, dateStart, dateEnd, title: titlePart };
+    return { type, status, order, dateStart, dateEnd, title };
   }
+
 
   function parseParticipants(nodes) {
     // расплющим DOM в токены "link" и "text"

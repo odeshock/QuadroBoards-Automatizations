@@ -225,7 +225,7 @@
     const mapStat = { on:['active','green'], off:['closed','teal'], archived:['archived','maroon'] };
     const t = mapType[type] || mapType.au;
     const s = mapStat[status] || mapStat.archived;
-    return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]]`;
+    return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]`;
   }
 
   function normalizeEpisodeTitle(type, rawTitle, dateRaw) {
@@ -275,7 +275,7 @@
       const ttl  = FMV.escapeHtml(norm.title);
       const errBeforeOrder = norm.err ? ` ${norm.err}` : '';
   
-      const ord  = ` [порядок: ${FMV.escapeHtml(String(e.order ?? 0))}]`;
+      const ord  = `${FMV.escapeHtml(String(e.order ?? 0))}]`;
   
       const asBB = true;
       const names = (e.participantsLower && e.participantsLower.length)
@@ -299,7 +299,7 @@
   
       const dash = dateHTML ? ' — ' : ' ';
       // ВСТАВЛЯЕМ ошибку ПЕРЕД "[порядок: N]"
-      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${errBeforeOrder}${ord}\n[i]${names}[/i]\n${loc}\n\n`;
+      return `${dateHTML}${dash}[url=${url}]${ttl}[/url]${errBeforeOrder}\n${status} / ${ord}\n[i]${names}[/i]\n${loc}\n\n`;
     });
   
     const body = rows.join('') || ``;

@@ -172,158 +172,115 @@ function cleanLocation(s) {
    * @param {boolean} [opts.respectAccess=true] - выполнять проверки доступа (группа/форум/тема), если есть хелперы
    * @returns {Promise<Object>} словарь { "<userId>": Episode[] }
    */
-function attachCollectChronoByUser(global) {
-  'use strict';
+/**
+ * collectChronoByUser
+ * Возвращает объект { "<userId>": { name: <имя профиля>, episodes: Episode[] } }
+ */
+async function collectChronoByUser(opts = {}) {
+  const GID = (opts.groupIds ?? window.CHRONO_CHECK?.GroupID ?? []).map(Number);
+  const FID = (opts.forumIds ?? window.CHRONO_CHECK?.AmsForumID ?? []).map(String);
+  const TID = String(opts.topicId ?? window.CHRONO_CHECK?.ChronoTopicID ?? '').trim();
+  const PID = String(opts.postId  ?? window.CHRONO_CHECK?.TotalChronoPostID ?? '').trim();
 
-  async function collectChronoByUser(opts = {}) {
-    const respectAccess = opts.respectAccess !== false;
+  if (!TID || !PID) throw new Error('Нужны topicId и postId');
 
-    const GID = (opts.groupIds ?? global.CHRONO_CHECK?.GroupID ?? []).map(Number);
-    const FID = (opts.forumIds ?? global.CHRONO_CHECK?.AmsForumID ?? []).map(String);
-    const TID = String(opts.topicId ?? global.CHRONO_CHECK?.ChronoTopicID ?? '').trim();
-    const PID = String(opts.postId  ?? global.CHRONO_CHECK?.TotalChronoPostID ?? '').trim();
+  const fetchDoc            = window.FMV?.fetchDoc || window.fetchDoc;
+  const parseFromScriptHTML = window.parseFromScriptHTML;
+  const parseFromRendered   = window.parseFromRendered;
+  const findPostNode        = window.findPostNode;
+  const findChronoRendered  = window.findChronoRendered;
 
-    if (!TID || !PID) {
-      throw new Error('[collectChronoByUser] Нужны topicId и postId (либо CHRONO_CHECK.*)');
+  const OPEN_URL = new URL(`/viewtopic.php?id=${TID}#p${PID}`, window.location.href);
+
+  const pickIdFromHref = (href) => {
+    if (!href) return null;
+    try {
+      const u = new URL(href, window.location.href);
+      if (!/profile\.php/i.test(u.pathname)) return null;
+      return (u.searchParams.get('id') || '').trim() || null;
+    } catch { return null; }
+  };
+
+  function makeMasksMap(lines = []) {
+    const m = new Map();
+    for (const line of lines) {
+      const [rawName, ...rest] = String(line).split('—');
+      const name = rawName?.trim();
+      const mask = rest.join('—').trim();
+      if (!name || !mask) continue;
+      const arr = m.get(name) || [];
+      if (!arr.includes(mask)) arr.push(mask);
+      m.set(name, arr);
     }
-
-    const fetchDoc            = global.FMV?.fetchDoc || global.fetchDoc;
-    const parseFromScriptHTML = global.parseFromScriptHTML;
-    const parseFromRendered   = global.parseFromRendered;
-    const findPostNode        = global.findPostNode;
-    const findChronoRendered  = global.findChronoRendered;
-
-    if (typeof fetchDoc !== 'function') {
-      throw new Error('[collectChronoByUser] Нет FMV.fetchDoc — подключи helpers.js раньше.');
-    }
-    if (typeof parseFromScriptHTML !== 'function' && typeof parseFromRendered !== 'function') {
-      throw new Error('[collectChronoByUser] Нет парсеров parseFromScriptHTML/parseFromRendered.');
-    }
-
-    // --- проверки доступа (опционально, если есть твои хелперы) ---
-    if (respectAccess) {
-      if (GID.length && typeof global.getCurrentGroupId === 'function') {
-        const gid = global.getCurrentGroupId();
-        if (!GID.map(String).includes(String(gid))) {
-          throw new Error('[collectChronoByUser] Доступ запрещён для текущей группы.');
-        }
-      }
-      if (FID.length && typeof global.isAllowedForum === 'function' && !global.isAllowedForum(FID)) {
-        throw new Error('[collectChronoByUser] Не тот форум.');
-      }
-      if (typeof global.isOnTopicId === 'function' && !global.isOnTopicId(TID)) {
-        throw new Error('[collectChronoByUser] Не та тема.');
-      }
-    }
-
-    const OPEN_URL = new URL(`/viewtopic.php?id=${TID}#p${PID}`, global.location?.href || String(global.location));
-
-    // --- helpers ---
-    const pickIdFromHref = (href) => {
-      if (!href) return null;
-      try {
-        const u = new URL(href, global.location?.href);
-        if (!/profile\.php/i.test(u.pathname)) return null;
-        const id = (u.searchParams.get('id') || '').trim();
-        return id || null;
-      } catch { return null; }
-    };
-
-    function makeMasksMap(masksLines = []) {
-      const m = new Map(); // name -> string[]
-      for (const line of masksLines) {
-        if (!line) continue;
-        const [rawName, ...rest] = String(line).split('—');
-        const name = rawName?.trim();
-        const mask = rest.join('—').trim();
-        if (!name || !mask) continue;
-        const arr = m.get(name) || [];
-        if (!arr.includes(mask)) arr.push(mask); // дедупликация
-        m.set(name, arr);
-      }
-      return m;
-    }
-
-    function normalizeParticipants(participants = [], masksMap) {
-      // берём ТОЛЬКО тех, у кого есть ссылка на профиль
-      return (participants || [])
-        .map(p => {
-          const id = pickIdFromHref(p.href || '');
-          if (!id) return null; // игнорируем текстовые ники
-          return { id, name: p.name || '', masks: masksMap.get(p.name) || [] };
-        })
-        .filter(Boolean);
-    }
-
-    async function loadRows() {
-      const doc = await fetchDoc(OPEN_URL.href);
-
-      // находим пост
-      let post = (typeof findPostNode === 'function') ? findPostNode(doc, PID) : null;
-      if (!post) {
-        post =
-          doc.getElementById(`p${PID}`) ||
-          doc.querySelector(`#p${PID}`) ||
-          doc.querySelector(`[id="p${PID}"]`);
-      }
-      if (!post) throw new Error(`Не нашёл пост #${PID}`);
-
-      const root =
-        post.querySelector('.post-content, .postmsg, .entry-content, .content, .post-body, .post') || post;
-
-      // 1) приоритет — шаблон в script[type="text/html"]
-      const tpl = root.querySelector(
-        '.quote-box.spoiler-box.media-box script[type="text/html"], ' +
-        '.spoiler-box script[type="text/html"], ' +
-        '.media-box script[type="text/html"]'
-      );
-      if (tpl?.textContent && typeof parseFromScriptHTML === 'function') {
-        return parseFromScriptHTML(tpl.textContent);
-      }
-
-      // 2) fallback — отрисованный блок
-      const rendered =
-        (typeof findChronoRendered === 'function' && findChronoRendered(root)) || root;
-
-      if (typeof parseFromRendered !== 'function') {
-        throw new Error('Нет parseFromRendered для разбора отрисованного блока.');
-      }
-      return parseFromRendered(rendered);
-    }
-
-    // --- основная логика ---
-    const rows = await loadRows();
-    const byUser = Object.create(null);
-
-    // сохраняем порядок строк как в комментарии
-    rows.forEach((r, idx) => { r.__sourceOrder = idx; });
-
-    for (const r of rows) {
-      const masksMap = makeMasksMap(r.masksLines || []);
-      const people   = normalizeParticipants(r.participants || [], masksMap); // только с профилями
-
-      for (const self of people) {
-        const others = people
-          .filter(p => p !== self) // без self
-          .map(p => ({ id: p.id, name: p.name, masks: p.masks }));
-
-        const episode = {
-          dateStart: r.dateStart || '',
-          dateEnd:   r.dateEnd || (r.dateStart || ''),
-          type:      r.type || '',
-          status:    r.status || '',
-          title:     r.title || '',
-          href:      r.href || '',
-          order:     Number(r.order ?? r.__sourceOrder ?? 0),
-          location:  r.location || '',
-          participants: others
-        };
-
-        (byUser[self.id] ||= []).push(episode);
-      }
-    }
-
-    // ничего не сортируем: порядок как в комментарии
-    return byUser;
+    return m;
   }
+
+  function normalizeParticipants(participants = [], masksMap) {
+    return participants
+      .map(p => {
+        const id = pickIdFromHref(p.href || '');
+        if (!id) return null;
+        return { id, name: p.name || '', masks: masksMap.get(p.name) || [] };
+      })
+      .filter(Boolean);
+  }
+
+  async function loadRows() {
+    const doc = await fetchDoc(OPEN_URL.href);
+    let post = (typeof findPostNode === 'function') ? findPostNode(doc, PID) : null;
+    if (!post) post = doc.getElementById(`p${PID}`) || doc.querySelector(`#p${PID}, [id="p${PID}"]`);
+    if (!post) throw new Error(`Не нашёл пост #${PID}`);
+
+    const root =
+      post.querySelector('.post-content, .postmsg, .entry-content, .content, .post-body, .post') || post;
+
+    const tpl = root.querySelector(
+      '.quote-box.spoiler-box.media-box script[type="text/html"], ' +
+      '.spoiler-box script[type="text/html"], ' +
+      '.media-box script[type="text/html"]'
+    );
+    if (tpl?.textContent && typeof parseFromScriptHTML === 'function') {
+      return parseFromScriptHTML(tpl.textContent);
+    }
+    const rendered =
+      (typeof findChronoRendered === 'function' && findChronoRendered(root)) || root;
+
+    return parseFromRendered(rendered);
+  }
+
+  const rows = await loadRows();
+  const byUser = Object.create(null);
+
+  rows.forEach((r, idx) => { r.__sourceOrder = idx; });
+
+  for (const r of rows) {
+    const masksMap = makeMasksMap(r.masksLines || []);
+    const people   = normalizeParticipants(r.participants || [], masksMap);
+
+    for (const self of people) {
+      const others = people
+        .filter(p => p !== self)
+        .map(p => ({ id: p.id, name: p.name, masks: p.masks }));
+
+      const episode = {
+        dateStart: r.dateStart || '',
+        dateEnd:   r.dateEnd || (r.dateStart || ''),
+        type:      r.type || '',
+        status:    r.status || '',
+        title:     r.title || '',
+        href:      r.href || '',
+        order:     Number(r.order ?? r.__sourceOrder ?? 0),
+        location:  r.location || '',
+        masks:     self.masks || [],   // маски владельца
+        participants: others
+      };
+
+      if (!byUser[self.id]) {
+        byUser[self.id] = { name: self.name, episodes: [] };
+      }
+      byUser[self.id].episodes.push(episode);
+    }
+  }
+
+  return byUser;
 }

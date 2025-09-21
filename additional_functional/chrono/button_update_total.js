@@ -53,7 +53,7 @@
         setStatus(success ? 'Готово' : 'Ошибка');
 
         const lines = [];
-        lines.push(`<b>Статус:</b> ${success ? 'ok' : st || 'unknown'}`);
+        lines.push(`Статус: ${success ? 'ok' : st || 'unknown'}`);
         const info  = toPlainShort(res.infoMessage || '');
         const error = toPlainShort(res.errorMessage || '');
         if (info)  lines.push(info);

@@ -478,3 +478,89 @@ async function collectEpisodesFromForums(opts = {}) {
 
   return all;
 }
+
+
+/**
+ * Собирает словарь по пользователям на основе collectEpisodesFromForums.
+ * Учитывает только участников со ссылкой на профиль (есть p.id).
+ *
+ * Параметры:
+ * @param {Object} [opts]
+ * @param {Array<number|string>} [opts.groupIds] - допустимые группы; по умолчанию берётся из CHRONO_CHECK.GroupID
+ * @param {boolean} [opts.respectAccess=true]    - выполнять проверки доступа (если есть хелперы)
+ *
+ * Возвращает:
+ * Promise<{ [userId: string]: { name: string, episodes: Episode[] } }>
+ *
+ * Episode = {
+ *   dateStart: string,
+ *   dateEnd:   string,
+ *   type:      string,
+ *   status:    string,
+ *   title:     string,
+ *   href:      string,
+ *   order:     number,
+ *   location:  string,
+ *   masks:     string[],  // маски владельца
+ *   participants: Array<{ id:string, name:string, masks:string[] }>
+ * }
+ */
+async function collectChronoByUser(opts = {}) {
+  if (typeof collectEpisodesFromForums !== 'function') {
+    throw new Error('collectEpisodesFromForums недоступна');
+  }
+
+  const GID = (opts.groupIds ?? window.CHRONO_CHECK?.GroupID ?? []).map(Number);
+  const respectAccess = opts.respectAccess !== false;
+
+  // получаем список эпизодов (без topicId; источник определяется внутри collectEpisodesFromForums)
+  const episodes = await collectEpisodesFromForums({
+    groupIds: GID,
+    respectAccess
+  });
+
+  const byUser = Object.create(null);
+
+  // гарантируем стабильный порядок
+  episodes.forEach((e, i) => { if (!Number.isFinite(e.order)) e.order = i; });
+
+  for (const ep of episodes) {
+    const participants = (ep.participants || [])
+      .map(p => {
+        const id = p?.id ? String(p.id).trim() : '';
+        if (!id) return null; // игнорируем ники без id/профиля
+        return {
+          id,
+          name: (p.name || '').trim(),
+          masks: Array.isArray(p.masks) ? p.masks.slice() : []
+        };
+      })
+      .filter(Boolean);
+
+    for (const self of participants) {
+      const others = participants
+        .filter(p => p !== self)
+        .map(p => ({ id: p.id, name: p.name, masks: p.masks.slice() }));
+
+      const outEpisode = {
+        dateStart: ep.dateStart || '',
+        dateEnd:   ep.dateEnd   || ep.dateStart || '',
+        type:      ep.type      || '',
+        status:    ep.status    || '',
+        title:     ep.title     || '',
+        href:      ep.href      || '',
+        order:     Number(ep.order || 0),
+        location:  ep.location  || '',
+        masks:     self.masks || [],
+        participants: others
+      };
+
+      if (!byUser[self.id]) {
+        byUser[self.id] = { name: self.name || '', episodes: [] };
+      }
+      byUser[self.id].episodes.push(outEpisode);
+    }
+  }
+
+  return byUser;
+}

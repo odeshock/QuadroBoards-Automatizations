@@ -21,7 +21,8 @@ const plashka_set = [
 ];
 
 
-applyImagePicker(icons_set, '5', btnWidth: 44);
+applyImagePicker(icons_set, '5',
+  btnWidth: 44,);
 applyImagePicker(plashka_set, '3',
   btnWidth: 229,    // ширина кнопки
   btnHeight: 42,   // высота кнопки);

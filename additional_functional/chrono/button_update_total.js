@@ -7,6 +7,7 @@
   const FID = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
   const TID = String(window.CHRONO_CHECK?.ChronoTopicID || '').trim();
   const PID = String(window.CHRONO_CHECK?.TotalChronoPostID || '').trim();
+  const OPEN_URL = (new URL(`/viewtopic.php?id=${TID}#p${PID}`, location.href)).href;
 
   if (!GID.length || !FID.length || !TID || !PID) {
     console.warn('[button_update_total] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');

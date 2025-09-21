@@ -16,7 +16,7 @@ const plashka_set = [
   },
   {
     value: 'hp-02',
-    thumb: `<a class="modal-link"><img src="https://cdn-icons-png.flaticon.com/256/86/86500.png"><wrds style="font-size:10px">ещё вариант</wrds></a>`
+    thumb: `<a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/561829.gif" class="plashka"><wrds style="font-size:10px">twinkle twinkle little star</wrds></a>`
   }
 ];
 

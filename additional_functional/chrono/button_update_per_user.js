@@ -29,11 +29,6 @@
 
   const lc = s => String(s || '').trim();
 
-  function renderStatus(type, status) {
-    const t = MAP_TYPE[type] || MAP_TYPE.au;
-    const s = MAP_STAT[status] || MAP_STAT.archived;
-    return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]]`;
-  }
   function fmtDateBold(start, end) {
     const s = lc(start), e = lc(end);
     if (!s && !e) return '';

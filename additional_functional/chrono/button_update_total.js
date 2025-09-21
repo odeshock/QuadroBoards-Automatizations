@@ -260,97 +260,82 @@
   function parseDateFlexible(raw) {
     let s = String(raw || '').trim();
     if (!s) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-
-    s = s.replace(DASH_RX, '-').replace(/\s*-\s*/g, '-');
+  
+    // нормализуем тире и «точки» (вдруг в заголовке стоят ∙ • · или U+2024)
+    s = s
+      .replace(/[\u2012-\u2015\u2212—–−]/g, '-')          // все тире -> '-'
+      .replace(/[.\u2024\u2219\u00B7\u2027\u22C5·∙•]/g, '.')
+      .replace(/\s*-\s*/g, '-');
+  
     const parts = s.split('-').slice(0,2);
-
     if (parts.length === 1) {
       const one = parseToken(parts[0]);
       if (!one || !one.y) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-      const start = one;
-      const disp = displaySingle(start);
-      const key  = [start.y, start.m ?? 0, start.d ?? 0];
-      return { hasDate:true, display:disp, startSort:key, endSort:key };
+      const k = [one.y, one.m ?? 0, one.d ?? 0];
+      return { hasDate:true, display:displaySingle(one), startSort:k, endSort:k };
     }
-
-    // диапазон
+  
     const leftRaw  = parts[0].trim();
     const rightRaw = parts[1].trim();
-
+  
     const R0 = parseToken(rightRaw);
     if (!R0 || !R0.y) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-
+  
     let L0 = parseToken(leftRaw);
-
-    // КЛЮЧЕВАЯ ПОПРАВКА:
-    // если слева только 1-2 цифры, это ДЕНЬ (если справа d+m), или МЕСЯЦ (если справа m+y), иначе ГОД.
-    const leftSoloM = leftRaw.match(/^\d{1,2}$/);
-    if (leftSoloM) {
-      const v = +leftSoloM[0];
-      if (R0.d != null && R0.m != null) {
-        L0 = { y: R0.y, m: R0.m, d: v };
-      } else if (R0.m != null) {
-        L0 = { y: R0.y, m: v };
-      } else {
-        L0 = { y: toYYYY(v) };
-      }
+  
+    // если слева только 1–2 цифры — день/месяц по контексту справа
+    const mSolo = leftRaw.match(/^\d{1,2}$/);
+    if (mSolo) {
+      const v = +mSolo[0];
+      if (R0.d != null && R0.m != null)      L0 = { y:R0.y, m:R0.m, d:v };   // 12-13.12.98
+      else if (R0.m != null)                 L0 = { y:R0.y, m:v };           // 11-12.2001
+      else                                   L0 = { y: toYYYY(v) };          // 97-98
     }
-
-    // если слева dd.mm без года, подставим год справа
-    if (L0 && L0.y == null && L0.d != null && L0.m != null && R0.y) L0.y = R0.y;
-
-    // финальная валидация
-    if (L0 && L0.d != null && !(L0.y && L0.m && L0.d>=1 && L0.d<=daysInMonth(L0.y,L0.m))) {
-      return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-    }
-    if (R0 && R0.d != null && !(R0.y && R0.m && R0.d>=1 && R0.d<=daysInMonth(R0.y,R0.m))) {
-      return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
-    }
-
-    const start = L0;
-    const end   = R0;
-
-    const startKey = [start.y, start.m ?? 0, start.d ?? 0];
-    const endKey   = [end.y ?? start.y, end.m ?? 0, end.d ?? 0];
-
-    const disp = displayRange(start, end);
-    return { hasDate:true, display:disp, startSort:startKey, endSort:endKey };
+  
+    if (L0 && L0.y == null && L0.d != null && L0.m != null && R0.y) L0.y = R0.y; // 30.11-02.12.01
+  
+    // валидация дней после подстановок
+    const okDay = (o)=> (o.d==null) || (o.y && o.m && o.d>=1 && o.d<=daysInMonth(o.y,o.m));
+    if (!okDay(L0) || !okDay(R0)) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };
+  
+    const startKey = [L0.y, L0.m ?? 0, L0.d ?? 0];
+    const endKey   = [R0.y ?? L0.y, R0.m ?? 0, R0.d ?? 0];
+  
+    return { hasDate:true, display:displayRange(L0,R0), startSort:startKey, endSort:endKey };
   }
 
   function parseToken(t) {
-    const s = String(t || '').trim();
+    const s = String(t || '').trim()
+      .replace(/[.\u2024\u2219\u00B7\u2027\u22C5·∙•]/g, '.');
   
-    // 1) Полная дата: dd.mm.yyyy / dd.mm.yy
+    // dd.mm.yyyy / dd.mm.yy
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
       const d  = +m[1], mo = +m[2], y = toYYYY(m[3]);
-      if (!(mo >= 1 && mo <= 12)) return null;
-      if (!(d >= 1 && d <= daysInMonth(y, mo))) return null;
+      if (mo<1 || mo>12) return null;
+      if (d<1 || d>daysInMonth(y,mo)) return null;
       return { y, m: mo, d };
     }
   
-    // 2) Месяц + год: mm.yyyy / mm.yy  (ставим ПЕРЕД dd.mm!)
+    // mm.yyyy / mm.yy  ← ПРИОРИТЕТНО!
     m = s.match(/^(\d{1,2})\.(\d{2}|\d{4})$/);
     if (m) {
-      const mo = +m[1], y = toYYYY(m[2]);
-      if (mo >= 1 && mo <= 12) return { y, m: mo };
-      // если «месяц» оказался 00/0 — точно не mm.yy → продолжаем ниже (в dd.mm не зайдём)
+      const mo = +m[1], y = toYYYY(m[2]);           // '12.00' -> 12, 2000
+      if (mo>=1 && mo<=12) return { y, m: mo };
+      // если «месяц» невалидный (0/13) — НЕ возвращаемся, пусть попробуют другие формы
     }
   
-    // 3) День + месяц без года: dd.mm   (используется в диапазонах слева)
+    // dd.mm (см. диапазоны слева)
     m = s.match(/^(\d{1,2})\.(\d{1,2})$/);
     if (m) {
       const d = +m[1], mo = +m[2];
-      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return { m: mo, d };
-      return null; // здесь уже точно dd.mm и оно невалидно
+      if (mo>=1 && mo<=12 && d>=1 && d<=31) return { m: mo, d };
+      return null;
     }
   
-    // 4) Год: yyyy / yy
+    // yyyy / yy
     m = s.match(/^(\d{2}|\d{4})$/);
-    if (m) {
-      const y = toYYYY(m[1]);
-      return { y };
-    }
+    if (m) return { y: toYYYY(m[1]) };
   
     return null;
   }

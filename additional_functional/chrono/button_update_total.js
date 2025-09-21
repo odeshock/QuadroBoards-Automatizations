@@ -228,7 +228,7 @@
     return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]]`;
   }
 
-  function normalizeEpisodeTitle(type, rawTitle) {
+  function normalizeEpisodeTitle(type, rawTitle, dateRaw) {
     const title = String(rawTitle || '');
   
     // Ошибка/подсказка будет в BB-коде [mark]...[/mark]
@@ -246,13 +246,13 @@
     }
   
     if (type === 'au') {
-      // Требуется префикс в самом начале: "[au] " (без учёта регистра)
-      const prefRx = /^\s*\[au\]\s+/i;
-      if (!prefRx.test(title)) {
+      // Проверяем факт наличия префикса по вынесенному parseTitle значению
+      const hasPrefix = /^\s*au\s*$/i.test(String(dateRaw || ''));
+      if (!hasPrefix) {
         err = `[mark]нужен префикс "[au] "[/mark]`;
       }
-      // Удаляем начальное "[au] " в любом регистре
-      const cleaned = title.replace(prefRx, '');
+      // На всякий случай удалим возможное "[au]" в начале самого заголовка
+      const cleaned = title.replace(/^[\uFEFF\u00A0\s]*\[\s*au\s*\]\s*/i, '');
       return { title: cleaned, err };
     }
   
@@ -271,7 +271,7 @@
       const url = FMV.escapeHtml(e.url);
   
       // НОВОЕ: проверяем/чистим заголовок по правилам типа
-      const norm = normalizeEpisodeTitle(e.type, e.episode || '');
+      const norm = normalizeEpisodeTitle(e.type, e.episode || '', e.dateRaw);
       const ttl  = FMV.escapeHtml(norm.title);
       const errBeforeOrder = norm.err ? ` ${norm.err}` : '';
   

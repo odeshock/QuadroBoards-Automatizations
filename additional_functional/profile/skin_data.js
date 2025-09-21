@@ -6,10 +6,11 @@ const icons_set = [
 
 const plashka_set = [
   `<a class="modal-link">
-        <img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka">
-        <wrds>
-          я не подарок, но и ты не шаверма
-        </wrds></a>z`,`<a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/561829.gif" class="plashka"><wrds>twinkle twinkle little star</wrds></a>`
+   <img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka">
+   <wrds>я не подарок, но и ты не шаверма</wrds></a>`,
+  `<a class="modal-link">
+   <img src="https://upforme.ru/uploads/001c/14/5b/440/561829.gif" class="plashka">
+   <wrds>twinkle twinkle little star</wrds></a>`
 ];
 
 

@@ -207,11 +207,16 @@
   function renderChrono(events) {
     const rows = events.map(e => {
       const status = renderStatus(e.type, e.status);
-      const dateHTML = e.hasDate ? FMV.escapeHtml(e.dateDisplay) : `[mark]дата не указана[/mark]`;
+  
+      // ⬇️ было: const dateHTML = e.hasDate ? ... : `[mark]дата не указана[/mark]`;
+      const dateHTML = (e.type === 'au')
+        ? (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : '') // в AU — ничего, если даты нет
+        : (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : `[mark]дата не указана[/mark]`);
+  
       const url  = FMV.escapeHtml(e.url);
       const ttl  = FMV.escapeHtml(e.episode || '');
       const ord  = ` [порядок: ${FMV.escapeHtml(String(e.order ?? 0))}]`;
-
+  
       const asBB = true;
       const names = (e.participantsLower && e.participantsLower.length)
         ? e.participantsLower.map(low => {
@@ -227,15 +232,15 @@
             return `${display}${tail}`;
           }).join(', ')
         : `[mark]не указаны[/mark]`;
-
+  
       const loc = (e.locationsLower && e.locationsLower.length)
         ? FMV.escapeHtml(e.locationsLower.join(', '))
         : `[mark]локация не указана[/mark]`;
-
+  
       const dash = dateHTML ? ' — ' : ' ';
       return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${ord}\n[i]${names}[/i]\n${loc}\n\n`;
     });
-
+  
     const body = rows.join('') || ``;
     return `[media="Собранная хронология"]${body}[/media]`;
   }

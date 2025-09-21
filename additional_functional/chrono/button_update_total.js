@@ -113,7 +113,7 @@
             ? ' [mark]в названии нет [au][/mark]'
             : ' [mark]в названии нет [с][/mark]');
 
-      const ord = `${FMV.escapeHtml(String(e.order ?? 0))}]`;
+      const ord = `${FMV.escapeHtml(String(e.order ?? 0))}`;
 
       const asBB = true;
       const names = (Array.isArray(e.participants) && e.participants.length)
@@ -133,7 +133,7 @@
 
       const dash = dateDisplay ? ' — ' : ' ';
 
-      return `${dateDisplay}${dash}[url=${url}]${ttl}[/url]${errBeforeOrder}\n${status} / ${ord}\n[i]${names}[/i]\n${loc}\n\n`;
+      return `${dateDisplay}${dash}[url=${url}]${ttl}[/url]${errBeforeOrder}\n[${status} / ${ord}]\n[i]${names}[/i]\n${loc}\n\n`;
     });
 
     return `[media="Общая хронология"]${rows.join('') || ''}[/media]`;

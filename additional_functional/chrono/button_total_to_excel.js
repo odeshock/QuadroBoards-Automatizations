@@ -25,7 +25,7 @@
 
     showStatus: true,
     showDetails: true,
-    showLink: true,        // <a> создаём сразу; видимость контролируем setLink('', '')
+    showLink: true,          // <a> создаём сразу; видимость управляем setLink('', '')
     linkText: 'скачать',
     linkHref: '',
 
@@ -34,7 +34,8 @@
       const setDetails = api?.setDetails || (()=>{});
       const setLink    = api?.setLink    || (()=>{});
 
-      setLink('', ''); // скрыть во время работы
+      // скрыть ссылку на время работы
+      setLink('', '');
 
       try {
         setStatus('Загружаю комментарий…');
@@ -46,23 +47,22 @@
 
         const root = post.querySelector('.post-content, .postmsg, .entry-content, .content, .post-body, .post') || post;
 
-        // 1) сначала пробуем исходный HTML в <script type="text/html"> внутри спойлера
-        let events = [];
+        // 1) приоритет — исходный HTML внутри спойлера (<script type="text/html">)
+        let rows = [];
         const scriptTpl = root.querySelector('.quote-box.spoiler-box.media-box script[type="text/html"], .spoiler-box script[type="text/html"], .media-box script[type="text/html"]');
-        if (scriptTpl && scriptTpl.textContent) events = parseFromScriptHTML(scriptTpl.textContent);
+        if (scriptTpl && scriptTpl.textContent) rows = parseFromScriptHTML(scriptTpl.textContent);
 
-        // 2) иначе — парсим отрендерённый блок
-        if (!events.length) {
+        // 2) иначе — fallback по отрендерённому блоку
+        if (!rows.length) {
           const media = findChronoRendered(root) || root;
-          events = parseFromRendered(media);
+          rows = parseFromRendered(media);
         }
 
-        if (!events.length) throw new Error('Не нашёл блок «Собранная хронология».');
+        if (!rows.length) throw new Error('Не удалось найти блок «Собранная хронология».');
 
         setStatus('Формирую .xlsx…');
-        const { blob, filename } = buildXLSX(events);
+        const { blob, filename } = buildXLSX(rows);
 
-        // revoke предыдущий урл
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }
         lastBlobUrl = URL.createObjectURL(blob);
 
@@ -71,7 +71,7 @@
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 
-        setDetails(`<b>Строк:</b> ${events.length}<br><b>Источник:</b> <a href="${FMV.escapeHtml(OPEN_URL)}" target="_blank">комментарий</a><br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
+        setDetails(`<b>Строк:</b> ${rows.length}<br><b>Источник:</b> <a href="${FMV.escapeHtml(OPEN_URL)}" target="_blank">комментарий</a><br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
       } catch (e) {
         setStatus('Ошибка');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
@@ -80,7 +80,7 @@
     }
   });
 
-  /* ===================== ПОИСК/БЛОК ===================== */
+  /* ===================== ПОИСК ПОСТА / БЛОКА ===================== */
 
   function findPostNode(doc, pid) {
     const id = `p${pid}`;
@@ -98,7 +98,7 @@
     return cand.closest('.quote-box, .media, .spoiler-box, .content, .post, div, section') || cand;
   }
 
-  /* ===================== ПАРСИНГ (из <script type="text/html">) ===================== */
+  /* ===================== ПАРСИНГ: <script type="text/html"> ===================== */
 
   function parseFromScriptHTML(htmlText) {
     const parser = new DOMParser();
@@ -112,7 +112,7 @@
     return out;
   }
 
-  /* ===================== ПАРСИНГ (fallback: отрендерённый HTML) ===================== */
+  /* ===================== ПАРСИНГ: отрендерённый HTML (fallback) ===================== */
 
   function parseFromRendered(container) {
     const ps = container.querySelectorAll('p');
@@ -160,8 +160,8 @@
       type, status, title, href,
       dateStart: start, dateEnd: end,
       order: Number.isFinite(order) ? order : 0,
-      participants,  // [{name, href}] в нужном порядке
-      masksLines,    // ["Имя — маска1, маска2", ...]
+      participants,      // [{name, href}]
+      masksLines,        // ["Имя — маска1, маска2", ...]
       location
     };
   }
@@ -199,12 +199,12 @@
     const list = [];
     let cur = null;
     const push = () => { if (cur) { list.push(cur); cur = null; } };
-    const masksMap = new Map(); // name -> [m1, m2]
+    const masksMap = new Map(); // name -> [mask1, mask2]
 
     for (const node of nodes) {
       if (node.nodeType === 3) {
         const t = node.nodeValue || '';
-        if (/^\s*,\s*$/.test(t)) { push(); continue; }     // разделитель
+        if (/^\s*,\s*$/.test(t)) { push(); continue; }        // разделитель
         const m = t.match(/\[\s*as\s+([^\]]+)\]/i);
         if (m && cur) {
           const arr = m[1].split(/\s*,\s*/).filter(Boolean);
@@ -256,12 +256,11 @@
     return t;
   }
 
-  /* ===================== XLSX builder (минимальный OpenXML + ZIP) ===================== */
+  /* ===================== XLSX builder (OpenXML + ZIP) ===================== */
 
-  // --- утилиты ZIP ---
   const encUTF8 = s => new TextEncoder().encode(s);
 
-  // CRC32 (для zip)
+  // CRC32
   const CRC_TABLE = (() => {
     const t = new Uint32Array(256);
     for (let n=0; n<256; n++){
@@ -287,73 +286,129 @@
       d.getDate();
     return { date, time };
   }
-  function ZipBuilder(){
+
+  // --- ZIP builder (fixed, UTF-8, no compression) ---
+  function ZipBuilder() {
+    const chunks = [];
     const files = [];
     let offset = 0;
-    const chunks = [];
-    return {
-      add(name, u8){
-        const {date,time} = toDOSDateTime();
-        const crc = crc32(u8);
-        const local =
-          [0x04034b50, 20, 0, 0, time, date, crc, u8.length, u8.length, name.length, 0]; // no extra
-        const localU8 = new Uint8Array(30 + name.length);
-        const dv = new DataView(localU8.buffer);
-        let p=0;
-        for (const v of local){ dv.setUint32(p, v>>>0, true); p+=4; }
-        for (let i=0;i<name.length;i++) localU8[30+i] = name.charCodeAt(i);
-        chunks.push(localU8, u8);
-        const headerOffset = offset;
-        offset += localU8.length + u8.length;
 
-        files.push({name, crc, size:u8.length, comp:u8.length, date, time, headerOffset});
+    const encName = (name) => new TextEncoder().encode(String(name).replace(/\\/g, '/'));
+
+    function writeLocalHeader(nameU8, dataU8, crc, date, time) {
+      const u8 = new Uint8Array(30 + nameU8.length);
+      const dv = new DataView(u8.buffer);
+      let p = 0;
+      dv.setUint32(p, 0x04034b50, true); p += 4;          // signature
+      dv.setUint16(p, 20, true);        p += 2;           // version needed
+      dv.setUint16(p, 0x0800, true);    p += 2;           // UTF-8 flag
+      dv.setUint16(p, 0, true);         p += 2;           // compression = 0
+      dv.setUint16(p, time, true);      p += 2;
+      dv.setUint16(p, date, true);      p += 2;
+      dv.setUint32(p, crc, true);       p += 4;
+      dv.setUint32(p, dataU8.length, true); p += 4;
+      dv.setUint32(p, dataU8.length, true); p += 4;
+      dv.setUint16(p, nameU8.length, true); p += 2;
+      dv.setUint16(p, 0, true);         p += 2;           // extra len
+      u8.set(nameU8, p);
+      return u8;
+    }
+
+    function writeCentralHeader(nameU8, f) {
+      const u8 = new Uint8Array(46 + nameU8.length);
+      const dv = new DataView(u8.buffer);
+      let p = 0;
+      dv.setUint32(p, 0x02014b50, true); p += 4;      // signature
+      dv.setUint16(p, 0x031E, true);     p += 2;      // version made by
+      dv.setUint16(p, 20, true);         p += 2;      // version needed
+      dv.setUint16(p, 0x0800, true);     p += 2;      // UTF-8 flag
+      dv.setUint16(p, 0, true);          p += 2;      // compression
+      dv.setUint16(p, f.time, true);     p += 2;
+      dv.setUint16(p, f.date, true);     p += 2;
+      dv.setUint32(p, f.crc, true);      p += 4;
+      dv.setUint32(p, f.size, true);     p += 4;      // csize
+      dv.setUint32(p, f.size, true);     p += 4;      // usize
+      dv.setUint16(p, nameU8.length, true); p += 2;
+      dv.setUint16(p, 0, true);          p += 2;      // extra len
+      dv.setUint16(p, 0, true);          p += 2;      // file comment len
+      dv.setUint16(p, 0, true);          p += 2;      // disk number
+      dv.setUint16(p, 0, true);          p += 2;      // internal attrs
+      dv.setUint32(p, 0, true);          p += 4;      // external attrs
+      dv.setUint32(p, f.headerOffset, true); p += 4;  // relative offset
+      u8.set(nameU8, p);
+      return u8;
+    }
+
+    return {
+      add(name, dataU8) {
+        const nameU8 = encName(name);
+        const { date, time } = toDOSDateTime();
+        const crc = crc32(dataU8);
+
+        const local = writeLocalHeader(nameU8, dataU8, crc, date, time);
+        const headerOffset = offset;
+        chunks.push(local, dataU8);
+        offset += local.length + dataU8.length;
+
+        files.push({ nameU8, crc, size: dataU8.length, date, time, headerOffset });
       },
-      finalize(){
+
+      finalize() {
         // central directory
-        const cds = [];
         let cdSize = 0;
-        for (const f of files){
-          const name = f.name;
-          const cdHead =
-            [0x02014b50, 0, 20, 0, 0, f.time, f.date, f.crc, f.size, f.size, name.length, 0, 0, 0, 0, 0, f.headerOffset];
-          const u8 = new Uint8Array(46 + name.length);
-          const dv = new DataView(u8.buffer); let p=0;
-          for (const v of cdHead){ dv.setUint32(p, v>>>0, true); p+=4; }
-          for (let i=0;i<name.length;i++) u8[46+i] = name.charCodeAt(i);
-          cds.push(u8); cdSize += u8.length;
-        }
+        const cds = files.map(f => {
+          const cd = writeCentralHeader(f.nameU8, f);
+          cdSize += cd.length;
+          return cd;
+        });
         const cdStart = offset;
         chunks.push(...cds);
         offset += cdSize;
 
-        const end =
-          [0x06054b50, 0,0, files.length, files.length, cdSize, cdStart, 0];
-        const endU8 = new Uint8Array(22);
-        const dv = new DataView(endU8.buffer); let p=0;
-        for (const v of end){ dv.setUint32(p, v>>>0, true); p+=4; }
-        chunks.push(endU8);
+        // end of central directory
+        const end = new Uint8Array(22);
+        const dv = new DataView(end.buffer);
+        let p = 0;
+        dv.setUint32(p, 0x06054b50, true); p += 4;
+        dv.setUint16(p, 0, true); p += 2; // disk
+        dv.setUint16(p, 0, true); p += 2; // start disk
+        dv.setUint16(p, files.length, true); p += 2;
+        dv.setUint16(p, files.length, true); p += 2;
+        dv.setUint32(p, cdSize, true); p += 4;
+        dv.setUint32(p, cdStart, true); p += 4;
+        dv.setUint16(p, 0, true); p += 2; // comment len
+        chunks.push(end);
 
         // concat
-        let total=0; for (const c of chunks) total+=c.length;
+        let total = 0; for (const c of chunks) total += c.length;
         const out = new Uint8Array(total);
-        let off=0; for (const c of chunks){ out.set(c, off); off+=c.length; }
+        let off = 0; for (const c of chunks) { out.set(c, off); off += c.length; }
         return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       }
     };
   }
 
-  // --- конвертация данных в OpenXML parts ---
-  function colLetter(n){ // 0 -> A
-    let s=''; n++;
-    while(n){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=(n-m-1)/26|0; }
-    return s;
+  // ==== helpers for sheet xml ====
+  function colLetter(n){ let s=''; n++; while(n){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=(n-m-1)/26|0; } return s; }
+  function escText(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function xmlAttr(s){ return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  function cellRef(ci, ri){ return colLetter(ci) + ri; }
+  function cellInlineStr(ci, ri, text, styleId){
+    const t = escText(text).replace(/\r?\n/g,'&#10;');
+    const sAttr = styleId ? ` s="${styleId}"` : '';
+    return `<c r="${cellRef(ci,ri)}" t="inlineStr"${sAttr}><is><t xml:space="preserve">${t}</t></is></c>`;
   }
+  function cellNumber(ci, ri, num, styleId){
+    const sAttr = styleId ? ` s="${styleId}"` : '';
+    return `<c r="${cellRef(ci,ri)}"${sAttr}><v>${Number(num)||0}</v></c>`;
+  }
+  function rowXML(ri, cells){ return `    <row r="${ri}">${cells.join('')}</row>`; }
 
+  // --- XLSX packer ---
   function buildXLSX(rows){
-    // Генерим минимальные части пакета XLSX
     const zip = ZipBuilder();
 
-    // 0) [Content_Types].xml
+    // [Content_Types].xml
     const CT =
 `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -362,11 +417,10 @@
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-  <Override PartName="/xl/worksheets/_rels/sheet1.xml.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 </Types>`;
     zip.add('[Content_Types].xml', encUTF8(CT));
 
-    // 1) _rels/.rels
+    // _rels/.rels
     const RELS =
 `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -374,7 +428,7 @@
 </Relationships>`;
     zip.add('_rels/.rels', encUTF8(RELS));
 
-    // 2) xl/workbook.xml
+    // xl/workbook.xml
     const WORKBOOK =
 `<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -385,16 +439,16 @@
 </workbook>`;
     zip.add('xl/workbook.xml', encUTF8(WORKBOOK));
 
-    // 3) xl/_rels/workbook.xml.rels
+    // xl/_rels/workbook.xml.rels
     const WB_RELS =
 `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"   Target="styles.xml"/>
 </Relationships>`;
     zip.add('xl/_rels/workbook.xml.rels', encUTF8(WB_RELS));
 
-    // 4) xl/styles.xml (wrapText стиль #1)
+    // xl/styles.xml (wrapText стиль 1)
     const STYLES =
 `<?xml version="1.0" encoding="UTF-8"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -410,47 +464,34 @@
 </styleSheet>`;
     zip.add('xl/styles.xml', encUTF8(STYLES));
 
-    // 5) xl/worksheets/sheet1.xml (+ rels для гиперссылок темы)
+    // xl/worksheets/sheet1.xml (+ hyperlinks rels)
     const header = ['Тип','Статус','Тема','Дата начала','Дата конца','Порядок','Участники','Маски','Локация'];
-
-    const wrapStyle = 1; // индекс в cellXfs
+    const wrapStyle = 1;
 
     const rowsXml = [];
-    // row 1 — заголовок
     rowsXml.push(rowXML(1, header.map((v,i)=> cellInlineStr(i,1,v,0))));
 
-    // гиперссылки (только в колонке C)
     const hlinks = [];
     rows.forEach((r, idx) => {
       const rnum = idx + 2;
       const cells = [];
 
-      // A: Тип
       cells.push(cellInlineStr(0, rnum, r.type, 0));
-      // B: Статус
       cells.push(cellInlineStr(1, rnum, r.status, 0));
-      // C: Тема (inline string + hyperlink)
-      const cRef = "C"+rnum;
+      // Тема (C) + гиперссылка
+      const cref = 'C' + rnum;
       cells.push(cellInlineStr(2, rnum, r.title || '', 0));
-      if (r.href) hlinks.push({ ref:cRef, href:r.href });
+      if (r.href) hlinks.push({ ref: cref, href: r.href });
 
-      // D: Дата начала
       cells.push(cellInlineStr(3, rnum, r.dateStart || '', 0));
-      // E: Дата конца (или дубль начала)
       cells.push(cellInlineStr(4, rnum, r.dateEnd || (r.dateStart || ''), 0));
-      // F: Порядок (число)
-      cells.push(cellNumber(5, rnum, Number(r.order)||0));
+      cells.push(cellNumber(5, rnum, Number(r.order) || 0, 0));
 
-      // G: Участники — "Имя — ссылка" по строкам
       const participantsText = (r.participants||[])
         .map(p => p.href ? `${p.name} — ${p.href}` : `${p.name}`)
         .join('\n');
       cells.push(cellInlineStr(6, rnum, participantsText, wrapStyle));
-
-      // H: Маски — каждая строка "Имя — маски"
       cells.push(cellInlineStr(7, rnum, (r.masksLines||[]).join('\n'), wrapStyle));
-
-      // I: Локация
       cells.push(cellInlineStr(8, rnum, r.location || '', wrapStyle));
 
       rowsXml.push(rowXML(rnum, cells));
@@ -480,23 +521,6 @@ ${hlinks.map((h,i)=>`  <Relationship Id="rId${i+1}" Type="http://schemas.openxml
     const blob = zip.finalize();
     const filename = `chronology_${new Date().toISOString().slice(0,10)}.xlsx`;
     return { blob, filename };
-
-    // helpers for sheet xml
-    function cellRef(ci, ri){ return colLetter(ci) + ri; }
-    function escText(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-    function xmlAttr(s){ return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-    function cellInlineStr(ci, ri, text, styleId){
-      const t = escText(text).replace(/\r?\n/g,'&#10;'); // \n внутри
-      const sAttr = styleId ? ` s="${styleId}"` : '';
-      return `<c r="${cellRef(ci,ri)}" t="inlineStr"${sAttr}><is><t xml:space="preserve">${t}</t></is></c>`;
-    }
-    function cellNumber(ci, ri, num, styleId){
-      const sAttr = styleId ? ` s="${styleId}"` : '';
-      return `<c r="${cellRef(ci,ri)}"${sAttr}><v>${Number(num)||0}</v></c>`;
-    }
-    function rowXML(ri, cells){
-      return `    <row r="${ri}">${cells.join('')}</row>`;
-    }
   }
 
 })();

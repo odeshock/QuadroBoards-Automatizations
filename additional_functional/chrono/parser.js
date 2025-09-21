@@ -547,8 +547,6 @@ async function collectChronoByUser(opts = {}) {
 
   // получаем эпизоды с учётом sections
   const episodes = await collectEpisodesFromForums({
-    groupIds: GID,
-    respectAccess,
     sections,
     maxPagesPerSection
   });

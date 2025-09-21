@@ -9,7 +9,7 @@ const plashka_set = [
     value: 'hp-01',
     thumb: `<a class="modal-link">
         <img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka">
-        <wrds style="color:#ffffff;font-family:Blue April;font-size:9px;letter-spacing:1.2px;opacity:0.8;">
+        <wrds">
           я не подарок, но и ты не шаверма
         </wrds></a>
     `

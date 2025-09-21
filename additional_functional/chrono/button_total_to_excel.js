@@ -66,7 +66,7 @@
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 
-        setDetails(`<b>Строк:</b> ${rows.length}<br><b>Источник:</b> <a href="${FMV.escapeHtml(OPEN_URL)}" target="_blank">комментарий</a><br><b>Файл:</b> ${FMV.escapeHtml(filename)}`);
+        setDetails(`Строк: ${rows.length}\nИсточник: "${FMV.escapeHtml(OPEN_URL)}\nФайл: ${FMV.escapeHtml(filename)}`);
       } catch (e) {
         setStatus('Ошибка');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));

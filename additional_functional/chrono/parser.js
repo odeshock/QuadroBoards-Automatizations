@@ -407,7 +407,7 @@ async function collectEpisodesFromForums(opts = {}) {
       const { dateRaw, episode } = parseTitle(safeTitle);
       const parsed = parseDateFlexible(dateRaw);
 
-      const norm = normalizeEpisodeTitle(type, episode || '');
+      const norm = normalizeEpisodeTitle(type, episode || '', parsed.hasDate);
 
       const rawChars = FMV.readTagText(first, 'characters');
       const rawLoc   = FMV.readTagText(first, 'location');

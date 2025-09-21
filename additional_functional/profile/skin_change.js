@@ -44,7 +44,7 @@ function resolveFieldBySuffix(suffix) {
   return (
     document.querySelector(`#${CSS.escape(id)}[name="${name}"][type="text"]`) ||
     document.getElementById(id) ||
-    document.querySelector(`input[name="${name}"]`)
+    document.querySelector(`textarea[name="${name}"]`)
   );
 }
 

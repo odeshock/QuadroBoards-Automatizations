@@ -125,9 +125,10 @@
             ? `[b]${FMV.escapeHtml(e.dateEnd && e.dateEnd !== e.dateStart ? `${e.dateStart}-${e.dateEnd}` : e.dateStart)}[/b]`
             : `[mark]дата не указана[/mark]`);
       const url = FMV.escapeHtml(e.href || '');
-      const norm = normalizeEpisodeTitle(e.type, e.title || '', '');
-      const ttl  = FMV.escapeHtml(norm.title);
-      const errBeforeOrder = norm.err ? ` ${norm.err}` : '';
+      const ttl  = FMV.escapeHtml(e.title || '');
+      const errBeforeOrder = e.isTitleNormalized 
+        ? '' 
+        : ((e.type === 'au') ? ' [mark]в названии нет [au][/mark]' : ' [mark]в названии нет [с][/mark]');
       const ord = `${FMV.escapeHtml(String(e.order ?? 0))}]`;
       const asBB = true;
       const names = (Array.isArray(e.participants) && e.participants.length)

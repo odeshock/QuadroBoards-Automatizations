@@ -20,7 +20,7 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'выгрузить Excel (.xlsx)',
+    label: 'выгрузить excel',
     order: 2,
     showStatus: true,
     showDetails: true,

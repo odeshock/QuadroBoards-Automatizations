@@ -238,6 +238,39 @@ function topicTitleFromCrumbs(doc) {
   return '';
 }
 
+/* ===================== парсинг ===================== */
+function parseFromScriptHTML(htmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${htmlText}</div>`, 'text/html');
+  const wrap = doc.body.firstElementChild;
+  const out = [];
+  wrap.querySelectorAll('p').forEach(p => { const row = parseParagraph(p); if (row) out.push(row); });
+  return out;
+}
+function parseFromRendered(container) {
+  const ps = container.querySelectorAll('p');
+  if (ps.length) return Array.from(ps).map(parseParagraph).filter(Boolean);
+  const html = container.innerHTML.replace(/<br\s*\/?>/gi, '\n');
+  return html.split(/\n{2,}/).map(chunk => {
+    const div = document.createElement('div');
+    div.innerHTML = `<p>${chunk}</p>`;
+    return parseParagraph(div.firstElementChild);
+  }).filter(Boolean);
+}
+function findPostNode(doc, pid) {
+  const id = `p${pid}`;
+  let node = doc.getElementById(id);
+  if (node) return node;
+  const a = doc.querySelector(`a[name="${id}"]`);
+  if (a) return a.closest('.post') || a.closest('.blockpost') || a.parentElement;
+  node = doc.querySelector(`[id^="p${pid}"]`);
+  return node;
+}
+function textFromNodes(nodes) {
+  return nodes.map(n => n.nodeType===3 ? (n.nodeValue||'') : (n.nodeType===1 ? (n.textContent||'') : ''))
+    .join('').replace(/\s+/g,' ').trim();
+}
+
 /* === helpers: общие утилиты для всех скриптов (НОВОЕ) === */
 (function () {
   'use strict';

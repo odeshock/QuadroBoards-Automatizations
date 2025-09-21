@@ -5,6 +5,12 @@ function findChronoRendered(root) {
   return cand.closest('.quote-box, .media, .spoiler-box, .content, .post, div, section') || cand;
 }
 
+function renderStatus(type, status) {
+  const t = MAP_TYPE[type] || MAP_TYPE.au;
+  const s = MAP_STAT[status] || MAP_STAT.archived;
+  return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]`;
+}
+
 // --- parseParagraph: делим <p> на 4 логические строки по <br> ---
 function parseParagraph(p) {
   const lines = [[], [], [], []]; // 0: дата+тема, 1: мета, 2: участники, 3: локация (+ всё остальное)

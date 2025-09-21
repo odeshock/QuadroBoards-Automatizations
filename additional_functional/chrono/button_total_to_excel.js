@@ -47,7 +47,7 @@
         setDetails('');
 
         // === берём готовые эпизоды из парсера
-        const episodes = await collectEpisodesFromForums();
+        const episodes = await collectEpisodesFromForums({ sections: SECTIONS });
         if (!episodes.length) throw new Error('Эпизоды не найдены.');
 
         // Маппинг эпизодов → строки таблицы

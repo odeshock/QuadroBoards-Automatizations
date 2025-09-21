@@ -415,8 +415,6 @@ async function collectEpisodesFromForums(opts = {}) {
         return { name: String(low), masks };
       });
 
-      const norm = normalizeEpisodeTitle(type, episode || '', dateRaw);
-
       const dateStartStr = parsed.hasDate
         ? (parsed.left?.d!=null ? displaySingle(parsed.left)
            : parsed.left?.m!=null ? displaySingle(parsed.left)

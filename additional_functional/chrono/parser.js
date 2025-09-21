@@ -324,26 +324,31 @@ async function collectEpisodesFromForums(opts = {}) {
       .localeCompare(String(b.title||'').toLowerCase(), 'ru', { sensitivity:'base' });
   }
   function normalizeEpisodeTitle(type, rawTitle) {
-    const title = String(rawTitle || '');
+    const title = String(rawTitle || '').trim();
     let ok = true;
   
     if (type === 'plot') {
-      const rx = /\[\s*[cс]\s*\]/i;                 // [c] или [с]
+      // "... [c]" или "... [с]" в конце (c — латиница, с — кириллица)
+      const rx = /\s\[\s*(?:c|с)\s*\]$/i;
       ok = rx.test(title);
-      return { title: title.replace(/\[\s*[cс]\s*\]/ig, '').trim(), ok };
+      return {
+        title: ok ? title.replace(rx, '').trim() : title,
+        ok
+      };
     }
   
     if (type === 'au') {
-      const rx = /\[\s*au\s*\]/i;                   // [au] в любой позиции
+      // Разрешаем только начало "[au] " или "[AU] " — строго оба символа в нижнем или в верхнем регистре
+      const rx = /^(?:\[\s*au\s*\]\s+|\[\s*AU\s*\]\s+)/;
       ok = rx.test(title);
-      return { title: title.replace(/\[\s*au\s*\]/ig, '').trim(), ok };
+      return {
+        title: ok ? title.replace(rx, '').trim() : title,
+        ok
+      };
     }
   
     return { title, ok };
-}
-
-
-  
+  }  
 
   // ==== скрапперы ====
   async function scrapeSection(section, seenTopics) {

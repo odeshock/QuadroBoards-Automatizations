@@ -1,4 +1,4 @@
-// button_collect_chrono_to_media.js
+// button_collect_chrono_to_media.js — через collectChronoByUser (sections)
 (() => {
   'use strict';
 
@@ -10,69 +10,87 @@
 
   if (!GID.length || !FID.length || !TID || !TARGET_PID) return;
 
+  // при наличии — явно прокинем sections
   const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
     ? window.CHRONO_CHECK.ForumInfo
-    : [];
+    : undefined;
 
-  // === новые константы карт типов и статусов ===
+  // карты типов/статусов (с цветами для bbcode-статуса)
   const MAP_TYPE = window.CHRONO_CHECK?.EpisodeMapType || {
     personal: ['personal', 'black'],
     plot:     ['plot',     'black'],
     au:       ['au',       'black']
   };
-
   const MAP_STAT = window.CHRONO_CHECK?.EpisodeMapStat || {
     on:       ['active',   'green'],
     off:      ['closed',   'teal'],
     archived: ['archived', 'maroon']
   };
 
+  // хелперы ссылок
+  if (typeof window.userLink !== 'function') {
+    window.userLink = (id, name, asBB = true) =>
+      asBB ? `[url=/profile.php?id=${FMV.escapeHtml(String(id))}]${FMV.escapeHtml(String(name))}[/url]`
+           : `<a href="/profile.php?id=${FMV.escapeHtml(String(id))}">${FMV.escapeHtml(String(name))}</a>`;
+  }
+  if (typeof window.missingUser !== 'function') {
+    window.missingUser = (name, asBB = true) =>
+      asBB ? `[i]${FMV.escapeHtml(String(name))}[/i]`
+           : `<i>${FMV.escapeHtml(String(name))}</i>`;
+  }
+
   const lc = s => String(s || '').trim();
 
-  const fmtDateBold = (start, end) => {
+  function renderStatus(type, status) {
+    const t = MAP_TYPE[type] || MAP_TYPE.au;
+    const s = MAP_STAT[status] || MAP_STAT.archived;
+    return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]]`;
+  }
+  function fmtDateBold(start, end) {
     const s = lc(start), e = lc(end);
     if (!s && !e) return '';
     if (!e || e === s) return `[b]${s}[/b]`;
     return `[b]${s}-${e}[/b]`;
-  };
-
-  const fmtParticipants = (arr = []) => {
+  }
+  function fmtParticipants(arr = []) {
     if (!arr.length) return '';
     const items = arr.map(p => {
-      const masks = (p.masks && p.masks.length) ? ` [as ${p.masks.join(', ')}]` : '';
-      return `${p.name}${masks}`;
+      const asBB = true;
+      const link = (p.id != null && String(p.id) !== '')
+        ? userLink(String(p.id), p.name, asBB)
+        : missingUser(String(p.name || ''), asBB);
+      const masks = Array.isArray(p.masks) && p.masks.length ? ` [as ${FMV.escapeHtml(p.masks.join(', '))}]` : '';
+      return `${link}${masks}`;
     });
     return `[i]${items.join(', ')}[/i]`;
-  };
+  }
 
-  // первая строка эпизода: дата (если есть) + " — " + ссылка-название + " [as <маски владельца>]" (если есть)
+  // одна запись-эпизод пользователя
   function fmtEpisode(ep) {
-    const headDate  = fmtDateBold(ep.dateStart, ep.dateEnd);
-    const linkTitle = `[url=${lc(ep.href)}]${lc(ep.title) || lc(ep.href)}[/url]`;
-    const ownerMasks = (ep.masks && ep.masks.length) ? ` [as ${ep.masks.join(', ')}]` : '';
+    const headDate   = fmtDateBold(ep.dateStart, ep.dateEnd);
+    const linkTitle  = `[url=${FMV.escapeHtml(lc(ep.href))}]${FMV.escapeHtml(lc(ep.title) || lc(ep.href))}[/url]`;
+    const ownerMasks = (Array.isArray(ep.masks) && ep.masks.length) ? ` [as ${FMV.escapeHtml(ep.masks.join(', '))}]` : '';
     const head = headDate ? `${headDate} — ${linkTitle}${ownerMasks}` : `${linkTitle}${ownerMasks}`;
 
-    const status = renderStatus(e.type, e.status);
-    const ord = `${FMV.escapeHtml(String(e.order ?? 0))}]`;
-    const meta = `[${status} / ${ord}]`;
-    const ppl  = fmtParticipants(ep.participants || []);
+    const metaStatus = renderStatus(ep.type, ep.status);
+    const metaOrder  = `${FMV.escapeHtml(String(ep.order ?? 0))}`;
+    const meta = `${metaStatus} [${metaOrder}]`;
+
+    const ppl = fmtParticipants(ep.participants || []);
     const out = [head, meta];
     if (ppl) out.push(ppl);
-    if (lc(ep.location)) out.push(lc(ep.location));
+    if (lc(ep.location)) out.push(FMV.escapeHtml(lc(ep.location)));
     return out.join('\n');
   }
 
-  // внутренний блок на персонажа
+  // блок для одного персонажа (media с кликабельным названием)
   function buildPersonBlock(name, episodes = []) {
-    const nameLink = `[url=${SITE_URL}/viewtopic.php?id=${TID}]${lc(name)}[/url]`;
+    const topicLink = `[url=${SITE_URL}/viewtopic.php?id=${TID}]${FMV.escapeHtml(lc(name))}[/url]`;
     const body = episodes.map(fmtEpisode).join('\n\n');
-    return `[media="${nameLink}"]\n${body}\n[/media]`;
+    return `[media="${topicLink}"]\n${body}\n[/media]`;
   }
-
-  // общий внешний блок-обёртка
-  function wrapAll(blocksText) {
-    return `[media="Хронология по персонажам"]\n${blocksText}\n[/media]`;
-  }
+  // общий контейнер
+  const wrapAll = blocksText => `[media="Хронология по персонажам"]\n${blocksText}\n[/media]`;
 
   const OPEN_URL = `${SITE_URL}/viewtopic.php?id=${TID}#p${TARGET_PID}`;
 
@@ -94,18 +112,19 @@
       const setLink    = api?.setLink    || (()=>{});
       const setLinkVis = api?.setLinkVisible || (()=>{});
 
-      // прячем линк на время работы
-      setLink('', ''); if (setLinkVis) setLinkVis(false);
+      setLink('', ''); setLinkVis?.(false);
 
       try {
         setStatus('Собираю…'); setDetails('');
 
-        // 1) словарь { id: { name, episodes } }
-        const byUser = await window.collectChronoByUser();
+        // 1) берём готовую раскладку: { "<userId>": { name, episodes[] } }
+        const byUser = await (window.collectChronoByUser
+          ? window.collectChronoByUser({ sections: SECTIONS })
+          : Promise.reject(new Error('collectChronoByUser недоступна')));
 
-        // 2) массив и сортировка по name (ru, без регистра)
-        const users = Object.entries(byUser)
-          .map(([id, v]) => ({ id, name: v.name || '', episodes: v.episodes || [] }))
+        // 2) в массив и сортировка по name
+        const users = Object.entries(byUser || {})
+          .map(([id, v]) => ({ id, name: v?.name || '', episodes: Array.isArray(v?.episodes) ? v.episodes : [] }))
           .filter(u => u.name)
           .sort((a,b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' }));
 
@@ -117,13 +136,13 @@
 
         setStatus('Формирую текст…');
 
-        // 3) внутренние блоки по персонажам
+        // 3) блоки по персонажам
         const perPerson = users.map(u => buildPersonBlock(u.name, u.episodes)).join('\n\n');
 
-        // 4) внешний общий блок
+        // 4) общий блок
         const finalBb = wrapAll(perPerson);
 
-        // 5) запись в пост
+        // 5) записываем в целевой пост
         setStatus('Записываю…');
         const html = FMV.toCp1251Entities(finalBb);
         const res  = await FMV.replaceComment(GID, TARGET_PID, html);
@@ -133,9 +152,8 @@
 
         setStatus(success ? 'Готово' : 'Ошибка');
 
-        // показать ссылку сбоку (без confirm) только при успехе
-        if (success) { setLink(OPEN_URL, 'Открыть пост'); if (setLinkVis) setLinkVis(true); }
-        else         { setLink('', ''); if (setLinkVis) setLinkVis(false); }
+        if (success) { setLink(OPEN_URL, 'Открыть пост'); setLinkVis?.(true); }
+        else         { setLink('', ''); setLinkVis?.(false); }
 
         const info  = (res?.infoMessage || '').replace(/<[^>]*>/g,' ').trim();
         const error = (res?.errorMessage || '').replace(/<[^>]*>/g,' ').trim();
@@ -146,7 +164,7 @@
       } catch (e) {
         setStatus('Ошибка');
         setDetails(e?.message || String(e));
-        setLink('', ''); if (setLinkVis) setLinkVis(false);
+        setLink('', ''); setLinkVis?.(false);
       }
     }
   });

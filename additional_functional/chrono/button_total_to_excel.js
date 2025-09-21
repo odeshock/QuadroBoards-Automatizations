@@ -25,7 +25,7 @@
     showStatus: true,
     showDetails: true,
     showLink: true,
-    linkText: 'скачать',
+    linkText: 'Скачать',
     linkHref: '',
     async onClick(api) {
       const setStatus  = api?.setStatus  || (()=>{});
@@ -62,7 +62,7 @@
         lastBlobUrl = URL.createObjectURL(blob);
 
         setStatus('Готово');
-        setLink(lastBlobUrl, 'скачать');
+        setLink(lastBlobUrl, 'Скачать');
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 

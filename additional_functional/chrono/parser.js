@@ -216,32 +216,26 @@ async function collectEpisodesFromForums(opts = {}) {
     return (a?.textContent || '').trim();
   }
 
-  // [дата] Заголовок — но только если внутри скобок действительно дата
+  // [дата] Заголовок — только если внутри реально дата/диапазон
   function parseTitle(str) {
     const s = String(str || '').trim();
   
-    // Есть ли вообще ведущие скобки?
     const m = s.match(/^\s*\[(.*?)\]\s*(.*)$/s);
     if (m) {
-      const inner = (m[1] || '').trim(); // то, что было внутри []
+      const inner = (m[1] || '').trim();
       const rest  = (m[2] || '').trim();
+      const d = parseDateFlexible(inner);   // ваша функция разбора дат
   
-      // Проверим, что inner — дата (или диапазон дат)
-      const d = parseDateFlexible(inner); // ваша функция разбора дат
       if (d && d.hasDate) {
-        return {
-          dateRaw: inner,
-          episode: rest.replace(/\s+/g, ' ')
-        };
+        // это действительно дата → отделяем
+        return { dateRaw: inner, episode: rest.replace(/\s+/g, ' ') };
       }
-      // иначе это не дата (например, [AU]) → не трогаем заголовок
+      // НЕ дата → ничего не откусываем
     }
   
-    return {
-      dateRaw: '',
-      episode: s.replace(/\s+/g, ' ')
-    };
+    return { dateRaw: '', episode: s.replace(/\s+/g, ' ') };
   }
+
 
   // ---- парсинг дат ----
   const DASH_RX = /[\u2012-\u2015\u2212—–−]/g;

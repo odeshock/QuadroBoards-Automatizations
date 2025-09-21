@@ -1,4 +1,4 @@
-// auto_chrono_converter_to_excel.js
+// button_total_to_excel (через collectEpisodesFromForums)
 (() => {
   'use strict';
 
@@ -10,9 +10,17 @@
   const OPEN_URL = (new URL(`/viewtopic.php?id=${TID}#p${PID}`, location.href)).href;
 
   if (!GID.length || !FID.length || !TID || !PID) {
-    console.warn('[auto_chrono_converter_to_excel] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
+    console.warn('[button_total_to_excel] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
     return;
   }
+
+  // разделы (можно переопределить через CHRONO_CHECK.ForumInfo)
+  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
+    ? window.CHRONO_CHECK.ForumInfo
+    : [];
+
+  // базовый адрес сайта для ссылок на профиль
+  const SITE_URL = (window.FMV?.siteUrl || location.origin || '').replace(/\/+$/, '');
 
   let lastBlobUrl = '';
 
@@ -20,40 +28,63 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'выгрузить хроно в excel',
+    label: 'выгрузить общее хроно в excel',
     order: 2,
     showStatus: true,
     showDetails: true,
     showLink: true,
     linkText: 'Скачать',
     linkHref: '',
+
     async onClick(api) {
       const setStatus  = api?.setStatus  || (()=>{});
       const setDetails = api?.setDetails || (()=>{});
       const setLink    = api?.setLink    || (()=>{});
-      setLink('', ''); // прячем ссылку на время работы
+      api?.setLink?.('', ''); // прячем ссылку на время работы
 
       try {
-        setStatus('Загружаю комментарий…');
+        setStatus('Собираю эпизоды…');
         setDetails('');
 
-        const doc  = await FMV.fetchDoc(OPEN_URL);
-        const post = findPostNode(doc, PID);
-        if (!post) throw new Error(`Не нашёл пост #${PID}`);
+        // === берём готовые эпизоды из парсера
+        const episodes = await collectEpisodesFromForums({ sections: SECTIONS });
+        if (!episodes.length) throw new Error('Эпизоды не найдены.');
 
-        const root = post.querySelector('.post-content, .postmsg, .entry-content, .content, .post-body, .post') || post;
+        // Маппинг эпизодов → строки таблицы
+        // Столбцы: Тип | Статус | Тема (ссылка) | Дата начала | Дата конца | Порядок | Участники | Маски | Локация
+        const rows = episodes.map(ep => {
+          // колонка «Участники»: "Имя — {SITE_URL}/profile.php?id=ID" или просто "Имя"
+          const participantsText = (ep.participants || []).map(p => {
+            const name = String(p.name || '').trim();
+            if (!name) return '';
+            if (p.id != null && p.id !== '') {
+              const href = `${SITE_URL}/profile.php?id=${encodeURIComponent(String(p.id))}`;
+              return `${name} — ${href}`;
+            }
+            return name;
+          }).filter(Boolean).join('\n');
 
-        // приоритет — сырой HTML в <script type="text/html"> под спойлером
-        let rows = [];
-        const scriptTpl = root.querySelector('.quote-box.spoiler-box.media-box script[type="text/html"], .spoiler-box script[type="text/html"], .media-box script[type="text/html"]');
-        if (scriptTpl && scriptTpl.textContent) rows = parseFromScriptHTML(scriptTpl.textContent);
+          // колонка «Маски»: "Имя — mask1, mask2" (только если маски есть)
+          const masksLines = (ep.participants || []).flatMap(p => {
+            const masks = Array.isArray(p.masks) ? p.masks.filter(Boolean) : [];
+            const name  = String(p.name || '').trim() || (p.id != null ? `user${p.id}` : '');
+            // Для каждой маски — своя строка "Имя — маска"
+            return masks.map(m => `${name} — ${m}`);
+          }).filter(Boolean);
 
-        // fallback — отрисованный блок
-        if (!rows.length) {
-          const media = findChronoRendered(root) || root;
-          rows = parseFromRendered(media);
-        }
-        if (!rows.length) throw new Error('Не удалось найти блок «Собранная хронология».');
+          return {
+            type: ep.type || '',
+            status: ep.status || '',
+            title: ep.title || '',
+            href: ep.href || '',
+            dateStart: ep.dateStart || '',
+            dateEnd: ep.dateEnd || ep.dateStart || '',
+            order: Number(ep.order || 0) || 0,
+            participantsText,
+            masksLines,
+            location: ep.location || ''
+          };
+        });
 
         setStatus('Формирую .xlsx…');
         const { blob, filename } = buildXLSX(rows);
@@ -62,11 +93,11 @@
         lastBlobUrl = URL.createObjectURL(blob);
 
         setStatus('Готово');
+        setDetails(`Строк: ${rows.length}\nИсточник: ${FMV.escapeHtml(OPEN_URL)}\nФайл: ${FMV.escapeHtml(filename)}`);
         setLink(lastBlobUrl, 'Скачать');
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 
-        setDetails(`Строк: ${rows.length}\nИсточник: "${FMV.escapeHtml(OPEN_URL)}\nФайл: ${FMV.escapeHtml(filename)}`);
       } catch (e) {
         setStatus('Ошибка');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
@@ -74,9 +105,8 @@
       }
     }
   });
-  
 
-  /* ===================== XLSX builder — ПРОВЕРЕННЫЙ ZIP из твоей рабочей версии ===================== */
+  /* ===================== XLSX builder ===================== */
 
   // helpers
   const str2u8 = s => new TextEncoder().encode(s);
@@ -102,24 +132,20 @@
     return cellInline(label||'');
   }
 
-  // Лист: наши 9 колонок (как просила)
+  // Лист: 9 колонок
   function sheetChronoXML(rows){
     const header = ['Тип','Статус','Тема','Дата начала','Дата конца','Порядок','Участники','Маски','Локация'];
     const headerRow = `<row r="1">${header.map(cellInline).join('')}</row>`;
     const dataRows = rows.map((r,i)=>{
-      const start = r.dateStart || '';
-      const end   = r.dateEnd || start || '';
-      const participantsText = (r.participants||[]).map(p=> p.href ? `${p.name} — ${p.href}` : `${p.name}`).join('\n');
-      const masksText = (r.masksLines||[]).join('\n');
       const cells = [
         cellInline(r.type||''),
         cellInline(r.status||''),
         linkCell(r.href||'', r.title || r.href || ''),
-        cellInline(start),
-        cellInline(end),
+        cellInline(r.dateStart||''),
+        cellInline(r.dateEnd||r.dateStart||''),
         cellNumber(r.order||0),
-        cellInline(participantsText),
-        cellInline(masksText),
+        cellInline(r.participantsText||''),
+        cellInline((r.masksLines||[]).join('\n')),
         cellInline(r.location||'')
       ];
       return `<row r="${i+2}">${cells.join('')}</row>`;
@@ -130,15 +156,13 @@
 </worksheet>`;
   }
 
-  // Минимальный рабочий пакет XLSX (как у тебя в рабочем файле): workbook + 1 worksheet, без docProps/rels-листов
+  // Минимальный рабочий пакет XLSX: workbook + 1 worksheet (без компрессии)
   function buildXLSX(rows){
-    const files=[], add=(name,content)=>files.push({name, data:str2u8(content)}); // имена ASCII — UTF-8 флаг не нужен
-
+    const files=[], add=(name,content)=>files.push({name, data:str2u8(content)});
     const wbRels = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
 </Relationships>`;
-
     const wbXML = `<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -146,7 +170,6 @@
     <sheet name="Хронология" sheetId="1" r:id="rId1"/>
   </sheets>
 </workbook>`;
-
     const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -154,7 +177,6 @@
   <Override PartName="/xl/workbook.xml"          ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
 </Types>`;
-
     add('[Content_Types].xml', contentTypes);
     add('_rels/.rels', `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -163,14 +185,12 @@
     add('xl/workbook.xml', wbXML);
     add('xl/_rels/workbook.xml.rels', wbRels);
     add('xl/worksheets/sheet1.xml', sheetChronoXML(rows));
-
     const blobZip = makeZip(files);
     const filename = `chronology_${new Date().toISOString().slice(0,10)}.xlsx`;
-    // Blob ZIP = valid xlsx (xlsx — это zip-контейнер)
     return { blob: blobZip, filename };
   }
 
-  // ZIP из твоей рабочей версии (без сжатия, максимально совместимый)
+  // ZIP (без сжатия)
   function makeZip(files){
     const now=dosDateTime();
     const locals=[], centrals=[]; let offset=0;

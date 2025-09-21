@@ -438,14 +438,15 @@ async function collectEpisodesFromForums(opts = {}) {
       });
 
       const dateStartStr = parsed.hasDate
-        ? (parsed.left?.d!=null ? displaySingle(parsed.left)
-           : parsed.left?.m!=null ? displaySingle(parsed.left)
-           : String(parsed.left?.y ?? ''))
+        ? ((parsed.left?.d != null) ? displaySingle(parsed.left)
+          : (parsed.left?.m != null) ? displaySingle(parsed.left)
+          : String(parsed.left?.y ?? ''))
         : '';
-      const dateEndStr   = parsed.hasDate
-        ? (parsed.right?.d!=null ? displaySingle(parsed.right)
-           : parsed.right?.m!=null ? displaySingle(parsed.right)
-           : String(parsed.right?.y ?? parsed.left?.y ?? ''))
+      
+      const dateEndStr = parsed.hasDate
+        ? ((parsed.right?.d != null) ? displaySingle(parsed.right)
+          : (parsed.right?.m != null) ? displaySingle(parsed.right)
+          : String(parsed.right?.y ?? parsed.left?.y ?? ''))
         : (dateStartStr || '');
 
       return {

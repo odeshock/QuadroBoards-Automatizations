@@ -20,22 +20,20 @@
     allowedGroups: GID,
     allowedForums: FID,
     topicId: TID,
-    label: 'выгрузить excel',
+    label: 'выгрузить хроно в excel',
     order: 2,
 
     showStatus: true,
     showDetails: true,
-    showLink: true,          // <a> создаём сразу; видимость управляем setLink('', '')
-    linkText: 'скачать',
+    showLink: true,
+    linkText: 'Скачать',
     linkHref: '',
 
     async onClick(api) {
       const setStatus  = api?.setStatus  || (()=>{});
       const setDetails = api?.setDetails || (()=>{});
       const setLink    = api?.setLink    || (()=>{});
-
-      // скрыть ссылку на время работы
-      setLink('', '');
+      setLink('', ''); // прячем линк
 
       try {
         setStatus('Загружаю комментарий…');
@@ -47,12 +45,12 @@
 
         const root = post.querySelector('.post-content, .postmsg, .entry-content, .content, .post-body, .post') || post;
 
-        // 1) приоритет — исходный HTML внутри спойлера (<script type="text/html">)
+        // 1) пробуем исходный HTML в <script type="text/html">
         let rows = [];
         const scriptTpl = root.querySelector('.quote-box.spoiler-box.media-box script[type="text/html"], .spoiler-box script[type="text/html"], .media-box script[type="text/html"]');
         if (scriptTpl && scriptTpl.textContent) rows = parseFromScriptHTML(scriptTpl.textContent);
 
-        // 2) иначе — fallback по отрендерённому блоку
+        // 2) fallback — отрендерённый блок
         if (!rows.length) {
           const media = findChronoRendered(root) || root;
           rows = parseFromRendered(media);
@@ -129,10 +127,7 @@
   /* ===================== Разбор одного <p> ===================== */
 
   function parseParagraph(p) {
-    // три "строки": заголовок / участники / локация
-    const headNodes = [];
-    const partNodes = [];
-    const locNodes  = [];
+    const headNodes = [], partNodes = [], locNodes = [];
     let mode = 'head';
     for (const node of p.childNodes) {
       if (node.nodeType === 1 && node.tagName === 'BR') { mode = (mode==='head') ? 'part' : 'loc'; continue; }
@@ -141,16 +136,12 @@
       else locNodes.push(node);
     }
 
-    // заголовок
     const a = p.querySelector('a[href*="viewtopic.php?id="]');
     const { type, status, dateStart, dateEnd, order } = parseHeader(headNodes);
     const title = (a?.textContent || '').trim();
     const href  = a?.href || '';
 
-    // участники/маски
     const { participants, masksLines } = parseParticipants(partNodes);
-
-    // локация
     const location = cleanLocation(textFromNodes(locNodes));
 
     const start = (type === 'au') ? '' : (dateStart || '');
@@ -160,8 +151,8 @@
       type, status, title, href,
       dateStart: start, dateEnd: end,
       order: Number.isFinite(order) ? order : 0,
-      participants,      // [{name, href}]
-      masksLines,        // ["Имя — маска1, маска2", ...]
+      participants,   // [{name, href}]
+      masksLines,     // ["Имя — маска1, маска2", ...]
       location
     };
   }
@@ -204,7 +195,7 @@
     for (const node of nodes) {
       if (node.nodeType === 3) {
         const t = node.nodeValue || '';
-        if (/^\s*,\s*$/.test(t)) { push(); continue; }        // разделитель
+        if (/^\s*,\s*$/.test(t)) { push(); continue; }
         const m = t.match(/\[\s*as\s+([^\]]+)\]/i);
         if (m && cur) {
           const arr = m[1].split(/\s*,\s*/).filter(Boolean);
@@ -256,11 +247,11 @@
     return t;
   }
 
-  /* ===================== XLSX builder (OpenXML + ZIP) ===================== */
+  /* ===================== XLSX builder (OpenXML + ZIP, sharedStrings) ===================== */
 
   const encUTF8 = s => new TextEncoder().encode(s);
 
-  // CRC32
+  // CRC32 + DOS time for ZIP
   const CRC_TABLE = (() => {
     const t = new Uint32Array(256);
     for (let n=0; n<256; n++){
@@ -287,7 +278,7 @@
     return { date, time };
   }
 
-  // --- ZIP builder (fixed, UTF-8, no compression) ---
+  // ZIP (fixed, UTF-8, no compression)
   function ZipBuilder() {
     const chunks = [];
     const files = [];
@@ -299,17 +290,17 @@
       const u8 = new Uint8Array(30 + nameU8.length);
       const dv = new DataView(u8.buffer);
       let p = 0;
-      dv.setUint32(p, 0x04034b50, true); p += 4;          // signature
-      dv.setUint16(p, 20, true);        p += 2;           // version needed
-      dv.setUint16(p, 0x0800, true);    p += 2;           // UTF-8 flag
-      dv.setUint16(p, 0, true);         p += 2;           // compression = 0
+      dv.setUint32(p, 0x04034b50, true); p += 4;
+      dv.setUint16(p, 20, true);        p += 2;
+      dv.setUint16(p, 0x0800, true);    p += 2; // UTF-8
+      dv.setUint16(p, 0, true);         p += 2; // no compression
       dv.setUint16(p, time, true);      p += 2;
       dv.setUint16(p, date, true);      p += 2;
       dv.setUint32(p, crc, true);       p += 4;
       dv.setUint32(p, dataU8.length, true); p += 4;
       dv.setUint32(p, dataU8.length, true); p += 4;
       dv.setUint16(p, nameU8.length, true); p += 2;
-      dv.setUint16(p, 0, true);         p += 2;           // extra len
+      dv.setUint16(p, 0, true);         p += 2; // extra len
       u8.set(nameU8, p);
       return u8;
     }
@@ -318,23 +309,23 @@
       const u8 = new Uint8Array(46 + nameU8.length);
       const dv = new DataView(u8.buffer);
       let p = 0;
-      dv.setUint32(p, 0x02014b50, true); p += 4;      // signature
-      dv.setUint16(p, 0x031E, true);     p += 2;      // version made by
-      dv.setUint16(p, 20, true);         p += 2;      // version needed
-      dv.setUint16(p, 0x0800, true);     p += 2;      // UTF-8 flag
-      dv.setUint16(p, 0, true);          p += 2;      // compression
+      dv.setUint32(p, 0x02014b50, true); p += 4;
+      dv.setUint16(p, 0x031E, true);     p += 2;
+      dv.setUint16(p, 20, true);         p += 2;
+      dv.setUint16(p, 0x0800, true);     p += 2;
+      dv.setUint16(p, 0, true);          p += 2;
       dv.setUint16(p, f.time, true);     p += 2;
       dv.setUint16(p, f.date, true);     p += 2;
       dv.setUint32(p, f.crc, true);      p += 4;
-      dv.setUint32(p, f.size, true);     p += 4;      // csize
-      dv.setUint32(p, f.size, true);     p += 4;      // usize
+      dv.setUint32(p, f.size, true);     p += 4;
+      dv.setUint32(p, f.size, true);     p += 4;
       dv.setUint16(p, nameU8.length, true); p += 2;
-      dv.setUint16(p, 0, true);          p += 2;      // extra len
-      dv.setUint16(p, 0, true);          p += 2;      // file comment len
-      dv.setUint16(p, 0, true);          p += 2;      // disk number
-      dv.setUint16(p, 0, true);          p += 2;      // internal attrs
-      dv.setUint32(p, 0, true);          p += 4;      // external attrs
-      dv.setUint32(p, f.headerOffset, true); p += 4;  // relative offset
+      dv.setUint16(p, 0, true);          p += 2;
+      dv.setUint16(p, 0, true);          p += 2;
+      dv.setUint16(p, 0, true);          p += 2;
+      dv.setUint16(p, 0, true);          p += 2;
+      dv.setUint32(p, 0, true);          p += 4;
+      dv.setUint32(p, f.headerOffset, true); p += 4;
       u8.set(nameU8, p);
       return u8;
     }
@@ -354,7 +345,6 @@
       },
 
       finalize() {
-        // central directory
         let cdSize = 0;
         const cds = files.map(f => {
           const cd = writeCentralHeader(f.nameU8, f);
@@ -365,21 +355,19 @@
         chunks.push(...cds);
         offset += cdSize;
 
-        // end of central directory
         const end = new Uint8Array(22);
         const dv = new DataView(end.buffer);
         let p = 0;
         dv.setUint32(p, 0x06054b50, true); p += 4;
-        dv.setUint16(p, 0, true); p += 2; // disk
-        dv.setUint16(p, 0, true); p += 2; // start disk
+        dv.setUint16(p, 0, true); p += 2;
+        dv.setUint16(p, 0, true); p += 2;
         dv.setUint16(p, files.length, true); p += 2;
         dv.setUint16(p, files.length, true); p += 2;
         dv.setUint32(p, cdSize, true); p += 4;
         dv.setUint32(p, cdStart, true); p += 4;
-        dv.setUint16(p, 0, true); p += 2; // comment len
+        dv.setUint16(p, 0, true); p += 2;
         chunks.push(end);
 
-        // concat
         let total = 0; for (const c of chunks) total += c.length;
         const out = new Uint8Array(total);
         let off = 0; for (const c of chunks) { out.set(c, off); off += c.length; }
@@ -390,23 +378,44 @@
 
   // ==== helpers for sheet xml ====
   function colLetter(n){ let s=''; n++; while(n){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=(n-m-1)/26|0; } return s; }
-  function escText(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function xmlAttr(s){ return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-  function cellRef(ci, ri){ return colLetter(ci) + ri; }
-  function cellInlineStr(ci, ri, text, styleId){
-    const t = escText(text).replace(/\r?\n/g,'&#10;');
-    const sAttr = styleId ? ` s="${styleId}"` : '';
-    return `<c r="${cellRef(ci,ri)}" t="inlineStr"${sAttr}><is><t xml:space="preserve">${t}</t></is></c>`;
-  }
-  function cellNumber(ci, ri, num, styleId){
-    const sAttr = styleId ? ` s="${styleId}"` : '';
-    return `<c r="${cellRef(ci,ri)}"${sAttr}><v>${Number(num)||0}</v></c>`;
-  }
-  function rowXML(ri, cells){ return `    <row r="${ri}">${cells.join('')}</row>`; }
+  const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const escAttr = s => String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
-  // --- XLSX packer ---
+  // sharedStrings
+  function SST(){
+    const map = new Map(); const items = [];
+    return {
+      add(s){
+        const key = String(s ?? '');
+        if (map.has(key)) return map.get(key);
+        const idx = items.length; items.push(key); map.set(key, idx); return idx;
+      },
+      xml(){
+        const total = items.length;
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${total}" uniqueCount="${total}">
+${items.map(t=>`  <si><t xml:space="preserve">${esc(t)}</t></si>`).join('\n')}
+</sst>`;
+      }
+    };
+  }
+
   function buildXLSX(rows){
     const zip = ZipBuilder();
+    const sst = SST();
+
+    // strings we know we'll need (headers + data)
+    const headers = ['Тип','Статус','Тема','Дата начала','Дата конца','Порядок','Участники','Маски','Локация'];
+    headers.forEach(s => sst.add(s));
+    rows.forEach(r => {
+      sst.add(r.type); sst.add(r.status); sst.add(r.title || '');
+      sst.add(r.dateStart || ''); sst.add(r.dateEnd || (r.dateStart || ''));
+      sst.add(String(Number(r.order)||0));
+      const participantsText = (r.participants||[]).map(p => p.href ? `${p.name} — ${p.href}` : `${p.name}`).join('\n');
+      sst.add(participantsText);
+      sst.add((r.masksLines||[]).join('\n'));
+      sst.add(r.location || '');
+    });
 
     // [Content_Types].xml
     const CT =
@@ -414,7 +423,11 @@
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml"  ContentType="application/xml"/>
+  <Override PartName="/_rels/.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 </Types>`;
@@ -425,8 +438,37 @@
 `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>`;
     zip.add('_rels/.rels', encUTF8(RELS));
+
+    // docProps/core.xml / app.xml
+    const now = new Date().toISOString();
+    const CORE =
+`<?xml version="1.0" encoding="UTF-8"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:dcterms="http://purl.org/dc/terms/"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>chronology</dc:title>
+  <dc:creator>FMV</dc:creator>
+  <cp:lastModifiedBy>FMV</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>
+</cp:coreProperties>`;
+    const APP =
+`<?xml version="1.0" encoding="UTF-8"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+ xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>FMV</Application>
+  <DocSecurity>0</DocSecurity>
+  <ScaleCrop>false</ScaleCrop>
+  <HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs>
+  <TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>Лист 1</vt:lpstr></vt:vector></TitlesOfParts>
+</Properties>`;
+    zip.add('docProps/core.xml', encUTF8(CORE));
+    zip.add('docProps/app.xml',  encUTF8(APP));
 
     // xl/workbook.xml
     const WORKBOOK =
@@ -444,11 +486,12 @@
 `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"   Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"    Target="styles.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
 </Relationships>`;
     zip.add('xl/_rels/workbook.xml.rels', encUTF8(WB_RELS));
 
-    // xl/styles.xml (wrapText стиль 1)
+    // xl/styles.xml (style 1 = wrapText)
     const STYLES =
 `<?xml version="1.0" encoding="UTF-8"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -460,44 +503,44 @@
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"><alignment wrapText="1" vertical="top"/></xf>
   </cellXfs>
-  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
     zip.add('xl/styles.xml', encUTF8(STYLES));
 
-    // xl/worksheets/sheet1.xml (+ hyperlinks rels)
-    const header = ['Тип','Статус','Тема','Дата начала','Дата конца','Порядок','Участники','Маски','Локация'];
-    const wrapStyle = 1;
+    // xl/sharedStrings.xml
+    zip.add('xl/sharedStrings.xml', encUTF8(sst.xml()));
 
+    // sheet1.xml + rels для гиперссылок темы
+    const wrapStyle = 1;
     const rowsXml = [];
-    rowsXml.push(rowXML(1, header.map((v,i)=> cellInlineStr(i,1,v,0))));
+    // заголовок
+    rowsXml.push(rowXML(1, headers.map((h,i)=> cellShared(i,1,sst.add(h),0))));
 
     const hlinks = [];
     rows.forEach((r, idx) => {
       const rnum = idx + 2;
       const cells = [];
 
-      cells.push(cellInlineStr(0, rnum, r.type, 0));
-      cells.push(cellInlineStr(1, rnum, r.status, 0));
-      // Тема (C) + гиперссылка
-      const cref = 'C' + rnum;
-      cells.push(cellInlineStr(2, rnum, r.title || '', 0));
-      if (r.href) hlinks.push({ ref: cref, href: r.href });
+      cells.push(cellShared(0,rnum,sst.add(r.type),0));
+      cells.push(cellShared(1,rnum,sst.add(r.status),0));
+      const cref = 'C'+rnum;
+      cells.push(cellShared(2,rnum,sst.add(r.title || ''),0));
+      if (r.href) hlinks.push({ ref:cref, href:r.href });
 
-      cells.push(cellInlineStr(3, rnum, r.dateStart || '', 0));
-      cells.push(cellInlineStr(4, rnum, r.dateEnd || (r.dateStart || ''), 0));
-      cells.push(cellNumber(5, rnum, Number(r.order) || 0, 0));
+      cells.push(cellShared(3,rnum,sst.add(r.dateStart || ''),0));
+      cells.push(cellShared(4,rnum,sst.add(r.dateEnd || (r.dateStart || '')),0));
+      cells.push(cellNumber(5,rnum, Number(r.order)||0, 0));
 
       const participantsText = (r.participants||[])
         .map(p => p.href ? `${p.name} — ${p.href}` : `${p.name}`)
         .join('\n');
-      cells.push(cellInlineStr(6, rnum, participantsText, wrapStyle));
-      cells.push(cellInlineStr(7, rnum, (r.masksLines||[]).join('\n'), wrapStyle));
-      cells.push(cellInlineStr(8, rnum, r.location || '', wrapStyle));
+      cells.push(cellShared(6,rnum,sst.add(participantsText),wrapStyle));
+      cells.push(cellShared(7,rnum,sst.add((r.masksLines||[]).join('\n')),wrapStyle));
+      cells.push(cellShared(8,rnum,sst.add(r.location || ''),wrapStyle));
 
       rowsXml.push(rowXML(rnum, cells));
     });
 
-    const dim = `A1:${colLetter(header.length-1)}${rows.length+1}`;
+    const dim = `A1:${colLetter(headers.length-1)}${rows.length+1}`;
     const SHEET =
 `<?xml version="1.0" encoding="UTF-8"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -514,13 +557,24 @@ ${rowsXml.join('\n')}
     const HL_RELS =
 `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-${hlinks.map((h,i)=>`  <Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${xmlAttr(h.href)}" TargetMode="External"/>`).join('\n')}
+${hlinks.map((h,i)=>`  <Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escAttr(h.href)}" TargetMode="External"/>`).join('\n')}
 </Relationships>`;
     zip.add('xl/worksheets/_rels/sheet1.xml.rels', encUTF8(HL_RELS));
 
     const blob = zip.finalize();
     const filename = `chronology_${new Date().toISOString().slice(0,10)}.xlsx`;
     return { blob, filename };
+
+    // cells/rows helpers
+    function cellShared(ci,ri,sidx,styleId){
+      const sAttr = styleId ? ` s="${styleId}"` : '';
+      return `<c r="${colLetter(ci)+ri}" t="s"${sAttr}><v>${sidx}</v></c>`;
+    }
+    function cellNumber(ci,ri,n,styleId){
+      const sAttr = styleId ? ` s="${styleId}"` : '';
+      return `<c r="${colLetter(ci)+ri}"${sAttr}><v>${Number(n)||0}</v></c>`;
+    }
+    function rowXML(ri,cells){ return `    <row r="${ri}">${cells.join('')}</row>`; }
   }
 
 })();

@@ -165,31 +165,79 @@
   }
 
   function parseParticipants(nodes) {
-    const list = []; let cur=null; const push=()=>{ if(cur){ list.push(cur); cur=null; } };
-    const masksMap = new Map(); // name -> [mask1, mask2]
-    for (const node of nodes) {
-      if (node.nodeType===3) {
-        const t=node.nodeValue||'';
-        if (/^\s*,\s*$/.test(t)) { push(); continue; }
-        const m=t.match(/\[\s*as\s+([^\]]+)\]/i);
-        if (m && cur) {
-          const arr=m[1].split(/\s*,\s*/).filter(Boolean);
-          if (arr.length){ if(!masksMap.has(cur.name)) masksMap.set(cur.name,[]); masksMap.get(cur.name).push(...arr); }
-        } else if (/\S/.test(t) && !cur) { cur={name:t.trim(), href:''}; }
+    // 1) расплющим DOM в последовательность токенов
+    const toks = [];
+    (function flat(arr){
+      Array.from(arr).forEach(n => {
+        if (n.nodeType === 3) {
+          toks.push({ t:'text', v: n.nodeValue || '' });
+        } else if (n.nodeType === 1) {
+          if (n.tagName === 'A') {
+            toks.push({ t:'link', name: (n.textContent||'').trim(), href: n.href || '' });
+          } else {
+            flat(n.childNodes);
+          }
+        }
+      });
+    })(nodes);
+  
+    const list = [];               // [{name, href}]
+    const maskMap = new Map();     // name -> [mask, ...]
+    let cur = null;
+    const commit = () => { if (cur) { list.push(cur); cur = null; } };
+  
+    for (const tk of toks) {
+      if (tk.t === 'link') {               // новый участник по ссылке
+        commit();
+        cur = { name: tk.name, href: tk.href };
         continue;
       }
-      if (node.nodeType===1) {
-        const el=node;
-        if (el.tagName==='A') { push(); cur={name:(el.textContent||'').trim(), href: el.href||''}; continue; }
-        if (/^(SPAN|MARK)$/i.test(el.tagName)) { const name=(el.textContent||'').trim(); if(name){ push(); cur={name, href:''}; } }
+  
+      if (tk.t === 'text') {
+        let t = tk.v || '';
+  
+        // если явно "не указаны" — возвращаем пусто
+        if (/не\s*указан/i.test(t)) return { participants: [], masksLines: [] };
+  
+        // вытащим все [as маска1, маска2]
+        t.replace(/\[\s*as\s*([^\]]+)\]/ig, (_m, group) => {
+          if (cur) {
+            group.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean).forEach(msk => {
+              if (!maskMap.has(cur.name)) maskMap.set(cur.name, []);
+              maskMap.get(cur.name).push(msk);
+            });
+          }
+          return '';
+        });
+  
+        // запятые считаем разделителями участников без ссылок
+        if (/,/.test(t)) {
+          t.split(',').forEach((seg, idx) => {
+            const s = seg.trim();
+            if (s) { commit(); cur = { name: s, href: '' }; }
+            // после запятой — завершить текущего
+            commit();
+          });
+        } else {
+          const s = t.trim();
+          if (s && !/^[–—-]+$/.test(s) && !cur) {
+            cur = { name: s, href: '' };    // «user11» и т.п.
+          }
+        }
       }
     }
-    push();
+    commit();
+  
+    // 2) соберём строки для колонки "Маски" — по маске на строку
     const masksLines = [];
-    for (const p of list) { const m=masksMap.get(p.name); if (m && m.length) masksLines.push(`${p.name} — ${m.join(', ')}`); }
+    for (const p of list) {
+      const arr = maskMap.get(p.name);
+      if (arr && arr.length) arr.forEach(msk => masksLines.push(`${p.name} — ${msk}`));
+    }
+  
     return { participants: list, masksLines };
   }
-
+  
   function textFromNodes(nodes) {
     return nodes.map(n => n.nodeType===3 ? (n.nodeValue||'') : (n.nodeType===1 ? (n.textContent||'') : ''))
       .join('').replace(/\s+/g,' ').trim();

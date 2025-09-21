@@ -228,17 +228,53 @@
     return `[[color=${t[1]}]${t[0]}[/color] / [color=${s[1]}]${s[0]}[/color]]`;
   }
 
+  function normalizeEpisodeTitle(type, rawTitle) {
+    const title = String(rawTitle || '');
+  
+    // Ошибка/подсказка будет в BB-коде [mark]...[/mark]
+    let err = '';
+  
+    if (type === 'plot') {
+      // Требуется суффикс в самом конце: " [с]" (поддержим и латинскую c на всякий случай)
+      const suffRx = /\s\[(?:с|c)\]\s*$/i;   // кириллическая "с" или латинская "c"
+      if (!suffRx.test(title)) {
+        err = `[mark]нужен суффикс " [с]"[/mark]`;
+      }
+      // Удаляем конечное " [с]" / " [c]"
+      const cleaned = title.replace(suffRx, '').trimEnd();
+      return { title: cleaned, err };
+    }
+  
+    if (type === 'au') {
+      // Требуется префикс в самом начале: "[au] " (без учёта регистра)
+      const prefRx = /^\s*\[au\]\s+/i;
+      if (!prefRx.test(title)) {
+        err = `[mark]нужен префикс "[au] "[/mark]`;
+      }
+      // Удаляем начальное "[au] " в любом регистре
+      const cleaned = title.replace(prefRx, '');
+      return { title: cleaned, err };
+    }
+  
+    // Для остальных типов — без изменений
+    return { title, err: '' };
+  }
+
   function renderChrono(events) {
     const rows = events.map(e => {
       const status = renderStatus(e.type, e.status);
   
-      // ⬇️ было: const dateHTML = e.hasDate ? ... : `[mark]дата не указана[/mark]`;
       const dateHTML = (e.type === 'au')
-        ? (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : '') // в AU — ничего, если даты нет
+        ? (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : '')
         : (e.hasDate ? FMV.escapeHtml(e.dateDisplay) : `[mark]дата не указана[/mark]`);
   
-      const url  = FMV.escapeHtml(e.url);
-      const ttl  = FMV.escapeHtml(e.episode || '');
+      const url = FMV.escapeHtml(e.url);
+  
+      // НОВОЕ: проверяем/чистим заголовок по правилам типа
+      const norm = normalizeEpisodeTitle(e.type, e.episode || '');
+      const ttl  = FMV.escapeHtml(norm.title);
+      const errBeforeOrder = norm.err ? ` ${norm.err}` : '';
+  
       const ord  = ` [порядок: ${FMV.escapeHtml(String(e.order ?? 0))}]`;
   
       const asBB = true;
@@ -262,7 +298,8 @@
         : `[mark]локация не указана[/mark]`;
   
       const dash = dateHTML ? ' — ' : ' ';
-      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${ord}\n[i]${names}[/i]\n${loc}\n\n`;
+      // ВСТАВЛЯЕМ ошибку ПЕРЕД "[порядок: N]"
+      return `${status} ${dateHTML}${dash}[url=${url}]${ttl}[/url]${errBeforeOrder}${ord}\n[i]${names}[/i]\n${loc}\n\n`;
     });
   
     const body = rows.join('') || ``;

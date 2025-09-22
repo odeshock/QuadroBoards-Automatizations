@@ -59,6 +59,30 @@ function injectStylesOnce() {
       overflow-y: hidden;            /* если и высота фиксирована — верните auto */
     }
 
+    /* рамка схлопнута по контенту и прокрутка вниз */
+.ip-box--shrink {
+  display: inline-block;
+  max-inline-size: 100%;
+}
+
+/* грид с переносом на несколько строк */
+.ip-box--shrink .ip-grid {
+  display: grid;
+  /* задаём ширину колонки = ширине кнопки,
+     а количество колонок выбирает браузер по доступной ширине контейнера */
+  grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
+  gap: var(--ip-gap, 8px);
+  align-content: start;
+}
+
+/* скроллим только вниз */
+.ip-box--shrink .ip-scroll {
+  overflow-y: auto;      /* вертикальная прокрутка */
+  overflow-x: hidden;    /* горизонталь убираем */
+  max-height: 200px;     /* или своя высота области просмотра */
+}
+
+
   `;
   document.head.appendChild(st);
 }
@@ -162,6 +186,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (ITEMS.length > 0) {
     const box = document.createElement('div');
     box.className = 'ip-box';
+    box.classList.add('ip-box--shrink');
     box.style.setProperty('--ip-rows', String(IP_ROWS));
     box.style.setProperty('--ip-gap',  `${IP_GAP}px`);
     box.style.setProperty('--ip-w',    `${w}px`);

@@ -36,100 +36,38 @@ function injectStylesOnce() {
     .ip-slot{position:relative;width:100%;height:100%;}
     .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
     .ip-slot *{pointer-events:none;}
+    /* --- SHRINK-TO-CONTENT + вертикальная прокрутка --- */
 
-        /* рамка по содержимому, но не шире контейнера формы */
-    .ip-box{
-      display: inline-block;
-      inline-size: fit-content;     /* или width: fit-content; */
-      max-inline-size: 100%;        /* не вылезать за край */
-    }
-    
-    /* грид не растягиваем — он «по содержимому» */
-    .ip-grid{
-      display: inline-grid;
-      grid-auto-flow: column;               /* кладём элементы по колонкам */
-      grid-auto-columns: var(--ip-col, 44px);
-      /* если нужен перенос — уберите grid-auto-flow: column и верните свой repeat(...).
-         Но тогда коробка снова станет шире, потому что контент займёт несколько рядов. */
-    }
-    
-    /* скролл, если контент шире доступного */
-    .ip-scroll{
-      overflow-x: auto;
-      overflow-y: hidden;            /* если и высота фиксирована — верните auto */
-    }
-
-    /* рамка схлопнута по контенту и прокрутка вниз */
-.ip-box--shrink {
-  display: inline-block;
-  max-inline-size: 100%;
-}
-
-/* грид с переносом на несколько строк */
-.ip-box--shrink .ip-grid {
-  display: grid;
-  /* задаём ширину колонки = ширине кнопки,
-     а количество колонок выбирает браузер по доступной ширине контейнера */
-  grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
-  gap: var(--ip-gap, 8px);
-  align-content: start;
-}
-
-/* скроллим только вниз */
-.ip-box--shrink .ip-scroll {
-  overflow-y: auto;      /* вертикальная прокрутка */
-  overflow-x: hidden;    /* горизонталь убираем */
-  max-height: 200px;     /* или своя высота области просмотра */
-}
-
-/* рамка обычная */
-.ip-box {
-  display: block;
-}
-
-/* вертикальный режим: фикс. число колонок и скролл вниз */
-.ip-box--vertical .ip-scroll {
-  max-height: 220px;       /* видимая высота; подбери под себя */
-  overflow-y: auto;        /* скроллим вниз */
-  overflow-x: hidden;      /* горизонталь убираем */
-}
-
-.ip-box--vertical .ip-grid {
-  display: grid;
-  gap: var(--ip-gap, 8px);
-  grid-template-columns: repeat(var(--ip-cols, 3), var(--ip-col, var(--ip-w, 44px)));
-  align-content: start;
-  justify-content: start;  /* чтобы не съезжало вправо */
-}
-
-/* делаем рамку по содержимому */
-.ip-box {
-  display: inline-block;       /* вместо block */
-  width: auto;                 /* авто-ширина */
-  max-width: 100%;             /* но не шире контейнера формы */
-  padding: 4px;                /* твои внутренние отступы */
+/* 1) Рамка больше не тянется на 100%, а подстраивается под контент
+      (но не шире родителя) */
+.ip-box{
+  display: inline-block;      /* вместо block */
+  width: max-content;         /* ширина = контенту */
+  max-width: 100%;            /* но не шире контейнера формы */
   box-sizing: border-box;
 }
 
-/* область скролла тоже не растягиваем */
-.ip-scroll {
+/* 2) Область прокрутки тоже «по контенту» по ширине,
+      по высоте – ограничена и скроллится ВНИЗ */
+.ip-scroll{
   display: inline-block;
-  width: auto;
+  width: max-content;
   max-width: 100%;
-  overflow-y: auto;            /* для вертикального скролла при необходимости */
+  /* было: height: ...  → делаем max-height, чтобы не оставалось пустоты */
+  max-height: calc(var(--ip-rows,1) * var(--ip-h,44px)
+                   + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));
+  overflow-y: auto;           /* только вертикальный скролл */
   overflow-x: hidden;
 }
 
-/* грид: перенос строк, ширина = сумме колонок в ряду */
-.ip-grid {
-  display: grid;
+/* 3) Грид переносит элементы на новые строки и выравнивает слева */
+.ip-grid{
+  display: grid;  /* оставляем grid, не inline-grid */
+  grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
   gap: var(--ip-gap, 8px);
-  grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w, 44px)));
-  justify-content: start;
+  justify-content: start;     /* чтобы не «уезжало» вправо */
   align-content: start;
 }
-
-
 
   `;
   document.head.appendChild(st);
@@ -234,7 +172,6 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (ITEMS.length > 0) {
     const box = document.createElement('div');
     box.className = 'ip-box';
-    box.classList.add('ip-box--vertical');
     box.style.setProperty('--ip-rows', String(IP_ROWS));
     box.style.setProperty('--ip-gap',  `${IP_GAP}px`);
     box.style.setProperty('--ip-w',    `${w}px`);

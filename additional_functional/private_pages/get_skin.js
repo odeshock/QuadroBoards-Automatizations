@@ -79,8 +79,8 @@ async function collectSkinSets() {
 
   // Парсинг наборов
   return {
-    icons:   pickLinks(doc, '#pun-main ._icon .item, .pun-main ._icon .item'),
-    plashki: pickLinks(doc, '#pun-main ._plashka .item, .pun-main ._plashka .item'),
-    backs:   pickLinks(doc, '#pun-main ._back .item, .pun-main ._back .item'),
+    icons:   pickLinks(doc, '#pun-main ._icon .item'),
+    plashki: pickLinks(doc, '#pun-main ._plashka .item'),
+    backs:   pickLinks(doc, '#pun-main ._background .item'),
   };
 }

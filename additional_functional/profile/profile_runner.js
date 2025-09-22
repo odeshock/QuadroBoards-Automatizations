@@ -50,7 +50,11 @@
         </summary>
         <div class="fmv-skins-body" style="padding:14px"></div>
         <div class="fmv-skins-footer" style="display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid #eee">
-          <button type="button" class="fmv-save" style="background:#2f67ff;color:#fff;border:1px solid #2f67ff;border-radius:8px;padding:8px 14px;cursor:pointer">Сохранить</button>
+          <button type="button" class="fmv-save"
+            style="background:#2f67ff;color:#fff;border:1px solid #2f67ff;border-radius:8px;padding:8px 14px;cursor:pointer">
+            Сохранить
+          </button>
+          <span class="fmv-status" style="margin-left:8px;font-size:14px;color:#666"></span>
           <span class="fmv-hint" style="opacity:.7">После выбора во всех секциях нажмите «Сохранить»</span>
         </div>
       </details>
@@ -105,6 +109,7 @@
     // кнопка "Сохранить"
     const panelRoot = document.getElementById('fmv-skins-panel');
     const btnSave = panelRoot ? panelRoot.querySelector('.fmv-save') : null;
+    const statusEl = panelRoot ? panelRoot.querySelector('.fmv-status') : null;
     if (!btnSave) {
       console.error('[profile_runner] Кнопка .fmv-save не найдена');
       return;
@@ -114,6 +119,10 @@
 
     btnSave.addEventListener('click', async () => {
       try {
+        if (statusEl) {
+          statusEl.textContent = 'Сохраняю…';
+          statusEl.style.color = '#666';
+        }
         const finalHtml = build ? build() : '';
         if (!finalHtml) {
           toast('Нечего сохранять', false);
@@ -148,9 +157,16 @@
 
         if (ok) {
           toast('Успешно', true);
+          if (statusEl) {
+            statusEl.textContent = '✓ Успешно сохранено';
+            statusEl.style.color = '#16a34a';
+          }
         } else {
-          console.warn('save result:', r);
           toast('Ошибка сохранения', false);
+          if (statusEl) {
+            statusEl.textContent = 'Ошибка сохранения';
+            statusEl.style.color = '#c24141';
+          }
         }
       } catch (e) {
         console.error(e);

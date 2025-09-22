@@ -5,7 +5,6 @@
   if (window.__profileRunnerMounted) return;
   window.__profileRunnerMounted = true;
 
-  // --- утилиты ---
   const qs = (sel, root = document) => root.querySelector(sel);
   function onReady() {
     return new Promise((res) => {
@@ -26,7 +25,6 @@
       .trim();
   }
 
-  // создаём оболочку для панелей и кнопку "Сохранить"
   async function waitMount() {
     await onReady();
     const box = qs('#viewprofile .container') || qs('#viewprofile') || qs('#pun-main') || document.body;
@@ -53,7 +51,6 @@
     return wrap.querySelector('.fmv-skins-body');
   }
 
-  // --- основной сценарий ---
   (async () => {
     if (!/\/profile\.php$/i.test(location.pathname)) return;
 
@@ -61,7 +58,7 @@
     if (!id) return;
 
     if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
-      console.error('[profile_runner] skinAdmin.load не найден. Подключите admin_bridge.js раньше этого файла.');
+      console.error('[profile_runner] skinAdmin.load не найден.');
       return;
     }
 
@@ -91,10 +88,7 @@
     const panelRoot = document.getElementById('fmv-skins-panel');
     const btnSave  = panelRoot?.querySelector('.fmv-save');
     const statusEl = panelRoot?.querySelector('.fmv-status');
-    if (!btnSave) {
-      console.error('[profile_runner] Кнопка .fmv-save не найдена');
-      return;
-    }
+    if (!btnSave) return;
 
     const pageName = `usr${id}_skin`;
 
@@ -140,8 +134,15 @@
         }
 
         if (statusEl) {
-          statusEl.textContent = ok ? '✓ Успешно сохранено' : 'Ошибка сохранения';
-          statusEl.style.color = ok ? '#16a34a' : '#c24141';
+          if (ok) {
+            statusEl.textContent = '✓ Успешно сохранено';
+            statusEl.style.color = '#16a34a';
+            // перезагрузка через 1 секунду
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            statusEl.textContent = 'Ошибка сохранения';
+            statusEl.style.color = '#c24141';
+          }
         }
       } catch (e) {
         console.error(e);

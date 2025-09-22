@@ -170,7 +170,10 @@
     }
 
     // обработчик «Сохранить»
-    const btnSave = document.querySelector('#fmv-skins-panel .fmv-save');
+    // сразу после получения id:
+    const pageName = `usr${id}_skin`;
+    
+    // ...
     btnSave?.addEventListener('click', async () => {
       try {
         const finalHtml = build ? build() : '';
@@ -178,17 +181,30 @@
           toast('Нечего сохранять', false);
           return;
         }
-        const r = await save(finalHtml);
+    
+        let r;
+        if (typeof window.FMVeditTextareaOnly === 'function') {
+          // самый надёжный путь из edit.js
+          r = await window.FMVeditTextareaOnly(pageName, finalHtml);
+        } else if (typeof save === 'function') {
+          // запасной путь через admin_bridge (как было)
+          r = await save(finalHtml);
+        } else {
+          toast('Нет функции сохранения', false);
+          return;
+        }
+    
         if (r && (r.ok || r.status === 'saved')) {
           toast('Успешно', true);
         } else {
+          console.warn('save result:', r);
           toast('Ошибка сохранения', false);
-          if (r && r.serverMessage) console.warn('save message:', r.serverMessage);
         }
       } catch (e) {
         console.error(e);
         toast('Ошибка сохранения', false);
       }
     });
+
   })();
 })();

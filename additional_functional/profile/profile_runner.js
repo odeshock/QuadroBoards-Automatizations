@@ -80,7 +80,7 @@
       return;
     }
 
-    const { status, initialHtml, save } = await window.skinAdmin.load(id);
+    const { status, initialHtml, save, targetUserId } = await window.skinAdmin.load(id);
     if (status !== 'ok' && status !== 'ок') {
       console.error('[profile_runner] Не удалось загрузить страницу со скинами');
       return;
@@ -108,7 +108,7 @@
     const statusEl = panelRoot?.querySelector('.fmv-status');
     if (!btnSave) return;
 
-    const pageName = `usr${id}_skin`;
+    const pageName = `usr${(targetUserId || id)}_skin`;
 
     btnSave.addEventListener('click', async () => {
       try {

@@ -82,6 +82,26 @@ function injectStylesOnce() {
   max-height: 200px;     /* или своя высота области просмотра */
 }
 
+/* рамка обычная */
+.ip-box {
+  display: block;
+}
+
+/* вертикальный режим: фикс. число колонок и скролл вниз */
+.ip-box--vertical .ip-scroll {
+  max-height: 220px;       /* видимая высота; подбери под себя */
+  overflow-y: auto;        /* скроллим вниз */
+  overflow-x: hidden;      /* горизонталь убираем */
+}
+
+.ip-box--vertical .ip-grid {
+  display: grid;
+  gap: var(--ip-gap, 8px);
+  grid-template-columns: repeat(var(--ip-cols, 3), var(--ip-col, var(--ip-w, 44px)));
+  align-content: start;
+  justify-content: start;  /* чтобы не съезжало вправо */
+}
+
 
   `;
   document.head.appendChild(st);
@@ -186,7 +206,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (ITEMS.length > 0) {
     const box = document.createElement('div');
     box.className = 'ip-box';
-    box.classList.add('ip-box--shrink');
+    box.classList.add('ip-box--vertical');
     box.style.setProperty('--ip-rows', String(IP_ROWS));
     box.style.setProperty('--ip-gap',  `${IP_GAP}px`);
     box.style.setProperty('--ip-w',    `${w}px`);

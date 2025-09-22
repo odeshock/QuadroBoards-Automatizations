@@ -49,7 +49,7 @@
         { id: '1', html: '<div class="item" data-id="1"><img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png"></div>'},
         { id: '2', html: '<div class="item" data-id="2"><img class="icon" src="https://static.thenounproject.com/png/2185221-200.png"></div>'},
       ],
-      '_back':  [
+      '_background':  [
         { id: '1', html: '<div class="item" data-id="1"><img class="back" src="https://upforme.ru/uploads/001c/14/5b/440/238270.gif"></div>'},
         { id: '2', html: '<div class="item" data-id="2"><img class="back" src="https://forumstatic.ru/files/001c/83/91/88621.png"></div>'},
       ],
@@ -77,13 +77,13 @@
     const [libPlashka0, libIcon0, libBack0] = await Promise.all([
       safeGetLib('_plashka'),
       safeGetLib('_icon'),
-      safeGetLib('_back'),
+      safeGetLib('_background'),
     ]);
 
     // финальная подстраховка
     const LIB_P = Array.isArray(libPlashka0) && libPlashka0.length ? libPlashka0 : DEFAULT_LIBS['_plashka'];
     const LIB_I = Array.isArray(libIcon0)    && libIcon0.length    ? libIcon0    : DEFAULT_LIBS['_icon'];
-    const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS['_back'];
+    const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS['_background'];
 
     console.log('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
 
@@ -123,7 +123,7 @@
 
     const panelBack = window.createChoicePanel({
       title: withHeaders ? 'Фон' : undefined,
-      targetClass: '_back', // важно: используем вычисленный класс
+      targetClass: '_background', // важно: используем вычисленный класс
       library: LIB_B,
       mountEl: grid,
       initialHtml,

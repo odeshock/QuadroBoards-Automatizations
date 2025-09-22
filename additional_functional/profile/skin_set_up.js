@@ -51,7 +51,7 @@
       ],
       '_back':  [
         { id: '1', html: '<div class="item" data-id="1"><img class="back" src="https://upforme.ru/uploads/001c/14/5b/440/238270.gif"></div>'},
-        { id: '2', html: '<div class="item" data-id="2"><img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png"></div>'},
+        { id: '2', html: '<div class="item" data-id="2"><img class="back" src="https://forumstatic.ru/files/001c/83/91/88621.png"></div>'},
       ],
     };
 

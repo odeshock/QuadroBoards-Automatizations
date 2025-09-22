@@ -38,7 +38,7 @@
           if (Array.isArray(r) && r.length) return r;
         }
       } catch (e) {
-        console.debug('[setupSkins] getLib error for', cls, e);
+        console.log('[setupSkins] getLib error for', cls, e);
       }
       return DEFAULT_LIBS[cls] ?? [];
     };
@@ -55,7 +55,7 @@
     const LIB_P = Array.isArray(libPlashka0) && libPlashka0.length ? libPlashka0 : DEFAULT_LIBS['_plashka'];
     const LIB_I = Array.isArray(libIcon0)    && libIcon0.length    ? libIcon0    : DEFAULT_LIBS['_icon'];
     const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS[backClass] ?? [];
-    console.debug('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
+    console.log('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
   
     // идемпотентно создаём/переиспользуем сетку
     let grid = container.querySelector('.skins-setup-grid');
@@ -67,7 +67,7 @@
       grid.style.gap = '16px';
       container.appendChild(grid);
     } else {
-      console.debug('[setupSkins] grid уже существует — переиспользуем');
+      console.log('[setupSkins] grid уже существует — переиспользуем');
     }
 
 

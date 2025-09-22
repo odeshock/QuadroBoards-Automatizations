@@ -38,37 +38,33 @@ function injectStylesOnce() {
     .ip-slot *{pointer-events:none;}
     /* --- SHRINK-TO-CONTENT + вертикальная прокрутка --- */
 
-/* 1) Рамка больше не тянется на 100%, а подстраивается под контент
-      (но не шире родителя) */
-.ip-box{
-  display: inline-block;      /* вместо block */
-  width: max-content;         /* ширина = контенту */
-  max-width: 100%;            /* но не шире контейнера формы */
-  box-sizing: border-box;
-}
-
-/* 2) Область прокрутки тоже «по контенту» по ширине,
-      по высоте – ограничена и скроллится ВНИЗ */
-.ip-scroll{
-  display: inline-block;
-  width: max-content;
-  max-width: 100%;
-  /* было: height: ...  → делаем max-height, чтобы не оставалось пустоты */
-  max-height: calc(var(--ip-rows,1) * var(--ip-h,44px)
-                   + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));
-  overflow-y: auto;           /* только вертикальный скролл */
-  overflow-x: hidden;
-}
-
-/* 3) Грид переносит элементы на новые строки и выравнивает слева */
-.ip-grid{
-  display: grid;  /* оставляем grid, не inline-grid */
-  grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
-  gap: var(--ip-gap, 8px);
-  justify-content: start;     /* чтобы не «уезжало» вправо */
-  align-content: start;
-}
-
+    /* рамка под контент (не 100%), но не шире родителя */
+    .ip-box{
+      display: inline-block;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    
+    /* область просмотра: только вертикальная прокрутка, высота ограничена
+       (если строк мало — пустоты снизу не будет) */
+    .ip-scroll{
+      display: inline-block;   /* чтобы ширина шла от контента */
+      max-width: 100%;
+      max-height: calc(var(--ip-rows,1) * var(--ip-h,44px)
+                       + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));
+      overflow-y: auto;        /* скролл ВНИЗ */
+      overflow-x: hidden;      /* горизонтальный убрать */
+    }
+    
+    /* сетка: фиксированная ширина «плитки», автоматический перенос,
+       добавлять новую колонку можно только если она влезает целиком */
+    .ip-grid{
+      display: inline-grid;    /* важное: ширина = max-content (по контенту) */
+      grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
+      gap: var(--ip-gap, 8px);
+      justify-content: start;  /* не уезжать вправо */
+      align-content: start;
+    }
   `;
   document.head.appendChild(st);
 }

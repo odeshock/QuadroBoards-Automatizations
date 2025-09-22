@@ -2,6 +2,7 @@
 const IP_ROWS = 1;        // видимых строк без скролла (UI)
 const IP_GAP  = 8;        // отступ между элементами (UI)
 const IP_REQUIRED = true; // выбор обязателен (если есть варианты)
+const FREEZE_SECONDS = 60; // длительность «фриза» перед реальным сабмитом
 
 /* ================== УТИЛИТЫ ================== */
 function isProfileFieldsPage() {
@@ -15,7 +16,7 @@ function isProfileFieldsPage() {
   } catch { return false; }
 }
 
-const STYLE_ID = 'ip-style-logger-keep-class';
+const STYLE_ID = 'ip-style-logger-freeze';
 function injectStylesOnce() {
   if (document.getElementById(STYLE_ID)) return;
   const st = document.createElement('style');
@@ -26,14 +27,26 @@ function injectStylesOnce() {
     .ip-box,.ip-scroll,.ip-grid,.ip-btn,.ip-btn *{pointer-events:auto;}
     .ip-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;
       height: calc(var(--ip-rows,1) * var(--ip-h,44px) + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));}
-    .ip-grid{display:grid;grid-template-columns:repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
-      gap:var(--ip-gap,8px);align-content:start;}
+    .ip-grid{display:grid;grid-template-columns:repeat(auto-fill, var(--ip-col, var(--ip-w,44px))); gap:var(--ip-gap,8px);align-content:start;}
     .ip-btn{position:relative;overflow:hidden;width:var(--ip-w,44px);height:var(--ip-h,44px);
       border:2px solid #d0d0d0;border-radius:10px;background:#fff;padding:0;cursor:pointer;touch-action:manipulation;}
     .ip-btn[selected]{border-color:#0b74ff;box-shadow:0 0 0 3px rgba(11,116,255,.15);}
     .ip-slot{position:relative;width:100%;height:100%;}
     .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
     .ip-slot *{pointer-events:none;}
+
+    /* Оверлей фриза */
+    #ip-freeze-overlay{
+      position:fixed; inset:0; background:rgba(0,0,0,.6); color:#fff; z-index:999999;
+      display:flex; align-items:center; justify-content:center; text-align:center; font-family:system-ui, sans-serif;
+    }
+    #ip-freeze-overlay .ip-box{
+      background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.25); padding:24px 28px; border-radius:12px;
+      max-width:min(90vw,680px); width:fit-content; box-shadow:0 10px 30px rgba(0,0,0,.45);
+    }
+    #ip-freeze-overlay h2{margin:0 0 6px; font-size:22px; font-weight:700}
+    #ip-freeze-overlay p{margin:0 0 12px; opacity:.9}
+    #ip-freeze-overlay .ip-count{font-size:28px; font-variant-tabular-nums:tabular-nums}
   `;
   document.head.appendChild(st);
 }
@@ -54,7 +67,7 @@ function resolveFieldBySuffix(suffix) {
 }
 
 // === НОРМАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ===
-// у <a.modal-link> оставляем ТОЛЬКО class и style (класс не удаляем)
+// у <a.modal-link> оставляем ТОЛЬКО class и style (класс не трогаем)
 function normalizeModalLinkAttrs(html) {
   const allowed = new Set(['class', 'style']);
   const t = document.createElement('template');
@@ -92,16 +105,10 @@ function createThumbSlot(htmlOrUrl) {
   const raw = String(htmlOrUrl ?? '').trim();
   if (!raw) return slot;
 
-  const t = document.createElement('template');
-  t.innerHTML = raw;
+  const t = document.createElement('template'); t.innerHTML = raw;
   const hasElements = !!t.content.querySelector('*');
-  if (hasElements) {
-    slot.appendChild(t.content.cloneNode(true));
-  } else {
-    const img = document.createElement('img');
-    img.src = raw; img.alt = ''; img.loading = 'lazy';
-    slot.appendChild(img);
-  }
+  if (hasElements) slot.appendChild(t.content.cloneNode(true));
+  else { const img = document.createElement('img'); img.src = raw; img.alt=''; img.loading='lazy'; slot.appendChild(img); }
   return slot;
 }
 
@@ -109,6 +116,45 @@ function keyFor(str) {
   const s = String(str ?? '');
   let h = 5381; for (let i=0;i<s.length;i++) h=((h<<5)+h)^s.charCodeAt(i);
   return 'k' + (h>>>0).toString(36);
+}
+
+// Оверлей-фриз c обратным отсчётом и последующим сабмитом
+function freezeThenSubmit(form, nativeSubmit, afterPrepareValue, seconds = FREEZE_SECONDS) {
+  if (form.dataset.ipFreezing === '1') return; // уже заморожено
+  form.dataset.ipFreezing = '1';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ip-freeze-overlay';
+  overlay.innerHTML = `
+    <div class="ip-box">
+      <h2>Пауза перед отправкой</h2>
+      <p>Мы подготовили значение поля. Смотрим консоль — там все шаги логируются.</p>
+      <div class="ip-count"><span id="ip-freeze-left">${seconds}</span> сек.</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  log('freeze:start', afterPrepareValue);
+
+  let left = seconds;
+  const countEl = overlay.querySelector('#ip-freeze-left');
+  const timer = setInterval(() => {
+    left -= 1;
+    if (left < 0) left = 0;
+    if (countEl) countEl.textContent = String(left);
+    log('freeze:tick', left);
+    if (left <= 0) {
+      clearInterval(timer);
+      overlay.remove();
+      delete form.dataset.ipFreezing;
+      // ставим флаг «идёт возобновление», чтобы слушатели submit не перехватили снова
+      form.dataset.ipResuming = '1';
+      log('freeze:end -> submit', afterPrepareValue);
+      nativeSubmit.call(form);
+      // снимем флаг после микротика
+      setTimeout(() => { delete form.dataset.ipResuming; }, 0);
+    }
+  }, 1000);
 }
 
 /* ================== ОСНОВНАЯ ФУНКЦИЯ ==================
@@ -230,15 +276,15 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   setValue(initialNorm);
   wireExternalLogging();
 
-  /* ===== ХУКИ ПЕРЕД СОХРАНЕНИЕМ ===== */
+  /* ===== ХУКИ ПЕРЕД СОХРАНЕНИЕМ (с фризом) ===== */
   function ensureValidAndPrepare() {
     let curNorm = modalLinkMode ? normalizeModalLinkAttrs(String(input.value ?? '')) : String(input.value ?? '');
     log('prepare:before-validate', curNorm);
 
     if (!ITEMS.length) {
-      input.value = modalLinkMode ? prepareModalLinkAttrs('', /*not used*/ false) : '';
+      input.value = modalLinkMode ? prepareModalLinkAttrs('') : '';
       log('prepare:empty-image-set', input.value);
-      return;
+      return input.value;
     }
 
     if (!allowed.has(curNorm)) {
@@ -249,12 +295,14 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     }
 
     if (modalLinkMode) {
-      const prepared = prepareModalLinkAttrs(curNorm); // класс уже сохранён на загрузке, восстанавливать не нужно
+      const prepared = prepareModalLinkAttrs(curNorm);
       input.value = prepared;
       log('prepare:final', input.value);
+      return prepared;
     } else {
       input.value = curNorm;
       log('prepare:final(no-modal-mode)', input.value);
+      return curNorm;
     }
   }
 
@@ -262,31 +310,48 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (form && !form.dataset.ipHooks) {
     form.dataset.ipHooks = '1';
 
-    // 1) обычный submit
-    form.addEventListener('submit', () => { ensureValidAndPrepare(); }, true);
+    // Сохраняем «нативный» submit до подмен
+    const nativeSubmit = form.submit;
 
-    // 2) FormData (ajax)
+    // 1) Обычный submit (в т.ч. Enter): ставим фриз
+    form.addEventListener('submit', (e) => {
+      if (form.dataset.ipResuming === '1') {
+        log('submit:resume-pass', true);
+        return; // это возобновление — пропускаем
+      }
+      e.preventDefault();
+      const prepared = ensureValidAndPrepare();
+      freezeThenSubmit(form, nativeSubmit, prepared, FREEZE_SECONDS);
+    }, true);
+
+    // 2) FormData (ajax сбор) — всё равно подготовим значение (для логов/страховки)
     form.addEventListener('formdata', (e) => {
-      ensureValidAndPrepare();
+      const prepared = ensureValidAndPrepare();
       try {
         const name = input.name || `form[fld${fieldSuffix}]`;
-        e.formData.set(name, input.value);
-        log('formdata:set', { name, value: input.value });
+        e.formData.set(name, prepared);
+        log('formdata:set', { name, value: prepared });
       } catch(err) {
         console.warn('[imagePicker] formdata.set failed:', err);
       }
     });
 
-    // 3) программный form.submit()
-    const nativeSubmit = form.submit;
-    form.submit = function(...args){
-      ensureValidAndPrepare();
-      return nativeSubmit.apply(this, args);
+    // 3) Программный form.submit(): тоже фризим
+    form.submit = function(...args) {
+      if (form.dataset.ipResuming === '1') {
+        return nativeSubmit.apply(this, args);
+      }
+      const prepared = ensureValidAndPrepare();
+      freezeThenSubmit(form, nativeSubmit, prepared, FREEZE_SECONDS);
+      // ничего не возвращаем: реальный submit произойдёт позже
     };
 
-    // 4) клик по submit-кнопкам
+    // 4) Клик по submit-кнопкам — просто готовим значение заранее (заморозит сам submit)
     form.querySelectorAll('button[type="submit"],input[type="submit"]').forEach(el => {
-      el.addEventListener('click', () => ensureValidAndPrepare(), { capture: true });
+      el.addEventListener('click', () => {
+        const prepared = ensureValidAndPrepare();
+        log('click:submit:prepared', prepared);
+      }, { capture: true });
     });
   }
 

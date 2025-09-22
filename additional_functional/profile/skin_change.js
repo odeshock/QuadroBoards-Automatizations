@@ -348,7 +348,3 @@
 
     return { set: setValue };
   }
-
-  // экспорт
-  window.applyImagePicker = applyImagePicker;
-})();

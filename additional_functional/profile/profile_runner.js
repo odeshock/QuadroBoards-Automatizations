@@ -97,7 +97,7 @@
     if (typeof window.setupSkins === 'function') {
       // «родной» путь
       try {
-        const api = window.setupSkins(mount, initialHtml);
+        const api = await window.setupSkins(mount, initialHtml); // <— ЖДЁМ промис
         if (api && typeof api.build === 'function') {
           build = api.build;
         }

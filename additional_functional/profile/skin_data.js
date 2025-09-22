@@ -20,6 +20,7 @@
 
 (async () => {
   const {icon_set, plashka_set, back_set } = await collectSkinSets();
+  console.log(icon_set, plashka_set, back_set);
   applyImagePicker(plashka_set, '3',
   {
       btnWidth: 229,    // ширина кнопки

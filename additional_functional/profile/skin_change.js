@@ -21,49 +21,72 @@ function injectStylesOnce() {
   const st = document.createElement('style');
   st.id = STYLE_ID;
   st.textContent = `
-    /* прячем оригинальный input/textarea, без артефактов */
-    .ip-hidden{display:none !important; resize:none !important; visibility:hidden !important;}
-
-    .ip-box{position:relative;display:block;max-width:100%;border:1px solid #ccc;border-radius:10px;background:#fff;padding:6px;}
-    .ip-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;
-      height: calc(var(--ip-rows,1) * var(--ip-h,44px) + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));}
-    .ip-grid{display:grid;grid-template-columns:repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
-      gap:var(--ip-gap,8px);align-content:start;}
-
-    .ip-btn{position:relative;overflow:hidden;width:var(--ip-w,44px);height:var(--ip-h,44px);
-      border:2px solid #d0d0d0;border-radius:10px;background:#fff;padding:0;cursor:pointer;touch-action:manipulation;}
-    .ip-btn[selected]{border-color:#0b74ff;box-shadow:0 0 0 3px rgba(11,116,255,.15);}
-    .ip-slot{position:relative;width:100%;height:100%;}
-    .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
-    .ip-slot *{pointer-events:none;}
-    /* --- SHRINK-TO-CONTENT + вертикальная прокрутка --- */
-
-    /* рамка под контент (не 100%), но не шире родителя */
-    .ip-box{
-      display: inline-block;
-      max-width: 100%;
-      box-sizing: border-box;
+    /* скрываем исходный textarea/input */
+    .ip-hidden {
+      display: none !important;
+      resize: none !important;
+      visibility: hidden !important;
     }
-    
-    /* область просмотра: только вертикальная прокрутка, высота ограничена
-       (если строк мало — пустоты снизу не будет) */
-    .ip-scroll{
-      display: inline-block;   /* чтобы ширина шла от контента */
+
+    /* Белый контейнер подстраивается под ширину контента */
+    .ip-box {
+      position: relative;
+      display: inline-block;          /* ширина = контенту */
       max-width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      background: #fff;
+      padding: 6px;
+    }
+
+    /* Вертикальный скролл */
+    .ip-scroll {
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
       max-height: calc(var(--ip-rows,1) * var(--ip-h,44px)
-                       + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));
-      overflow-y: auto;        /* скролл ВНИЗ */
-      overflow-x: hidden;      /* горизонтальный убрать */
+                      + (var(--ip-rows,1) - 1) * var(--ip-gap,8px));
     }
-    
-    /* сетка: фиксированная ширина «плитки», автоматический перенос,
-       добавлять новую колонку можно только если она влезает целиком */
-    .ip-grid{
-      display: inline-grid;    /* важное: ширина = max-content (по контенту) */
-      grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w,44px)));
-      gap: var(--ip-gap, 8px);
-      justify-content: start;  /* не уезжать вправо */
-      align-content: start;
+
+    /* Сетка: перенос вниз, ширина по контенту */
+    .ip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--ip-gap,8px);
+      align-content: flex-start;
+      justify-content: flex-start;
+    }
+
+    .ip-btn {
+      position: relative;
+      overflow: hidden;
+      width: var(--ip-w,44px);
+      height: var(--ip-h,44px);
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      background: #fff;
+      padding: 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .ip-btn[selected] {
+      border-color: #0b74ff;
+      box-shadow: 0 0 0 3px rgba(11,116,255,.15);
+    }
+
+    .ip-slot {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    .ip-slot img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+    .ip-slot * {
+      pointer-events: none;
     }
   `;
   document.head.appendChild(st);

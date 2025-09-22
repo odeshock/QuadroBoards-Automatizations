@@ -444,3 +444,4 @@ function createChoicePanel(userOpts){
 
 // экспорт
 window.createChoicePanel = createChoicePanel;
+window.buildSelectedInnerHTML = buildSelectedInnerHTML;

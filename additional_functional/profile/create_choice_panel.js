@@ -322,16 +322,15 @@ function createChoicePanel(userOpts){
     return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean));
   }
   
-  // === robust title-aware builder for selected row (safe & strict) ===
+  // === robust title-aware builder for selected row (final) ===
   function buildSelectedInnerHTML(row, html, opts = {}) {
     const ATTR = opts.editableAttr || 'title';
   
-    // 0) «пустые» слоты игнорируем
-    if (!html || typeof html !== 'string' || !/<div\s+class="item"\b/i.test(html)) {
-      return '';
-    }
+    // если вообще нет шаблона — тогда уж нечего собирать
+    if (html == null) return '';
   
-    let out = html;
+    // всегда работаем со строкой и НИКОГДА не возвращаем пусто без причины
+    let out = String(html);
   
     // helpers
     const get = (sel) => (row && row.querySelector ? row.querySelector(sel) : null);
@@ -342,7 +341,7 @@ function createChoicePanel(userOpts){
       .replace(/\s+/g, ' ')
       .trim();
   
-    // снять title ТОЛЬКО у opening-тэга .item
+    // снять title ТОЛЬКО у opening-тэга .item (если его там нет — строка просто не изменится)
     const stripItemTitle = (h) =>
       h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
   
@@ -357,10 +356,10 @@ function createChoicePanel(userOpts){
     // 2) читаем заголовок пользователя
     const edTitle = get('.ufo-title-edit');
     const cleanTitle = cleanCE(edTitle ? edTitle.innerHTML : '');
-  
     if (cleanTitle) {
       out = addItemTitle(out, cleanTitle);
     }
+    // иначе — title не добавляем, карточка останется без атрибута (так и нужно)
   
     // 3) текст внутри <wrds>, если редактируемый блок есть
     const edText = get('.ufo-text-edit');
@@ -369,9 +368,10 @@ function createChoicePanel(userOpts){
       if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
         out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
       }
-      // если пусто — оставляем текст из библиотеки как есть
+      // если пусто — не трогаем <wrds>, оставляем библиотечный текст как есть
     }
   
+    // ВАЖНО: возвращаем итоговый HTML карточки (даже если пользователь ничего не ввёл)
     return out;
   }
 

@@ -1,40 +1,45 @@
 // admin_bridge.js
+(function(){
+  'use strict';
 
-async function fetchDoc(url){
-  const res = await fetch(url, { credentials:'include' });
-  const html = await res.text();
-  const doc  = new DOMParser().parseFromString(html, 'text/html');
-  return { ok: res.ok, html, doc };
-}
-
-async function loadSkinAdmin(n){
-  const ADMIN_URL = new URL(`/admin_pages.php?edit_page=usr${n}_skin`, location.origin).toString();
-  const page = await fetchDoc(ADMIN_URL);
-  const bodyText = page.doc?.body?.textContent || '';
-
-  if (!page.ok || /Ссылка, по которой Вы пришли, неверная или устаревшая\./.test(bodyText)) {
-    return { status: 'ошибка доступа к персональной странице' };
+  async function fetchDoc(url){
+    const res = await fetch(url, { credentials:'include' });
+    const html = await res.text();
+    const doc  = new DOMParser().parseFromString(html, 'text/html');
+    return { ok: res.ok, html, doc };
   }
 
-  const form = page.doc.querySelector('form[action*="admin_pages.php"]') || page.doc.querySelector('form');
-  const ta   = page.doc.querySelector('#page-content');
-  if (!form || !ta) return { status: 'ошибка: не найдены форма или textarea' };
+  async function loadSkinAdmin(n){
+    const ADMIN_URL = new URL(`/admin_pages.php?edit_page=usr${n}_skin`, location.origin).toString();
+    const page = await fetchDoc(ADMIN_URL);
+    const bodyText = page.doc?.body?.textContent || '';
 
-  const initialHtml = ta.value || '';
+    if (!page.ok || /Ссылка, по которой Вы пришли, неверная или устаревшая\./.test(bodyText)) {
+      return { status: 'ошибка доступа к персональной странице' };
+    }
 
-  async function save(newHtml){
-    const fresh = await fetchDoc(ADMIN_URL);
-    const fForm = fresh.doc.querySelector('form[action*="admin_pages.php"]') || fresh.doc.querySelector('form');
-    const fTa   = fresh.doc.querySelector('#page-content');
-    if (!fForm || !fTa) return { ok:false, status:'ошибка: не найдены форма или textarea при сохранении' };
+    const form = page.doc.querySelector('form[action*="admin_pages.php"]') || page.doc.querySelector('form');
+    const ta   = page.doc.querySelector('#page-content');
+    if (!form || !ta) return { status: 'ошибка: не найдены форма или textarea' };
 
-    fTa.value = newHtml;
-    const fd = new FormData(fForm);
-    fd.set(fTa.getAttribute('name') || 'content', fTa.value);
+    const initialHtml = ta.value || '';
 
-    const res = await fetch(ADMIN_URL, { method:'POST', credentials:'include', body: fd });
-    return { ok: res.ok, status: res.ok ? 'успешно' : 'ошибка сохранения' };
+    async function save(newHtml){
+      const fresh = await fetchDoc(ADMIN_URL);
+      const fForm = fresh.doc.querySelector('form[action*="admin_pages.php"]') || fresh.doc.querySelector('form');
+      const fTa   = fresh.doc.querySelector('#page-content');
+      if (!fForm || !fTa) return { ok:false, status:'ошибка: не найдены форма или textarea при сохранении' };
+
+      fTa.value = newHtml;
+      const fd = new FormData(fForm);
+      fd.set(fTa.getAttribute('name') || 'content', fTa.value);
+
+      const res = await fetch(ADMIN_URL, { method:'POST', credentials:'include', body: fd });
+      return { ok: res.ok, status: res.ok ? 'успешно' : 'ошибка сохранения' };
+    }
+
+    return { status:'ok', initialHtml, save };
   }
 
-  return { status:'ok', initialHtml, save };
-}
+  window.skinAdmin = { load: loadSkinAdmin };
+})();

@@ -18,22 +18,22 @@
 //  `<img class="back" src="https://forumstatic.ru/files/001c/83/91/88621.png">`,
 // ];
 
-const { icon_set, plashka_set, back_set } = await collectSkinSets();
+(async () => {
+  const {icon_set, plashka_set, back_set } = await collectSkinSets();
   applyImagePicker(plashka_set, '3',
   {
-    btnWidth: 229,    // ширина кнопки
-    btnHeight: 42, // высота кнопки
-    modalLinkMode: true, 
+      btnWidth: 229,    // ширина кнопки
+      btnHeight: 42, // высота кнопки
+      modalLinkMode: true, 
   });
-applyImagePicker(icon_set, '5',
- {
-   btnWidth: 44
-});
-applyImagePicker(back_set, '4',
+  applyImagePicker(back_set, '4',
   {
-    btnWidth: 229,    // ширина кнопки
-    btnHeight: 42, // высота кнопки
-    modalLinkMode: true, 
+      btnWidth: 229,    // ширина кнопки
+      btnHeight: 42, // высота кнопки
+      modalLinkMode: true, 
   });
-
-
+  applyImagePicker(icon_set, '5',
+  {
+     btnWidth: 44
+  });
+})();

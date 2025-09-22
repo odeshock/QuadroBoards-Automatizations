@@ -321,68 +321,63 @@ function createChoicePanel(userOpts){
   function getSelectedIds(){
     return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean));
   }
-  // === robust title-aware builder for selected row ===
+  
+  // === robust title-aware builder for selected row (safe) ===
   function buildSelectedInnerHTML(row, html, opts = {}) {
-    // row  — DOM-строка выбранного элемента (в ней есть .ufo-title-edit и .ufo-text-edit ?)
-    // html — исходный HTML карточки из библиотеки (часто уже содержит title="пример №…")
+    // row  — DOM-элемент строки выбранной карточки (может быть null/undefined)
+    // html — исходный HTML карточки из библиотеки
     // opts.editableAttr — имя атрибута (обычно 'title')
   
-    const ATTR = (opts.editableAttr || 'title');
+    const ATTR = opts.editableAttr || 'title';
+    let out = String(html || ''); // всегда строка
   
-    // 1) достаём введённый заголовок из contenteditable
-    const ed = row.querySelector('.ufo-title-edit');
-  
-    // берём innerHTML и жёстко чистим всё «невидимое»
-    const rawTitle = ed ? ed.innerHTML : '';
-    const cleanTitle = String(rawTitle)
-      .replace(/<br\s*\/?>/gi, '\n')                        // <br> -> перенос строки
-      .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '') // NBSP и zero-width
-      .replace(/\s+/g, ' ')                                  // схлопываем пробелы
-      .trim();
-  
-    // 2) убираем существующий title где бы он ни встретился
-    function stripAttr(h, attrName) {
-      // у opening-тэга .item (самый частый случай)
+    // helper: убрать любые title="..." (и у .item, и в принципе в первом теге)
+    function stripTitle(h) {
+      if (!h) return '';
+      // у opening-тэга .item
       h = h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
-      // на всякий случай снимем у любых тегов, если вдруг где-то ещё всплыло
+      // на всякий случай — любые оставшиеся title
       h = h.replace(/\s+title="[^"]*"/gi, '');
       return h;
     }
   
-    // 3) добавляем title ТОЛЬКО если после чистки он не пуст
-    function addAttrToItem(h, attrName, value) {
+    // helper: добавить атрибут к opening-тэгу .item
+    function addTitleToItem(h, value) {
       const safe = String(value).replace(/"/g, '&quot;');
-      return h.replace(/(<div\s+class="item"\b)/i, `$1 ${attrName}="${safe}"`);
+      return h.replace(/(<div\s+class="item"\b)/i, `$1 ${ATTR}="${safe}"`);
     }
   
-    // сначала всегда снимаем дефолтный title из шаблона библиотеки
-    let out = stripAttr(html, ATTR);
-  
-    // если пользователь реально что-то ввёл — ставим title заново
-    if (cleanTitle) {
-      out = addAttrToItem(out, ATTR, cleanTitle);
-    }
-  
-    // 4) (опционально) если у вас есть поле текста .ufo-text-edit — подставьте его внутрь wrds/подписи
-    const edText = row.querySelector('.ufo-text-edit');
-    if (edText) {
-      const rawText = edText.innerHTML || edText.textContent || '';
-      const cleanText = String(rawText)
+    // helper: жёсткая чистка «невидимых» символов и <br>
+    function cleanContenteditableHTML(s) {
+      return String(s || '')
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
-        .replace(/\s+$/g, '')
+        .replace(/\s+/g, ' ')
         .trim();
+    }
   
-      // пример: вставляем в <wrds>…</wrds> если такой контейнер есть
+    // 1) всегда снимаем любой дефолтный title из шаблона
+    out = stripTitle(out);
+  
+    // 2) читаем заголовок, если row/редактор существуют
+    const edTitle = (row && row.querySelector) ? row.querySelector('.ufo-title-edit') : null;
+    const cleanTitle = cleanContenteditableHTML(edTitle ? edTitle.innerHTML : '');
+  
+    // 3) если заголовок не пуст — ставим title заново
+    if (cleanTitle) {
+      out = addTitleToItem(out, cleanTitle);
+    }
+  
+    // 4) Текст внутри <wrds> (если редактируемый блок есть)
+    const edText = (row && row.querySelector) ? row.querySelector('.ufo-text-edit') : null;
+    if (edText) {
+      const cleanText = cleanContenteditableHTML(edText.innerHTML || edText.textContent);
       if (cleanText) {
         if (/<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
           out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
         }
-      } else {
-        // если пусто — не затираем существующее из библиотеки; оставляем как есть
-        // (если нужно наоборот — раскомментируй строку ниже)
-        // out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, '<wrds></wrds>');
       }
+      // если пусто — ничего не трогаем, оставляем текст из библиотеки как есть
     }
   
     return out;

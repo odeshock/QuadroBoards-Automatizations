@@ -2,6 +2,8 @@
   'use strict';
 
   async function setupSkins(container, initialHtml, opts = {}) {
+    if (window.__skinsSetupMounted) return window.__skinsSetupMounted;
+    
     if (!container || !(container instanceof HTMLElement)) {
       throw new Error('[setupSkins] container обязателен и должен быть HTMLElement');
     }
@@ -113,4 +115,6 @@
   }
 
   window.setupSkins = setupSkins;
+  window.__skinsSetupMounted = api;
+  return api;
 })();

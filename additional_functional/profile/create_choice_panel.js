@@ -322,56 +322,55 @@ function createChoicePanel(userOpts){
     return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean));
   }
   
-  // === robust title-aware builder for selected row (final) ===
+  // === robust title-aware builder for selected row ===
   function buildSelectedInnerHTML(row, html, opts = {}) {
     const ATTR = opts.editableAttr || 'title';
   
-    // если вообще нет шаблона — тогда уж нечего собирать
-    if (html == null) return '';
-  
-    // всегда работаем со строкой и НИКОГДА не возвращаем пусто без причины
-    let out = String(html);
-  
-    // helpers
-    const get = (sel) => (row && row.querySelector ? row.querySelector(sel) : null);
-  
-    const cleanCE = (s) => String(s || '')
+    // 1) достаём введённый заголовок из contenteditable
+    const ed = row.querySelector('.ufo-title-edit');
+    const rawTitle = ed ? ed.innerHTML : '';
+    const cleanTitle = String(rawTitle)
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
   
-    // снять title ТОЛЬКО у opening-тэга .item (если его там нет — строка просто не изменится)
-    const stripItemTitle = (h) =>
-      h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
-  
-    const addItemTitle = (h, value) => {
-      const safe = String(value).replace(/"/g, '&quot;');
-      return h.replace(/(<div\s+class="item"\b)/i, `$1 ${ATTR}="${safe}"`);
-    };
-  
-    // 1) всегда снимаем дефолтный title из шаблона
-    out = stripItemTitle(out);
-  
-    // 2) читаем заголовок пользователя
-    const edTitle = get('.ufo-title-edit');
-    const cleanTitle = cleanCE(edTitle ? edTitle.innerHTML : '');
-    if (cleanTitle) {
-      out = addItemTitle(out, cleanTitle);
+    // 2) убираем существующий title где бы он ни встретился
+    function stripAttr(h, attrName) {
+      h = h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
+      h = h.replace(/\s+title="[^"]*"/gi, '');
+      return h;
     }
-    // иначе — title не добавляем, карточка останется без атрибута (так и нужно)
   
-    // 3) текст внутри <wrds>, если редактируемый блок есть
-    const edText = get('.ufo-text-edit');
+    // 3) добавляем title только если после чистки он не пуст
+    function addAttrToItem(h, attrName, value) {
+      const safe = String(value).replace(/"/g, '&quot;');
+      return h.replace(/(<div\s+class="item"\b)/i, `$1 ${attrName}="${safe}"`);
+    }
+  
+    // Всегда снимаем любой title из шаблона
+    let out = stripAttr(String(html || ''), ATTR);
+  
+    // Если пользователь ввёл непустой заголовок — ставим его заново
+    if (cleanTitle.length > 0) {
+      out = addAttrToItem(out, ATTR, cleanTitle);
+    }
+  
+    // 4) обновляем текст внутри <wrds>, если редактировали
+    const edText = row.querySelector('.ufo-text-edit');
     if (edText) {
-      const cleanText = cleanCE(edText.innerHTML || edText.textContent);
+      const rawText = edText.innerHTML || edText.textContent || '';
+      const cleanText = String(rawText)
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
+        .replace(/\s+$/g, '')
+        .trim();
+  
       if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
         out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
       }
-      // если пусто — не трогаем <wrds>, оставляем библиотечный текст как есть
     }
   
-    // ВАЖНО: возвращаем итоговый HTML карточки (даже если пользователь ничего не ввёл)
     return out;
   }
 

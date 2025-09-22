@@ -45,8 +45,14 @@
         { id: '6', html: '<div class="item" title="пример №6" data-id="6"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/6/220828.png" class="plashka"><wrds>я став клованом</wrds></a></div>' },
         { id: '7', html: '<div class="item" data-id="7"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/1014/625440.png" class="plashka"><wrds>пупупу</wrds></a></div>' },
       ],
-      '_icon': [],
-      '_back': []
+      '_icon': [
+        { id: '1', html: '<div class="item" data-id="1"><img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png"></div>'},
+        { id: '2', html: '<div class="item" data-id="2"><img class="icon" src="https://static.thenounproject.com/png/2185221-200.png"></div>'},
+      ],
+      '_back':  [
+        { id: '1', html: '<div class="item" data-id="1"><img class="back" src="https://upforme.ru/uploads/001c/14/5b/440/238270.gif"></div>'},
+        { id: '2', html: '<div class="item" data-id="2"><img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png"></div>'},
+      ],
     };
 
     // --- безопасная обёртка вокруг get_skin_lib / opts.getLib

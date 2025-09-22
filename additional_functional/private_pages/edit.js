@@ -85,9 +85,13 @@ async function FMVeditPersonalPage(name, patch = {}) {
 
   // --- 4) сериализация формы в CP1251 + POST ---
   let res, text;
+  
+  // ВАЖНО: постим на фактический action формы (обычно "/admin_pages.php")
+  const postUrl = new URL(form.getAttribute('action') || editUrl, location.origin).toString();
+  
   if (typeof serializeFormCP1251_SelectSubmit === 'function' && typeof fetchCP1251Text === 'function') {
     const body = serializeFormCP1251_SelectSubmit(form, submitName);
-    ({ res, text } = await fetchCP1251Text(editUrl, {
+    ({ res, text } = await fetchCP1251Text(postUrl, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=windows-1251' },
@@ -96,10 +100,9 @@ async function FMVeditPersonalPage(name, patch = {}) {
       body
     }));
   } else {
-    // Запасной путь (без CP1251-магии, что может ломать кириллицу)
     const fd = new FormData(form);
     fd.append(submitName, saveBtn?.value || '1');
-    res  = await fetch(editUrl, { method:'POST', credentials:'include', body: fd });
+    res  = await fetch(postUrl, { method:'POST', credentials:'include', body: fd });
     text = await res.text();
   }
 

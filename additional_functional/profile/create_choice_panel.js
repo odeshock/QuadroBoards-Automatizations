@@ -179,6 +179,10 @@
       const btnRemove=mkBtn('✕', (e)=>{e.preventDefault(); e.stopPropagation(); row.remove(); if (libCard) libCard.classList.remove('disabled'); recalc();});
       actions.append(btnUp, btnDown, btnRemove);
       row.dataset.html = item.html.trim();
+      if (o.usePageHtml) {
+        // запомним «как было на странице», чтобы при сборке беречь его title
+        row.dataset.pageHtml = o.usePageHtml.trim();
+      }
       row.append(id, full, actions, editor);
       selBox.insertBefore(row, selBox.firstChild); recalc();
     }

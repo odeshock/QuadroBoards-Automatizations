@@ -158,17 +158,14 @@
       }));
 
       // билдер: конкатенация по targetClass в порядке (_plashka, _icon, _background)
-      build = () => {
-        let result = '';
+      build = (fullHtml = initialHtml || '') => {
+        let current = fullHtml;
         for (const p of panels) {
-          if (p && typeof p.build === 'function') {
-            const part = p.build(); // ожидаем HTML фрагмента секции
-            if (part) {
-              result += (result ? '\n\n' : '') + part;
-            }
+          if (p && typeof p.builder === 'function') {
+            current = p.builder(current);  // <- корректно вызываем builder
           }
         }
-        return result;
+        return current;
       };
     }
 

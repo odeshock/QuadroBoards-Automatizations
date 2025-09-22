@@ -16,7 +16,10 @@
     return String(s || '')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
-      .replace(/\s+$/g, '')
+      .replace(/&quot;/g, '"')
+      .replace(/>\s+</g, '><')
+      .replace(/[ \t\n]+/g, ' ')
+      .replace(/\s*=\s*/g, '=')
       .trim();
   }
 

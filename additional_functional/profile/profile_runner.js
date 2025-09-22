@@ -54,12 +54,26 @@
   }
 
   (async () => {
+    // 1) URL-гейт: только /profile.php?id=N и никаких других параметров
     if (location.pathname !== '/profile.php') return;
     const sp = new URLSearchParams(location.search);
     if (!sp.has('id') || [...sp.keys()].some(k => k !== 'id')) return;
-
-    const id = getProfileIdFromURL();
+  
+    const id = (sp.get('id') || '').trim();
     if (!id) return;
+  
+    // 2) Group-гейт: список разрешённых групп берём из SKIN.GroupID (массив строк)
+    //    ensureAllowed() использует CHRONO_CHECK.GroupID и текущий gid
+    window.CHRONO_CHECK = {
+      GroupID: (window.SKIN && Array.isArray(window.SKIN.GroupID)) ? window.SKIN.GroupID : []
+    };
+  
+    if (typeof window.ensureAllowed === 'function') {
+      const ok = await window.ensureAllowed();
+      if (!ok) return; // не в нужной группе — выходим тихо
+    } else {
+      return; // подстраховка: нет функции — никому не показываем
+    }
 
     if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
       console.error('[profile_runner] skinAdmin.load не найден.');

@@ -1,9 +1,9 @@
-/* ===== константы (общие) ===== */
+/* ================== КОНСТАНТЫ ДЛЯ ВСЕХ ИНСТАНСОВ ================== */
 const IP_ROWS = 1;         // сколько строк видно без скролла
-const IP_GAP  = 8;         // зазор между элементами (px)
+const IP_GAP  = 8;         // отступ между элементами, px
 const IP_REQUIRED = true;  // выбор обязателен (если есть варианты)
 
-/* ===== утилиты ===== */
+/* ================== УТИЛИТЫ ================== */
 function isProfileFieldsPage() {
   try {
     const u = new URL(location.href);
@@ -15,7 +15,7 @@ function isProfileFieldsPage() {
   } catch { return false; }
 }
 
-const STYLE_ID = 'ip-style-unified';
+const STYLE_ID = 'ip-style-unified-stronghooks';
 function injectStylesOnce() {
   if (document.getElementById(STYLE_ID)) return;
   const st = document.createElement('style');
@@ -44,11 +44,11 @@ function resolveFieldBySuffix(suffix) {
   return (
     document.querySelector(`#${CSS.escape(id)}[name="${name}"][type="text"]`) ||
     document.getElementById(id) ||
-    document.querySelector(`textarea[name="${name}"]`)
+    document.querySelector(`input[name="${name}"]`)
   );
 }
 
-// очищаем у <a.modal-link> все атрибуты кроме class
+// Очистка <a.modal-link>: оставить только class
 function normalizeModalLinkAttrs(html) {
   const t = document.createElement('template');
   t.innerHTML = String(html ?? '');
@@ -60,7 +60,8 @@ function normalizeModalLinkAttrs(html) {
   return t.innerHTML.trim();
 }
 
-// перед сабмитом: добавить data-reveal-id всем <a.modal-link>, id="usrN" — первой
+// Перед сабмитом: всем <a.modal-link> добавить data-reveal-id="character",
+// а первой ещё и id="usrN" (N из ?id=N)
 function prepareModalLinkAttrs(html) {
   const t = document.createElement('template');
   t.innerHTML = String(html ?? '');
@@ -74,32 +75,41 @@ function prepareModalLinkAttrs(html) {
   return t.innerHTML.trim();
 }
 
-// превью: если строка выглядит как HTML — innerHTML, иначе <img src="...">
+// Превью: если строка дает элементы при парсе — это HTML; иначе считаем URL картинки
 function createThumbSlot(htmlOrUrl) {
   const slot = document.createElement('div');
   slot.className = 'ip-slot';
-  const s = String(htmlOrUrl ?? '').trim();
-  if (s.startsWith('<') && s.endsWith('>')) {
-    slot.innerHTML = s;
-  } else if (s) {
+  const raw = String(htmlOrUrl ?? '').trim();
+  if (!raw) return slot;
+
+  const t = document.createElement('template');
+  t.innerHTML = raw;
+  const hasElements = !!t.content.querySelector('*');
+
+  if (hasElements) {
+    slot.appendChild(t.content.cloneNode(true));
+  } else {
     const img = document.createElement('img');
-    img.src = s; img.alt = ''; img.loading = 'lazy';
+    img.src = raw; img.alt = ''; img.loading = 'lazy';
     slot.appendChild(img);
   }
   return slot;
 }
 
-// ключ по строке (для data-атрибутов/подсветки)
+// Ключ для выделения (детерминированный хеш строки)
 function keyFor(str) {
   const s = String(str ?? '');
   let h = 5381; for (let i=0;i<s.length;i++) h=((h<<5)+h)^s.charCodeAt(i);
   return 'k' + (h>>>0).toString(36);
 }
 
-/* ===== основная функция =====
-   image_set: массив СТРОК (HTML или URL). Каждая строка = и превью, и значение.
-   fieldSuffix: '5' -> fld5 / form[fld5]
-   opts: { btnWidth?:number, btnHeight?:number, gridColSize?:number, modalLinkMode?:boolean }
+/* ================== ОСНОВНАЯ ФУНКЦИЯ ==================
+   image_set: массив СТРОК (HTML или URL); каждая строка = и значение, и превью
+   fieldSuffix: строка, напр. '5' → fld5 / form[fld5]
+   opts: {
+     btnWidth?:number, btnHeight?:number, gridColSize?:number,
+     modalLinkMode?:boolean       // работать ли с <a.modal-link> (чистка/добавление атрибутов)
+   }
 */
 function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (!isProfileFieldsPage()) return;
@@ -153,14 +163,11 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     NORMS.forEach((norm, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'ip-btn'; btn.dataset.key = keyByNorm.get(norm);
-      // превью: показываем нормализованную (если modalLinkMode) или исходную строку
       const display = modalLinkMode ? norm : ITEMS[idx];
       btn.appendChild(createThumbSlot(display));
-
       const pick = (e) => { e.preventDefault(); e.stopPropagation(); setValue(norm); };
       btn.addEventListener('pointerdown', pick);
-      btn.addEventListener('click', pick);
-
+      btn.addEventListener('click',  pick);
       g.appendChild(btn);
     });
 
@@ -169,7 +176,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     grid = g;
   }
 
-  // подсветка
+  // подсветка выбранной
   function highlight(normStr) {
     if (!grid) return;
     const key = keyByNorm.get(String(normStr)) || '';
@@ -180,7 +187,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     }
   }
 
-  // установка значения (norm), без рекурсии
+  // установка значения (norm) без рекурсии
   let internal = false;
   function setValue(normVal) {
     const v = String(normVal ?? '');
@@ -210,22 +217,50 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     input.dataset.ipSynced = '1';
   }
 
-  // перед submit
+  /* ===== «ЖЕЛЕЗОБЕТОННЫЕ» ХУКИ ПЕРЕД СОХРАНЕНИЕМ ===== */
+  function ensureValidAndPrepare() {
+    let curNorm = modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '');
+    if (!hasItems) {
+      input.value = modalLinkMode ? prepareModalLinkAttrs('') : '';
+      return;
+    }
+    if (!allowed.has(curNorm)) {
+      const fallback = input.dataset.ipInitial ?? (IP_REQUIRED ? firstNorm : '');
+      curNorm = String(fallback);
+      setValue(curNorm);
+    }
+    input.value = modalLinkMode ? prepareModalLinkAttrs(curNorm) : curNorm;
+  }
+
   const form = input.closest('form');
-  if (form && !form.dataset.ipSubmitHooked) {
+  if (form && !form.dataset.ipHooks) {
+    form.dataset.ipHooks = '1';
+
+    // 1) обычный submit
     form.addEventListener('submit', () => {
-      let curNorm = modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '');
-      if (!hasItems) { setValue(''); return; }
-      if (!allowed.has(curNorm)) {
-        const fallback = input.dataset.ipInitial ?? (IP_REQUIRED ? firstNorm : '');
-        curNorm = String(fallback);
-        setValue(curNorm);
-      }
-      if (modalLinkMode) {
-        input.value = prepareModalLinkAttrs(curNorm);
-      }
+      ensureValidAndPrepare();
     }, true);
-    form.dataset.ipSubmitHooked = '1';
+
+    // 2) FormData (ajax-сбор)
+    form.addEventListener('formdata', (e) => {
+      ensureValidAndPrepare();
+      try {
+        const name = input.name || `form[fld${fieldSuffix}]`;
+        e.formData.set(name, input.value);
+      } catch(_) {}
+    });
+
+    // 3) программный form.submit()
+    const nativeSubmit = form.submit;
+    form.submit = function(...args){
+      ensureValidAndPrepare();
+      return nativeSubmit.apply(this, args);
+    };
+
+    // 4) клик по submit-кнопкам
+    form.querySelectorAll('button[type="submit"],input[type="submit"]').forEach(el => {
+      el.addEventListener('click', () => ensureValidAndPrepare(), { capture: true });
+    });
   }
 
   return { set: setValue };

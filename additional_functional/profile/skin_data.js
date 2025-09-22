@@ -29,7 +29,7 @@ applyImagePicker(icon_set, '5',
  {
    btnWidth: 44
 });
-applyImagePicker(back_set, '8',
+applyImagePicker(back_set, '4',
   {
     btnWidth: 229,    // ширина кнопки
     btnHeight: 42, // высота кнопки

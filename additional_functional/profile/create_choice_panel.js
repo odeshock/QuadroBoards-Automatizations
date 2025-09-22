@@ -404,19 +404,39 @@ function createChoicePanel(userOpts){
   if (!opts.external) ensureGlobalSubmitHook(opts.textareaSelector);
 
   // В external-режиме вернём builder()
-  function builder(fullHtmlOpt){
-    let current = '';
-    if (typeof fullHtmlOpt === 'string') current = fullHtmlOpt;
-    else if (typeof opts.initialHtml === 'string') current = opts.initialHtml;
-    else {
-      const ta = $(opts.textareaSelector);
-      const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
-      if (tm) current = tm.getContent();
-      else if (ta) current = ta.value || '';
+  function builder(fullHtml) {
+    const targetClass = opts.targetClass || '_plashka';
+    const lib = Array.isArray(opts.library) ? opts.library : [];
+  
+    // 1) собираем выбранные строки
+    const rows = Array.from(panelEl.querySelectorAll('.ufo-selected .ufo-row[data-id]'));
+  
+    // 2) для каждой строки берём базовый HTML карточки ИЗ БИБЛИОТЕКИ ПО ID
+    const parts = rows.map(row => {
+      const id = String(row.getAttribute('data-id') || row.dataset.srcId || '');
+      const libItem = lib.find(x => String(x.id) === id);
+      const baseHtml = libItem ? String(libItem.html || '') : '';
+      return buildSelectedInnerHTML(row, baseHtml, { editableAttr: opts.editableAttr || 'title' });
+    }).filter(s => s && s.trim());
+  
+    const content = parts.join('\n');
+    let html = String(fullHtml || '');
+  
+    // 3) устойчиво заменяем содержимое якоря (или создаём якорь, если его нет)
+    const anchorRe = new RegExp(
+      `(<div\\s+class=(?:"|')${targetClass}(?:"|')[^>]*>)[\\s\\S]*?(</div>)`,
+      'i'
+    );
+  
+    if (anchorRe.test(html)) {
+      // подмена содержимого уже существующего якоря
+      html = html.replace(anchorRe, `$1\n${content}\n$2`);
+    } else {
+      // якоря нет — создаём в конце
+      html += `\n<div class="${targetClass}">\n${content}\n</div>\n`;
     }
-    const inner = buildSelectedInnerHTML();
-    const ids = getSelectedIds();
-    return rewriteSectionHTML(current, opts, inner, ids);
+  
+    return html;
   }
 
   return { details, builder, getSelectedIds };

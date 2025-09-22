@@ -325,9 +325,16 @@ function createChoicePanel(userOpts){
     const cards=[...selBox.querySelectorAll('.ufo-card')];
     return cards.map((row)=>{
       let html=row.dataset.html||'';
-      const ed=row.querySelector('.ufo-title-edit');
-      const t = ed ? ed.textContent.trim() : '';
+      const ed = row.querySelector('.ufo-title-edit');
+      // Жёстко чистим невидимые символы и <br>
+      const raw = ed ? ed.innerHTML : '';
+      const t = raw
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
       const attr = opts.editableAttr;
+      
       if (t) {
         const safe = t.replace(/"/g,'&quot;');
         const re = new RegExp(`${attr}="[^"]*"`);
@@ -335,7 +342,7 @@ function createChoicePanel(userOpts){
         else html = html.replace(/<div\s+class="item"\b([^>]*)>/,(m,a)=>`<div class="item" ${attr}="${safe}"${a}>`);
       } else {
         const reAttr = new RegExp(`(<div\\s+class="item"\\b[^>]*?)\\s+${attr}="[^"]*"(.*?>)`);
-        html = html.replace(reAttr, '$1$2');
+        html = html.replace(reAttr, '$1$2');     // принудительно убираем title
       }
       return html;
     }).join('\n');

@@ -1,6 +1,8 @@
-// profile_runner.js — запуск панелей со страницы профиля в режиме EDIT
 (function () {
   'use strict';
+
+  if (window.__profileRunnerMounted) return;   // <== защита от повторного запуска
+  window.__profileRunnerMounted = true;
 
   // --- небольшие утилиты ---
   function qs(sel, root = document) { return root.querySelector(sel); }

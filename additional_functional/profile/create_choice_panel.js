@@ -327,10 +327,6 @@ function createChoicePanel(userOpts){
     // если по какой-то причине row не передали — просто вернём исходный html строкой
     if (!row || typeof row.querySelector !== 'function') return String(html || '');
   
-    // row — DOM-строка выбранного элемента (в ней есть .ufo-title-edit и .ufo-text-edit ?)
-    // html — исходный HTML карточки из библиотеки (часто уже содержит title="пример №…")
-    // opts.editableAttr — имя атрибута (обычно 'title')
-  
     const ATTR = (opts.editableAttr || 'title');
   
     // 1) достаём введённый заголовок из contenteditable
@@ -347,9 +343,7 @@ function createChoicePanel(userOpts){
     // 2) убираем существующий title где бы он ни встретился
     function stripAttr(h /*, attrName */) {
       h = String(h || '');
-      // у opening-тэга .item (самый частый случай)
       h = h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
-      // на всякий случай снимем у любых тегов, если вдруг где-то ещё всплыло
       h = h.replace(/\s+title="[^"]*"/gi, '');
       return h;
     }
@@ -378,15 +372,12 @@ function createChoicePanel(userOpts){
         .replace(/\s+$/g, '')
         .trim();
   
-      // пример: вставляем в <wrds>…</wrds> если такой контейнер есть
       if (cleanText) {
         if (/<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
           out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
         }
       } else {
         // если пусто — не затираем существующее из библиотеки; оставляем как есть
-        // (если нужно наоборот — раскомментируй строку ниже)
-        // out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, '<wrds></wrds>');
       }
     }
   

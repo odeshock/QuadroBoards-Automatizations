@@ -35,10 +35,7 @@
     wrap.id = 'fmv-skins-panel';
     wrap.style.margin = '16px 0';
     wrap.innerHTML = `
-      <details open style="border:1px solid #d6d6de;border-radius:10px;background:#fff">
-        <summary style="list-style:none;padding:10px 14px;border-bottom:1px solid #e8e8ef;border-radius:10px;font-weight:600;background:#f6f7fb;cursor:pointer">
-          Плашки: библиотека и выбранные
-        </summary>
+      <details open style="border:1px solid #d6d6de;border-radius:10px;">
         <div class="fmv-skins-body" style="padding:14px"></div>
         <div class="fmv-skins-footer" style="display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid #eee">
           <button type="button" class="fmv-save"

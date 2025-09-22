@@ -1,21 +1,24 @@
+// profile_runner.js — запуск панелей со страницы профиля (EDIT-режим)
 (function () {
   'use strict';
 
-  if (window.__profileRunnerMounted) return;   // <== защита от повторного запуска
+  // защита от повторного запуска скрипта
+  if (window.__profileRunnerMounted) return;
   window.__profileRunnerMounted = true;
 
-  // --- небольшие утилиты ---
-  function qs(sel, root = document) { return root.querySelector(sel); }
+  // --- утилиты ---
+  const qs = (sel, root = document) => root.querySelector(sel);
   function toast(msg, ok = false) {
     const d = document.createElement('div');
     d.textContent = msg;
-    d.style.cssText = 'position:fixed;right:14px;bottom:14px;padding:8px 12px;border-radius:8px;color:#fff;z-index:999999;' +
+    d.style.cssText =
+      'position:fixed;right:14px;bottom:14px;padding:8px 12px;border-radius:8px;color:#fff;z-index:999999;' +
       (ok ? 'background:#16a34a;' : 'background:#c24141;');
     document.body.appendChild(d);
     setTimeout(() => d.remove(), 1800);
   }
   function onReady() {
-    return new Promise(res => {
+    return new Promise((res) => {
       if (document.readyState === 'complete' || document.readyState === 'interactive') return res();
       document.addEventListener('DOMContentLoaded', () => res(), { once: true });
     });
@@ -25,17 +28,21 @@
     const id = u.searchParams.get('id');
     return id ? String(id).trim() : '';
   }
+  function normalizeHtml(s) {
+    return String(s || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\s+$/g, '')
+      .trim();
+  }
 
-  // аккуратно ждём ноду-подложку, куда будем рисовать
+  // создаём оболочку для панелей и кнопку "Сохранить"
   async function waitMount() {
     await onReady();
-    // у вас просили рисовать «внутри #viewprofile , под #container».
-    // #viewprofile -> .container
     const box = qs('#viewprofile .container') || qs('#viewprofile') || qs('#pun-main') || document.body;
     const wrap = document.createElement('div');
     wrap.id = 'fmv-skins-panel';
     wrap.style.margin = '16px 0';
-    // отдельный блок, чуть похожий на карточку
     wrap.innerHTML = `
       <details open style="border:1px solid #d6d6de;border-radius:10px;background:#fff">
         <summary style="list-style:none;padding:10px 14px;border-bottom:1px solid #e8e8ef;border-radius:10px;font-weight:600;background:#f6f7fb;cursor:pointer">
@@ -52,15 +59,7 @@
     return wrap.querySelector('.fmv-skins-body');
   }
 
-  // попытка получить библиотеки из глобалов в fallback-режиме
-  function getLib(nameCandidates) {
-    for (const n of nameCandidates) {
-      if (window[n]) return window[n];
-    }
-    return [];
-  }
-
-  // основной сценарий
+  // --- основной сценарий ---
   (async () => {
     // работаем только на странице профиля
     if (!/\/profile\.php$/i.test(location.pathname)) return;
@@ -74,127 +73,80 @@
       return;
     }
 
-    // загружаем админскую страницу (edit)
+    // грузим HTML страницы редактирования
     const { status, initialHtml, save } = await window.skinAdmin.load(id);
-    if (status !== 'ok') {
-      // status может быть: 'forbidden' | 'notfound' | 'error' | 'unknown' | ...
-      const msg = (status === 'forbidden')
+    if (status !== 'ok' && status !== 'ок') {
+      const msg = status === 'ошибка доступа к персональной странице'
         ? 'Страница со скинами недоступна'
         : 'Не удалось загрузить страницу со скинами';
       toast(msg, false);
       return;
     }
 
-    // монтируем визуальную панель на странице профиля
+    // монтируем контейнер и запускаем панели
     const mount = await waitMount();
 
-    // ДВА ВАРИАНТА:
-    // 1) Если в skin_set_up.js есть функция setupSkins(container, initialHtml) — используем её.
-    //    Она должна отрисовать три секции (_plashka, _icon, _background) и вернуть { build() }.
-    // 2) Иначе — падаем в fallback: вызываем createChoicePanel трижды и собираем итог через их билдеры.
-
-    let build;
+    let build = null;
     if (typeof window.setupSkins === 'function') {
-      // «родной» путь
       try {
-        const api = await window.setupSkins(mount, initialHtml); // <— ЖДЁМ промис
-        if (api && typeof api.build === 'function') {
-          build = api.build;
-        }
+        // ВАЖНО: ждём Promise от setupSkins
+        const api = await window.setupSkins(mount, initialHtml);
+        if (api && typeof api.build === 'function') build = api.build;
       } catch (e) {
         console.error('setupSkins() error:', e);
       }
     }
 
     if (!build) {
-      // --- Fallback: ручной вызов createChoicePanel ---
-      if (typeof window.createChoicePanel !== 'function') {
-        toast('createChoicePanel не найден — не могу отрисовать панели', false);
-        return;
-      }
-
-      // библиотеки стараемся угадать из глобалов
-      const LIB_P = getLib(['LIB_P', 'LIB_PLASHKI', 'LIB_PL', 'LIB_PLA']);
-      const LIB_I = getLib(['LIB_I', 'LIB_ICON', 'LIB_IC']);
-      const LIB_B = getLib(['LIB_B', 'LIB_BACKGROUND', 'LIB_BG', 'LIB_BACK']);
-
-      // контейнер под 3 панели
-      const grid = document.createElement('div');
-      grid.style.display = 'grid';
-      grid.style.gridTemplateColumns = '1fr';
-      grid.style.gap = '16px';
-      mount.appendChild(grid);
-
-      const panels = [];
-
-      // плашки
-      panels.push(window.createChoicePanel({
-        title: 'Плашки',
-        targetClass: '_plashka',
-        library: LIB_P,
-        mountEl: grid,
-        initialHtml,
-        external: true
-      }));
-
-      // иконки
-      panels.push(window.createChoicePanel({
-        title: 'Иконки',
-        targetClass: '_icon',
-        library: LIB_I,
-        mountEl: grid,
-        initialHtml,
-        external: true
-      }));
-
-      // фон
-      panels.push(window.createChoicePanel({
-        title: 'Фон',
-        targetClass: '_background',
-        library: LIB_B,
-        mountEl: grid,
-        initialHtml,
-        external: true
-      }));
-
-      // билдер: конкатенация по targetClass в порядке (_plashka, _icon, _background)
-      build = (fullHtml = initialHtml || '') => {
-        let current = fullHtml;
-        for (const p of panels) {
-          if (p && typeof p.builder === 'function') {
-            current = p.builder(current);  // <- корректно вызываем builder
-          }
-        }
-        return current;
-      };
+      toast('Не удалось инициализировать панели', false);
+      return;
     }
 
-    // обработчик «Сохранить»
-    // сразу после получения id:
+    // кнопка "Сохранить"
+    const panelRoot = document.getElementById('fmv-skins-panel');
+    const btnSave = panelRoot ? panelRoot.querySelector('.fmv-save') : null;
+    if (!btnSave) {
+      console.error('[profile_runner] Кнопка .fmv-save не найдена');
+      return;
+    }
+
     const pageName = `usr${id}_skin`;
-    
-    const btnSave = document.querySelector('#fmv-skins-panel .fmv-save');
-    btnSave?.addEventListener('click', async () => {
+
+    btnSave.addEventListener('click', async () => {
       try {
         const finalHtml = build ? build() : '';
         if (!finalHtml) {
           toast('Нечего сохранять', false);
           return;
         }
-    
-        let r;
+
+        // 1) сохраняем: сначала через FMVeditTextareaOnly, иначе — через admin_bridge.save
+        let r = null;
         if (typeof window.FMVeditTextareaOnly === 'function') {
-          // самый надёжный путь из edit.js
           r = await window.FMVeditTextareaOnly(pageName, finalHtml);
         } else if (typeof save === 'function') {
-          // запасной путь через admin_bridge (как было)
           r = await save(finalHtml);
         } else {
           toast('Нет функции сохранения', false);
           return;
         }
-    
-        if (r && (r.ok || r.status === 'saved')) {
+
+        // 2) первичный признак успеха
+        let ok = !!(r && (r.ok || r.status === 'saved' || r.status === 'успешно' || r.status === 'ok'));
+
+        // 3) пост-верификация: перечитываем страницу редактирования и сравниваем textarea
+        if (!ok && window.skinAdmin && typeof window.skinAdmin.load === 'function') {
+          try {
+            const check = await window.skinAdmin.load(id);
+            if (check && (check.status === 'ok' || check.status === 'ок')) {
+              ok = normalizeHtml(check.initialHtml) === normalizeHtml(finalHtml);
+            }
+          } catch (e) {
+            console.warn('[profile_runner] verify failed:', e);
+          }
+        }
+
+        if (ok) {
           toast('Успешно', true);
         } else {
           console.warn('save result:', r);
@@ -205,6 +157,5 @@
         toast('Ошибка сохранения', false);
       }
     });
-
   })();
 })();

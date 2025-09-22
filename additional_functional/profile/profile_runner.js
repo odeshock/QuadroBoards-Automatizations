@@ -54,7 +54,9 @@
   }
 
   (async () => {
-    if (!/\/profile\.php$/i.test(location.pathname)) return;
+    if (location.pathname !== '/profile.php') return;
+    const sp = new URLSearchParams(location.search);
+    if (!sp.has('id') || [...sp.keys()].some(k => k !== 'id')) return;
 
     const id = getProfileIdFromURL();
     if (!id) return;

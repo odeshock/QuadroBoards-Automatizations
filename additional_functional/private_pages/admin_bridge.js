@@ -1,39 +1,61 @@
-// admin_bridge.js (UTF8/CP1251-safe loader + correct save)
-// Экспортирует window.skinAdmin.load(userId) -> { status, initialHtml, save(newHtml) }
+// admin_bridge.js (UTF8/CP1251-safe loader + correct POST + post-verify)
+// Экспортирует: window.skinAdmin.load(userId) -> { status, initialHtml, save(newHtml) }
 
 (function () {
   'use strict';
   if (window.skinAdmin) return;
 
-  // 1) универсальный загрузчик HTML (если есть твой fetchHtml — используем его)
+  // Универсальный загрузчик HTML (если есть твой fetchHtml — используем его)
   const getHtml = (typeof window.fetchHtml === 'function')
     ? window.fetchHtml
     : async (url) => (await fetch(url, { credentials: 'include' })).text();
 
   const toDoc = (html) => new DOMParser().parseFromString(html, 'text/html');
 
+  function normalizeHtml(s) {
+    return String(s || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\s+$/g, '')
+      .trim();
+  }
+
   async function loadSkinAdmin(userId) {
     const editUrl = new URL(`/admin_pages.php?edit_page=usr${userId}_skin`, location.origin).toString();
 
-    // 2) грузим страницу редактирования
+    // 1) грузим страницу редактирования
     const html = await getHtml(editUrl);
     const doc  = toDoc(html);
 
-    // базовые проверки доступа
+    // проверка доступа
     const bodyText = (doc.body && doc.body.textContent || '').trim();
     if (/Ссылка, по которой Вы пришли, неверная или устаревшая\./i.test(bodyText)) {
       return { status: 'ошибка доступа к персональной странице' };
     }
 
+    // находим форму и textarea
     const form = doc.querySelector('form[action*="admin_pages.php"]') || doc.querySelector('form');
     const ta   = doc.querySelector('#page-content,[name="content"]');
     if (!form || !ta) return { status: 'ошибка: не найдены форма или textarea' };
 
     const initialHtml = ta.value || '';
 
-    // 3) функция сохранения
+    // утилита пост-верификации: перечитать и сравнить textarea
+    async function verifySaved(expectedHtml) {
+      try {
+        const checkHtml = await getHtml(editUrl);
+        const checkDoc  = toDoc(checkHtml);
+        const checkTa   = checkDoc.querySelector('#page-content,[name="content"]');
+        if (!checkTa) return false;
+        return normalizeHtml(checkTa.value) === normalizeHtml(expectedHtml);
+      } catch {
+        return false;
+      }
+    }
+
+    // 2) функция сохранения
     async function save(newHtml) {
-      // берём СВЕЖУЮ форму (токены/hidden могут меняться)
+      // берём СВЕЖУЮ форму (на случай токенов/hidden)
       const freshHtml = await getHtml(editUrl);
       const freshDoc  = toDoc(freshHtml);
       const fForm = freshDoc.querySelector('form[action*="admin_pages.php"]') || freshDoc.querySelector('form');
@@ -43,7 +65,7 @@
       // новый контент
       fTa.value = newHtml;
 
-      // адрес для POST — фактический action формы (обычно "/admin_pages.php")
+      // фактический адрес POST — из action формы
       const postUrl = new URL(fForm.getAttribute('action') || editUrl, location.origin).toString();
 
       // имя submit-кнопки
@@ -53,9 +75,10 @@
       const submitName  = submitBtn?.name  || 'save';
       const submitValue = submitBtn?.value || '1';
 
-      // a) путь с CP1251-утилитами, если у тебя они есть глобально
+      // --- Ветвь A: CP1251-инструменты доступны
       if (typeof window.serializeFormCP1251_SelectSubmit === 'function' &&
           typeof window.fetchCP1251Text === 'function') {
+
         const body = window.serializeFormCP1251_SelectSubmit(fForm, submitName);
         const { res, text } = await window.fetchCP1251Text(postUrl, {
           method: 'POST',
@@ -65,11 +88,14 @@
           referrerPolicy: 'strict-origin-when-cross-origin',
           body
         });
+
         const okByText = /Сохранено|успешн|изменени[яй]\s+сохранены/i.test(text);
-        return { ok: (res.ok || okByText || res.redirected), status: okByText ? 'успешно' : 'ошибка сохранения' };
+        let ok = (res.ok || okByText || res.redirected);
+        if (!ok) ok = await verifySaved(newHtml); // пост-верификация
+        return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
       }
 
-      // b) современный путь: FormData + submit-параметр + проверка текста ответа
+      // --- Ветвь B: современный путь — FormData + submit + проверка текста
       const fd = new FormData(fForm);
       fd.set(fTa.getAttribute('name') || 'content', fTa.value);
       fd.append(submitName, submitValue);
@@ -82,11 +108,15 @@
         referrerPolicy: 'strict-origin-when-cross-origin'
       });
       const text = await res.text();
+
       const okByText = /Сохранено|успешн|изменени[яй]\s+сохранены/i.test(text);
-      return { ok: (res.ok || okByText || res.redirected), status: okByText ? 'успешно' : 'ошибка сохранения' };
+      let ok = (res.ok || okByText || res.redirected);
+      if (!ok) ok = await verifySaved(newHtml); // пост-верификация
+
+      return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
     }
 
-    return { status: 'ok', initialHtml, save };
+    return { status: 'ок', initialHtml, save };
   }
 
   window.skinAdmin = { load: loadSkinAdmin };

@@ -39,10 +39,11 @@
       '_plashka': [
         { id: '1', html: '<div class="item" title="за вступление!" data-id="1"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka"><wrds>я не подарок, но и ты не шаверма</wrds></a></div>' },
         { id: '2', html: '<div class="item" title="новый дизайн — новая плашка! такие вот делишки, девчонки и мальчишки) а так же их родители.." data-id="2"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/561829.gif" class="plashka"><wrds>twinkle twinkle little star</wrds></a></div>' },
-        { id: '3', html: '<div class="item" title="пример №3" data-id="3"><a class="modal-link"><img src="https://picsum.photos/seed/3/300/120" class="plashka"><wrds>пример 3</wrds></a></div>' },
-        { id: '4', html: '<div class="item" title="пример №4" data-id="4"><a class="modal-link"><img src="https://picsum.photos/seed/4/300/120" class="plashka"><wrds>пример 4</wrds></a></div>' },
-        { id: '5', html: '<div class="item" title="пример №5" data-id="5"><a class="modal-link"><img src="https://picsum.photos/seed/5/300/120" class="plashka"><wrds>пример 5</wrds></a></div>' },
-        { id: '6', html: '<div class="item" title="пример №6" data-id="6"><a class="modal-link"><img src="https://picsum.photos/seed/6/300/120" class="plashka"><wrds>пример 6</wrds></a></div>' },
+        { id: '3', html: '<div class="item" title="пример №3" data-id="3"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/6/144030.png" class="plashka"><wrds>все мысли о тебе</wrds></a></div>' },
+        { id: '4', html: '<div class="item" title="пример №4" data-id="4"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/2/873866.gif" class="plashka"><wrds>я раздену тебя до души</wrds></a></div>' },
+        { id: '5', html: '<div class="item" title="пример №5" data-id="5"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/1014/371365.png" class="plashka"><wrds>вальсом по красным линиям</wrds></a></div>' },
+        { id: '6', html: '<div class="item" title="пример №6" data-id="6"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/6/220828.png" class="plashka"><wrds>я став клованом</wrds></a></div>' },
+        { id: '7', html: '<div class="item" data-id="7"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/1014/625440.png" class="plashka"><wrds>пупупу</wrds></a></div>' },
       ],
       '_icon': [],
       '_back': []

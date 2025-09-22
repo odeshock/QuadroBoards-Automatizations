@@ -116,7 +116,7 @@
       return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
     }
 
-    return { status: 'ок', initialHtml, save };
+    return { status: 'ok', initialHtml, save };
   }
 
   window.skinAdmin = { load: loadSkinAdmin };

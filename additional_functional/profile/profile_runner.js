@@ -2,21 +2,11 @@
 (function () {
   'use strict';
 
-  // защита от повторного запуска скрипта
   if (window.__profileRunnerMounted) return;
   window.__profileRunnerMounted = true;
 
   // --- утилиты ---
   const qs = (sel, root = document) => root.querySelector(sel);
-  function toast(msg, ok = false) {
-    const d = document.createElement('div');
-    d.textContent = msg;
-    d.style.cssText =
-      'position:fixed;right:14px;bottom:14px;padding:8px 12px;border-radius:8px;color:#fff;z-index:999999;' +
-      (ok ? 'background:#16a34a;' : 'background:#c24141;');
-    document.body.appendChild(d);
-    setTimeout(() => d.remove(), 1800);
-  }
   function onReady() {
     return new Promise((res) => {
       if (document.readyState === 'complete' || document.readyState === 'interactive') return res();
@@ -65,7 +55,6 @@
 
   // --- основной сценарий ---
   (async () => {
-    // работаем только на странице профиля
     if (!/\/profile\.php$/i.test(location.pathname)) return;
 
     const id = getProfileIdFromURL();
@@ -73,27 +62,20 @@
 
     if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
       console.error('[profile_runner] skinAdmin.load не найден. Подключите admin_bridge.js раньше этого файла.');
-      toast('admin_bridge.js не подключён', false);
       return;
     }
 
-    // грузим HTML страницы редактирования
     const { status, initialHtml, save } = await window.skinAdmin.load(id);
     if (status !== 'ok' && status !== 'ок') {
-      const msg = status === 'ошибка доступа к персональной странице'
-        ? 'Страница со скинами недоступна'
-        : 'Не удалось загрузить страницу со скинами';
-      toast(msg, false);
+      console.error('[profile_runner] Не удалось загрузить страницу со скинами');
       return;
     }
 
-    // монтируем контейнер и запускаем панели
     const mount = await waitMount();
 
     let build = null;
     if (typeof window.setupSkins === 'function') {
       try {
-        // ВАЖНО: ждём Promise от setupSkins
         const api = await window.setupSkins(mount, initialHtml);
         if (api && typeof api.build === 'function') build = api.build;
       } catch (e) {
@@ -102,14 +84,13 @@
     }
 
     if (!build) {
-      toast('Не удалось инициализировать панели', false);
+      console.error('[profile_runner] Не удалось инициализировать панели');
       return;
     }
 
-    // кнопка "Сохранить"
     const panelRoot = document.getElementById('fmv-skins-panel');
-    const btnSave = panelRoot ? panelRoot.querySelector('.fmv-save') : null;
-    const statusEl = panelRoot ? panelRoot.querySelector('.fmv-status') : null;
+    const btnSave  = panelRoot?.querySelector('.fmv-save');
+    const statusEl = panelRoot?.querySelector('.fmv-status');
     if (!btnSave) {
       console.error('[profile_runner] Кнопка .fmv-save не найдена');
       return;
@@ -125,25 +106,28 @@
         }
         const finalHtml = build ? build() : '';
         if (!finalHtml) {
-          toast('Нечего сохранять', false);
+          if (statusEl) {
+            statusEl.textContent = 'Нечего сохранять';
+            statusEl.style.color = '#c24141';
+          }
           return;
         }
 
-        // 1) сохраняем: сначала через FMVeditTextareaOnly, иначе — через admin_bridge.save
         let r = null;
         if (typeof window.FMVeditTextareaOnly === 'function') {
           r = await window.FMVeditTextareaOnly(pageName, finalHtml);
         } else if (typeof save === 'function') {
           r = await save(finalHtml);
         } else {
-          toast('Нет функции сохранения', false);
+          if (statusEl) {
+            statusEl.textContent = 'Нет функции сохранения';
+            statusEl.style.color = '#c24141';
+          }
           return;
         }
 
-        // 2) первичный признак успеха
         let ok = !!(r && (r.ok || r.status === 'saved' || r.status === 'успешно' || r.status === 'ok'));
 
-        // 3) пост-верификация: перечитываем страницу редактирования и сравниваем textarea
         if (!ok && window.skinAdmin && typeof window.skinAdmin.load === 'function') {
           try {
             const check = await window.skinAdmin.load(id);
@@ -155,22 +139,16 @@
           }
         }
 
-        if (ok) {
-          toast('Успешно', true);
-          if (statusEl) {
-            statusEl.textContent = '✓ Успешно сохранено';
-            statusEl.style.color = '#16a34a';
-          }
-        } else {
-          toast('Ошибка сохранения', false);
-          if (statusEl) {
-            statusEl.textContent = 'Ошибка сохранения';
-            statusEl.style.color = '#c24141';
-          }
+        if (statusEl) {
+          statusEl.textContent = ok ? '✓ Успешно сохранено' : 'Ошибка сохранения';
+          statusEl.style.color = ok ? '#16a34a' : '#c24141';
         }
       } catch (e) {
         console.error(e);
-        toast('Ошибка сохранения', false);
+        if (statusEl) {
+          statusEl.textContent = 'Ошибка сохранения';
+          statusEl.style.color = '#c24141';
+        }
       }
     });
   })();

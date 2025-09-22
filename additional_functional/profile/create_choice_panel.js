@@ -322,62 +322,54 @@ function createChoicePanel(userOpts){
     return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean));
   }
   
-  // === robust title-aware builder for selected row (safe) ===
+  // === robust title-aware builder for selected row (safe & strict) ===
   function buildSelectedInnerHTML(row, html, opts = {}) {
-    // row  — DOM-элемент строки выбранной карточки (может быть null/undefined)
-    // html — исходный HTML карточки из библиотеки
-    // opts.editableAttr — имя атрибута (обычно 'title')
-  
     const ATTR = opts.editableAttr || 'title';
-    let out = String(html || ''); // всегда строка
   
-    // helper: убрать любые title="..." (и у .item, и в принципе в первом теге)
-    function stripTitle(h) {
-      if (!h) return '';
-      // у opening-тэга .item
-      h = h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
-      // на всякий случай — любые оставшиеся title
-      h = h.replace(/\s+title="[^"]*"/gi, '');
-      return h;
+    // 0) «пустые» слоты игнорируем
+    if (!html || typeof html !== 'string' || !/<div\s+class="item"\b/i.test(html)) {
+      return '';
     }
   
-    // helper: добавить атрибут к opening-тэгу .item
-    function addTitleToItem(h, value) {
+    let out = html;
+  
+    // helpers
+    const get = (sel) => (row && row.querySelector ? row.querySelector(sel) : null);
+  
+    const cleanCE = (s) => String(s || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  
+    // снять title ТОЛЬКО у opening-тэга .item
+    const stripItemTitle = (h) =>
+      h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
+  
+    const addItemTitle = (h, value) => {
       const safe = String(value).replace(/"/g, '&quot;');
       return h.replace(/(<div\s+class="item"\b)/i, `$1 ${ATTR}="${safe}"`);
-    }
+    };
   
-    // helper: жёсткая чистка «невидимых» символов и <br>
-    function cleanContenteditableHTML(s) {
-      return String(s || '')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
+    // 1) всегда снимаем дефолтный title из шаблона
+    out = stripItemTitle(out);
   
-    // 1) всегда снимаем любой дефолтный title из шаблона
-    out = stripTitle(out);
+    // 2) читаем заголовок пользователя
+    const edTitle = get('.ufo-title-edit');
+    const cleanTitle = cleanCE(edTitle ? edTitle.innerHTML : '');
   
-    // 2) читаем заголовок, если row/редактор существуют
-    const edTitle = (row && row.querySelector) ? row.querySelector('.ufo-title-edit') : null;
-    const cleanTitle = cleanContenteditableHTML(edTitle ? edTitle.innerHTML : '');
-  
-    // 3) если заголовок не пуст — ставим title заново
     if (cleanTitle) {
-      out = addTitleToItem(out, cleanTitle);
+      out = addItemTitle(out, cleanTitle);
     }
   
-    // 4) Текст внутри <wrds> (если редактируемый блок есть)
-    const edText = (row && row.querySelector) ? row.querySelector('.ufo-text-edit') : null;
+    // 3) текст внутри <wrds>, если редактируемый блок есть
+    const edText = get('.ufo-text-edit');
     if (edText) {
-      const cleanText = cleanContenteditableHTML(edText.innerHTML || edText.textContent);
-      if (cleanText) {
-        if (/<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
-          out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
-        }
+      const cleanText = cleanCE(edText.innerHTML || edText.textContent);
+      if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
+        out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
       }
-      // если пусто — ничего не трогаем, оставляем текст из библиотеки как есть
+      // если пусто — оставляем текст из библиотеки как есть
     }
   
     return out;

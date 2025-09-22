@@ -3,7 +3,7 @@
   const IP_ROWS = 1;
   const IP_GAP  = 8;
   const IP_REQUIRED = true;
-  const FREEZE_SECONDS = 60;
+  const FREEZE_SECONDS = 15;
 
   /* ================== УТИЛИТЫ ================== */
   function isProfileFieldsPage() {

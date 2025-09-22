@@ -13,7 +13,7 @@ const plashka_set = [
    <wrds>twinkle twinkle little star</wrds></a>`
 ];
 
-const icon_set = [
+const back_set = [
  `<img class="back" src="https://upforme.ru/uploads/001c/14/5b/440/238270.gif">`,
  `<img class="back" src="https://forumstatic.ru/files/001c/83/91/88621.png">`,
 ];

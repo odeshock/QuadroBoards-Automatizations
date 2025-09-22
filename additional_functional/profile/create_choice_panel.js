@@ -179,6 +179,11 @@
       const btnRemove=mkBtn('✕', (e)=>{e.preventDefault(); e.stopPropagation(); row.remove(); if (libCard) libCard.classList.remove('disabled'); recalc();});
       actions.append(btnUp, btnDown, btnRemove);
       row.dataset.html = item.html.trim();
+      // если карточка пришла из текущей страницы — сохраним этот HTML,
+      // чтобы при сборке не терять её фактический title:
+      if (o.usePageHtml) {
+        row.dataset.pageHtml = o.usePageHtml.trim();
+      }
       if (o.usePageHtml) {
         // запомним «как было на странице», чтобы при сборке беречь его title
         row.dataset.pageHtml = o.usePageHtml.trim();
@@ -238,56 +243,46 @@
     // Билдер для одной «выбранной» карточки (как было)
     function buildSelectedInnerHTML(row, html, opts = {}) {
       if (!row || typeof row.querySelector !== 'function') return String(html || '');
+    
       const ATTR = opts.editableAttr || 'title';
+      // База: предпочитаем HTML, который реально был на странице (с текущим title),
+      // затем — библиотечный, затем — то, что пришло в аргументах.
+      const base = row.dataset.pageHtml || row.dataset.html || String(html || '');
     
-      // 0) Базовый HTML: предпочитаем то, что реально было на странице (pageHtml), иначе библиотеку
-      const baseHtml = row.dataset.pageHtml || row.dataset.html || String(html || '');
-    
-      // 1) Текст из редактора
+      // Текст из редактора
       const ed = row.querySelector('.ufo-title-edit');
-      const rawTitle = ed ? ed.innerHTML : '';
-      const cleanTitle = String(rawTitle)
+      const cleanTitle = String(ed ? ed.innerHTML : '')
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
     
-      // 2) Небольшие утилиты
-      function setAttrOnItem(h, attrName, value) {
-        const safe = String(value).replace(/"/g, '&quot;');
-        if (new RegExp(`\\s${attrName}="[^"]*"`, 'i').test(h)) {
-          // заменить существующий
-          return h.replace(new RegExp(`(${attrName}=")[^"]*(")`, 'i'), `$1${safe}$2`);
-        }
-        // добавить, если нет
-        return h.replace(/(<div\s+class="item"\b)/i, `$1 ${attrName}="${safe}"`);
+      // Работаем через DOM, чтобы править только .item
+      const tmp = document.createElement('div');
+      tmp.innerHTML = base.trim();
+      const itemEl = tmp.querySelector((opts && opts.itemSelector) || '.item');
+    
+      if (itemEl) {
+        if (cleanTitle) {
+          itemEl.setAttribute(ATTR, cleanTitle);
+        } // если пусто — оставляем исходный title как есть
       }
     
-      // 3) Формируем итог:
-      //    - если редактор НЕ пустой -> ставим то, что ввёл пользователь
-      //    - если пустой -> НИЧЕГО не меняем, оставляем title как в baseHtml
-      let out = baseHtml;
-      if (cleanTitle.length > 0) {
-        out = setAttrOnItem(out, ATTR, cleanTitle);
-      }
-    
-      // 4) (опционально) перенос текста в <wrds> из .ufo-text-edit
+      // (Опционально) перенести текст в <wrds> из .ufo-text-edit
       const edText = row.querySelector('.ufo-text-edit');
-      if (edText) {
+      if (edText && itemEl) {
         const rawText = edText.innerHTML || edText.textContent || '';
         const cleanText = String(rawText)
           .replace(/<br\s*\/?>/gi, '\n')
           .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
           .replace(/\s+$/g, '')
           .trim();
-        if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
-          out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
-        }
+        const wrdsEl = itemEl.querySelector('wrds');
+        if (cleanText && wrdsEl) wrdsEl.textContent = cleanText;
       }
     
-      return out;
+      return tmp.innerHTML;
     }
-
 
     // NEW: собрать HTML ВСЕХ «выбранных»
     function buildSelectedInnerAll(){

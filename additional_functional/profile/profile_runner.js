@@ -173,7 +173,7 @@
     // сразу после получения id:
     const pageName = `usr${id}_skin`;
     
-    // ...
+    const btnSave = document.querySelector('#fmv-skins-panel .fmv-save');
     btnSave?.addEventListener('click', async () => {
       try {
         const finalHtml = build ? build() : '';

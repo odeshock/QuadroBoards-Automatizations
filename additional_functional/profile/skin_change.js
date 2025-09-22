@@ -102,6 +102,34 @@ function injectStylesOnce() {
   justify-content: start;  /* чтобы не съезжало вправо */
 }
 
+/* делаем рамку по содержимому */
+.ip-box {
+  display: inline-block;       /* вместо block */
+  width: auto;                 /* авто-ширина */
+  max-width: 100%;             /* но не шире контейнера формы */
+  padding: 4px;                /* твои внутренние отступы */
+  box-sizing: border-box;
+}
+
+/* область скролла тоже не растягиваем */
+.ip-scroll {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  overflow-y: auto;            /* для вертикального скролла при необходимости */
+  overflow-x: hidden;
+}
+
+/* грид: перенос строк, ширина = сумме колонок в ряду */
+.ip-grid {
+  display: grid;
+  gap: var(--ip-gap, 8px);
+  grid-template-columns: repeat(auto-fill, var(--ip-col, var(--ip-w, 44px)));
+  justify-content: start;
+  align-content: start;
+}
+
+
 
   `;
   document.head.appendChild(st);

@@ -57,11 +57,21 @@
         return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
       }
 
-      // b) запасной современный путь
+      // b) запасной современный путь (с добавлением submit-параметра)
       const fd = new FormData(fForm);
       fd.set(fTa.getAttribute('name') || 'content', fTa.value);
+      
+      // добавить "save" (или фактическое имя submit-кнопки)
+      const submitBtn = [...fForm.elements].find(el =>
+        el.type === 'submit' && (el.name === 'save' || /сохр|save/i.test(el.value || el.textContent || ''))
+      );
+      const submitName  = submitBtn?.name  || 'save';
+      const submitValue = submitBtn?.value || '1';
+      fd.append(submitName, submitValue);
+      
       const res = await fetch(url, { method: 'POST', credentials: 'include', body: fd });
       return { ok: res.ok, status: res.ok ? 'успешно' : 'ошибка сохранения' };
+
     }
 
     return { status: 'ok', initialHtml, save };

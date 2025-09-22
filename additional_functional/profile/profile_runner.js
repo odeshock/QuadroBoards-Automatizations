@@ -43,7 +43,6 @@
             Сохранить
           </button>
           <span class="fmv-status" style="margin-left:8px;font-size:14px;color:#666"></span>
-          <span class="fmv-hint" style="opacity:.7">После выбора во всех секциях нажмите «Сохранить»</span>
         </div>
       </details>
     `;

@@ -1,5 +1,5 @@
-// admin_bridge.js (UTF8/CP1251-safe loader + correct POST + post-verify)
-// Экспортирует: window.skinAdmin.load(userId) -> { status, initialHtml, save(newHtml) }
+// admin_bridge.js (UTF8/CP1251-safe loader + correct POST + post-verify + main-marker redirect)
+// Экспортирует: window.skinAdmin.load(userId) -> { status, initialHtml, save(newHtml), targetUserId }
 
 (function () {
   'use strict';
@@ -24,26 +24,65 @@
   }
 
   async function loadSkinAdmin(userId) {
-    const editUrl = new URL(`/admin_pages.php?edit_page=usr${userId}_skin`, location.origin).toString();
+    const mkEditUrl = (uid) => new URL(`/admin_pages.php?edit_page=usr${uid}_skin`, location.origin).toString();
+    const findMainMarker = (html) => {
+      const m = String(html || '').match(/<!--\s*main:\s*usr(\d+)_skin\s*-->/i);
+      return m ? m[1] : null; // "M" либо null
+    };
 
-    // 1) грузим страницу редактирования
-    const html = await getHtml(editUrl);
-    const doc  = toDoc(html);
+    // Шаг 0: грузим исходную N-страницу
+    let currentId = String(userId);
+    let editUrl   = mkEditUrl(currentId);
 
-    // проверка доступа
+    let html = await getHtml(editUrl);
+    let doc  = toDoc(html);
+
+    // доступ
     const bodyText = (doc.body && doc.body.textContent || '').trim();
     if (/Ссылка, по которой Вы пришли, неверная или устаревшая\./i.test(bodyText)) {
       return { status: 'ошибка доступа к персональной странице' };
     }
 
-    // находим форму и textarea
+    // Шаг 1: проверяем маркер <!-- main: usrM_skin -->
+    const mainId1 = findMainMarker(html);
+    if (mainId1) {
+      if (mainId1 === currentId) {
+        console.error('Найден цикл');
+        return { status: 'ошибка: найден цикл main-страниц' };
+      }
+      // переходим на M
+      const nextId  = mainId1;
+      const nextUrl = mkEditUrl(nextId);
+      const html2   = await getHtml(nextUrl);
+      const doc2    = toDoc(html2);
+
+      const bodyText2 = (doc2.body && doc2.body.textContent || '').trim();
+      if (/Ссылка, по которой Вы пришли, неверная или устаревшая\./i.test(bodyText2)) {
+        return { status: 'ошибка доступа к персональной странице' };
+      }
+
+      const mainId2 = findMainMarker(html2);
+      if (mainId2) {
+        // второй маркер — считаем цикл (какая-то цепочка)
+        console.error('Найден цикл');
+        return { status: 'ошибка: найден цикл main-страниц' };
+      }
+
+      // фиксация целевой страницы
+      currentId = nextId;
+      editUrl   = nextUrl;
+      html      = html2;
+      doc       = doc2;
+    }
+
+    // Шаг 2: как и прежде — находим форму/textarea на ЦЕЛЕВОЙ странице
     const form = doc.querySelector('form[action*="admin_pages.php"]') || doc.querySelector('form');
     const ta   = doc.querySelector('#page-content,[name="content"]');
     if (!form || !ta) return { status: 'ошибка: не найдены форма или textarea' };
 
     const initialHtml = ta.value || '';
 
-    // утилита пост-верификации: перечитать и сравнить textarea
+    // Пост-верификация чтением именно целевой страницы
     async function verifySaved(expectedHtml) {
       try {
         const checkHtml = await getHtml(editUrl);
@@ -56,7 +95,7 @@
       }
     }
 
-    // 2) функция сохранения
+    // Шаг 3: save(newHtml) — сохраняем на ЦЕЛЕВОЙ странице (currentId)
     async function save(newHtml) {
       // берём СВЕЖУЮ форму (на случай токенов/hidden)
       const freshHtml = await getHtml(editUrl);
@@ -119,7 +158,8 @@
       return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
     }
 
-    return { status: 'ok', initialHtml, save };
+    // Возвращаем целевой ID — полезно для внешних сохранителей (FMVeditTextareaOnly)
+    return { status: 'ok', initialHtml, save, targetUserId: currentId };
   }
 
   window.skinAdmin = { load: loadSkinAdmin };

@@ -239,6 +239,11 @@
     function buildSelectedInnerHTML(row, html, opts = {}) {
       if (!row || typeof row.querySelector !== 'function') return String(html || '');
       const ATTR = opts.editableAttr || 'title';
+    
+      // 0) Базовый HTML: предпочитаем то, что реально было на странице (pageHtml), иначе библиотеку
+      const baseHtml = row.dataset.pageHtml || row.dataset.html || String(html || '');
+    
+      // 1) Текст из редактора
       const ed = row.querySelector('.ufo-title-edit');
       const rawTitle = ed ? ed.innerHTML : '';
       const cleanTitle = String(rawTitle)
@@ -246,18 +251,43 @@
         .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-      function stripAttr(h){ h=String(h||''); h=h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i,'$1'); h=h.replace(/\s+title="[^"]*"/gi,''); return h; }
-      function addAttrToItem(h, attrName, value){ const safe=String(value).replace(/"/g,'&quot;'); return h.replace(/(<div\s+class="item"\b)/i, `$1 ${attrName}="${safe}"`); }
-      let out = stripAttr(html);
-      if (cleanTitle.length > 0) out = addAttrToItem(out, ATTR, cleanTitle);
+    
+      // 2) Небольшие утилиты
+      function setAttrOnItem(h, attrName, value) {
+        const safe = String(value).replace(/"/g, '&quot;');
+        if (new RegExp(`\\s${attrName}="[^"]*"`, 'i').test(h)) {
+          // заменить существующий
+          return h.replace(new RegExp(`(${attrName}=")[^"]*(")`, 'i'), `$1${safe}$2`);
+        }
+        // добавить, если нет
+        return h.replace(/(<div\s+class="item"\b)/i, `$1 ${attrName}="${safe}"`);
+      }
+    
+      // 3) Формируем итог:
+      //    - если редактор НЕ пустой -> ставим то, что ввёл пользователь
+      //    - если пустой -> НИЧЕГО не меняем, оставляем title как в baseHtml
+      let out = baseHtml;
+      if (cleanTitle.length > 0) {
+        out = setAttrOnItem(out, ATTR, cleanTitle);
+      }
+    
+      // 4) (опционально) перенос текста в <wrds> из .ufo-text-edit
       const edText = row.querySelector('.ufo-text-edit');
       if (edText) {
         const rawText = edText.innerHTML || edText.textContent || '';
-        const cleanText = String(rawText).replace(/<br\s*\/?>/gi,'\n').replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g,'').replace(/\s+$/g,'').trim();
-        if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
+        const cleanText = String(rawText)
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
+          .replace(/\s+$/g, '')
+          .trim();
+        if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
+          out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
+        }
       }
+    
       return out;
     }
+
 
     // NEW: собрать HTML ВСЕХ «выбранных»
     function buildSelectedInnerAll(){

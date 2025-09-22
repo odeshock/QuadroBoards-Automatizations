@@ -321,48 +321,48 @@ function createChoicePanel(userOpts){
   function getSelectedIds(){
     return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean));
   }
-
-  // === robust title-aware builder for selected row ===
+  
+  // === robust title-aware builder for selected row (stable) ===
   function buildSelectedInnerHTML(row, html, opts = {}) {
-    // если по какой-то причине row не передали — просто вернём исходный html строкой
+    // гард: если row нет по какой-то причине — просто вернём исходный html строкой
     if (!row || typeof row.querySelector !== 'function') return String(html || '');
   
-    const ATTR = (opts.editableAttr || 'title');
+    const ATTR = opts.editableAttr || 'title';
   
     // 1) достаём введённый заголовок из contenteditable
     const ed = row.querySelector('.ufo-title-edit');
-  
-    // берём innerHTML и жёстко чистим всё «невидимое»
     const rawTitle = ed ? ed.innerHTML : '';
     const cleanTitle = String(rawTitle)
-      .replace(/<br\s*\/?>/gi, '\n')                        // <br> -> перенос строки
-      .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '') // NBSP и zero-width
-      .replace(/\s+/g, ' ')                                  // схлопываем пробелы
+      .replace(/<br\s*\/?>/gi, '\n')                       // <br> -> перенос строки
+      .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '') // NBSP/zero-width
+      .replace(/\s+/g, ' ')                                 // схлопываем пробелы
       .trim();
   
-    // 2) убираем существующий title где бы он ни встретился
-    function stripAttr(h /*, attrName */) {
+    // 2) снимаем любой title из шаблона (только потом добавляем, если надо)
+    function stripAttr(h) {
       h = String(h || '');
+      // у opening-тэга .item
       h = h.replace(/(<div\s+class="item"\b[^>]*?)\s+title="[^"]*"/i, '$1');
+      // и на всякий случай — у любых тегов
       h = h.replace(/\s+title="[^"]*"/gi, '');
       return h;
     }
   
-    // 3) добавляем title ТОЛЬКО если после чистки он не пуст
+    // 3) добавляем title только если он реально непустой
     function addAttrToItem(h, attrName, value) {
       const safe = String(value).replace(/"/g, '&quot;');
       return h.replace(/(<div\s+class="item"\b)/i, `$1 ${attrName}="${safe}"`);
     }
   
-    // сначала всегда снимаем дефолтный title из шаблона библиотеки
-    let out = stripAttr(String(html || ''));
+    // снимаем дефолтный title из библиотеки
+    let out = stripAttr(html);
   
-    // если пользователь реально что-то ввёл — ставим title заново
-    if (cleanTitle) {
+    // если пользователь что-то ввёл — ставим title заново
+    if (cleanTitle.length > 0) {
       out = addAttrToItem(out, ATTR, cleanTitle);
     }
   
-    // 4) (опционально) если у вас есть поле текста .ufo-text-edit — подставьте его внутрь wrds/подписи
+    // 4) (опционально) текст в <wrds> из .ufo-text-edit
     const edText = row.querySelector('.ufo-text-edit');
     if (edText) {
       const rawText = edText.innerHTML || edText.textContent || '';
@@ -372,17 +372,15 @@ function createChoicePanel(userOpts){
         .replace(/\s+$/g, '')
         .trim();
   
-      if (cleanText) {
-        if (/<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
-          out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
-        }
-      } else {
-        // если пусто — не затираем существующее из библиотеки; оставляем как есть
+      if (cleanText && /<wrds>[\s\S]*?<\/wrds>/i.test(out)) {
+        out = out.replace(/<wrds>[\s\S]*?<\/wrds>/i, `<wrds>${cleanText}</wrds>`);
       }
+      // если пусто — библиотечный <wrds> не трогаем
     }
   
     return out;
   }
+
 
   // регистрация панели (для админки)
   PANELS.push({
@@ -395,39 +393,19 @@ function createChoicePanel(userOpts){
   if (!opts.external) ensureGlobalSubmitHook(opts.textareaSelector);
 
   // В external-режиме вернём builder()
-  function builder(fullHtml) {
-    const targetClass = opts.targetClass || '_plashka';
-    const lib = Array.isArray(opts.library) ? opts.library : [];
-  
-    // 1) собираем выбранные строки
-    const rows = Array.from(panelEl.querySelectorAll('.ufo-selected .ufo-row[data-id]'));
-  
-    // 2) для каждой строки берём базовый HTML карточки ИЗ БИБЛИОТЕКИ ПО ID
-    const parts = rows.map(row => {
-      const id = String(row.getAttribute('data-id') || row.dataset.srcId || '');
-      const libItem = lib.find(x => String(x.id) === id);
-      const baseHtml = libItem ? String(libItem.html || '') : '';
-      return buildSelectedInnerHTML(row, baseHtml, { editableAttr: opts.editableAttr || 'title' });
-    }).filter(s => s && s.trim());
-  
-    const content = parts.join('\n');
-    let html = String(fullHtml || '');
-  
-    // 3) устойчиво заменяем содержимое якоря (или создаём якорь, если его нет)
-    const anchorRe = new RegExp(
-      `(<div\\s+class=(?:"|')${targetClass}(?:"|')[^>]*>)[\\s\\S]*?(</div>)`,
-      'i'
-    );
-  
-    if (anchorRe.test(html)) {
-      // подмена содержимого уже существующего якоря
-      html = html.replace(anchorRe, `$1\n${content}\n$2`);
-    } else {
-      // якоря нет — создаём в конце
-      html += `\n<div class="${targetClass}">\n${content}\n</div>\n`;
+  function builder(fullHtmlOpt){
+    let current = '';
+    if (typeof fullHtmlOpt === 'string') current = fullHtmlOpt;
+    else if (typeof opts.initialHtml === 'string') current = opts.initialHtml;
+    else {
+      const ta = $(opts.textareaSelector);
+      const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
+      if (tm) current = tm.getContent();
+      else if (ta) current = ta.value || '';
     }
-  
-    return html;
+    const inner = buildSelectedInnerHTML();
+    const ids = getSelectedIds();
+    return rewriteSectionHTML(current, opts, inner, ids);
   }
 
   return { details, builder, getSelectedIds };
@@ -435,5 +413,3 @@ function createChoicePanel(userOpts){
 
 // экспорт
 window.createChoicePanel = createChoicePanel;
-window.buildSelectedInnerHTML = buildSelectedInnerHTML;
-window.builder = builder;

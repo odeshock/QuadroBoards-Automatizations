@@ -36,6 +36,29 @@ function injectStylesOnce() {
     .ip-slot{position:relative;width:100%;height:100%;}
     .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
     .ip-slot *{pointer-events:none;}
+
+        /* рамка по содержимому, но не шире контейнера формы */
+    .ip-box{
+      display: inline-block;
+      inline-size: fit-content;     /* или width: fit-content; */
+      max-inline-size: 100%;        /* не вылезать за край */
+    }
+    
+    /* грид не растягиваем — он «по содержимому» */
+    .ip-grid{
+      display: inline-grid;
+      grid-auto-flow: column;               /* кладём элементы по колонкам */
+      grid-auto-columns: var(--ip-col, 44px);
+      /* если нужен перенос — уберите grid-auto-flow: column и верните свой repeat(...).
+         Но тогда коробка снова станет шире, потому что контент займёт несколько рядов. */
+    }
+    
+    /* скролл, если контент шире доступного */
+    .ip-scroll{
+      overflow-x: auto;
+      overflow-y: hidden;            /* если и высота фиксирована — верните auto */
+    }
+
   `;
   document.head.appendChild(st);
 }

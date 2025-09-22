@@ -19,22 +19,22 @@
 // ];
 
 (async () => {
-  const {icon_set, plashka_set, back_set } = await collectSkinSets();
-  console.log(icon_set, plashka_set, back_set);
-  applyImagePicker(plashka_set, '3',
-  {
-      btnWidth: 229,    // ширина кнопки
-      btnHeight: 42, // высота кнопки
-      modalLinkMode: true, 
+  // было: const {icon_set, plashka_set, back_set } = await collectSkinSets();
+  const { icons, plashki, backs } = await collectSkinSets();
+
+  applyImagePicker(plashki, '3', {
+    btnWidth: 229,
+    btnHeight: 42,
+    modalLinkMode: true,
   });
-  applyImagePicker(back_set, '4',
-  {
-      btnWidth: 229,    // ширина кнопки
-      btnHeight: 42, // высота кнопки
-      modalLinkMode: true, 
+
+  applyImagePicker(backs, '4', {
+    btnWidth: 229,
+    btnHeight: 42,
+    modalLinkMode: true,
   });
-  applyImagePicker(icon_set, '5',
-  {
-     btnWidth: 44
+
+  applyImagePicker(icons, '5', {
+    btnWidth: 44,
   });
 })();

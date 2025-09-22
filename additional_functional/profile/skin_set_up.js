@@ -76,7 +76,7 @@
     // финальная подстраховка
     const LIB_P = Array.isArray(libPlashka0) && libPlashka0.length ? libPlashka0 : DEFAULT_LIBS['_plashka'];
     const LIB_I = Array.isArray(libIcon0)    && libIcon0.length    ? libIcon0    : DEFAULT_LIBS['_icon'];
-    const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : (DEFAULT_LIBS['_back] ?? []);
+    const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS['_back];
 
     console.log('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
 

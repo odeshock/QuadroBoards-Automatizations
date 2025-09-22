@@ -1,21 +1,6 @@
-// skin_set_up.js
-// setupSkins(container, initialHtml, opts?) -> Promise<{ build(fullHtml?) => string, panels }>
-// Панели строятся через createChoicePanel (external-режим). Библиотеки подтягиваются ТОЛЬКО через get_skin_lib(className).
-
 (function () {
   'use strict';
 
-  /**
-   * @param {HTMLElement} container         куда рисовать панели
-   * @param {string}      initialHtml       ПОЛНЫЙ HTML из textarea админки
-   * @param {Object=}     opts
-   *   @param {string=}   opts.backClass    '_background' | '_back' (по умолчанию '_background')
-   *   @param {boolean=}  opts.withHeaders  показывать заголовки секций (по умолчанию true)
-   *   @param {boolean=}  opts.startOpen    панели раскрыты при старте (по умолчанию false)
-   *   @param {function=} opts.getLib       кастомная async (cls)=>[{id,html},...] (по умолчанию window.get_skin_lib)
-   *
-   * @returns {Promise<{ build: (fullHtmlOpt?:string)=>string, panels: { plashka:any, icon:any, back:any } }>}
-   */
   async function setupSkins(container, initialHtml, opts = {}) {
     if (!container || !(container instanceof HTMLElement)) {
       throw new Error('[setupSkins] container обязателен и должен быть HTMLElement');
@@ -24,22 +9,33 @@
       throw new Error('[setupSkins] createChoicePanel не найден. Подключите файл с панелью раньше.');
     }
 
-    const {
-      withHeaders = true,
-      startOpen   = false,
-      getLib      = (typeof window.get_skin_lib === 'function' ? window.get_skin_lib : null),
-    } = opts;
+    const withHeaders = opts.withHeaders ?? true;
+    const startOpen   = opts.startOpen   ?? false;
+    const backClass   = opts.backClass   ?? '_back'; // или '_background', если так у вас принято
 
-    if (typeof getLib !== 'function') {
-      throw new Error('[setupSkins] get_skin_lib не найден. Передайте opts.getLib или подключите глобальную функцию.');
-    }
+    // ← главное изменение: безопасная обёртка вокруг get_skin_lib
+    const getLibRaw = opts.getLib ?? (typeof window.get_skin_lib === 'function'
+                                      ? window.get_skin_lib
+                                      : null);
 
-    // 1) тянем библиотеки по одному классу
+    const getLib = async (cls) => {
+      try {
+        if (typeof getLibRaw === 'function') {
+          const r = await getLibRaw(cls);
+          return Array.isArray(r) ? r : [];
+        }
+      } catch (_) {}
+      return []; // если функции нет/упала — возвращаем пустую библиотеку
+    };
+
+    // ← и используем её для всех трёх секций
     const [libPlashka, libIcon, libBack] = await Promise.all([
-      // Promise.resolve().then(() => getLib('_plashka')),
-      // Promise.resolve().then(() => getLib('_icon')),
-      // Promise.resolve().then(() => getLib('_back')),
-      Promise.resolve().then(() => [
+      getLib('_plashka'),
+      getLib('_icon'),
+      getLib(backClass),
+    ]);
+
+    const LIB_P = Array.isArray(libPlashka) ? libPlashka : [
     { id: '1', html:
       '<div class="item" title="за вступление!" data-id="1">' +
       '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka"><wrds>я не подарок, но и ты не шаверма</wrds></a>' +
@@ -70,17 +66,11 @@
       '<a class="modal-link"><img src="https://picsum.photos/seed/6/300/120" class="plashka"><wrds>пример 6</wrds></a>' +
       '</div>'
     }
-  ]),
-      Promise.resolve().then(() => []),
-      Promise.resolve().then(() => []),
-    ]);
-
-    // подстраховка
-    const LIB_P = Array.isArray(libPlashka) ? libPlashka : [];
+  ];
     const LIB_I = Array.isArray(libIcon)    ? libIcon    : [];
     const LIB_B = Array.isArray(libBack)    ? libBack    : [];
 
-    // 2) контейнер под три панели
+    // дальше — как было
     const grid = document.createElement('div');
     grid.className = 'skins-setup-grid';
     grid.style.display = 'grid';
@@ -88,7 +78,6 @@
     grid.style.gap = '16px';
     container.appendChild(grid);
 
-    // 3) три панели (external = true, используем initialHtml)
     const panelPlashka = window.createChoicePanel({
       title: withHeaders ? 'Плашки' : undefined,
       targetClass: '_plashka',
@@ -111,7 +100,7 @@
 
     const panelBack = window.createChoicePanel({
       title: withHeaders ? 'Фон' : undefined,
-      targetClass: '_back',
+      targetClass: backClass,
       library: LIB_B,
       mountEl: grid,
       initialHtml,
@@ -119,25 +108,16 @@
       startOpen
     });
 
-    // 4) сборка: последовательно применяем builder каждой панели к ОДНОМУ HTML
     function build(fullHtmlOpt) {
       let current = (typeof fullHtmlOpt === 'string') ? fullHtmlOpt : (initialHtml || '');
-      if (panelPlashka && typeof panelPlashka.builder === 'function') current = panelPlashka.builder(current);
-      if (panelIcon    && typeof panelIcon.builder    === 'function') current = panelIcon.builder(current);
-      if (panelBack    && typeof panelBack.builder    === 'function') current = panelBack.builder(current);
+      if (panelPlashka?.builder) current = panelPlashka.builder(current);
+      if (panelIcon?.builder)    current = panelIcon.builder(current);
+      if (panelBack?.builder)    current = panelBack.builder(current);
       return current;
     }
 
-    return {
-      build,
-      panels: {
-        plashka: panelPlashka,
-        icon:    panelIcon,
-        back:    panelBack
-      }
-    };
+    return { build, panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack } };
   }
 
-  // экспорт
   window.setupSkins = setupSkins;
 })();

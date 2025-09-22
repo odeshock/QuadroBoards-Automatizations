@@ -1,4 +1,4 @@
-
+(() => {
   /* ================== КОНСТАНТЫ ================== */
   const IP_ROWS = 1;
   const IP_GAP  = 8;
@@ -348,3 +348,7 @@
 
     return { set: setValue };
   }
+
+  // экспорт
+  window.applyImagePicker = applyImagePicker;
+})();

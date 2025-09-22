@@ -369,3 +369,6 @@ function createChoicePanel(userOpts){
 
   return { details, builder, getSelectedIds };
 }
+
+// экспорт
+window.createChoicePanel = createChoicePanel;

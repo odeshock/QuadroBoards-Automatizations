@@ -57,20 +57,38 @@
         return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
       }
 
-      // b) запасной современный путь (с добавлением submit-параметра)
+      // b) запасной современный путь (multipart + submit + проверка по тексту ответа)
       const fd = new FormData(fForm);
+      
+      // поле контента уже в форме (мы выше присвоили fTa.value = newHtml),
+      // но на всякий случай перезапишем правильным именем:
       fd.set(fTa.getAttribute('name') || 'content', fTa.value);
       
-      // добавить "save" (или фактическое имя submit-кнопки)
+      // добавить submit-параметр (имя кнопки может отличаться от "save")
       const submitBtn = [...fForm.elements].find(el =>
-        el.type === 'submit' && (el.name === 'save' || /сохр|save/i.test(el.value || el.textContent || ''))
+        el.type === 'submit' && (
+          el.name === 'save' || /сохр|save/i.test(el.value || el.textContent || '')
+        )
       );
       const submitName  = submitBtn?.name  || 'save';
       const submitValue = submitBtn?.value || '1';
       fd.append(submitName, submitValue);
       
-      const res = await fetch(url, { method: 'POST', credentials: 'include', body: fd });
-      return { ok: res.ok, status: res.ok ? 'успешно' : 'ошибка сохранения' };
+      // отправляем и СЧИТЫВАЕМ ТЕКСТ ОТВЕТА (важно!)
+      const res  = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+        // часто старые движки хотят реферер
+        referrer: url,
+        referrerPolicy: 'strict-origin-when-cross-origin'
+      });
+      const text = await res.text();
+      
+      // успех детектим по тексту, а не только по res.ok (302/redirect даст !ok)
+      const okByText = /Сохранено|успешн|изменени[яй]\s+сохранены/i.test(text);
+      return { ok: (res.ok || okByText), status: okByText ? 'успешно' : 'ошибка сохранения' };
+
 
     }
 

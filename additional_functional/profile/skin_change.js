@@ -1,7 +1,7 @@
-/* ================== КОНСТАНТЫ ДЛЯ ВСЕХ ИНСТАНСОВ ================== */
-const IP_ROWS = 1;         // сколько строк видно без скролла
-const IP_GAP  = 8;         // отступ между элементами, px
-const IP_REQUIRED = true;  // выбор обязателен (если есть варианты)
+/* ================== КОНСТАНТЫ ================== */
+const IP_ROWS = 1;        // сколько строк видно без скролла (UI)
+const IP_GAP  = 8;        // отступ между элементами (UI)
+const IP_REQUIRED = true; // выбор обязателен (если есть варианты)
 
 /* ================== УТИЛИТЫ ================== */
 function isProfileFieldsPage() {
@@ -15,7 +15,7 @@ function isProfileFieldsPage() {
   } catch { return false; }
 }
 
-const STYLE_ID = 'ip-style-unified-stronghooks';
+const STYLE_ID = 'ip-style-logger';
 function injectStylesOnce() {
   if (document.getElementById(STYLE_ID)) return;
   const st = document.createElement('style');
@@ -33,9 +33,14 @@ function injectStylesOnce() {
     .ip-btn[selected]{border-color:#0b74ff;box-shadow:0 0 0 3px rgba(11,116,255,.15);}
     .ip-slot{position:relative;width:100%;height:100%;}
     .ip-slot img{width:100%;height:100%;display:block;object-fit:cover;}
-    .ip-slot *{pointer-events:none;} /* превью не перехватывает клики */
+    .ip-slot *{pointer-events:none;}
   `;
   document.head.appendChild(st);
+}
+
+// единый логгер
+function log(step, value) {
+  console.log(`[imagePicker] ${step}:`, value);
 }
 
 function resolveFieldBySuffix(suffix) {
@@ -48,34 +53,51 @@ function resolveFieldBySuffix(suffix) {
   );
 }
 
-// Очистка <a.modal-link>: оставить только class
+// Был ли в исходной строке <a class="modal-link">
+function hadModalLinkClass(raw) {
+  const s = String(raw ?? '');
+  return /\<a\b[^>]*\bclass\s*=\s*["'][^"']*\bmodal-link\b/i.test(s);
+}
+
+// При ЗАГРУЗКЕ: у <a.modal-link> оставить ТОЛЬКО style
 function normalizeModalLinkAttrs(html) {
   const t = document.createElement('template');
   t.innerHTML = String(html ?? '');
   t.content.querySelectorAll('a.modal-link').forEach(a => {
     Array.from(a.attributes).forEach(attr => {
-      if (attr.name !== 'class') a.removeAttribute(attr.name);
+      if (attr.name !== 'style') a.removeAttribute(attr.name);
     });
   });
   return t.innerHTML.trim();
 }
 
-// Перед сабмитом: всем <a.modal-link> добавить data-reveal-id="character",
-// а первой ещё и id="usrN" (N из ?id=N)
-function prepareModalLinkAttrs(html) {
+// ПОДГОТОВКА ПЕРЕД СОХРАНЕНИЕМ:
+//  - если item изначально имел класс modal-link, но после нормализации он пропал,
+//    восстанавливаем класс (на ВСЕХ <a>, т.к. определить «какой именно» уже нельзя);
+//  - дальше добавляем к a.modal-link: data-reveal-id="character" и id="usrN".
+function prepareModalLinkAttrs(html, shouldRestoreClass) {
   const t = document.createElement('template');
   t.innerHTML = String(html ?? '');
+
+  if (shouldRestoreClass) {
+    t.content.querySelectorAll('a').forEach(a => {
+      a.classList.add('modal-link');
+    });
+  }
   const anchors = t.content.querySelectorAll('a.modal-link');
   if (anchors.length) {
-    anchors.forEach(a => a.setAttribute('data-reveal-id', 'character'));
     const u = new URL(location.href);
     const n = u.searchParams.get('id');
-    if (n && /^\d+$/.test(n)) anchors[0].setAttribute('id', `usr${n}`);
+    const usrId = (n && /^\d+$/.test(n)) ? `usr${n}` : null;
+    anchors.forEach(a => {
+      a.setAttribute('data-reveal-id', 'character');
+      if (usrId) a.setAttribute('id', usrId);
+    });
   }
   return t.innerHTML.trim();
 }
 
-// Превью: если строка дает элементы при парсе — это HTML; иначе считаем URL картинки
+// превью: HTML → вставляем как DOM, иначе <img src="...">
 function createThumbSlot(htmlOrUrl) {
   const slot = document.createElement('div');
   slot.className = 'ip-slot';
@@ -85,7 +107,6 @@ function createThumbSlot(htmlOrUrl) {
   const t = document.createElement('template');
   t.innerHTML = raw;
   const hasElements = !!t.content.querySelector('*');
-
   if (hasElements) {
     slot.appendChild(t.content.cloneNode(true));
   } else {
@@ -96,7 +117,6 @@ function createThumbSlot(htmlOrUrl) {
   return slot;
 }
 
-// Ключ для выделения (детерминированный хеш строки)
 function keyFor(str) {
   const s = String(str ?? '');
   let h = 5381; for (let i=0;i<s.length;i++) h=((h<<5)+h)^s.charCodeAt(i);
@@ -104,44 +124,53 @@ function keyFor(str) {
 }
 
 /* ================== ОСНОВНАЯ ФУНКЦИЯ ==================
-   image_set: массив СТРОК (HTML или URL); каждая строка = и значение, и превью
-   fieldSuffix: строка, напр. '5' → fld5 / form[fld5]
+   image_set: массив СТРОК (HTML или URL)
+   fieldSuffix: '5' → fld5 / form[fld5]
    opts: {
-     btnWidth?:number, btnHeight?:number, gridColSize?:number,
-     modalLinkMode?:boolean       // работать ли с <a.modal-link> (чистка/добавление атрибутов)
+     btnWidth?: number, btnHeight?: number, gridColSize?: number,
+     modalLinkMode?: boolean
    }
 */
 function applyImagePicker(image_set, fieldSuffix, opts = {}) {
-  if (!isProfileFieldsPage()) return;
+  if (!isProfileFieldsPage()) { log('abort:not-profile-fields-page', location.href); return; }
   injectStylesOnce();
 
   const modalLinkMode = !!opts.modalLinkMode;
+  log('init:modalLinkMode', modalLinkMode);
 
   const RAW = Array.isArray(image_set) ? image_set : [];
   const ITEMS = RAW.map(s => String(s ?? ''));
-  const hasItems = ITEMS.length > 0;
+  log('init:image_set.count', ITEMS.length);
 
   const input = resolveFieldBySuffix(fieldSuffix);
-  if (!input) { console.warn('[imagePicker] field not found:', fieldSuffix); return; }
-  if (input.dataset.ipApplied === '1') return;
-  input.dataset.ipApplied = '1';
+  if (!input) { log('abort:field-not-found', fieldSuffix); return; }
 
-  // размеры инстанса
+  log('init:input.original', input.value);
+
+  // размеры
   const w = Number.isFinite(opts.btnWidth)  ? Math.max(1, opts.btnWidth)  : 44;
   const h = Number.isFinite(opts.btnHeight) ? Math.max(1, opts.btnHeight) : 44;
   const col = Number.isFinite(opts.gridColSize) ? Math.max(1, opts.gridColSize) : w;
+  log('init:sizes', { w, h, col });
 
   // спрятать input
   input.classList.add('ip-hidden');
 
-  // нормализованные строки для хранения/сравнения
+  // инфо по исходным карточкам
+  const ORIG_HAS_MODAL = ITEMS.map(hadModalLinkClass);
+
+  // нормализованные строки (для хранения/сравнения)
   const NORMS = ITEMS.map(v => modalLinkMode ? normalizeModalLinkAttrs(v) : v);
   const allowed = new Set(NORMS);
   const keyByNorm = new Map(NORMS.map(n => [n, keyFor(n)]));
+  const restoreClassByNorm = new Map(NORMS.map((n, i) => [n, ORIG_HAS_MODAL[i]]));
+
+  const currentNorm = modalLinkMode ? normalizeModalLinkAttrs(String(input.value ?? '')) : String(input.value ?? '');
+  log('init:input.normalized', currentNorm);
 
   // UI
   let grid = null;
-  if (hasItems) {
+  if (ITEMS.length > 0) {
     const box = document.createElement('div');
     box.className = 'ip-box';
     box.style.setProperty('--ip-rows', String(IP_ROWS));
@@ -165,18 +194,20 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
       btn.type = 'button'; btn.className = 'ip-btn'; btn.dataset.key = keyByNorm.get(norm);
       const display = modalLinkMode ? norm : ITEMS[idx];
       btn.appendChild(createThumbSlot(display));
-      const pick = (e) => { e.preventDefault(); e.stopPropagation(); setValue(norm); };
+      const pick = (e) => { e.preventDefault(); e.stopPropagation(); log('pick:requested', norm); setValue(norm); };
       btn.addEventListener('pointerdown', pick);
-      btn.addEventListener('click',  pick);
+      btn.addEventListener('click', pick);
       g.appendChild(btn);
     });
 
     scroll.appendChild(g);
     box.appendChild(scroll);
     grid = g;
+    log('ui:built', { items: ITEMS.length });
+  } else {
+    log('ui:skipped-empty-image_set', true);
   }
 
-  // подсветка выбранной
   function highlight(normStr) {
     if (!grid) return;
     const key = keyByNorm.get(String(normStr)) || '';
@@ -187,10 +218,16 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     }
   }
 
-  // установка значения (norm) без рекурсии
+  // фиксация изменений value, инициированных извне
+  function wireExternalLogging() {
+    input.addEventListener('input',  () => log('external:input', input.value));
+    input.addEventListener('change', () => log('external:change', input.value));
+  }
+
   let internal = false;
   function setValue(normVal) {
     const v = String(normVal ?? '');
+    log('setValue:before', v);
     if (input.value !== v) {
       internal = true;
       input.value = v;
@@ -199,37 +236,47 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
       internal = false;
     }
     highlight(v);
+    log('setValue:after', input.value);
   }
 
-  // инициализация
-  const currentNorm = modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '');
-  const firstNorm   = hasItems ? NORMS[0] : '';
-  const initialNorm = hasItems
+  // инициализация выбранного
+  const firstNorm   = NORMS[0] || '';
+  const initialNorm = ITEMS.length
     ? (allowed.has(currentNorm) ? currentNorm : (IP_REQUIRED ? firstNorm : ''))
     : '';
   input.dataset.ipInitial = initialNorm;
+  log('init:initialNorm', initialNorm);
   setValue(initialNorm);
+  wireExternalLogging();
 
-  // синхронизация внешних изменений
-  if (!input.dataset.ipSynced) {
-    input.addEventListener('input',  () => { if (!internal) highlight(modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '')); });
-    input.addEventListener('change', () => { if (!internal) highlight(modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '')); });
-    input.dataset.ipSynced = '1';
-  }
-
-  /* ===== «ЖЕЛЕЗОБЕТОННЫЕ» ХУКИ ПЕРЕД СОХРАНЕНИЕМ ===== */
+  /* ===== ХУКИ ПЕРЕД СОХРАНЕНИЕМ ===== */
   function ensureValidAndPrepare() {
-    let curNorm = modalLinkMode ? normalizeModalLinkAttrs(input.value) : String(input.value ?? '');
-    if (!hasItems) {
-      input.value = modalLinkMode ? prepareModalLinkAttrs('') : '';
+    let curNorm = modalLinkMode ? normalizeModalLinkAttrs(String(input.value ?? '')) : String(input.value ?? '');
+    log('prepare:before-validate', curNorm);
+
+    if (!ITEMS.length) {
+      input.value = modalLinkMode ? prepareModalLinkAttrs('', false) : '';
+      log('prepare:empty-image-set', input.value);
       return;
     }
+
     if (!allowed.has(curNorm)) {
       const fallback = input.dataset.ipInitial ?? (IP_REQUIRED ? firstNorm : '');
       curNorm = String(fallback);
+      log('prepare:apply-fallback', curNorm);
       setValue(curNorm);
     }
-    input.value = modalLinkMode ? prepareModalLinkAttrs(curNorm) : curNorm;
+
+    if (modalLinkMode) {
+      // восстановим класс modal-link, если он был у выбранного item изначально
+      const shouldRestoreClass = !!restoreClassByNorm.get(curNorm);
+      const prepared = prepareModalLinkAttrs(curNorm, shouldRestoreClass);
+      input.value = prepared;
+      log('prepare:final', input.value);
+    } else {
+      input.value = curNorm;
+      log('prepare:final(no-modal-mode)', input.value);
+    }
   }
 
   const form = input.closest('form');
@@ -237,17 +284,18 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     form.dataset.ipHooks = '1';
 
     // 1) обычный submit
-    form.addEventListener('submit', () => {
-      ensureValidAndPrepare();
-    }, true);
+    form.addEventListener('submit', () => { ensureValidAndPrepare(); }, true);
 
-    // 2) FormData (ajax-сбор)
+    // 2) FormData (ajax)
     form.addEventListener('formdata', (e) => {
       ensureValidAndPrepare();
       try {
         const name = input.name || `form[fld${fieldSuffix}]`;
         e.formData.set(name, input.value);
-      } catch(_) {}
+        log('formdata:set', { name, value: input.value });
+      } catch(err) {
+        console.warn('[imagePicker] formdata.set failed:', err);
+      }
     });
 
     // 3) программный form.submit()

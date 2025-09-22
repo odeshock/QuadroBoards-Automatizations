@@ -54,22 +54,39 @@ async function collectSkinSets() {
   if (!isProfileFieldsPage()) return { icons: [], plashki: [], backs: [] };
 
   const profileId = getProfileId();
-  const pointerOnProfile = findMainPointerId(document);
-  const targetId = pointerOnProfile || profileId;
 
-  const doc = await fetchDocSmart(`/pages/usr${targetId}_skin`);
-  if (!doc) return { icons: [], plashki: [], backs: [] };
+  // 1) открываем /pages/usr<profileId>_skin
+  const doc1 = await fetchDocSmart(`/pages/usr${profileId}_skin`);
+  if (!doc1) return { icons: [], plashki: [], backs: [] };
 
-  // Защита от цикла
-  if (findMainPointerId(doc)) {
+  // 2) смотрим "маяк" на ПЕРВОЙ открытой странице
+  const ptr1 = findMainPointerId(doc1);
+
+  // Если "маяка" нет — парсим doc1 и выходим
+  if (!ptr1) {
+    return {
+      icons:   pickItemsHTML(doc1, '#pun-main ._icon .item, .pun-main ._icon .item'),
+      plashki: pickItemsHTML(doc1, '#pun-main ._plashka .item, .pun-main ._plashka .item'),
+      backs:   pickItemsHTML(doc1, '#pun-main ._background .item, .pun-main ._background .item')
+    };
+  }
+
+  // 3) "маяк" есть → переходим НА СЛЕДУЮЩУЮ страницу /pages/usr<ptr1>_skin
+  const doc2 = await fetchDocSmart(`/pages/usr${ptr1}_skin`);
+  if (!doc2) return { icons: [], plashki: [], backs: [] };
+
+  // 4) если и здесь снова есть "маяк" — это цикл
+  const ptr2 = findMainPointerId(doc2);
+  if (ptr2) {
     console.log('Найден цикл');
     return { icons: [], plashki: [], backs: [] };
   }
 
-  // Собираем все innerHTML внутри .item
+  // 5) иначе парсим вторую страницу
   return {
-    icons:   pickItemsHTML(doc, '#pun-main ._icon .item'),
-    plashki: pickItemsHTML(doc, '#pun-main ._plashka .item'),
-    backs:   pickItemsHTML(doc, '#pun-main ._background .item')
+    icons:   pickItemsHTML(doc2, '#pun-main ._icon .item, .pun-main ._icon .item'),
+    plashki: pickItemsHTML(doc2, '#pun-main ._plashka .item, .pun-main ._plashka .item'),
+    backs:   pickItemsHTML(doc2, '#pun-main ._background .item, .pun-main ._background .item')
   };
 }
+

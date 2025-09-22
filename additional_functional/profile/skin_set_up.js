@@ -12,44 +12,51 @@
     const withHeaders = opts.withHeaders ?? true;
     const startOpen   = opts.startOpen   ?? false;
 
-    // --- defaults, если get_skin_lib нет или вернул пусто ---
+    // === 1) дефолтные библиотеки (на случай, если get_skin_lib нет/упала/вернула пусто)
     const DEFAULT_LIBS = {
       '_plashka': [
         { id: '1', html: '<div class="item" title="за вступление!" data-id="1"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/247944.gif" class="plashka"><wrds>я не подарок, но и ты не шаверма</wrds></a></div>' },
         { id: '2', html: '<div class="item" title="новый дизайн — новая плашка! такие вот делишки, девчонки и мальчишки) а так же их родители.." data-id="2"><a class="modal-link"><img src="https://upforme.ru/uploads/001c/14/5b/440/561829.gif" class="plashka"><wrds>twinkle twinkle little star</wrds></a></div>' },
         { id: '3', html: '<div class="item" title="пример №3" data-id="3"><a class="modal-link"><img src="https://picsum.photos/seed/3/300/120" class="plashka"><wrds>пример 3</wrds></a></div>' },
-        { id: '4', html: '<div class="item" title="пример №4" data-id="4"><a class="modal-link"><img src="https://picsum.photos/seed/4/300/120" class="plashка"><wrds>пример 4</wrds></a></div>' },
-        { id: '5', html: '<div class="item" title="пример №5" data-id="5"><a class="modal-link"><img src="https://picsum.photos/seed/5/300/120" class="plashка"><wrds>пример 5</wrds></a></div>' },
-        { id: '6', html: '<div class="item" title="пример №6" data-id="6"><a class="modal-link"><img src="https://picsum.photos/seed/6/300/120" class="plashка"><wrds>пример 6</wrds></a></div>' },
+        { id: '4', html: '<div class="item" title="пример №4" data-id="4"><a class="modal-link"><img src="https://picsum.photos/seed/4/300/120" class="plashka"><wrds>пример 4</wrds></a></div>' },
+        { id: '5', html: '<div class="item" title="пример №5" data-id="5"><a class="modal-link"><img src="https://picsum.photos/seed/5/300/120" class="plashka"><wrds>пример 5</wrds></a></div>' },
+        { id: '6', html: '<div class="item" title="пример №6" data-id="6"><a class="modal-link"><img src="https://picsum.photos/seed/6/300/120" class="plashka"><wrds>пример 6</wrds></a></div>' },
       ],
       '_icon': [],
       '_back': []
     };
+  
+    // безопасная обёртка вокруг get_skin_lib (или opts.getLib)
+    const getLibRaw =
+      opts.getLib ??
+      (typeof window.get_skin_lib === 'function' ? window.get_skin_lib : null);
     
-    // безопасная обёртка вокруг get_skin_lib
-    const getLibRaw = opts.getLib ?? (typeof window.get_skin_lib === 'function' ? window.get_skin_lib : null);
     const safeGetLib = async (cls) => {
       try {
         if (typeof getLibRaw === 'function') {
           const r = await getLibRaw(cls);
           if (Array.isArray(r) && r.length) return r;
         }
-      } catch (e) {}
-      // если функции нет или вернулось пусто — отдаём дефолт
+      } catch (e) {
+        console.debug('[setupSkins] getLib error for', cls, e);
+      }
       return DEFAULT_LIBS[cls] ?? [];
     };
     
-    // тянем библиотеки
-    const [libPlashka, libIcon, libBack] = await Promise.all([
+    // фактическая загрузка (всегда вернёт массивы; для плашек — хотя бы DEFAULT_LIBS)
+    const backClass = opts.backClass ?? '_back';
+    const [libPlashka0, libIcon0, libBack0] = await Promise.all([
       safeGetLib('_plashka'),
       safeGetLib('_icon'),
       safeGetLib(backClass),
     ]);
     
-    const LIB_P = Array.isArray(libPlashka) ? libPlashka : [];
-    const LIB_I = Array.isArray(libIcon)    ? libIcon    : [];
-    const LIB_B = Array.isArray(libBack)    ? libBack    : [];
-
+    // финальные массивы (если что-то пришло не так — подстрахуемся ещё раз)
+    const LIB_P = Array.isArray(libPlashka0) && libPlashka0.length ? libPlashka0 : DEFAULT_LIBS['_plashka'];
+    const LIB_I = Array.isArray(libIcon0)    && libIcon0.length    ? libIcon0    : DEFAULT_LIBS['_icon'];
+    const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS[backClass] ?? [];
+    console.debug('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
+  
     // идемпотентно создаём/переиспользуем сетку
     let grid = container.querySelector('.skins-setup-grid');
     if (!grid) {

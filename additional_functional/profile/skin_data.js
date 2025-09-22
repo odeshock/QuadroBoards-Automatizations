@@ -19,22 +19,30 @@
 // ];
 
 (async () => {
-  // было: const {icon_set, plashka_set, back_set } = await collectSkinSets();
   const { icons, plashki, backs } = await collectSkinSets();
 
-  applyImagePicker(plashki, '3', {
-    btnWidth: 229,
-    btnHeight: 42,
-    modalLinkMode: true,
-  });
+  // Плашка
+  if (SKIN?.PlashkaFieldID) {
+    applyImagePicker(plashki, SKIN.PlashkaFieldID, {
+      btnWidth: 229,
+      btnHeight: 42,
+      modalLinkMode: true,
+    });
+  }
 
-  applyImagePicker(backs, '4', {
-    btnWidth: 229,
-    btnHeight: 42,
-    modalLinkMode: true,
-  });
+  // Фон
+  if (SKIN?.BackFieldID) {
+    applyImagePicker(backs, SKIN.BackFieldID, {
+      btnWidth: 229,
+      btnHeight: 42,
+      modalLinkMode: true,
+    });
+  }
 
-  applyImagePicker(icons, '5', {
-    btnWidth: 44,
-  });
+  // Иконка
+  if (SKIN?.IconFieldID) {
+    applyImagePicker(icons, SKIN.IconFieldID, {
+      btnWidth: 44,
+    });
+  }
 })();

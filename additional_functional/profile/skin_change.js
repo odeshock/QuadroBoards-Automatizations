@@ -1,5 +1,5 @@
 /* ================== КОНСТАНТЫ ================== */
-const IP_ROWS = 1;        // сколько строк видно без скролла (UI)
+const IP_ROWS = 1;        // видимых строк без скролла (UI)
 const IP_GAP  = 8;        // отступ между элементами (UI)
 const IP_REQUIRED = true; // выбор обязателен (если есть варианты)
 
@@ -15,7 +15,7 @@ function isProfileFieldsPage() {
   } catch { return false; }
 }
 
-const STYLE_ID = 'ip-style-logger';
+const STYLE_ID = 'ip-style-logger-keep-class';
 function injectStylesOnce() {
   if (document.getElementById(STYLE_ID)) return;
   const st = document.createElement('style');
@@ -53,37 +53,25 @@ function resolveFieldBySuffix(suffix) {
   );
 }
 
-// Был ли в исходной строке <a class="modal-link">
-function hadModalLinkClass(raw) {
-  const s = String(raw ?? '');
-  return /\<a\b[^>]*\bclass\s*=\s*["'][^"']*\bmodal-link\b/i.test(s);
-}
-
-// При ЗАГРУЗКЕ: у <a.modal-link> оставить ТОЛЬКО style
+// === НОРМАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ===
+// у <a.modal-link> оставляем ТОЛЬКО class и style (класс не удаляем)
 function normalizeModalLinkAttrs(html) {
+  const allowed = new Set(['class', 'style']);
   const t = document.createElement('template');
   t.innerHTML = String(html ?? '');
   t.content.querySelectorAll('a.modal-link').forEach(a => {
     Array.from(a.attributes).forEach(attr => {
-      if (attr.name !== 'style') a.removeAttribute(attr.name);
+      if (!allowed.has(attr.name)) a.removeAttribute(attr.name);
     });
   });
   return t.innerHTML.trim();
 }
 
-// ПОДГОТОВКА ПЕРЕД СОХРАНЕНИЕМ:
-//  - если item изначально имел класс modal-link, но после нормализации он пропал,
-//    восстанавливаем класс (на ВСЕХ <a>, т.к. определить «какой именно» уже нельзя);
-//  - дальше добавляем к a.modal-link: data-reveal-id="character" и id="usrN".
-function prepareModalLinkAttrs(html, shouldRestoreClass) {
+// === ПОДГОТОВКА ПЕРЕД СОХРАНЕНИЕМ ===
+// каждой a.modal-link добавляем data-reveal-id="character" и id="usrN"
+function prepareModalLinkAttrs(html) {
   const t = document.createElement('template');
   t.innerHTML = String(html ?? '');
-
-  if (shouldRestoreClass) {
-    t.content.querySelectorAll('a').forEach(a => {
-      a.classList.add('modal-link');
-    });
-  }
   const anchors = t.content.querySelectorAll('a.modal-link');
   if (anchors.length) {
     const u = new URL(location.href);
@@ -97,7 +85,7 @@ function prepareModalLinkAttrs(html, shouldRestoreClass) {
   return t.innerHTML.trim();
 }
 
-// превью: HTML → вставляем как DOM, иначе <img src="...">
+// превью: HTML → DOM, иначе <img src="...">
 function createThumbSlot(htmlOrUrl) {
   const slot = document.createElement('div');
   slot.className = 'ip-slot';
@@ -126,10 +114,7 @@ function keyFor(str) {
 /* ================== ОСНОВНАЯ ФУНКЦИЯ ==================
    image_set: массив СТРОК (HTML или URL)
    fieldSuffix: '5' → fld5 / form[fld5]
-   opts: {
-     btnWidth?: number, btnHeight?: number, gridColSize?: number,
-     modalLinkMode?: boolean
-   }
+   opts: { btnWidth?: number, btnHeight?: number, gridColSize?: number, modalLinkMode?: boolean }
 */
 function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   if (!isProfileFieldsPage()) { log('abort:not-profile-fields-page', location.href); return; }
@@ -156,14 +141,10 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
   // спрятать input
   input.classList.add('ip-hidden');
 
-  // инфо по исходным карточкам
-  const ORIG_HAS_MODAL = ITEMS.map(hadModalLinkClass);
-
   // нормализованные строки (для хранения/сравнения)
   const NORMS = ITEMS.map(v => modalLinkMode ? normalizeModalLinkAttrs(v) : v);
   const allowed = new Set(NORMS);
   const keyByNorm = new Map(NORMS.map(n => [n, keyFor(n)]));
-  const restoreClassByNorm = new Map(NORMS.map((n, i) => [n, ORIG_HAS_MODAL[i]]));
 
   const currentNorm = modalLinkMode ? normalizeModalLinkAttrs(String(input.value ?? '')) : String(input.value ?? '');
   log('init:input.normalized', currentNorm);
@@ -218,7 +199,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     }
   }
 
-  // фиксация изменений value, инициированных извне
+  // лог внешних изменений value
   function wireExternalLogging() {
     input.addEventListener('input',  () => log('external:input', input.value));
     input.addEventListener('change', () => log('external:change', input.value));
@@ -255,7 +236,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     log('prepare:before-validate', curNorm);
 
     if (!ITEMS.length) {
-      input.value = modalLinkMode ? prepareModalLinkAttrs('', false) : '';
+      input.value = modalLinkMode ? prepareModalLinkAttrs('', /*not used*/ false) : '';
       log('prepare:empty-image-set', input.value);
       return;
     }
@@ -268,9 +249,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     }
 
     if (modalLinkMode) {
-      // восстановим класс modal-link, если он был у выбранного item изначально
-      const shouldRestoreClass = !!restoreClassByNorm.get(curNorm);
-      const prepared = prepareModalLinkAttrs(curNorm, shouldRestoreClass);
+      const prepared = prepareModalLinkAttrs(curNorm); // класс уже сохранён на загрузке, восстанавливать не нужно
       input.value = prepared;
       log('prepare:final', input.value);
     } else {

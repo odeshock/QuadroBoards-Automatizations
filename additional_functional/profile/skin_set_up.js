@@ -1,14 +1,22 @@
 // ==UserScript==
-// @name         Admin: универсальные панели выбора (сетка, автопорог 2 ряда, автоподхват, частичное сохранение)
+// @name         Admin: универсальные панели выбора (external-режим + builder)
 // @namespace    upforme-helper
-// @version      2.0.0
-// @description  Многоразовая функция createChoicePanel({ title, targetClass, library, ...opts }) для страниц редактирования. Несколько панелей на странице, каждая правит только свой блок по классу. Скролл включается, когда элементов > 2 рядов (порог вычисляется автоматически). Пустой editableAttr удаляется.
+// @version      2.1.0
+// @description  createChoicePanel({ title, targetClass, library, ...opts }) с поддержкой внешнего вызова: mountEl, initialHtml, external=true.
 // @match        *://*/admin_pages.php*
 // @run-at       document-idle
 // @grant        GM_addStyle
 // ==/UserScript==
 
-// --- утилиты среды страницы ---
+/* ====== ИСХОДНАЯ ОСНОВА ТВОЕГО КОДА (уплотнено) + маленькие ДОБАВКИ =====
+ * Новые опции:
+ * - mountEl?: HTMLElement — если задан, панель вставляется сюда (вместо after textarea)
+ * - initialHtml?: string  — если задан, берём этот HTML как исходный (вместо чтения из textarea/tinymce)
+ * - external?: boolean    — если true, НЕ ставим общий submit-хук; возвращаем объект { details, builder, getSelectedIds }
+ *
+ * Внутренняя логика, стили и UX не трогал.
+ */
+
 const $ = (sel, root = document) => root.querySelector(sel);
 const ready = (sel, root = document) => new Promise((res) => {
   const el = root.querySelector(sel);
@@ -19,12 +27,8 @@ const ready = (sel, root = document) => new Promise((res) => {
   });
   obs.observe(document.documentElement, { childList: true, subtree: true });
 });
-
-// нам нужен #page-content; если его нет — тихо выходим
-// (вы можете сами вызывать createChoicePanel только на нужных страницах)
 const ensureTextarea = async (sel) => ready(sel);
 
-// --- общие стили один раз ---
 const baseCSS = `
 details.ufo-panel{margin-top:12px;border:1px solid #d0d0d7;border-radius:10px;background:#fff}
 details.ufo-panel>summary{cursor:pointer;list-style:none;padding:10px 14px;font-weight:600;background:#f6f6f8;border-bottom:1px solid #e6e6ef;border-radius:10px}
@@ -58,17 +62,13 @@ details.ufo-panel>summary::-webkit-details-marker{display:none}
   if (typeof GM_addStyle==='function') GM_addStyle(baseCSS);
 })();
 
-// ===== Реестр панелей для единого сохранения =====
-const PANELS = []; // { uid, opts, rootEl, selectedBox, libBox, getSelectedInner, getSelectedIds }
-
-// ===== Общие вспомогательные функции =====
+const PANELS = [];
 const mkBtn = (txt, onClick) => {
   const b=document.createElement('button');
   b.type='button'; b.className='ufo-btn'; b.textContent=txt;
   b.addEventListener('click', onClick);
   return b;
 };
-
 function computeTwoRowMaxSelected(container){
   const first = container.querySelector('.ufo-card');
   if (!first) { container.style.maxHeight = ''; return; }
@@ -82,7 +82,6 @@ function computeTwoRowMaxSelected(container){
   const max = Math.round(h * 2 + (mt + mb) * 3 + pt + pb);
   container.style.maxHeight = max + 'px';
 }
-
 function firstVisibleCard(container){
   const cards = [...container.querySelectorAll('.ufo-card')];
   return cards.find(c => getComputedStyle(c).display !== 'none') || null;
@@ -98,7 +97,6 @@ function computeTwoRowMaxLib(container){
   const max = Math.round(ch * 2 + rowGap + pt + pb);
   container.style.maxHeight = max + 'px';
 }
-
 function observeSelected(container){
   const mo = new MutationObserver(()=> computeTwoRowMaxSelected(container));
   mo.observe(container, { childList: true, subtree: true, attributes: true });
@@ -111,11 +109,8 @@ function observeLib(container){
   window.addEventListener('resize', ()=> computeTwoRowMaxLib(container));
   computeTwoRowMaxLib(container);
 }
-
-// безопасный комментарий (без "--")
 const safeComment = (s) => String(s).replace(/--/g,'—');
 
-// ===== Сохранение (для одной панели) =====
 function rewriteSectionHTML(pageHtml, opts, selectedInner, selectedIds){
   const { targetClass, itemSelector = '.item', idAttr = 'data-id' } = opts;
   const root=document.createElement('div'); root.innerHTML=pageHtml;
@@ -123,14 +118,12 @@ function rewriteSectionHTML(pageHtml, opts, selectedInner, selectedIds){
   const nodeToPreservedComment = (node) => {
     if (node.nodeType===1){
       const el=node;
-      // если это .item с id, и он выбран сейчас — не сохраняем как preserved
       if (el.matches(itemSelector)) {
         let id = el.getAttribute(idAttr);
         if (id == null) id = 'undefined';
         if (id !== 'undefined' && selectedIds.has(id)) return '';
         return `<!-- preserved (${idAttr}="${safeComment(id)}")\n${safeComment(el.outerHTML)}\n-->`;
       }
-      // для прочих тегов — просто консервируем как undefined
       return `<!-- preserved (${idAttr}="undefined")\n${safeComment(el.outerHTML)}\n-->`;
     } else if (node.nodeType===8){
       return `<!--${safeComment(node.nodeValue)}-->`;
@@ -140,7 +133,6 @@ function rewriteSectionHTML(pageHtml, opts, selectedInner, selectedIds){
     }
     return '';
   };
-
   if (block){
     const preserved=[];
     block.childNodes.forEach(n=>preserved.push(nodeToPreservedComment(n)));
@@ -152,35 +144,29 @@ function rewriteSectionHTML(pageHtml, opts, selectedInner, selectedIds){
   return root.innerHTML;
 }
 
-// ===== Единый submit: последовательно применяем все панели =====
+// общий submit-хук только для админки
 function ensureGlobalSubmitHook(textareaSelector){
   if (ensureGlobalSubmitHook._installed) return;
   ensureGlobalSubmitHook._installed = true;
-
   const form = $('#editpage') || $('form[action*="admin_pages.php"]');
   if (!form) return;
-
   form.addEventListener('submit', ()=>{
     const ta = $(textareaSelector) || $('#page-content');
     const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
-
     let current = '';
     if (tm) current = tm.getContent();
     else if (ta) current = ta.value || '';
-
-    // прогоняем все панели по очереди
     for (const p of PANELS) {
       const selectedInner = p.getSelectedInner();
       const selectedIds = p.getSelectedIds();
       current = rewriteSectionHTML(current, p.opts, selectedInner, selectedIds);
     }
-
     if (tm) tm.setContent(current);
     if (ta) ta.value = current;
   }, true);
 }
 
-// ===== Создание панели =====
+// ==== ГЛАВНАЯ ФУНКЦИЯ ====
 function createChoicePanel(userOpts){
   const opts = Object.assign({
     title: 'Библиотека и выбранные',
@@ -188,29 +174,27 @@ function createChoicePanel(userOpts){
     library: [],
     startOpen: false,
     textareaSelector: '#page-content',
-    anchorSelector: null,              // если null — вставим после textarea
+    anchorSelector: null,
     itemSelector: '.item',
     idAttr: 'data-id',
     editableAttr: 'title',
-    searchPlaceholder: 'поиск по id'
+    searchPlaceholder: 'поиск по id',
+    mountEl: null,         // NEW: для профиля
+    initialHtml: null,     // NEW: для профиля
+    external: false        // NEW: true — не ставим submit-хук, возвращаем builder()
   }, userOpts || {});
-  if (!opts.library || !Array.isArray(opts.library)) opts.library = [];
+  if (!Array.isArray(opts.library)) opts.library = [];
 
   const LIB_ID_SET = new Set(opts.library.map(x => x.id));
   const LIB_MAP = new Map(opts.library.map(x => [x.id, x]));
-
   const uid = 'ufo_' + (opts.targetClass || 'section').replace(/\W+/g,'_') + '_' + Math.random().toString(36).slice(2,7);
 
-  // элементы панели
   const details = document.createElement('details');
   details.className = 'ufo-panel';
   details.open = !!opts.startOpen;
-
-  const summary = document.createElement('summary');
-  summary.textContent = opts.title || 'Панель';
+  const summary = document.createElement('summary'); summary.textContent = opts.title || 'Панель';
   const wrap = document.createElement('div'); wrap.className='ufo-wrap';
 
-  // библиотека
   const libCol = document.createElement('div'); libCol.className='ufo-col';
   const hLib = document.createElement('h4'); hLib.textContent='Библиотека';
   const search = document.createElement('input');
@@ -219,7 +203,6 @@ function createChoicePanel(userOpts){
   const libBox = document.createElement('div'); libBox.className='ufo-lib'; libBox.id = uid+'-lib';
   libCol.append(hLib, libBox);
 
-  // выбранные
   const selCol = document.createElement('div'); selCol.className='ufo-col';
   selCol.innerHTML = '<h4>Выбранные (сверху — новее)</h4>';
   const selBox = document.createElement('div'); selBox.className='ufo-selected'; selBox.id = uid+'-selected';
@@ -228,14 +211,17 @@ function createChoicePanel(userOpts){
   wrap.append(libCol, selCol);
   details.append(summary, wrap);
 
-  // куда вставлять
+  // КУДА вставлять
   (async ()=>{
-    await ensureTextarea(opts.textareaSelector);
-    const anchor = opts.anchorSelector ? $(opts.anchorSelector) : $(opts.textareaSelector);
-    if (anchor) anchor.insertAdjacentElement('afterend', details);
+    if (opts.mountEl) {
+      opts.mountEl.appendChild(details);
+    } else {
+      await ensureTextarea(opts.textareaSelector);
+      const anchor = opts.anchorSelector ? $(opts.anchorSelector) : $(opts.textareaSelector);
+      if (anchor) anchor.insertAdjacentElement('afterend', details);
+    }
   })();
 
-  // ——— рендер карточек библиотеки ———
   function renderLibItem(item){
     const card=document.createElement('div'); card.className='ufo-card'; card.dataset.id=item.id;
     const id=document.createElement('div'); id.className='ufo-idtag'; id.textContent='#'+item.id;
@@ -248,7 +234,6 @@ function createChoicePanel(userOpts){
   }
   opts.library.forEach(x => libBox.appendChild(renderLibItem(x)));
 
-  // ——— добавление в выбранные ———
   function addToSelected(item, o){
     o = o || {};
     const libCard = libBox.querySelector(`.ufo-card[data-id="${item.id}"]`);
@@ -279,7 +264,6 @@ function createChoicePanel(userOpts){
     recalc();
   }
 
-  // DnD
   (function enableDnd(container){
     let dragEl=null;
     container.addEventListener('dragstart', (e)=>{const card=e.target.closest('.ufo-card'); if(!card) return; dragEl=card; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','');});
@@ -288,7 +272,6 @@ function createChoicePanel(userOpts){
     container.addEventListener('dragend', ()=>{dragEl=null; computeTwoRowMaxSelected(container);});
   })(selBox);
 
-  // поиск
   search.addEventListener('input', ()=>{
     const v = search.value.trim();
     libBox.querySelectorAll('.ufo-card').forEach(c=>{
@@ -297,20 +280,27 @@ function createChoicePanel(userOpts){
     computeTwoRowMaxLib(libBox);
   });
 
-  // автопорог для обоих контейнеров
-  observeLib(libBox);
-  observeSelected(selBox);
+  const mo1=new MutationObserver(()=>computeTwoRowMaxSelected(selBox));
+  mo1.observe(selBox,{childList:true,subtree:true,attributes:true});
+  const mo2=new MutationObserver(()=>computeTwoRowMaxLib(libBox));
+  mo2.observe(libBox,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+  window.addEventListener('resize',()=>{computeTwoRowMaxLib(libBox); computeTwoRowMaxSelected(selBox);});
+  computeTwoRowMaxLib(libBox); computeTwoRowMaxSelected(selBox);
 
-  // ——— автоподхват из targetClass ———
+  // --- ГИДРАТАЦИЯ ---
   (function hydrateFromPage(){
-    const ta = $(opts.textareaSelector);
-    const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
-    let current=''; if (tm) current=tm.getContent(); else if (ta) current=ta.value||'';
+    let current='';
+    if (typeof opts.initialHtml === 'string') {
+      current = opts.initialHtml;
+    } else {
+      const ta = $(opts.textareaSelector);
+      const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
+      if (tm) current = tm.getContent();
+      else if (ta) current = ta.value || '';
+    }
     if (!current) return;
-
     const root=document.createElement('div'); root.innerHTML=current;
     const block=root.querySelector('div.'+opts.targetClass); if (!block) return;
-
     const items=[];
     block.childNodes.forEach(n=>{
       if (n.nodeType===1 && n.matches(opts.itemSelector)){
@@ -328,7 +318,6 @@ function createChoicePanel(userOpts){
     }
   })();
 
-  // ——— подготовка данных к сохранению ———
   function getSelectedIds(){
     return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean));
   }
@@ -338,39 +327,45 @@ function createChoicePanel(userOpts){
       let html=row.dataset.html||'';
       const ed=row.querySelector('.ufo-title-edit');
       const t = ed ? ed.textContent.trim() : '';
-
+      const attr = opts.editableAttr;
       if (t) {
         const safe = t.replace(/"/g,'&quot;');
-        if (new RegExp(`${opts.editableAttr}="[^"]*"`).test(html)) {
-          const re = new RegExp(`${opts.editableAttr}="[^"]*"`);
-          html = html.replace(re, `${opts.editableAttr}="${safe}"`);
-        } else {
-          // вставим в открывающий тег .item
-          const reOpen = new RegExp(`<div\\s+class="item"\\b([^>]*)>`);
-          html = html.replace(reOpen, (m, attrs)=>`<div class="item" ${opts.editableAttr}="${safe}"${attrs}>`);
-        }
+        const re = new RegExp(`${attr}="[^"]*"`);
+        if (re.test(html)) html = html.replace(re, `${attr}="${safe}"`);
+        else html = html.replace(/<div\s+class="item"\b([^>]*)>/,(m,a)=>`<div class="item" ${attr}="${safe}"${a}>`);
       } else {
-        // удалить атрибут, если пусто
-        const reAttr = new RegExp(`(<div\\s+class="item"\\b[^>]*?)\\s+${opts.editableAttr}="[^"]*"(.*?>)`);
+        const reAttr = new RegExp(`(<div\\s+class="item"\\b[^>]*?)\\s+${attr}="[^"]*"(.*?>)`);
         html = html.replace(reAttr, '$1$2');
       }
       return html;
     }).join('\n');
   }
 
-  // ——— зарегистрируем панель в реестре для общего submit ———
+  // регистрация панели (для админки)
   PANELS.push({
-    uid,
-    opts,
-    rootEl: details,
-    selectedBox: selBox,
-    libBox,
+    uid, opts, rootEl: details, selectedBox: selBox, libBox,
     getSelectedInner: buildSelectedInnerHTML,
     getSelectedIds
   });
 
-  // поставим общий submit-хук (один раз на страницу)
-  ensureGlobalSubmitHook(opts.textareaSelector);
+  // В админке — автосохранение через submit; в external — НЕТ
+  if (!opts.external) ensureGlobalSubmitHook(opts.textareaSelector);
 
-  return details; // вдруг захочется руками двигать панель
+  // В external-режиме вернём builder()
+  function builder(fullHtmlOpt){
+    let current = '';
+    if (typeof fullHtmlOpt === 'string') current = fullHtmlOpt;
+    else if (typeof opts.initialHtml === 'string') current = opts.initialHtml;
+    else {
+      const ta = $(opts.textareaSelector);
+      const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
+      if (tm) current = tm.getContent();
+      else if (ta) current = ta.value || '';
+    }
+    const inner = buildSelectedInnerHTML();
+    const ids = getSelectedIds();
+    return rewriteSectionHTML(current, opts, inner, ids);
+  }
+
+  return { details, builder, getSelectedIds };
 }

@@ -82,6 +82,7 @@
       safeGetLib('_plashka'),
       safeGetLib('_icon'),
       safeGetLib('_background'),
+      safeGetLib('_gift')    // ← добавили сюда, но слева забыли переменную
     ]);
 
     // финальная подстраховка

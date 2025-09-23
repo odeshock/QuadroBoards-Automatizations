@@ -2,10 +2,9 @@
  * Загружает карточки из текущего домена.
  * @param {string} N  id темы (viewtopic.php?id=N)
  * @param {string} K  id поста (#pK-content)
- * @param {string} wrapClass CSS-класс обёртки
  * @returns {Promise<Array<{id:string, html:string}>>}
  */
-async function fetchCardsWrappedClean(N, K, wrapClass) {
+async function fetchCardsWrappedClean(N, K) {
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(N))}`;
 
   const normSpace = (typeof FMV?.normSpace === 'function')
@@ -56,7 +55,7 @@ async function fetchCardsWrappedClean(N, K, wrapClass) {
     const rawTitle  = normSpace(card.querySelector('.desc')?.textContent || '');
     const content   = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
     const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
-    const html      = `<div class="${wrapClass}" data-id="${id}"${titleAttr}>${content}</div>`;
+    const html      = `<div class="item" data-id="${id}"${titleAttr}>${content}</div>`;
     return { id, html };
   });
 

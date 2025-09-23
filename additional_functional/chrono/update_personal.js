@@ -23,11 +23,6 @@
   function getFromMap(byUser, id) {
     const k = String(id);
     return byUser?.[k]
-        ?? byUser?.[+k]
-        ?? byUser?.["user"+k]
-        ?? byUser?.["usr"+k]
-        ?? byUser?.users?.[k]
-        ?? byUser?.users?.["user"+k]
         ?? null;
   }
 

@@ -76,20 +76,26 @@
 
   function rewriteSectionHTML(pageHtml, opts, selectedInner, selectedIds){
     const { targetClass, itemSelector = '.item', idAttr = 'data-id' } = opts;
+    const libIds = new Set((opts.library || []).map(x => String(x.id)));
+    
     const root=document.createElement('div'); root.innerHTML=pageHtml;
     const block=root.querySelector('div.'+targetClass);
+    
     const nodeToPreservedComment = (node) => {
       if (node.nodeType===1){
         const el=node;
         if (el.matches(itemSelector)) {
           let id = el.getAttribute(idAttr);
           if (id == null) id = 'undefined';
-          // в мульти-режиме (подарки) не удаляем совпавшие id — разрешаем дубли
-          if (!opts.allowMultiAdd && id !== 'undefined' && selectedIds.has(id)) return '';
+          // новый порядок:
+          // 1) любые элементы из библиотеки — УДАЛЯЕМ (секцию строим заново из выбранных)
+          if (libIds.has(String(id))) return '';
+          // 2) всё, что не из библиотеки — сохраняем в комментарии
           return `<!-- preserved (${idAttr}="${safeComment(id)}")\n${safeComment(el.outerHTML)}\n-->`;
         }
+        // не .item — тоже сохраняем как preserved
         return `<!-- preserved (${idAttr}="undefined")\n${safeComment(el.outerHTML)}\n-->`;
-      } else if (node.nodeType===8){
+     } else if (node.nodeType===8){
         return `<!--${safeComment(node.nodeValue)}-->`;
       } else if (node.nodeType===3){
         const txt=node.nodeValue; if (txt.trim()==='') return '';

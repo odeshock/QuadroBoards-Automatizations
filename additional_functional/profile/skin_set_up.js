@@ -78,7 +78,7 @@
     };
 
     // --- 1) тянем библиотеки (всегда получим массивы)
-    const [libPlashka0, libIcon0, libBack0] = await Promise.all([
+    const [libPlashka0, libIcon0, libBack0, libGift0] = await Promise.all([
       safeGetLib('_plashka'),
       safeGetLib('_icon'),
       safeGetLib('_background'),

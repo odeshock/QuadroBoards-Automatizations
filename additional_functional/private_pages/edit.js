@@ -110,7 +110,12 @@ async function FMVeditPersonalPage(name, patch = {}) {
   const okByText = /Сохранено|успешн|изменени[яй]\s+сохранены/i.test(text);
   const msg = (typeof extractInfoMessage === 'function' ? extractInfoMessage(text) : '') || '';
 
-  if (res.ok && okByText) {
+  const redirectedToAdminList =
+    res.ok &&
+    (res.url && /\/admin_pages\.php(?:\?|$)/.test(res.url)) &&
+    !/ошибк|forbidden|нет прав|устаревш/i.test((text || '').toLowerCase());
+
+  if (res.ok && (okByText || redirectedToAdminList)) {
     return { status:'saved', serverMessage: msg || 'Изменения сохранены', httpStatus: res.status, url: editUrl };
   }
 

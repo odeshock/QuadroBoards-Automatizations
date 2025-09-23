@@ -84,7 +84,8 @@
         if (el.matches(itemSelector)) {
           let id = el.getAttribute(idAttr);
           if (id == null) id = 'undefined';
-          if (id !== 'undefined' && selectedIds.has(id)) return '';
+          // в мульти-режиме (подарки) не удаляем совпавшие id — разрешаем дубли
+          if (!opts.allowMultiAdd && id !== 'undefined' && selectedIds.has(id)) return '';
           return `<!-- preserved (${idAttr}="${safeComment(id)}")\n${safeComment(el.outerHTML)}\n-->`;
         }
         return `<!-- preserved (${idAttr}="undefined")\n${safeComment(el.outerHTML)}\n-->`;
@@ -126,7 +127,8 @@
     const opts = Object.assign({
       title: 'Библиотека и выбранные', targetClass: '_section', library: [], startOpen: false,
       textareaSelector: '#page-content', anchorSelector: null, itemSelector: '.item', idAttr: 'data-id', editableAttr: 'title',
-      searchPlaceholder: 'поиск по id', mountEl: null, initialHtml: null, external: false
+      searchPlaceholder: 'поиск по id', mountEl: null, initialHtml: null, external: false, 
+      allowMultiAdd: false            // ← НОВОЕ: разрешать многоразовое добавление одного и того же id
     }, userOpts || {});
     if (!Array.isArray(opts.library)) opts.library = [];
 
@@ -163,8 +165,12 @@
 
     function addToSelected(item, o){
       o = o || {};
-      const libCard = libBox.querySelector(`.ufo-card[data-id="${item.id}"]`); if (libCard) libCard.classList.add('disabled');
-      if (selBox.querySelector(`.ufo-card[data-id="${item.id}"]`)) return;
+      const libCard = libBox.querySelector(`.ufo-card[data-id="${item.id}"]`);
+      // в обычных секциях — блокируем дубль и «гасим» карточку в библиотеке
+      if (!opts.allowMultiAdd) {
+        if (libCard) libCard.classList.add('disabled');
+        if (selBox.querySelector(`.ufo-card[data-id="${item.id}"]`)) return;
+      }
       const row=document.createElement('div'); row.className='ufo-card'; row.draggable=true; row.dataset.id=item.id;
       const id=document.createElement('div'); id.className='ufo-idtag'; id.textContent='#'+item.id;
       const full=document.createElement('div'); full.className='ufo-full';
@@ -176,7 +182,12 @@
       const recalc = ()=> computeTwoRowMaxSelected(selBox);
       const btnUp=mkBtn('↑', (e)=>{e.preventDefault(); e.stopPropagation(); if (row.previousElementSibling) row.parentElement.insertBefore(row, row.previousElementSibling); recalc();});
       const btnDown=mkBtn('↓', (e)=>{e.preventDefault(); e.stopPropagation(); if (row.nextElementSibling) row.parentElement.insertBefore(row.nextElementSibling, row); recalc();});
-      const btnRemove=mkBtn('✕', (e)=>{e.preventDefault(); e.stopPropagation(); row.remove(); if (libCard) libCard.classList.remove('disabled'); recalc();});
+      const btnRemove=mkBtn('✕', (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        row.remove();
+        if (!opts.allowMultiAdd && libCard) libCard.classList.remove('disabled');
+        recalc();
+      });
       actions.append(btnUp, btnDown, btnRemove);
       row.dataset.html = item.html.trim();
       // если карточка пришла из текущей страницы — сохраним этот HTML,

@@ -53,6 +53,10 @@
         { id: '1', html: '<div class="item" data-id="1"><img class="back" src="https://upforme.ru/uploads/001c/14/5b/440/238270.gif"></div>'},
         { id: '2', html: '<div class="item" data-id="2"><img class="back" src="https://forumstatic.ru/files/001c/83/91/88621.png"></div>'},
       ],
+      '_gift': [
+        { id:'1', html:'<div class="item" data-id="1"><img class="gift" src="https://icons.iconarchive.com/icons/iconka/harry-potter/128/hat-icon.png"></div>' },
+        { id:'2', html:'<div class="item" data-id="2"><img class="gift" src="https://cdn2.iconfinder.com/data/icons/harrypotter/mail.png"></div>' }
+      ],
     };
 
     // --- безопасная обёртка вокруг get_skin_lib / opts.getLib
@@ -84,6 +88,7 @@
     const LIB_P = Array.isArray(libPlashka0) && libPlashka0.length ? libPlashka0 : DEFAULT_LIBS['_plashka'];
     const LIB_I = Array.isArray(libIcon0)    && libIcon0.length    ? libIcon0    : DEFAULT_LIBS['_icon'];
     const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS['_background'];
+    const LIB_G = Array.isArray(libGift0) && libGift0.length ? libGift0 : DEFAULT_LIBS['_gift'];
 
     console.log('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
 
@@ -101,6 +106,17 @@
     }
 
     // --- 3) три панели (external = true, используем initialHtml)
+    const panelGift    = window.createChoicePanel({
+      title: withHeaders ? 'Подарки' : undefined,
+      targetClass: '_gift',
+      library: LIB_G,
+      mountEl: grid,
+      initialHtml,
+      external: true,
+      startOpen,
+      allowMultiAdd: true          // ← ключевая строчка
+    });
+    
     const panelPlashka = window.createChoicePanel({
       title: withHeaders ? 'Плашки' : undefined,
       targetClass: '_plashka',
@@ -137,12 +153,13 @@
       if (panelPlashka && typeof panelPlashka.builder === 'function') current = panelPlashka.builder(current);
       if (panelIcon    && typeof panelIcon.builder    === 'function') current = panelIcon.builder(current);
       if (panelBack    && typeof panelBack.builder    === 'function') current = panelBack.builder(current);
+      if (panelGift    && typeof panelGift.builder    === 'function') current = panelGift.builder(current);
       return current;
     }
 
     const api = {
       build,
-      panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack }
+      panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift },
     };
     window.__skinsSetupMounted = api;
     return api;

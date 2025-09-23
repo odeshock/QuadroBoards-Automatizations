@@ -75,8 +75,6 @@
       window.__ams_ready = true;
       window.dispatchEvent(new CustomEvent('ams:ready', { detail: { node: infoDiv } }));
       if (typeof window.__amsReadyResolve === 'function') window.__amsReadyResolve(infoDiv);
-
-      console.log('[AMS injector] div .ams_info добавлен');
     } catch (e) {
       console.log('[AMS injector] error:', e);
     }

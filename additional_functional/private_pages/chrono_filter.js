@@ -18,31 +18,7 @@ const episodes = Array.from(document.querySelectorAll('.episode')).map(el=>{
 });
 
 // 2) Динамически наполняем списки фильтров из данных
-const sets = { type:new Set(), status:new Set(), mask:new Set(), player:new Set(), location:new Set() };
-episodes.forEach(ep=>{
-  if(ep.type) sets.type.add(ep.type);
-  if(ep.status) sets.status.add(ep.status);
-  ep.masks.forEach(m=>sets.mask.add(m));
-  ep.players.forEach(p=>sets.player.add(p));
-  if(ep.location) sets.location.add(ep.location);
-});
 
-function fill(containerId, items, name){
-  const box = document.getElementById(containerId);
-  box.innerHTML = '';
-  Array.from(items).sort((a,b)=>a.localeCompare(b,'ru')).forEach(v=>{
-    const lbl = document.createElement('label');
-    const cb  = document.createElement('input');
-    cb.type='checkbox'; cb.name=name; cb.value=v;
-    lbl.appendChild(cb); lbl.append(' '+v);
-    box.appendChild(lbl);
-  });
-}
-fill('typeList', sets.type, 'type');
-fill('statusList', sets.status, 'status');
-fill('maskList', sets.mask, 'mask');
-fill('playerList', sets.player, 'player');
-fill('locationList', sets.location, 'location');
 
 // 3) Тогглы раскрывашек
 function wireToggle(btnId, listId){

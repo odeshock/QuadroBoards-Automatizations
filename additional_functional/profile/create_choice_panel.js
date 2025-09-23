@@ -245,7 +245,8 @@
       for (let i=items.length-1; i>=0; i--){
         const it=items[i];
         addToSelected({ id: it.id, html: it.lib.html }, { usePageHtml: it.pageHtml });
-        const libCard = libBox.querySelector(`.ufo-card[data-id="${it.id}"]`); if (libCard) libCard.classList.add('disabled');
+        const libCard = libBox.querySelector(`.ufo-card[data-id="${it.id}"]`);
+        if (!opts.allowMultiAdd && libCard) libCard.classList.add('disabled');
       }
     })();
 

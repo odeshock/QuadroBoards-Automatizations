@@ -115,7 +115,12 @@ async function FMVeditPersonalPage(name, patch = {}) {
     (res.url && /\/admin_pages\.php(?:\?|$)/.test(res.url)) &&
     !/ошибк|forbidden|нет прав|устаревш/i.test((text || '').toLowerCase());
 
-  if (res.ok && (okByText || redirectedToAdminList)) {
+  // NEW: содержимое ответа похоже на страницу списка админ-страниц
+  const looksLikeAdminList =
+    /Администрировани[ея]\s*[–-]\s*Страниц[ыь]/i.test(text) ||      // «Администрирование – Страницы»
+    /Список\s+персональных\s+страниц/i.test(text);                   // на некоторых шаблонах так
+
+  if (res.ok && (okByText || redirectedToAdminList || looksLikeAdminList)) {
     return { status:'saved', serverMessage: msg || 'Изменения сохранены', httpStatus: res.status, url: editUrl };
   }
 

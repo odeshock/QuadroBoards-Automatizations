@@ -27,7 +27,6 @@
 
     // --- защита от повторной инициализации
     if (window.__skinsSetupMounted) {
-      console.log('[setupSkins] уже смонтировано — возвращаю ранее созданный API');
       return window.__skinsSetupMounted;
     }
 
@@ -91,8 +90,6 @@
     const LIB_B = Array.isArray(libBack0)    && libBack0.length    ? libBack0    : DEFAULT_LIBS['_background'];
     const LIB_G = Array.isArray(libGift0) && libGift0.length ? libGift0 : DEFAULT_LIBS['_gift'];
 
-    console.log('[setupSkins] libs sizes:', { plashka: LIB_P.length, icon: LIB_I.length, back: LIB_B.length });
-
     // --- 2) контейнер под три панели (идемпотентно)
     let grid = container.querySelector('.skins-setup-grid');
     if (!grid) {
@@ -102,8 +99,6 @@
       grid.style.gridTemplateColumns = '1fr';
       grid.style.gap = '16px';
       container.appendChild(grid);
-    } else {
-      console.log('[setupSkins] grid уже существует — переиспользуем');
     }
 
     // --- 3) три панели (external = true, используем initialHtml)

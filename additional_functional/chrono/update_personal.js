@@ -1,104 +1,167 @@
-// FMV.runBulkChronoUpdate — массовое обновление usr{ID}_chrono из collectChronoByUser
+// update_personal (1).js
+// Делает точечный апдейт персональной страницы usr{ID}_chrono,
+// используя collectChronoByUser и общий билдер FMV.buildChronoHtml.
+// Плюс — массовое обновление поверх этого же вызова.
 (function () {
   if (!window.FMV) window.FMV = {};
 
-  const esc = s => String(s ?? "")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
-
-  function buildHtml(data, fallbackName) {
-    const title = esc(data?.name ?? fallbackName);
-    const eps = Array.isArray(data?.episodes) ? data.episodes : [];
-    if (!eps.length) return `<p><strong>${title}</strong></p><p>(нет эпизодов)</p>`;
-    const items = eps.map(ep => {
-      const ds = esc(ep?.dateStart || "");
-      const de = esc(ep?.dateEnd || "");
-      const range = (de && de !== ds) ? ` – ${de}` : "";
-      return `<li>${ds}${range} — ${esc(ep?.title || "")}</li>`;
-    }).join("");
-    return `<p><strong>${title}</strong></p><ul>${items}</ul>`;
+  /** ============================
+   *  Валидации окружения
+   *  ============================ */
+  function requireFn(name) {
+    const fn = getByPath(name);
+    if (typeof fn !== "function") {
+      throw new Error(`${name} не найден — подключите соответствующий скрипт`);
+    }
+    return fn;
+  }
+  function getByPath(path) {
+    return path.split(".").reduce((o,k)=>o && o[k], window);
   }
 
-  function getFromMap(byUser, id) {
-    const k = String(id);
-    return byUser?.[k]
-        ?? null;
-  }
-
+  /** ============================
+   *  Точечный апдейт одного пользователя
+   *  ============================ */
   /**
+   * @param {string|number} userId
    * @param {Object} [opts]
-   * @param {number[]} [opts.ids]    ограничить списком ID; по умолчанию — все из /userlist.php
-   * @param {number}   [opts.delayMs=200] задержка между пользователями
-   * @param {boolean}  [opts.verify=false] перечитывать страницу и проверять textarea при неоднозначном статусе
+   * @param {Array}  [opts.sections]   список секций (если у вас есть CHRONO_CHECK.ForumInfo, можно оставить пустым)
+   * @param {boolean} [opts.verify=false]  верифицировать чтением страницы после сохранения
+   * @param {string} [opts.titlePrefix="Хронология"]  префикс заголовка в билдере
+   * @returns {Promise<{id:string,status:string, page?:string}>}
    */
-  FMV.runBulkChronoUpdate = async function runBulkChronoUpdate(opts = {}) {
-    if (!window.FMV?.fetchUsers) throw new Error("FMV.fetchUsers не найден");
-    if (typeof window.FMVeditPersonalPage !== "function") throw new Error("FMVeditPersonalPage не найден");
-    if (typeof window.collectChronoByUser !== "function") throw new Error("collectChronoByUser не найден");
+  FMV.updateChronoForUser = async function updateChronoForUser(userId, opts = {}) {
+    const FMVeditPersonalPage = requireFn("FMVeditPersonalPage");
+    const collectChronoByUser = requireFn("collectChronoByUser");
+    const buildChronoHtml     = requireFn("FMV.buildChronoHtml");
 
-    const DELAY  = Number.isFinite(opts.delayMs) ? opts.delayMs : 200;
     const VERIFY = !!opts.verify;
-    const sleep  = ms => new Promise(r => setTimeout(r, ms));
+    const id = String(userId);
+    const pageName = `usr${id}_chrono`;
 
-    // 1) sections — как в кнопке
-    const SECTIONS =
-      Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-        ? window.CHRONO_CHECK.ForumInfo
-        : undefined;
+    // Источник секций (не обязательно)
+    const SECTIONS = Array.isArray(opts.sections) && opts.sections.length
+      ? opts.sections
+      : (Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
+          ? window.CHRONO_CHECK.ForumInfo
+          : undefined);
 
-    // 2) общая карта по всем пользователям
-    const byUser = await window.collectChronoByUser({ sections: SECTIONS });
-
-    // 3) список пользователей (с пагинацией внутри)
-    const users = Array.isArray(opts.ids)
-      ? opts.ids.map(String).map(id => ({ id }))
-      : await FMV.fetchUsers();
-
-    const results = [];
-
-    for (const u of users) {
-      const id = String(u.id);
-      const pageName = `usr${id}_chrono`;
-
-      const data = getFromMap(byUser, id);
-      if (!data) {
-        results.push({ id, status: "нет данных" });
-        if (DELAY) await sleep(DELAY);
-        continue;
-      }
-
-      const html = buildHtml(data, "user"+id);
-
-      try {
-        const res = await FMVeditPersonalPage(pageName, { content: html });
-
-        if (res.status === "saved") {
-          results.push({ id, status: "обновлено" });
-        } else if (res.status === "forbidden") {
-          results.push({ id, status: "нет доступа/устарело" });
-        } else if (res.status === "notfound") {
-          results.push({ id, status: "страница не найдена" });
-        } else if (VERIFY) {
-          // бэкап-проверка содержимого
-          const url = `/admin_pages.php?edit_page=${encodeURIComponent(pageName)}`;
-          const doc = (typeof fetchCP1251Doc === "function")
-            ? await fetchCP1251Doc(url)
-            : new DOMParser().parseFromString(await fetch(url, { credentials: "include" }).then(r=>r.text()), "text/html");
-          const ta = doc.querySelector('#page-content,[name="content"]');
-          const ok = !!ta && String(ta.value || "").includes(data?.name || "");
-          results.push({ id, status: ok ? "обновлено (подтверждено)" : `ошибка: ${res.serverMessage || res.status}` });
-        } else {
-          results.push({ id, status: `ошибка: ${res.serverMessage || res.status}` });
-        }
-      } catch (e) {
-        results.push({ id, status: `исключение: ${e.message}` });
-      }
-
-      if (DELAY) await sleep(DELAY);
+    // 1) Собираем хронологию по пользователям
+    let byUser;
+    try {
+      byUser = await collectChronoByUser({ sections: SECTIONS });
+    } catch (e) {
+      return { id, status: `ошибка collectChronoByUser: ${e?.message || e}` };
     }
 
-    try { console.table(results.map(r => ({ id: r.id, status: r.status }))); } catch {}
+    // 2) Берём только нужного юзера
+    const data = byUser?.[id];
+    if (!data) {
+      return { id, status: "нет данных (пользователь не найден в хроно-коллекции)" };
+    }
+
+    // 3) Строим HTML через общий билдер
+    let html;
+    try {
+      html = buildChronoHtml(data, { titlePrefix: opts.titlePrefix || "Хронология" });
+    } catch (e) {
+      return { id, status: `ошибка buildChronoHtml: ${e?.message || e}` };
+    }
+
+    // 4) Сохраняем личную страницу
+    let res;
+    try {
+      res = await FMVeditPersonalPage(pageName, { content: html });
+    } catch (e) {
+      return { id, status: `ошибка сохранения: ${e?.message || e}` };
+    }
+
+    // Нормализуем ответ
+    const saved = normalizeSaveStatus(res);
+    if (!VERIFY) return { id, status: saved, page: pageName };
+
+    // 5) Верификация (опционально)
+    try {
+      const ok = await verifyPageContains(pageName, data?.name || "");
+      return { id, status: ok ? `${saved} (подтверждено)` : `${saved} (не подтвердилось чтением)` , page: pageName };
+    } catch (e) {
+      return { id, status: `${saved} (ошибка верификации: ${e?.message || e})`, page: pageName };
+    }
+  };
+
+  /** ============================
+   *  Массовое обновление
+   *  ============================ */
+  /**
+   * @param {Object} [opts]
+   * @param {Array<string|number>} [opts.ids] — явный список id; если не задан, будет вызван FMV.fetchUsers()
+   * @param {number} [opts.delayMs=200] — пауза между сохранениями
+   * @param {boolean} [opts.verify=false]
+   * @param {Array} [opts.sections]
+   * @param {string} [opts.titlePrefix]
+   * @returns {Promise<Array<{id:string,status:string,page?:string}>>}
+   */
+  FMV.runBulkChronoUpdate = async function runBulkChronoUpdate(opts = {}) {
+    const delayMs = Number.isFinite(opts.delayMs) ? opts.delayMs : 200;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // Источник пользователей
+    let users;
+    if (Array.isArray(opts.ids) && opts.ids.length) {
+      users = opts.ids.map(x => ({ id: String(x) }));
+    } else {
+      // Пробуем взять из FMV.fetchUsers()
+      const fetchUsers = getByPath("FMV.fetchUsers");
+      if (typeof fetchUsers !== "function") {
+        throw new Error("Не заданы ids и отсутствует FMV.fetchUsers()");
+      }
+      const arr = await fetchUsers();
+      users = Array.isArray(arr) ? arr : [];
+    }
+
+    const results = [];
+    for (const u of users) {
+      const r = await FMV.updateChronoForUser(u.id, {
+        sections: opts.sections,
+        verify:   !!opts.verify,
+        titlePrefix: opts.titlePrefix
+      });
+      results.push(r);
+      if (delayMs) await sleep(delayMs);
+    }
+    try { console.table(results.map(x => ({ id: x.id, status: x.status }))); } catch {}
     return results;
   };
+
+  /** ============================
+   *  Вспомогательные
+   *  ============================ */
+  function normalizeSaveStatus(res) {
+    // Набор типичных статусов, подстройтесь под ваш FMVeditPersonalPage.
+    const s = (res && (res.status || res.result || res.ok)) ?? "unknown";
+    if (s === true || s === "ok" || s === "saved" || s === "success") return "обновлено";
+    if (s === "forbidden" || s === "noaccess") return "нет доступа";
+    if (s === "notfound") return "страница не найдена";
+    return String(s);
+  }
+
+  async function verifyPageContains(pageName, needle) {
+    if (!needle) return false;
+    const url = `/admin_pages.php?edit_page=${encodeURIComponent(pageName)}`;
+
+    // Если у вас есть кастомный загрузчик CP1251:
+    if (typeof window.fetchCP1251Doc === "function") {
+      const doc = await window.fetchCP1251Doc(url);
+      const ta = doc?.querySelector?.('#page-content,[name="content"]');
+      const val = (ta && (ta.value || ta.textContent)) || doc?.body?.innerText || "";
+      return String(val).includes(needle);
+    }
+
+    // Обычный fetch
+    const html = await fetch(url, { credentials: "include" }).then(r => r.text());
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const ta = doc.querySelector('#page-content,[name="content"]');
+    const val = (ta && (ta.value || ta.textContent)) || doc.body?.innerText || "";
+    return String(val).includes(needle);
+  }
 })();

@@ -222,7 +222,17 @@
     // Справочники
     const masksAll = unique(episodes.flatMap(e => Array.isArray(e?.masks) ? e.masks : []));
     const playersAll = unique(
-      episodes.flatMap(e => Array.isArray(e?.participants) ? e.participants.map(p => p?.name).filter(Boolean) : [])
+      episodes.flatMap(e =>
+        (Array.isArray(e?.participants) ? e.participants : [])
+          .map(p => {
+            const masksArr = Array.isArray(p?.masks)
+              ? p.masks.filter(Boolean).map(x => String(x).trim()).filter(Boolean)
+              : (typeof p?.mask === 'string' && p.mask.trim() ? [p.mask.trim()] : []);
+            return masksArr.length ? masksArr.join(", ") : String(p?.name || "").trim();
+          })
+          .map(t => t.replace(/;/g, " ")) // чтобы не ломать разделитель ;
+          .filter(Boolean)
+      )
     );
     const locationsAll = unique(episodes.map(e => e?.location).filter(Boolean));
 
@@ -235,65 +245,25 @@
       return b;
     });
 
-   
-
-    // Эпизоды
-    if (!episodes.length) {
-      html += `<div class="meta">Нет эпизодов</div></section>`;
-      return html;
-    }
-
-    episodes.forEach((ep, idx) => {
-      const typeMeta   = TYPE_RU[ep?.type] || TYPE_RU.au;
-      const statusMeta = STATUS_RU[ep?.status] || STATUS_RU.archived;
-
-      const typeLabel   = ep?.type || "";
-      const typeBadge   = `${capitalize(typeLabel)} ${typeMeta.emoji}`;
-      const statusLabel = ep?.status || "";
-      const statusBadge = `${capitalize(statusLabel)} ${statusMeta.emoji}`;
-
-      const masks = Array.isArray(ep?.masks) ? ep.masks.filter(Boolean) : [];
-      const participantTokens = (Array.isArray(ep?.participants) ? ep.participants : [])
-        .map(p => {
-          // поддержим p.masks (массив) или p.mask (строка)
-          const masksArr = Array.isArray(p?.masks)
-            ? p.masks.filter(Boolean).map(x => String(x).trim()).filter(Boolean)
-            : (typeof p?.mask === 'string' && p.mask.trim() ? [p.mask.trim()] : []);
-      
-          // если есть маски — используем их (через ", "), иначе имя
-          const token = masksArr.length ? masksArr.join(", ") : String(p?.name || "").trim();
-          return token;
-        })
-        .map(t => t.replace(/\s+/g, " "))     // нормализуем пробелы
-        .map(t => t.replace(/;/g, " "))       // чтобы не ломать разделитель в data-атрибуте
-        .filter(Boolean);
-      const playersData  = participantTokens.join(";");
-      const playersHuman = participantTokens.join(", ");
-      const loc = ep?.location || "";
-
-      const b = boundsArr[idx];
-      const human = formatHumanRange(ep?.dateStart, ep?.dateEnd);
-      const dateBlock = human ? `<span class="muted">${esc(human)} — </span>` : "";
-
-       // Фильтры
-      const typeOptions = Object.entries(TYPE_RU)
-        .map(([key, t]) => `<label><input type="checkbox" name="type" value="${escAttr(key)}"> ${esc(t.label)}</label>`)
-        .join("");
-      const statusOptions = Object.entries(STATUS_RU)
-        .map(([key, s]) => `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`)
-        .join("");
-      const maskOptions = unique(masksAll)
-        .map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`)
-        .join("");
-      const playerOptions = playersData
-        .map(p => `<label><input type="checkbox" name="player" value="${escAttr(p)}"> ${esc(p)}</label>`)
-        .join("");
-      const locationOptions = locationsAll
-        .map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`)
-        .join("");
+    // Фильтры
+    const typeOptions = Object.entries(TYPE_RU)
+      .map(([key, t]) => `<label><input type="checkbox" name="type" value="${escAttr(key)}"> ${esc(t.label)}</label>`)
+      .join("");
+    const statusOptions = Object.entries(STATUS_RU)
+      .map(([key, s]) => `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`)
+      .join("");
+    const maskOptions = unique(masksAll)
+      .map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`)
+      .join("");
+    const playerOptions = playersAll
+      .map(p => `<label><input type="checkbox" name="player" value="${escAttr(p)}"> ${esc(p)}</label>`)
+      .join("");
+    const locationOptions = locationsAll
+      .map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`)
+      .join("");
   
-      // Шапка + фильтры
-      let html = `
+    // Шапка + фильтры
+    let html = `
   <h1 style="margin:0 0 8px 0;font-size:22px">${esc(titlePrefix)} — ${userName}</h1>
   
   <section class="filters" id="filters">
@@ -356,7 +326,57 @@
   </section>
   
   <section class="list" id="list">
-  `;
+    `;
+   
+    // Эпизоды
+    if (!episodes.length) {
+      html += `<div class="meta">Нет эпизодов</div></section>`;
+      return html;
+    }
+
+    episodes.forEach((ep, idx) => {
+      const typeMeta   = TYPE_RU[ep?.type] || TYPE_RU.au;
+      const statusMeta = STATUS_RU[ep?.status] || STATUS_RU.archived;
+
+      const typeLabel   = ep?.type || "";
+      const typeBadge   = `${capitalize(typeLabel)} ${typeMeta.emoji}`;
+      const statusLabel = ep?.status || "";
+      const statusBadge = `${capitalize(statusLabel)} ${statusMeta.emoji}`;
+
+      const masks = Array.isArray(ep?.masks) ? ep.masks.filter(Boolean) : [];
+      // массив с токенами для data-players (как раньше: маски или имя)
+      const participantTokens = (Array.isArray(ep?.participants) ? ep.participants : [])
+        .map(p => {
+          const masksArr = Array.isArray(p?.masks)
+            ? p.masks.filter(Boolean).map(x => String(x).trim()).filter(Boolean)
+            : (typeof p?.mask === 'string' && p.mask.trim() ? [p.mask.trim()] : []);
+          const token = masksArr.length ? masksArr.join(", ") : String(p?.name || "").trim();
+          return token.replace(/;/g, " ");
+        })
+        .filter(Boolean);
+      
+      const playersData = participantTokens.join(";"); // для data-players
+      
+      // а вот для текстового вывода делаем ссылки
+      const playersHuman = (Array.isArray(ep?.participants) ? ep.participants : [])
+        .map(p => {
+          const display = (Array.isArray(p?.masks) && p.masks.length)
+            ? p.masks.join(", ")
+            : String(p?.name || "").trim();
+          const id = p?.id ? String(p.id).trim() : "";
+          return id
+            ? `<a href="/profile.php?id=${escAttr(id)}">${esc(display)}</a>`
+            : esc(display);
+        })
+        .filter(Boolean)
+        .join(", ");
+      const loc = ep?.location || "";
+
+      const b = boundsArr[idx];
+      const human = formatHumanRange(ep?.dateStart, ep?.dateEnd);
+      const dateBlock = human ? `<span class="muted">${esc(human)} — </span>` : "";
+
+       
       
       html += `
   <div class="episode" 
@@ -371,7 +391,7 @@
     <div>${dateBlock}<span class="title"><a href="${esc(ep?.href || "#")}">${esc(ep?.title || "")}</a></span>
       ${masks.length ? ` [as ${esc(masks.join(", "))}]` : ""}</div>
     <div>локация: ${esc(loc)}</div>
-    <div>участники: ${esc(playersHuman)}</div>
+    <div>участники: ${playersHuman}</div>
   </div>`;
     });
 

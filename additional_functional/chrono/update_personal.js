@@ -53,11 +53,9 @@
     } catch (e) {
       return { id, status: `ошибка collectChronoByUser: ${e?.message || e}` };
     }
-    console.log(byUser);
 
     // 2) Берём только нужного юзера
     const data = byUser?.[id];
-    console.log(id, data);
     if (!data) {
       return { id, status: "нет данных (пользователь не найден в хроно-коллекции)" };
     }

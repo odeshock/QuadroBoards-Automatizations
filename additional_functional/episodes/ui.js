@@ -489,10 +489,13 @@
 
     // /post.php?action=post&fid=8 — создание, UI всегда (с очисткой textarea)
     if (/\/post\.php$/i.test(path) && q.get('action') === 'post') {
-      const fid = +(q.get('fid')||0);
+      // 🚫 не подключаем UI если открыто «ответить в теме» (есть tid)
+      if (q.has('tid')) return;
+    
+      const fid = Number(q.get('fid'));
       const allowed = (CHRONO_CHECK.ForumID || []).map(Number);
       if (!fid || allowed.includes(fid)) {
-        attachToPage({ strip:true, showOnlyIfCast:false });
+        attachToPage({ strip: true, showOnlyIfCast: false });
       }
     }
 

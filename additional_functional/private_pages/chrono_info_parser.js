@@ -112,9 +112,25 @@
   function wrapStyles(content) {
     const css = `
 <style>
-  body{background:#0b0f14;color:#e8eef6;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px}
-  a{color:#6aa1ff;text-decoration:none}
-  a:hover{text-decoration:underline}
+    body{background:#f9f9fb;color:#1a1a1a;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px}
+    a{color:#3366cc;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .filters{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;background:#ffffff;padding:16px;border-radius:16px;border:1px solid #d0d0d0;position:sticky;top:0;z-index:5;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+    .f{grid-column:span 3}
+    .f label{display:block;font-size:12px;color:#555;margin-bottom:6px}
+    .f input[type="date"]{width:100%;background:#ffffff;color:#1a1a1a;border:1px solid #ccc;border-radius:10px;padding:10px;font-size:14px}
+    .dropdown-wrapper{position:relative}
+    .dropdown-toggle{width:100%;background:#ffffff;color:#1a1a1a;border:1px solid #ccc;border-radius:10px;padding:10px;text-align:left;cursor:pointer;font-size:14px}
+    .dropdown-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#ffffff;border:1px solid #ccc;border-radius:10px;max-height:220px;overflow:auto;display:none;z-index:10;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+    .dropdown-list label{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer}
+    .dropdown-list label:hover{background:#f0f0f0}
+    .actions{display:flex;gap:8px;align-items:end}
+    .btn{background:linear-gradient(135deg,#4d9cff,#9b6cff);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .list{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+    .episode{background:#ffffff;border:1px solid #d0d0d0;border-radius:10px;padding:10px 12px;line-height:1.5;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+    .episode .muted{color:#666}
+    .episode .title{font-weight:700;color:#222}
+    .meta{color:#555;margin:6px 0 14px}
 </style>`;
     return css + "\n" + content;
   }

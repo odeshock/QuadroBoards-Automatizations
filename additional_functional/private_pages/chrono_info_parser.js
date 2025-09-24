@@ -47,131 +47,108 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   const userName = esc(userData?.name || "");
   const episodes = Array.isArray(userData?.episodes) ? userData.episodes : [];
 
-  // ==== helpers для дат (поддерживаем dd.mm.yyyy / yyyy-mm-dd / mm.yyyy / yyyy) ====
+  // ===== Вспомогательные для дат =====
   const pad = n => String(n).padStart(2, "0");
-  function lastDayOfMonth(y, m) { return new Date(y, m, 0).getDate(); }
+  const lastDayOfMonth = (y, m) => new Date(y, m, 0).getDate();
+  function toISO(y, m, d) { return `${y}-${pad(m)}-${pad(d)}`; }
   function parseDateSmart(raw) {
     const s = String(raw || "").trim();
     if (!s) return null;
-
-    // dd.mm.yyyy
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
     if (m) return { y:+m[3], m:+m[2], d:+m[1], g:"day" };
-
-    // yyyy-mm-dd
     m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (m) return { y:+m[1], m:+m[2], d:+m[3], g:"day" };
-
-    // mm.yyyy
     m = s.match(/^(\d{1,2})\.(\d{4})$/);
     if (m) return { y:+m[2], m:+m[1], d:1, g:"month" };
-
-    // yyyy
     m = s.match(/^(\d{4})$/);
     if (m) return { y:+m[1], m:1, d:1, g:"year" };
-
     return null;
   }
-  function toISO(y, m, d) { return `${y}-${pad(m)}-${pad(d)}`; }
-
-  // Границы для data-атрибутов:
-  // start-l = минимально возможная дата начала (по гранулярности)
-  // start-r = фактический старт
-  // end-l   = фактический конец (или старт, если конец не задан)
-  // end-r   = максимально возможная дата конца (по гранулярности)
   function calcBounds(startRaw, endRaw) {
     const ps = parseDateSmart(startRaw);
     const pe = endRaw ? parseDateSmart(endRaw) : null;
+    if (!ps && !pe) return { startL:"", startR:"", endL:"", endR:"" };
 
-    if (!ps && !pe) {
-      // нет дат — пустые строки
-      return { startL:"", startR:"", endL:"", endR:"" };
-    }
-
-    // фактический старт
     const sY = ps?.y ?? pe.y;
-    const sM = ps?.m ?? (pe.g === "year" ? 1 : pe.m ?? 1);
+    const sM = ps?.m ?? (pe?.g === "year" ? 1 : pe?.m ?? 1);
     const sD = ps?.d ?? 1;
     const startActual = toISO(sY, sM, sD);
 
-    // фактический конец
-    const eY = (pe?.y ?? ps.y);
-    const eM = (pe?.m ?? (ps.g === "year" ? 12 : ps.m ?? 12));
-    const eD = (pe?.d ?? (pe?.g === "month" ? lastDayOfMonth(eY, eM)
-                           : pe?.g === "year" ? 31
-                           : ps.g === "month" ? lastDayOfMonth(eY, eM)
-                           : ps.g === "year" ? 31
-                           : ps.d));
+    const eY = pe?.y ?? ps.y;
+    const eM = pe?.m ?? (ps?.g === "year" ? 12 : ps?.m ?? 12);
+    const eD = pe?.d
+      ?? (pe?.g === "month" ? lastDayOfMonth(eY, eM)
+          : pe?.g === "year" ? 31
+          : ps?.g === "month" ? lastDayOfMonth(eY, eM)
+          : ps?.g === "year" ? 31
+          : ps.d);
     const endActual = toISO(eY, eM, eD);
 
-    // нижняя/верхняя «рамки» по гранулярности
-    const startMin = (() => {
-      if (!ps) return toISO(sY, 1, 1);
-      if (ps.g === "day")   return toISO(ps.y, ps.m, 1);
-      if (ps.g === "month") return toISO(ps.y, ps.m, 1);
-      return toISO(ps.y, 1, 1); // year
-    })();
+    const startMin = ps
+      ? (ps.g === "year" ? toISO(ps.y, 1, 1)
+         : toISO(ps.y, ps.m, 1))
+      : toISO(sY, 1, 1);
 
-    const endMax = (() => {
-      if (pe) {
-        if (pe.g === "day")   return toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m));
-        if (pe.g === "month") return toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m));
-        return toISO(pe.y, 12, 31); // year
-      }
-      // если конец не задан — растянуть по старту
-      if (ps.g === "day")   return toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m));
-      if (ps.g === "month") return toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m));
-      return toISO(ps.y, 12, 31); // year
-    })();
+    const endMax = pe
+      ? (pe.g === "year" ? toISO(pe.y, 12, 31)
+         : pe.g === "month" ? toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m))
+         : toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m)))
+      : (ps.g === "year" ? toISO(ps.y, 12, 31)
+         : ps.g === "month" ? toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m))
+         : toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m)));
 
     return { startL: startMin, startR: startActual, endL: endActual, endR: endMax };
   }
 
   const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 
+  // ===== Уникальные значения для фильтров =====
+  const masksAll = unique(episodes.flatMap(e => Array.isArray(e?.masks) ? e.masks : []));
+  const playersAll = unique(
+    episodes.flatMap(e => Array.isArray(e?.participants) ? e.participants.map(p => p?.name).filter(Boolean) : [])
+  );
+  const locationsAll = unique(episodes.map(e => e?.location).filter(Boolean));
 
-  const css = `
-<style>
-    .filters{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;background:#ffffff;padding:16px;border-radius:16px;border:1px solid #d0d0d0;position:sticky;top:0;z-index:5;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
-    .f{grid-column:span 3}
-    .f label{display:block;font-size:12px;color:#555;margin-bottom:6px}
-    .f input[type="date"]{width:100%;background:#ffffff;color:#1a1a1a;border:1px solid #ccc;border-radius:10px;padding:10px;font-size:14px}
-    .dropdown-wrapper{position:relative}
-    .dropdown-toggle{width:100%;background:#ffffff;color:#1a1a1a;border:1px solid #ccc;border-radius:10px;padding:10px;text-align:left;cursor:pointer;font-size:14px}
-    .dropdown-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#ffffff;border:1px solid #ccc;border-radius:10px;max-height:220px;overflow:auto;display:none;z-index:10;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
-    .dropdown-list label{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer}
-    .dropdown-list label:hover{background:#f0f0f0}
-    .actions{display:flex;gap:8px;align-items:end}
-    .btn{background:linear-gradient(135deg,#4d9cff,#9b6cff);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
-    .list{display:flex;flex-direction:column;gap:8px;margin-top:16px}
-    .episode{background:#ffffff;border:1px solid #d0d0d0;border-radius:10px;padding:10px 12px;line-height:1.5;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-    .episode .muted{color:#666}
-    .episode .title{font-weight:700;color:#222}
-    .meta{color:#555;margin:6px 0 14px}
-    .f{grid-column:span 3}
-  </style>`
-  
-  // ===== шапка + фильтры =====
+  // генерируем чекбоксы для маски/соигрока/локации
+  const maskOptions = masksAll.map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`).join("");
+  const playerOptions = playersAll.map(p => `<label><input type="checkbox" name="player" value="${escAttr(p)}"> ${esc(p)}</label>`).join("");
+  const locationOptions = locationsAll.map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`).join("");
+
+  // генерируем чекбоксы для типа/статуса из глобальных констант
+  const typeOptions = Object.entries(TYPE_RU).map(([key, t]) =>
+    `<label><input type="checkbox" name="type" value="${escAttr(key)}"> ${esc(t.label)}</label>`).join("");
+  const statusOptions = Object.entries(STATUS_RU).map(([key, s]) =>
+    `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`).join("");
+
+  // ==== глобальные min/max дат для дефолтного value в input[type=date] ====
+  let globalMin = null;
+  let globalMax = null;
+  const boundsArr = episodes.map(e => {
+    const b = calcBounds(e?.dateStart, e?.dateEnd);
+    if (b.startL && (!globalMin || b.startL < globalMin)) globalMin = b.startL;
+    if (b.endR && (!globalMax || b.endR > globalMax)) globalMax = b.endR;
+    return b;
+  });
+
+  // ===== Фильтры =====
   let html = `
 <h1 style="margin:0 0 8px 0;font-size:22px">${esc(titlePrefix)} — ${userName}</h1>
 
-<div class="filters" id="filters">
+<section class="filters" id="filters">
   <div class="f">
     <label>Дата начала фильтра</label>
-    <input type="date" id="dateStart">
+    <input type="date" id="dateStart" value="${escAttr(globalMin || "")}">
   </div>
   <div class="f">
     <label>Дата конца фильтра</label>
-    <input type="date" id="dateEnd">
+    <input type="date" id="dateEnd" value="${escAttr(globalMax || "")}">
   </div>
   <div class="f">
     <label>Тип</label>
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="typeToggle">Выбрать тип</button>
       <div class="dropdown-list" id="typeList">
-        <label><input type="checkbox" name="type" value="personal"> личный</label>
-        <label><input type="checkbox" name="type" value="plot"> сюжетный</label>
-        <label><input type="checkbox" name="type" value="au"> au</label></div>
+        ${typeOptions}
       </div>
     </div>
   </div>
@@ -180,9 +157,7 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="statusToggle">Выбрать статус</button>
       <div class="dropdown-list" id="statusList">
-        <label><input type="checkbox" name="status" value="active"> активен</label>
-        <label><input type="checkbox" name="status" value="archived"> неактуален</label>
-        <label><input type="checkbox" name="status" value="closed"> закрыт</label></div>
+        ${statusOptions}
       </div>
     </div>
   </div>
@@ -190,45 +165,50 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
     <label>Маска</label>
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="maskToggle">Выбрать маску</button>
-      <div class="dropdown-list" id="maskList"></div>
+      <div class="dropdown-list" id="maskList">
+        ${maskOptions}
+      </div>
     </div>
   </div>
   <div class="f">
     <label>Соигрок</label>
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="playerToggle">Выбрать соигрока</button>
-      <div class="dropdown-list" id="playerList"></div>
+      <div class="dropdown-list" id="playerList">
+        ${playerOptions}
+      </div>
     </div>
   </div>
   <div class="f">
     <label>Локация</label>
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="locationToggle">Выбрать локацию</button>
-      <div class="dropdown-list" id="locationList"></div>
+      <div class="dropdown-list" id="locationList">
+        ${locationOptions}
+      </div>
     </div>
   </div>
   <div class="actions">
     <button class="btn" id="resetBtn">Сбросить</button>
   </div>
-</div>
+</section>
 
-<div class="list" id="list">
+<section class="list" id="list">
 `;
 
-  // ===== список эпизодов =====
+  // ===== Список эпизодов =====
   if (!episodes.length) {
     html += `<div class="meta">Нет эпизодов</div></section>`;
-    return html; // стиль/обёртка остаются как в файле
+    return html;
   }
 
-  for (const ep of episodes) {
-    // ✅ используем глобальные TYPE_RU / STATUS_RU
-    const typeMeta   = (window.TYPE_RU || TYPE_RU)[ep?.type] || (window.TYPE_RU || TYPE_RU).au;
-    const statusMeta = (window.STATUS_RU || STATUS_RU)[ep?.status] || (window.STATUS_RU || STATUS_RU).archived;
+  episodes.forEach((ep, idx) => {
+    const typeMeta   = TYPE_RU[ep?.type] || TYPE_RU.au;
+    const statusMeta = STATUS_RU[ep?.status] || STATUS_RU.archived;
 
-    const typeLabel   = typeMeta.label;                 // "личный" | "сюжетный" | "au"
+    const typeLabel   = typeMeta.label;
     const typeBadge   = `${capitalize(typeLabel)} ${typeMeta.emoji}`;
-    const statusLabel = statusMeta.label;               // "активен" | "архивирован" | "закрыт"
+    const statusLabel = statusMeta.label;
     const statusBadge = `${capitalize(statusLabel)} ${statusMeta.emoji}`;
 
     const masks = Array.isArray(ep?.masks) ? ep.masks.filter(Boolean) : [];
@@ -236,21 +216,15 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
       .map(p => p?.name).filter(Boolean);
     const loc = ep?.location || "";
 
-    const bounds = calcBounds(ep?.dateStart, ep?.dateEnd);
-    const rangeHuman = (()=>{
-      const s = parseDateSmart(ep?.dateStart);
-      const e = ep?.dateEnd ? parseDateSmart(ep?.dateEnd) : s;
-      if (!s && !e) return "";
-      const toIsoHuman = obj => toISO(obj.y, obj.m, obj.d);
-      return `${toIsoHuman(s || e)} — ${toIsoHuman(e || s)}`;
-    })();
+    const b = boundsArr[idx];
+    const rangeHuman = b.startR && b.endL ? `${b.startR} — ${b.endL}` : "";
 
     html += `
   <div class="episode" 
        data-type="${escAttr(typeLabel)}" 
        data-status="${escAttr(statusLabel)}" 
-       data-start-l="${escAttr(bounds.startL)}" data-start-r="${escAttr(bounds.startR)}" 
-       data-end-l="${escAttr(bounds.endL)}" data-end-r="${escAttr(bounds.endR)}"
+       data-start-l="${escAttr(b.startL)}" data-start-r="${escAttr(b.startR)}" 
+       data-end-l="${escAttr(b.endL)}" data-end-r="${escAttr(b.endR)}"
        ${masks.length ? `data-mask="${escAttr(masks.join(','))}"` : ``}
        ${loc ? `data-location="${escAttr(loc)}"` : ``}
        ${participants.length ? `data-players="${escAttr(participants.join(','))}"` : ``}>
@@ -259,12 +233,11 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
     <div>локация: ${esc(loc)}</div>
     <div>соигроки: ${esc(participants.join(", "))}</div>
   </div>`;
-  }
+  });
 
-  html += `</div>`;
+  html += `</section>`;
   return html;
 };
-
 
   /** ============================
    *  (Опционально) Экспорт вспомогательного

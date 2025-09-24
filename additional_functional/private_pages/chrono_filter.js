@@ -1,195 +1,244 @@
-(() => {
-  const DEBUG = false;
-  const log = (...a) => DEBUG && console.log('[ChronoFilter]', ...a);
-
-  // Публичный API
-  const API = {
-    init,        // init({ root }) — разовая инициализация + первичное применение
-    apply,       // ручное применение фильтра
-    reset,       // сброс фильтров
-    destroy      // снять обработчики (если нужно)
+/*
+ * ChronoFilter — modal-ready version
+ * Works when a modal appears; stays dormant otherwise.
+ *
+ * Usage examples:
+ *  1) Auto-run for a modal that mounts/unmounts dynamically
+ *     ChronoFilter.start({
+ *       modalSelector: '.modal_wrap',
+ *       listSelector: '#list',
+ *       filtersSelector: '#filters',
+ *       // Optional: provide filters template if your modal content lacks it
+ *       ensureFiltersWith: () => `
+ *         <div id="filters" class="chrono-filters">
+ *           <input type="text" data-filter="search" placeholder="Поиск..." />
+ *           <select data-filter="type">
+ *             <option value="">Все типы</option>
+ *             <option value="story">История</option>
+ *             <option value="event">Событие</option>
+ *           </select>
+ *         </div>`
+ *     });
+ *
+ *  2) Manually init inside a specific root (modal content element):
+ *     ChronoFilter.initIn(document.querySelector('.modal_wrap'));
+ *
+ *  To stop watching entirely:
+ *     ChronoFilter.stop();
+ */
+(function () {
+  const DEFAULTS = {
+    modalSelector: '.modal_wrap',
+    listSelector: '#list',
+    filtersSelector: '#filters',
+    ensureFiltersWith: null, // () => string of HTML, appended before list if filters missing
+    onInit: null,            // (root) => void
+    onDestroy: null          // (root) => void
   };
 
-  // Переменные состояния
-  let root = document;      // будет заменён на модальный root
-  let episodes = [];        // кэш разобранных эпизодов
-  let unbinders = [];       // функции отписки слушателей
-
-  // Утилиты (всегда в пределах root!)
-  const $  = (sel) => root.querySelector(sel);
-  const $$ = (sel) => Array.from(root.querySelectorAll(sel));
-  const parseDate = (v) => (v ? new Date(v) : null);
-
-  function getChecked(listId, name) {
-    // строго в пределах root, даже если id глобальный
-    return $$('#' + listId + ' input[name="' + name + '"]:checked').map(i => i.value);
+  /** Utility: tiny event manager to simplify cleanup */
+  class Disposables {
+    constructor() { this._items = []; }
+    add(fn) { if (typeof fn === 'function') this._items.push(fn); }
+    run() { this._items.splice(0).forEach(fn => {
+      try { fn(); } catch (_) {}
+    }); }
   }
 
-  function wireToggle(btnId, listId) {
-    const btn  = $('#' + btnId);
-    const list = $('#' + listId);
-    if (!btn || !list) return () => {};
+  /** Core filter bound to a specific root */
+  class ChronoFilterCore {
+    constructor(root, opts) {
+      this.root = root;
+      this.opts = opts;
+      this.disposables = new Disposables();
+      this.filtersEl = null;
+      this.listEl = null;
+    }
 
-    const onBtn = (e) => {
-      e.stopPropagation();
-      list.style.display = list.style.display === 'block' ? 'none' : 'block';
-    };
-    const onDoc = (e) => {
-      // закрывать по клику вне списка/кнопки
-      if (!list.contains(e.target) && !btn.contains(e.target)) {
-        list.style.display = 'none';
+    _q(sel) { return this.root.querySelector(sel); }
+
+    /** Attempt to find or create UI and wire up listeners */
+    init() {
+      // Find list first; without it there is nothing to filter
+      this.listEl = this._q(this.opts.listSelector);
+      if (!this.listEl) return false;
+
+      // Ensure filters exist under the same root
+      this.filtersEl = this._q(this.opts.filtersSelector);
+      if (!this.filtersEl && typeof this.opts.ensureFiltersWith === 'function') {
+        const html = this.opts.ensureFiltersWith();
+        if (html) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = String(html).trim();
+          const node = tmp.firstElementChild;
+          if (node) this.listEl.parentElement?.insertBefore(node, this.listEl);
+          this.filtersEl = this._q(this.opts.filtersSelector);
+        }
+      }
+      if (!this.filtersEl) return false;
+
+      this._bind();
+      this._apply();
+      if (typeof this.opts.onInit === 'function') this.opts.onInit(this.root);
+      return true;
+    }
+
+    /** Read current criteria from filters */
+    _criteria() {
+      const crit = {};
+      this.filtersEl.querySelectorAll('[data-filter]')
+        .forEach(el => {
+          const key = el.getAttribute('data-filter');
+          let val = '';
+          if (el.tagName === 'INPUT') val = el.value.trim();
+          else if (el.tagName === 'SELECT') val = el.value;
+          else if (el.type === 'checkbox') val = el.checked ? '1' : '';
+          else val = el.getAttribute('data-value') || '';
+          crit[key] = val;
+        });
+      return crit;
+    }
+
+    /** Apply filter to items */
+    _apply() {
+      const crit = this._criteria();
+      const items = Array.from(this.listEl.children);
+
+      const text = (s) => (s || '').toLowerCase();
+      const search = text(crit.search);
+      const type = crit.type || '';
+
+      items.forEach(el => {
+        // You can adapt these getters to your DOM
+        const title = text(el.getAttribute('data-title') || el.textContent);
+        const itemType = (el.getAttribute('data-type') || '').toLowerCase();
+
+        let ok = true;
+        if (search) ok = ok && title.includes(search);
+        if (type) ok = ok && itemType === type;
+        el.style.display = ok ? '' : 'none';
+      });
+    }
+
+    _bind() {
+      const handler = (e) => {
+        // Debounce input typing a bit
+        if (e && e.target && e.target.matches('[data-filter]')) {
+          if (e.type === 'input') {
+            clearTimeout(this._t);
+            this._t = setTimeout(() => this._apply(), 120);
+          } else {
+            this._apply();
+          }
+        }
+      };
+
+      // Delegate inside filters block
+      this.filtersEl.addEventListener('input', handler);
+      this.filtersEl.addEventListener('change', handler);
+      this.disposables.add(() => {
+        this.filtersEl.removeEventListener('input', handler);
+        this.filtersEl.removeEventListener('change', handler);
+      });
+
+      // Optional: close popouts when clicking outside (if you add dropdowns)
+      const outsideClick = (ev) => {
+        if (!this.root.contains(ev.target)) return;
+        // close logic for custom dropdowns could go here
+      };
+      document.addEventListener('click', outsideClick, true);
+      this.disposables.add(() => document.removeEventListener('click', outsideClick, true));
+    }
+
+    destroy() {
+      this.disposables.run();
+      if (typeof this.opts.onDestroy === 'function') this.opts.onDestroy(this.root);
+      this.root = null;
+      this.filtersEl = null;
+      this.listEl = null;
+    }
+  }
+
+  /** Watches DOM for the modal and (re)initializes ChronoFilterCore when needed */
+  class ModalWatcher {
+    constructor(opts) {
+      this.opts = opts;
+      this.observer = null;
+      this.instance = null; // ChronoFilterCore
+      this.enabled = false;
+    }
+
+    start() {
+      if (this.enabled) return;
+      this.enabled = true;
+
+      const tryMount = () => {
+        if (!this.enabled) return;
+        const root = document.querySelector(this.opts.modalSelector);
+        if (root && !this.instance) {
+          const inst = new ChronoFilterCore(root, this.opts);
+          if (inst.init()) {
+            this.instance = inst;
+          } else {
+            // If list/filters not ready yet, keep watching
+          }
+        }
+        if (!root && this.instance) {
+          this.instance.destroy();
+          this.instance = null;
+        }
+      };
+
+      // Initial check (covers already-open modal)
+      tryMount();
+
+      // Observe body for modal add/remove and for late children within modal
+      this.observer = new MutationObserver(() => tryMount());
+      this.observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
+
+    stop() {
+      this.enabled = false;
+      if (this.observer) { this.observer.disconnect(); this.observer = null; }
+      if (this.instance) { this.instance.destroy(); this.instance = null; }
+    }
+  }
+
+  // Public API
+  const API = (() => {
+    let watcher = null;
+
+    function normalizeOptions(userOpts) {
+      return Object.assign({}, DEFAULTS, userOpts || {});
+    }
+
+    return {
+      /** Autostart: watch for modal appearance and init inside it. */
+      start(userOpts) {
+        const opts = normalizeOptions(userOpts);
+        if (watcher) watcher.stop();
+        watcher = new ModalWatcher(opts);
+        watcher.start();
+      },
+
+      /** Stop watching and destroy current instance (if any). */
+      stop() { if (watcher) watcher.stop(); watcher = null; },
+
+      /** Manually init inside specific root */
+      initIn(root, userOpts) {
+        const opts = normalizeOptions(userOpts);
+        const inst = new ChronoFilterCore(root, opts);
+        if (!inst.init()) return null;
+        return inst; // caller can hold and call .destroy()
       }
     };
+  })();
 
-    btn.addEventListener('click', onBtn);
-    document.addEventListener('click', onDoc);
-    return () => {
-      btn.removeEventListener('click', onBtn);
-      document.removeEventListener('click', onDoc);
-    };
+  // Attach to window (non-intrusive if never used)
+  if (typeof window !== 'undefined') {
+    window.ChronoFilter = API;
   }
-
-  function buildEpisodes() {
-    const nodes = $$('#list .episode');
-    episodes = nodes.map(el => {
-      const masks   = (el.dataset.mask || '').split(';').map(s => s.trim()).filter(Boolean);
-      const players = (el.dataset.players || '').split(';').map(s => s.trim()).filter(Boolean);
-      return {
-        el,
-        type:    (el.dataset.type    || '').trim(),
-        status:  (el.dataset.status  || '').trim(),
-        startL:  parseDate(el.dataset.startL),
-        startR:  parseDate(el.dataset.startR),
-        endL:    parseDate(el.dataset.endL),
-        endR:    parseDate(el.dataset.endR),
-        masks,
-        players,
-        location: (el.dataset.location || '').trim()
-      };
-    });
-    log('episodes:', episodes.length);
-  }
-
-  function apply() {
-    const filters = $('#filters');
-    const list    = $('#list');
-    if (!filters || !list || !episodes.length) {
-      log('apply: нет filters/list/episodes — выходим');
-      return [];
-    }
-
-    const elDateStart = $('#dateStart');
-    const elDateEnd   = $('#dateEnd');
-
-    const ds = elDateStart && elDateStart.value ? new Date(elDateStart.value) : null;
-    const de = elDateEnd   && elDateEnd.value   ? new Date(elDateEnd.value)   : null;
-
-    const selType     = getChecked('typeList', 'type');
-    const selStatus   = getChecked('statusList', 'status');
-    const selMask     = getChecked('maskList', 'mask');
-    const selPlayer   = getChecked('playerList', 'player');
-    const selLocation = getChecked('locationList', 'location');
-
-    const visible = [];
-    const hidden  = [];
-
-    episodes.forEach(ep => {
-      let ok = true;
-
-      // по датам (пересечение интервалов)
-      if (ok && ds && ep.endL   && ep.endL   < ds) ok = false;
-      if (ok && de && ep.startR && ep.startR > de) ok = false;
-
-      // по типу/статусу
-      if (ok && selType.length   && !selType.includes(ep.type))     ok = false;
-      if (ok && selStatus.length && !selStatus.includes(ep.status)) ok = false;
-
-      // по маскам/соигрокам/локации
-      if (ok && selMask.length     && !ep.masks.some(m => selMask.includes(m)))     ok = false;
-      if (ok && selPlayer.length   && !ep.players.some(p => selPlayer.includes(p))) ok = false;
-      if (ok && selLocation.length && !selLocation.includes(ep.location))           ok = false;
-
-      ep.el.style.display = ok ? '' : 'none';
-      (ok ? visible : hidden).push(ep.el);
-    });
-
-    // уведомим слушателей (если есть)
-    document.dispatchEvent(new CustomEvent('chrono:filtered', { detail: { visible, hidden } }));
-    log('apply -> visible:', visible.length, 'hidden:', hidden.length);
-
-    return visible;
-  }
-
-  function reset() {
-    const elDateStart = $('#dateStart');
-    const elDateEnd   = $('#dateEnd');
-    if (elDateStart) elDateStart.value = '';
-    if (elDateEnd)   elDateEnd.value   = '';
-    $$('#filters .dropdown-list input[type="checkbox"]').forEach(cb => { cb.checked = false; });
-    return apply();
-  }
-
-  function destroy() {
-    // снять все слушатели
-    unbinders.forEach(fn => { try { fn(); } catch {} });
-    unbinders = [];
-    episodes = [];
-    root = document;
-  }
-
-  function init(opts = {}) {
-    destroy(); // на всякий случай, если переинициализация
-    root = opts.root || document;
-    log('init, root:', root);
-
-    const filters = $('#filters');
-    const list    = $('#list');
-    if (!filters || !list) {
-      log('нет filters/list в корне — выходим');
-      return;
-    }
-
-    // собрать эпизоды
-    buildEpisodes();
-
-    // провязать контролы (в пределах root)
-    const elDateStart = $('#dateStart');
-    const elDateEnd   = $('#dateEnd');
-    const elReset     = $('#resetBtn');
-
-    // dropdown toggles
-    const unTypeTgl     = wireToggle('typeToggle', 'typeList');
-    const unStatusTgl   = wireToggle('statusToggle', 'statusList');
-    const unMaskTgl     = wireToggle('maskToggle', 'maskList');
-    const unPlayerTgl   = wireToggle('playerToggle', 'playerList');
-    const unLocationTgl = wireToggle('locationToggle', 'locationList');
-    unbinders.push(unTypeTgl, unStatusTgl, unMaskTgl, unPlayerTgl, unLocationTgl);
-
-    // чекбоксы фильтров
-    const onChange = (e) => {
-      if (e.target.matches('#filters .dropdown-list input[type="checkbox"]')) apply();
-    };
-    root.addEventListener('change', onChange);
-    unbinders.push(() => root.removeEventListener('change', onChange));
-
-    if (elDateStart) {
-      elDateStart.addEventListener('change', apply);
-      unbinders.push(() => elDateStart.removeEventListener('change', apply));
-    }
-    if (elDateEnd) {
-      elDateEnd.addEventListener('change', apply);
-      unbinders.push(() => elDateEnd.removeEventListener('change', apply));
-    }
-    if (elReset) {
-      const onReset = (e) => { e.preventDefault(); reset(); };
-      elReset.addEventListener('click', onReset);
-      unbinders.push(() => elReset.removeEventListener('click', onReset));
-    }
-
-    // первичное применение
-    apply();
-  }
-
-  // экспорт
-  window.ChronoFilter = API;
 })();

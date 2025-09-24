@@ -334,8 +334,22 @@
       const statusBadge = `${capitalize(statusLabel)} ${statusMeta.emoji}`;
 
       const masks = Array.isArray(ep?.masks) ? ep.masks.filter(Boolean) : [];
-      const participants = (Array.isArray(ep?.participants) ? ep.participants : [])
-        .map(p => p?.name).filter(Boolean);
+      const participantTokens = (Array.isArray(ep?.participants) ? ep.participants : [])
+        .map(p => {
+          // поддержим p.masks (массив) или p.mask (строка)
+          const masksArr = Array.isArray(p?.masks)
+            ? p.masks.filter(Boolean).map(x => String(x).trim()).filter(Boolean)
+            : (typeof p?.mask === 'string' && p.mask.trim() ? [p.mask.trim()] : []);
+      
+          // если есть маски — используем их (через ", "), иначе имя
+          const token = masksArr.length ? masksArr.join(", ") : String(p?.name || "").trim();
+          return token;
+        })
+        .map(t => t.replace(/\s+/g, " "))     // нормализуем пробелы
+        .map(t => t.replace(/;/g, " "))       // чтобы не ломать разделитель в data-атрибуте
+        .filter(Boolean);
+      const playersData  = participantTokens.join(";");
+      const playersHuman = participantTokens.join(", ");
       const loc = ep?.location || "";
 
       const b = boundsArr[idx];
@@ -349,13 +363,13 @@
        data-end-l="${escAttr(b.endL)}" data-end-r="${escAttr(b.endR)}"
        ${masks.length ? `data-mask="${escAttr(masks.join(';'))}"` : ``}
        ${loc ? `data-location="${escAttr(loc)}"` : ``}
-       ${participants.length ? `data-players="${escAttr(participants.join(';'))}"` : ``}>
+       ${participantTokens.length ? `data-players="${escAttr(playersData)}"` : ``}>
     <div>тип: ${esc(typeBadge)}; статус: ${esc(statusBadge)}</div>
-    <div><span class="muted">${esc(human)}</span>
+    <div><span class="muted">${esc(human)} —</span>
       <span class="title"> <a href="${esc(ep?.href || "#")}">${esc(ep?.title || "")}</a></span>
       ${masks.length ? ` [as ${esc(masks.join(", "))}]` : ""}</div>
     <div>локация: ${esc(loc)}</div>
-    <div>соигроки: ${esc(participants.join(", "))}</div>
+    <div>соигроки: ${esc(playersHuman)}</div>
   </div>`;
     });
 

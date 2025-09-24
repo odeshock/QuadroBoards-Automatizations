@@ -220,7 +220,7 @@ async function collectEpisodesFromForums(opts = {}) {
     return [];
   }
 
-  const MAX_PAGES_PER_SECTION = Number.isFinite(+opts.maxPagesPerSection) ? +opts.maxPagesPerSection : 50;
+  const MAX_PAGES_PER_SECTION = 100;
 
   // ==== утилиты ====
   const abs  = (base, href)=>{ try { return new URL(href, base).href; } catch { return href; } };
@@ -389,50 +389,66 @@ async function collectEpisodesFromForums(opts = {}) {
 
   // ==== скрапперы ====
   async function scrapeSection(section, seenTopics) {
-    let url = abs(location.href, `/viewforum.php?id=${section.id}`);
-    const seenPages = new Set();
-    const out  = [];
-    let n = 0;
-    let lastSig = '';
+  let url = abs(location.href, `/viewforum.php?id=${section.id}`);
+  const seenPages = new Set();
+  const out  = [];
+  let n = 0;
 
-    while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
-      n++; seenPages.add(url);
-      const doc = await FMV.fetchDoc(url);
+  // [NEW] Зафиксируем какие темы уже встречали в этом разделе:
+  const sectionSeen = new Set();
 
-      // список тем на странице (id → {url,title})
-      const topics = new Map();
-      doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
-        const href = abs(url, a.getAttribute('href'));
-        const m = href.match(/viewtopic\.php\?id=(\d+)/i);
-        const ttl = text(a);
-        if (!m) return;
-        if (/^\s*(RSS|Atom)\s*$/i.test(ttl)) return;
-        if (/#p\d+$/i.test(href)) return;
-        if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(ttl)) return;
-        topics.set(m[1], { url: href, title: ttl });
-      });
+  let lastSig = '';
 
-      const sig = Array.from(topics.keys()).sort().join(',');
-      if (sig && sig === lastSig) break;
-      lastSig = sig;
+  while (url && !seenPages.has(url) && n < MAX_PAGES_PER_SECTION) {
+    n++; seenPages.add(url);
+    const doc = await FMV.fetchDoc(url);
 
-      for (const [tid, { url: turl, title }] of topics) {
-        const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
-        if (seenTopics.has(key)) continue;
-        const row = await scrapeTopic(turl, title, section.type, section.status);
-        if (row) { seenTopics.add(key); out.push(row); }
-      }
+    // список тем на странице (id → {url,title})
+    const topics = new Map();
+    doc.querySelectorAll('a[href*="viewtopic.php?id="]').forEach(a => {
+      const href = abs(url, a.getAttribute('href'));
+      const m = href.match(/viewtopic\.php\?id=(\d+)/i);
+      const ttl = text(a);
+      if (!m) return;
+      if (/^\s*(RSS|Atom)\s*$/i.test(ttl)) return;
+      if (/#p\d+$/i.test(href)) return;
+      if (/^\d{1,2}\.\d{1,2}\.\d{2,4}(?:\s+\d{1,2}:\d{2})?$/.test(ttl)) return;
+      topics.set(m[1], { url: href, title: ttl });
+    });
 
-      const next = (function findNextPage(doc){
-        const a = doc.querySelector('a[rel="next"], a[href*="&p="]:not([rel="prev"])');
-        return a ? a.getAttribute('href') : null;
-      })(doc);
-      const nextUrl = next ? abs(url, next) : null;
-      if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
-      url = nextUrl;
+    // === РАННИЕ ВЫХОДЫ ===
+
+    // (а) Совпала сигнатура со страницей N-1 → дальше листать нет смысла
+    const pageIds = Array.from(topics.keys()).sort();
+    const sig = pageIds.join(',');
+    if (sig && sig === lastSig) break;
+    lastSig = sig;
+
+    // (б) На странице нет ни одного нового id относительно уже виденных в этом разделе
+    const newIds = pageIds.filter(id => !sectionSeen.has(id));
+    if (newIds.length === 0) break;
+    newIds.forEach(id => sectionSeen.add(id));
+
+    // === Обработка тем ===
+    for (const [tid, { url: turl, title }] of topics) {
+      const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
+      if (seenTopics.has(key)) continue;
+      const row = await scrapeTopic(turl, title, section.type, section.status);
+      if (row) { seenTopics.add(key); out.push(row); }
     }
-    return out;
+
+    // Переход на следующую страницу
+    const next = (function findNextPage(doc){
+      const a = doc.querySelector('a[rel="next"], a[href*="&p="]:not([rel="prev"])');
+      return a ? a.getAttribute('href') : null;
+    })(doc);
+    const nextUrl = next ? abs(url, next) : null;
+    if (!nextUrl || seenPages.has(nextUrl)) { url = null; break; }
+    url = nextUrl;
   }
+  return out;
+}
+
 
   async function scrapeTopic(topicUrl, rawTitle, type, status) {
     try {

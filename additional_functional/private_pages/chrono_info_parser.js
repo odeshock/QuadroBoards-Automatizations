@@ -305,7 +305,7 @@
     <div class="f">
       <label>Участник</label>
       <div class="dropdown-wrapper">
-        <button class="dropdown-toggle" id="playerToggle">Выбрать соигрока</button>
+        <button class="dropdown-toggle" id="playerToggle">Выбрать участника</button>
         <div class="dropdown-list" id="playerList">
           ${playerOptions}
         </div>

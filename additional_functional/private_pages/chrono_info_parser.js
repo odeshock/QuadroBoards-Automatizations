@@ -131,7 +131,8 @@
     .episode .muted{color:#666}
     .episode .title{font-weight:700;color:#222}
     .meta{color:#555;margin:6px 0 14px}
-</style>`;
+    .f{grid-column:span 3}
+  </style>`
     return css + "\n" + content;
   }
 

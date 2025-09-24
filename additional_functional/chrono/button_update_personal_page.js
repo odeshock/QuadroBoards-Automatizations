@@ -183,7 +183,7 @@
   // Хелперы ссылок/экрановки — совместимы с другими кнопками
   if (typeof window.userLinkHtml !== 'function') {
     window.userLinkHtml = (id, name) =>
-      `<a href="/profile.php?id=${FMV.escapeHtml(String(id))}">${FMV.escapeHtml(String(name || id))}</a>`;
+      `${FMV.escapeHtml(String(name || id))}`;
   }
 
   // Получаем карту имен для красивых ссылок
@@ -220,7 +220,7 @@
   createForumButton({
     allowedGroups: GID,
     allowedForums: FID,
-    label: 'обновить персоналки',
+    label: 'обновить личные страницы',
     order: 4,
     showStatus: true,
     showDetails: true,

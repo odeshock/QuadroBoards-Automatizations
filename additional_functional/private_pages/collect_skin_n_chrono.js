@@ -105,4 +105,23 @@
 
   // динамика (модалки)
   const seen = new WeakSet();
-  const observer = new MutationObserver((recs) =>
+  const observer = new MutationObserver((recs) => {
+    recs.forEach(rec => {
+      rec.addedNodes && rec.addedNodes.forEach(n => {
+        if (!(n instanceof Element)) return;
+        // если добавили .character — запускаемся в его scope
+        if (n.matches && n.matches(CHARACTER_SELECTOR) && !seen.has(n)) {
+          seen.add(n);
+          initIn(scopeForCharacter(n));
+        }
+        // или если .character появился как потомок
+        n.querySelectorAll && n.querySelectorAll(CHARACTER_SELECTOR).forEach(el => {
+          if (seen.has(el)) return;
+          seen.add(el);
+          initIn(scopeForCharacter(el));
+        });
+      });
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+})();

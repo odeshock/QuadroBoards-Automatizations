@@ -132,9 +132,6 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
 
   const css = `
 <style>
-    body{background:#f9f9fb;color:#1a1a1a;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px}
-    a{color:#3366cc;text-decoration:none}
-    a:hover{text-decoration:underline}
     .filters{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;background:#ffffff;padding:16px;border-radius:16px;border:1px solid #d0d0d0;position:sticky;top:0;z-index:5;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
     .f{grid-column:span 3}
     .f label{display:block;font-size:12px;color:#555;margin-bottom:6px}

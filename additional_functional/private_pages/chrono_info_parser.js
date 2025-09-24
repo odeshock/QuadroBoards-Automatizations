@@ -264,7 +264,7 @@
   
     // Шапка + фильтры
     let html = `
-  <h1 style="margin:0 0 8px 0;font-size:22px">${esc(titlePrefix)} — ${userName}</h1>
+  <script type="text/javascript" src="https://odeshock.github.io/QuadroBoards-Automatizations/additional_functional/private_pages/chrono_filter.js"></script>
   
   <section class="filters" id="filters">
     <div class="f">

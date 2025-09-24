@@ -53,6 +53,7 @@
     } catch (e) {
       return { id, status: `ошибка collectChronoByUser: ${e?.message || e}` };
     }
+    console.log(byUser);
 
     // 2) Берём только нужного юзера
     const data = byUser?.[id];

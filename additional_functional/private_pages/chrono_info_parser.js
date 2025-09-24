@@ -24,9 +24,9 @@
     au:       { label: "au",       emoji: "<иконка>" },
   };
   const STATUS_RU = {
-    active:   { label: "активен",     emoji: "<иконка>" },
+    on:   { label: "активен",     emoji: "<иконка>" },
     archived: { label: "неактуален",  emoji: "<иконка>" },
-    closed:   { label: "закрыт",      emoji: "<иконка>" },
+    off:   { label: "закрыт",      emoji: "<иконка>" },
   };
 
   /** ============================

@@ -328,9 +328,9 @@
       const typeMeta   = TYPE_RU[ep?.type] || TYPE_RU.au;
       const statusMeta = STATUS_RU[ep?.status] || STATUS_RU.archived;
 
-      const typeLabel   = typeMeta.label;
+      const typeLabel   = ep?.type || "";
       const typeBadge   = `${capitalize(typeLabel)} ${typeMeta.emoji}`;
-      const statusLabel = statusMeta.label;
+      const statusLabel = ep?.status || "";
       const statusBadge = `${capitalize(statusLabel)} ${statusMeta.emoji}`;
 
       const masks = Array.isArray(ep?.masks) ? ep.masks.filter(Boolean) : [];

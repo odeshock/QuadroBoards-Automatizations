@@ -354,6 +354,7 @@
 
       const b = boundsArr[idx];
       const human = formatHumanRange(ep?.dateStart, ep?.dateEnd);
+      const dateBlock = human ? `<span class="muted">${esc(human)} — </span>` : "";
 
       html += `
   <div class="episode" 
@@ -365,8 +366,7 @@
        ${loc ? `data-location="${escAttr(loc)}"` : ``}
        ${participantTokens.length ? `data-players="${escAttr(playersData)}"` : ``}>
     <div>тип: ${esc(typeBadge)}; статус: ${esc(statusBadge)}</div>
-    <div><span class="muted">${esc(human)} —</span>
-      <span class="title"> <a href="${esc(ep?.href || "#")}">${esc(ep?.title || "")}</a></span>
+    <div>${dateBlock}<span class="title"><a href="${esc(ep?.href || "#")}">${esc(ep?.title || "")}</a></span>
       ${masks.length ? ` [as ${esc(masks.join(", "))}]` : ""}</div>
     <div>локация: ${esc(loc)}</div>
     <div>соигроки: ${esc(playersHuman)}</div>

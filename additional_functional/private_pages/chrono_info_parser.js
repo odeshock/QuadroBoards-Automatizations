@@ -50,54 +50,91 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   // ===== Вспомогательные для дат =====
   const pad = n => String(n).padStart(2, "0");
   const lastDayOfMonth = (y, m) => new Date(y, m, 0).getDate();
-  function toISO(y, m, d) { return `${y}-${pad(m)}-${pad(d)}`; }
+  const toISO = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+
   function parseDateSmart(raw) {
     const s = String(raw || "").trim();
     if (!s) return null;
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-    if (m) return { y:+m[3], m:+m[2], d:+m[1], g:"day" };
+    if (m) return { y:+m[3], m:+m[2], d:+m[1], g:"day" };      // dd.mm.yyyy
     m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return { y:+m[1], m:+m[2], d:+m[3], g:"day" };
+    if (m) return { y:+m[1], m:+m[2], d:+m[3], g:"day" };      // yyyy-mm-dd
     m = s.match(/^(\d{1,2})\.(\d{4})$/);
-    if (m) return { y:+m[2], m:+m[1], d:1, g:"month" };
+    if (m) return { y:+m[2], m:+m[1], d:1, g:"month" };        // mm.yyyy
     m = s.match(/^(\d{4})$/);
-    if (m) return { y:+m[1], m:1, d:1, g:"year" };
+    if (m) return { y:+m[1], m:1, d:1, g:"year" };             // yyyy
     return null;
   }
+
+  // === НОВЫЕ правила рамок для start/end ===
   function calcBounds(startRaw, endRaw) {
     const ps = parseDateSmart(startRaw);
     const pe = endRaw ? parseDateSmart(endRaw) : null;
+
+    // если вообще нет дат — пусто
     if (!ps && !pe) return { startL:"", startR:"", endL:"", endR:"" };
 
-    const sY = ps?.y ?? pe.y;
-    const sM = ps?.m ?? (pe?.g === "year" ? 1 : pe?.m ?? 1);
-    const sD = ps?.d ?? 1;
-    const startActual = toISO(sY, sM, sD);
+    // ---------- START ----------
+    let startL = "", startR = "";
+    if (ps) {
+      if (ps.g === "day") {
+        // dd: l = 1 число месяца, r = фактический день
+        startL = toISO(ps.y, ps.m, 1);
+        startR = toISO(ps.y, ps.m, ps.d);
+      } else if (ps.g === "month") {
+        // mm.yyyy: l = 1 число месяца, r = последний день месяца
+        startL = toISO(ps.y, ps.m, 1);
+        startR = toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m));
+      } else { // year
+        // yyyy: l = 01-01, r = 12-31
+        startL = toISO(ps.y, 1, 1);
+        startR = toISO(ps.y, 12, 31);
+      }
+    } else if (pe) {
+      // старт не задан, но есть конец: используем год/месяц конца в качестве рамок старта
+      if (pe.g === "day") {
+        startL = toISO(pe.y, pe.m, 1);
+        startR = toISO(pe.y, pe.m, pe.d);
+      } else if (pe.g === "month") {
+        startL = toISO(pe.y, pe.m, 1);
+        startR = toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m));
+      } else {
+        startL = toISO(pe.y, 1, 1);
+        startR = toISO(pe.y, 12, 31);
+      }
+    }
 
-    const eY = pe?.y ?? ps.y;
-    const eM = pe?.m ?? (ps?.g === "year" ? 12 : ps?.m ?? 12);
-    const eD = pe?.d
-      ?? (pe?.g === "month" ? lastDayOfMonth(eY, eM)
-          : pe?.g === "year" ? 31
-          : ps?.g === "month" ? lastDayOfMonth(eY, eM)
-          : ps?.g === "year" ? 31
-          : ps.d);
-    const endActual = toISO(eY, eM, eD);
+    // ---------- END ----------
+    let endL = "", endR = "";
+    if (pe) {
+      if (pe.g === "day") {
+        // dd: l = фактический день, r = последний день месяца
+        endL = toISO(pe.y, pe.m, pe.d);
+        endR = toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m));
+      } else if (pe.g === "month") {
+        // mm.yyyy: l = 1 число месяца, r = последний день месяца
+        endL = toISO(pe.y, pe.m, 1);
+        endR = toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m));
+      } else { // year
+        // yyyy: l = 01-01, r = 12-31
+        endL = toISO(pe.y, 1, 1);
+        endR = toISO(pe.y, 12, 31);
+      }
+    } else if (ps) {
+      // конец не задан, но есть старт: наследуем рамки по гранулярности старта
+      if (ps.g === "day") {
+        endL = toISO(ps.y, ps.m, ps.d);
+        endR = toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m));
+      } else if (ps.g === "month") {
+        endL = toISO(ps.y, ps.m, 1);
+        endR = toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m));
+      } else {
+        endL = toISO(ps.y, 1, 1);
+        endR = toISO(ps.y, 12, 31);
+      }
+    }
 
-    const startMin = ps
-      ? (ps.g === "year" ? toISO(ps.y, 1, 1)
-         : toISO(ps.y, ps.m, 1))
-      : toISO(sY, 1, 1);
-
-    const endMax = pe
-      ? (pe.g === "year" ? toISO(pe.y, 12, 31)
-         : pe.g === "month" ? toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m))
-         : toISO(pe.y, pe.m, lastDayOfMonth(pe.y, pe.m)))
-      : (ps.g === "year" ? toISO(ps.y, 12, 31)
-         : ps.g === "month" ? toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m))
-         : toISO(ps.y, ps.m, lastDayOfMonth(ps.y, ps.m)));
-
-    return { startL: startMin, startR: startActual, endL: endActual, endR: endMax };
+    return { startL, startR, endL, endR };
   }
 
   const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
@@ -109,24 +146,21 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   );
   const locationsAll = unique(episodes.map(e => e?.location).filter(Boolean));
 
-  // генерируем чекбоксы для маски/соигрока/локации
+  // фильтры
   const maskOptions = masksAll.map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`).join("");
   const playerOptions = playersAll.map(p => `<label><input type="checkbox" name="player" value="${escAttr(p)}"> ${esc(p)}</label>`).join("");
   const locationOptions = locationsAll.map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`).join("");
-
-  // генерируем чекбоксы для типа/статуса из глобальных констант
   const typeOptions = Object.entries(TYPE_RU).map(([key, t]) =>
     `<label><input type="checkbox" name="type" value="${escAttr(key)}"> ${esc(t.label)}</label>`).join("");
   const statusOptions = Object.entries(STATUS_RU).map(([key, s]) =>
     `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`).join("");
 
-  // ==== глобальные min/max дат для дефолтного value в input[type=date] ====
-  let globalMin = null;
-  let globalMax = null;
+  // глобальные min/max дат для дефолтов инпутов
+  let globalMin = null, globalMax = null;
   const boundsArr = episodes.map(e => {
     const b = calcBounds(e?.dateStart, e?.dateEnd);
     if (b.startL && (!globalMin || b.startL < globalMin)) globalMin = b.startL;
-    if (b.endR && (!globalMax || b.endR > globalMax)) globalMax = b.endR;
+    if (b.endR   && (!globalMax || b.endR   > globalMax)) globalMax = b.endR;
     return b;
   });
 
@@ -196,11 +230,13 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
 <section class="list" id="list">
 `;
 
-  // ===== Список эпизодов =====
+  // ===== Эпизоды =====
   if (!episodes.length) {
     html += `<div class="meta">Нет эпизодов</div></section>`;
     return html;
   }
+
+  const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 
   episodes.forEach((ep, idx) => {
     const typeMeta   = TYPE_RU[ep?.type] || TYPE_RU.au;
@@ -229,9 +265,7 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
        ${loc ? `data-location="${escAttr(loc)}"` : ``}
        ${participants.length ? `data-players="${escAttr(participants.join(';'))}"` : ``}>
     <div>тип: ${esc(typeBadge)}; статус: ${esc(statusBadge)}</div>
-    <div><span class="muted">${esc(rangeHuman)}</span> <span class="title">
-      <a href="${esc(ep?.href || '#')}">${esc(ep?.title.toLowerCase() || "")}</a>
-      </span>${masks.length ? ` [as ${esc(masks.join(", "))}]` : ""}</div>
+    <div><span class="muted">${esc(rangeHuman)}</span> <span class="title">${esc(ep?.title || "")}</span>${masks.length ? ` as ${esc(masks.join(", "))}` : ""}</div>
     <div>локация: ${esc(loc)}</div>
     <div>соигроки: ${esc(participants.join(", "))}</div>
   </div>`;

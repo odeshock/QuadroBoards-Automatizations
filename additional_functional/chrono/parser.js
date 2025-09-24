@@ -203,6 +203,23 @@ function cleanLocation(s) {
  *   - respectAccess: флаг для внешних проверок доступа (пробрасывается как есть)
  */
 async function collectEpisodesFromForums(opts = {}) {
+    // --- вспомогательная функция для ограниченной параллельной загрузки ---
+    async function asyncPool(limit, items, iteratee) {
+      const ret = [];
+      const executing = new Set();
+      for (const item of items) {
+        const p = Promise.resolve().then(() => iteratee(item));
+        ret.push(p);
+        executing.add(p);
+        const clean = () => executing.delete(p);
+        p.then(clean, clean);
+        if (executing.size >= limit) {
+          await Promise.race(executing);
+        }
+      }
+      return Promise.all(ret);
+    }
+  
   // разделы: либо из opts.sections, либо автообнаружение по текущему документу
   let SECTIONS = Array.isArray(opts.sections) && opts.sections.length ? opts.sections.slice() : [];
   if (!SECTIONS.length) {
@@ -429,12 +446,25 @@ async function collectEpisodesFromForums(opts = {}) {
     if (newIds.length === 0) break;
     newIds.forEach(id => sectionSeen.add(id));
 
-    // === Обработка тем ===
-    for (const [tid, { url: turl, title }] of topics) {
-      const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
-      if (seenTopics.has(key)) continue;
-      const row = await scrapeTopic(turl, title, section.type, section.status);
-      if (row) { seenTopics.add(key); out.push(row); }
+    // --- параллельная загрузка тем с лимитом потоков ---
+    const CONCURRENCY = Number.isFinite(+opts?.concurrencyPerPage)
+      ? +opts.concurrencyPerPage
+      : 6; // дефолт: 6 запросов одновременно
+    
+    const topicEntries = Array.from(topics.entries());
+    
+    const rows = await asyncPool(CONCURRENCY, topicEntries,
+      async ([tid, { url: turl, title }]) => {
+        const key = tid ? `id:${tid}` : `url:${turl.replace(/#.*$/,'')}`;
+        if (seenTopics.has(key)) return null;
+        const row = await scrapeTopic(turl, title, section.type, section.status);
+        return row ? { key, row } : null;
+      });
+    
+    for (const r of rows) {
+      if (!r) continue;
+      seenTopics.add(r.key);
+      out.push(r.row);
     }
 
     // Переход на следующую страницу

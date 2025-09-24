@@ -56,7 +56,7 @@
 
     // 2) Берём только нужного юзера
     const data = byUser?.[id];
-    console.log(id, data):
+    console.log(id, data);
     if (!data) {
       return { id, status: "нет данных (пользователь не найден в хроно-коллекции)" };
     }

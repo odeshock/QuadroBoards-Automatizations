@@ -235,88 +235,7 @@
       return b;
     });
 
-    // Фильтры
-    const typeOptions = Object.entries(TYPE_RU)
-      .map(([key, t]) => `<label><input type="checkbox" name="type" value="${escAttr(key)}"> ${esc(t.label)}</label>`)
-      .join("");
-    const statusOptions = Object.entries(STATUS_RU)
-      .map(([key, s]) => `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`)
-      .join("");
-    const maskOptions = masksAll
-      .map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`)
-      .join("");
-    const playerOptions = playersAll
-      .map(p => `<label><input type="checkbox" name="player" value="${escAttr(p)}"> ${esc(p)}</label>`)
-      .join("");
-    const locationOptions = locationsAll
-      .map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`)
-      .join("");
-
-    // Шапка + фильтры
-    let html = `
-<h1 style="margin:0 0 8px 0;font-size:22px">${esc(titlePrefix)} — ${userName}</h1>
-
-<section class="filters" id="filters">
-  <div class="f">
-    <label>Дата начала фильтра</label>
-    <input type="date" id="dateStart" value="${escAttr(globalMin || "")}">
-  </div>
-  <div class="f">
-    <label>Дата конца фильтра</label>
-    <input type="date" id="dateEnd" value="${escAttr(globalMax || "")}">
-  </div>
-  <div class="f">
-    <label>Тип</label>
-    <div class="dropdown-wrapper">
-      <button class="dropdown-toggle" id="typeToggle">Выбрать тип</button>
-      <div class="dropdown-list" id="typeList">
-        ${typeOptions}
-      </div>
-    </div>
-  </div>
-  <div class="f">
-    <label>Статус</label>
-    <div class="dropdown-wrapper">
-      <button class="dropdown-toggle" id="statusToggle">Выбрать статус</button>
-      <div class="dropdown-list" id="statusList">
-        ${statusOptions}
-      </div>
-    </div>
-  </div>
-  <div class="f">
-    <label>Маска</label>
-    <div class="dropdown-wrapper">
-      <button class="dropdown-toggle" id="maskToggle">Выбрать маску</button>
-      <div class="dropdown-list" id="maskList">
-        ${maskOptions}
-      </div>
-    </div>
-  </div>
-  <div class="f">
-    <label>Соигрок</label>
-    <div class="dropdown-wrapper">
-      <button class="dropdown-toggle" id="playerToggle">Выбрать соигрока</button>
-      <div class="dropdown-list" id="playerList">
-        ${playerOptions}
-      </div>
-    </div>
-  </div>
-  <div class="f">
-    <label>Локация</label>
-    <div class="dropdown-wrapper">
-      <button class="dropdown-toggle" id="locationToggle">Выбрать локацию</button>
-      <div class="dropdown-list" id="locationList">
-        ${locationOptions}
-      </div>
-    </div>
-  </div>
-  <div class="actions">
-    <button class="btn" id="resetBtn">Сбросить</button>
-  </div>
-</section>
-
-<section class="list" id="list">
-`;
+   
 
     // Эпизоды
     if (!episodes.length) {
@@ -356,6 +275,89 @@
       const human = formatHumanRange(ep?.dateStart, ep?.dateEnd);
       const dateBlock = human ? `<span class="muted">${esc(human)} — </span>` : "";
 
+       // Фильтры
+      const typeOptions = Object.entries(TYPE_RU)
+        .map(([key, t]) => `<label><input type="checkbox" name="type" value="${escAttr(key)}"> ${esc(t.label)}</label>`)
+        .join("");
+      const statusOptions = Object.entries(STATUS_RU)
+        .map(([key, s]) => `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`)
+        .join("");
+      const maskOptions = masksAll
+        .map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`)
+        .join("");
+      const playerOptions = playersData
+        .map(p => `<label><input type="checkbox" name="player" value="${escAttr(p)}"> ${esc(p)}</label>`)
+        .join("");
+      const locationOptions = locationsAll
+        .map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`)
+        .join("");
+  
+      // Шапка + фильтры
+      let html = `
+  <h1 style="margin:0 0 8px 0;font-size:22px">${esc(titlePrefix)} — ${userName}</h1>
+  
+  <section class="filters" id="filters">
+    <div class="f">
+      <label>Дата начала фильтра</label>
+      <input type="date" id="dateStart" value="${escAttr(globalMin || "")}">
+    </div>
+    <div class="f">
+      <label>Дата конца фильтра</label>
+      <input type="date" id="dateEnd" value="${escAttr(globalMax || "")}">
+    </div>
+    <div class="f">
+      <label>Тип</label>
+      <div class="dropdown-wrapper">
+        <button class="dropdown-toggle" id="typeToggle">Выбрать тип</button>
+        <div class="dropdown-list" id="typeList">
+          ${typeOptions}
+        </div>
+      </div>
+    </div>
+    <div class="f">
+      <label>Статус</label>
+      <div class="dropdown-wrapper">
+        <button class="dropdown-toggle" id="statusToggle">Выбрать статус</button>
+        <div class="dropdown-list" id="statusList">
+          ${statusOptions}
+        </div>
+      </div>
+    </div>
+    <div class="f">
+      <label>Маска</label>
+      <div class="dropdown-wrapper">
+        <button class="dropdown-toggle" id="maskToggle">Выбрать маску</button>
+        <div class="dropdown-list" id="maskList">
+          ${maskOptions}
+        </div>
+      </div>
+    </div>
+    <div class="f">
+      <label>Соигрок</label>
+      <div class="dropdown-wrapper">
+        <button class="dropdown-toggle" id="playerToggle">Выбрать соигрока</button>
+        <div class="dropdown-list" id="playerList">
+          ${playerOptions}
+        </div>
+      </div>
+    </div>
+    <div class="f">
+      <label>Локация</label>
+      <div class="dropdown-wrapper">
+        <button class="dropdown-toggle" id="locationToggle">Выбрать локацию</button>
+        <div class="dropdown-list" id="locationList">
+          ${locationOptions}
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="resetBtn">Сбросить</button>
+    </div>
+  </section>
+  
+  <section class="list" id="list">
+  `;
+      
       html += `
   <div class="episode" 
        data-type="${escAttr(typeLabel)}" 

@@ -225,9 +225,9 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
        data-status="${escAttr(statusLabel)}" 
        data-start-l="${escAttr(b.startL)}" data-start-r="${escAttr(b.startR)}" 
        data-end-l="${escAttr(b.endL)}" data-end-r="${escAttr(b.endR)}"
-       ${masks.length ? `data-mask="${escAttr(masks.join(','))}"` : ``}
+       ${masks.length ? `data-mask="${escAttr(masks.join(';'))}"` : ``}
        ${loc ? `data-location="${escAttr(loc)}"` : ``}
-       ${participants.length ? `data-players="${escAttr(participants.join(','))}"` : ``}>
+       ${participants.length ? `data-players="${escAttr(participants.join(';'))}"` : ``}>
     <div>тип: ${esc(typeBadge)}; статус: ${esc(statusBadge)}</div>
     <div><span class="muted">${esc(rangeHuman)}</span> <span class="title">${esc(ep?.title || "")}</span>${masks.length ? ` as ${esc(masks.join(", "))}` : ""}</div>
     <div>локация: ${esc(loc)}</div>

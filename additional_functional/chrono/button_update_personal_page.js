@@ -165,3 +165,107 @@
     return String(val).includes(needle);
   }
 })();
+
+// === КНОПКА: массовое обновление персоналок (обёртка над runBulkChronoUpdate) ===
+(() => {
+  'use strict';
+
+  const GID        = (window.CHRONO_CHECK?.GroupID || []).map(Number);
+  const FID        = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
+  // если нужно ограничить показ — используйте forum/topic из CHRONO_CHECK по аналогии с другими кнопками
+  if (!GID.length || !FID.length) return;
+
+  // Пробуем прокинуть sections, если заранее подготовлены
+  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
+    ? window.CHRONO_CHECK.ForumInfo
+    : undefined;
+
+  // Хелперы ссылок/экрановки — совместимы с другими кнопками
+  if (typeof window.userLinkHtml !== 'function') {
+    window.userLinkHtml = (id, name) =>
+      `<a href="/profile.php?id=${FMV.escapeHtml(String(id))}">${FMV.escapeHtml(String(name || id))}</a>`;
+  }
+
+  // Получаем карту имен для красивых ссылок
+  async function getUserNameMap(explicitIds) {
+    // 1) если есть FMV.fetchUsers(), возьмём оттуда
+    const fetchUsers = (window.FMV && typeof FMV.fetchUsers === 'function') ? FMV.fetchUsers : null;
+    let list = [];
+    if (Array.isArray(explicitIds) && explicitIds.length) {
+      list = explicitIds.map(x => ({ id: String(x) }));
+    } else if (fetchUsers) {
+      try {
+        const arr = await fetchUsers();
+        list = Array.isArray(arr) ? arr : [];
+      } catch { /* no-op */ }
+    }
+    const map = new Map();
+    for (const u of list) {
+      if (!u) continue;
+      const id = String(u.id ?? '');
+      const nm = String(u.name ?? '').trim();
+      if (id) map.set(id, nm || id);
+    }
+    return map;
+  }
+
+  function normalizeInfoStatus(status) {
+    const s = String(status || '').toLowerCase();
+    // маппим внутренние формулировки на требуемые пользователем
+    if (s.includes('нет доступа')) return 'нет доступа';
+    if (s.includes('нет данных') || s.includes('не найден')) return 'пользователь не упоминается в хронологии';
+    return ''; // не интересует для "Показать детали"
+  }
+
+  createForumButton({
+    allowedGroups: GID,
+    allowedForums: FID,
+    label: 'обновить персоналки',
+    order: 4,
+    showStatus: true,
+    showDetails: true,
+    showLink: false,
+
+    async onClick(api) {
+      const setStatus  = api?.setStatus  || (()=>{});
+      const setDetails = api?.setDetails || (()=>{});
+
+      setDetails('');
+      try {
+        // Этап 1: сбор подготовительных данных/сечений
+        setStatus('Собираю…');
+
+        const explicitIds = Array.isArray(window.CHRONO_CHECK?.UserIDs) ? window.CHRONO_CHECK.UserIDs : undefined;
+        const nameMap = await getUserNameMap(explicitIds);
+
+        // Этап 2: массовое обновление
+        setStatus('Обновляю…');
+
+        const results = await FMV.runBulkChronoUpdate({
+          ids: explicitIds,
+          sections: SECTIONS,
+          // при необходимости можно прокинуть verify/titlePrefix:
+          // verify: false,
+          // titlePrefix: 'Хронология'
+        }); // вернёт [{ id, status, page? }] — см. реализацию в update_personal
+
+        // Пост-обработка результатов
+        const lines = [];
+        for (const r of (results || [])) {
+          const info = normalizeInfoStatus(r?.status);
+          if (!info) continue; // нас интересуют только 2 типа
+          const id = String(r?.id || '');
+          const name = nameMap.get(id) || id;
+          lines.push(`${userLinkHtml(id, name)} — ${FMV.escapeHtml(info)}`);
+        }
+
+        // Если сам вызов отработал — это «Готово», даже если были частичные "нет доступа"/"не упоминается"
+        setStatus('Готово');
+        setDetails(lines.length ? lines.join('\n') : ''); // пусто — если нет «проблемных» юзеров
+      } catch (e) {
+        setStatus('Ошибка');
+        setDetails(e?.message || String(e));
+      }
+    }
+  });
+})();

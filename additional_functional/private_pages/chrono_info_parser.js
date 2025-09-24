@@ -262,7 +262,7 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   }
 
   html += `</div>`;
-  return html + css;
+  return html;
 };
 
 

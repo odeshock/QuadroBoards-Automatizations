@@ -263,10 +263,7 @@
       .join("");
   
     // Шапка + фильтры
-    let html = `
-  <script type="text/javascript" src="https://odeshock.github.io/QuadroBoards-Automatizations/additional_functional/private_pages/chrono_filter.js"></script>
-  
-  <section class="filters" id="filters">
+    let html = `<div class="filters" id="filters">
     <div class="f">
       <label>Дата начала фильтра</label>
       <input type="date" id="dateStart" value="${escAttr(globalMin || "")}">
@@ -323,9 +320,9 @@
     <div class="actions">
       <button class="btn" id="resetBtn">Сбросить</button>
     </div>
-  </section>
+  </div>
   
-  <section class="list" id="list">
+  <div class="list" id="list">
     `;
    
     // Эпизоды
@@ -395,7 +392,7 @@
   </div>`;
     });
 
-    html += `</section>`;
+    html += `</div>\n<script type="text/javascript" src="https://odeshock.github.io/QuadroBoards-Automatizations/additional_functional/private_pages/chrono_filter.js"></script>`;
     return html;
   };
 })();

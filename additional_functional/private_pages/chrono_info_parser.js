@@ -158,7 +158,7 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   let html = `
 <h1 style="margin:0 0 8px 0;font-size:22px">${esc(titlePrefix)} — ${userName}</h1>
 
-<section class="filters" id="filters">
+<div class="filters" id="filters">
   <div class="f">
     <label>Дата начала фильтра</label>
     <input type="date" id="dateStart">
@@ -213,9 +213,9 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   <div class="actions">
     <button class="btn" id="resetBtn">Сбросить</button>
   </div>
-</section>
+</div>
 
-<section class="list" id="list">
+<div class="list" id="list">
 `;
 
   // ===== список эпизодов =====
@@ -264,7 +264,7 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
   </div>`;
   }
 
-  html += `</section>`;
+  html += `</div>`;
   return html + css;
 };
 

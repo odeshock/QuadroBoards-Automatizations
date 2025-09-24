@@ -282,7 +282,7 @@
       const statusOptions = Object.entries(STATUS_RU)
         .map(([key, s]) => `<label><input type="checkbox" name="status" value="${escAttr(key)}"> ${esc(s.label)}</label>`)
         .join("");
-      const maskOptions = masksAll
+      const maskOptions = unique(masksAll)
         .map(m => `<label><input type="checkbox" name="mask" value="${escAttr(m)}"> ${esc(m)}</label>`)
         .join("");
       const playerOptions = playersData

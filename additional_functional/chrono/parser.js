@@ -76,11 +76,22 @@ function parseHeaderNew(dateTitleNodes, metaNodes, linkEl) {
   let datePart = (wrap.querySelector('strong')?.textContent || '').trim();
 
   if (!datePart) {
-    // (б) искать дату только В НАЧАЛЕ строки
-    const m = l1Text.match(/^\s*(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\.\d{4}|\d{4})(?:\s*[-—–]\s*(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\.\d{4}|\d{4}))?/);
-    if (m) {
-      dateStart = m[1];
-      dateEnd   = m[2] || '';
+        // (б) пытаемся взять префикс до первого « —/–/- » как кандидата на дату
+    const head = l1Text.split(/\s[—–-]\s/)[0]?.trim() || '';
+    const d = parseDateFlexible(head); // уже умеет все нужные форматы и диапазоны
+    if (d && d.hasDate) {
+      // сохраняем как текстовые значения для твоей дальнейшей логики
+      const show = (a) =>
+        a?.y != null
+          ? (a.d != null ? `${String(a.d).padStart(2,'0')}.${String(a.m).padStart(2,'0')}.${a.y}`
+             : a.m != null ? `${String(a.m).padStart(2,'0')}.${a.y}`
+             : String(a.y))
+          : '';
+      dateStart = show(d.left);
+      // ставим dateEnd только если диапазон реально есть
+      dateEnd = (d.right && (d.right.y !== d.left.y || d.right.m != null || d.right.d != null))
+                  ? show(d.right)
+                  : '';
     }
   } else {
     // распарсить диапазон из strong, если он есть
@@ -305,6 +316,21 @@ async function collectEpisodesFromForums(opts = {}) {
       else if (R0.m != null)                 L0 = { y:R0.y, m:v };
       else                                   L0 = { y: toYYYY(v) };
     }
+
+    // если оба — чисто двухзначные годы и получился "перевёрнутый" диапазон,
+    // подгоняем век левой границы под правую
+    const left2  = /^\d{1,2}$/.test(leftRaw);
+    const right2 = /^\d{1,2}$/.test(rightRaw);
+    if (left2 && right2 && L0?.y && R0?.y && (L0.m==null && L0.d==null) && (R0.m==null && R0.d==null)) {
+      if (L0.y > R0.y) {
+        // примем век правой границы для левой
+        const century = Math.floor(R0.y / 100) * 100;       // 1900 или 2000
+        const yy = +leftRaw;                                 // 22
+        L0.y = century + yy;                                 // 1922
+      }
+    }
+
+    
     if (L0 && L0.y == null && L0.d != null && L0.m != null && R0.y) L0.y = R0.y;
     const okDay = (o)=> (o.d==null) || (o.y && o.m && o.d>=1 && o.d<=daysInMonth(o.y,o.m));
     if (!okDay(L0) || !okDay(R0)) return { hasDate:false, display:'', startSort:[0,0,0], endSort:[0,0,0] };

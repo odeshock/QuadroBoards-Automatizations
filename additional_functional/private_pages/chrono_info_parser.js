@@ -26,7 +26,7 @@
   };
   const STATUS_RU = {
     active:   { label: "активен",     emoji: "<иконка>" },
-    archived: { label: "архивирован", emoji: "<иконка>" },
+    archived: { label: "неактуален", emoji: "<иконка>" },
     closed:   { label: "закрыт",      emoji: "<иконка>" },
   };
 
@@ -146,14 +146,22 @@ FMV.buildChronoHtml = function buildChronoHtml(userData, opts = {}) {
     <label>Тип</label>
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="typeToggle">Выбрать тип</button>
-      <div class="dropdown-list" id="typeList"></div>
+      <div class="dropdown-list" id="typeList">
+        <label><input type="checkbox" name="type" value="personal"> личный</label>
+        <label><input type="checkbox" name="type" value="plot"> сюжетный</label>
+        <label><input type="checkbox" name="type" value="au"> au</label></div>
+      </div>
     </div>
   </div>
   <div class="f">
     <label>Статус</label>
     <div class="dropdown-wrapper">
       <button class="dropdown-toggle" id="statusToggle">Выбрать статус</button>
-      <div class="dropdown-list" id="statusList"></div>
+      <div class="dropdown-list" id="statusList">
+        <label><input type="checkbox" name="status" value="active"> активен</label>
+        <label><input type="checkbox" name="status" value="archived"> неактуален</label>
+        <label><input type="checkbox" name="status" value="closed"> закрыт</label></div>
+      </div>
     </div>
   </div>
   <div class="f">

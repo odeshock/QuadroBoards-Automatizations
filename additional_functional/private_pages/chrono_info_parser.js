@@ -333,7 +333,7 @@
       </div>
     </div>
     <div class="f">
-      <label>Соигрок</label>
+      <label>Участник</label>
       <div class="dropdown-wrapper">
         <button class="dropdown-toggle" id="playerToggle">Выбрать соигрока</button>
         <div class="dropdown-list" id="playerList">
@@ -371,7 +371,7 @@
     <div>${dateBlock}<span class="title"><a href="${esc(ep?.href || "#")}">${esc(ep?.title || "")}</a></span>
       ${masks.length ? ` [as ${esc(masks.join(", "))}]` : ""}</div>
     <div>локация: ${esc(loc)}</div>
-    <div>соигроки: ${esc(playersHuman)}</div>
+    <div>участники: ${esc(playersHuman)}</div>
   </div>`;
     });
 

@@ -1,22 +1,16 @@
-// modal.js — финальная сборка
+// modal.js — stable/safe версия без обязательного fetch
 (function () {
-  // === Настройки ===
-  const MODAL_SEL   = '#character';
-  const WRAP_SEL    = '#character > .modal_wrap';      // контейнер контента в модалке
-  const CLOSE_SEL   = '#character .close-reveal-modal';
-  const DEFAULT_CHARSET = 'windows-1251';
+  const MODAL_SEL = '#character';
+  const WRAP_SEL  = '#character > .modal_wrap';
+  const CLOSE_SEL = '#character .close-reveal-modal';
   const DEBUG = false;
-  // ==================
 
   const log  = (...a) => DEBUG && console.log('[Modal]', ...a);
   const warn = (...a) => DEBUG && console.warn('[Modal]', ...a);
 
-  let ctl = null;                 // AbortController для загрузки страницы
-  let lastFilterApi = null;       // чтобы корректно снимать обработчики при закрытии
-  const pageCache = new Map();    // url -> Document (кэш исходных страниц)
-  let isOpening = false;          // замок от авто-тоггла во время открытия
+  let lastFilterApi = null;
+  let isOpening = false;
 
-  // Мгновенно показываемый скелет
   const INSTANT_TEMPLATE =
     '<div class="container">\n' +
     '  <div class="character" data-id>шаблон1\n' +
@@ -25,55 +19,34 @@
     '  </div>\n' +
     '</div>';
 
-  function normalizeUrl(pageId) {
-    // поддержим: usrN | /pages/usrN | полный href
-    if (!pageId) return null;
-    try {
-      if (/^https?:\/\//i.test(pageId)) {
-        const u = new URL(pageId, location.origin);
-        const m = u.pathname.match(/(?:^|\/)usr\d+(?:$|(?=\/))/i) || u.pathname.match(/(?:^|\/)pages\/(usr\d+)(?:$|(?=\/))/i);
-        return m ? '/pages/' + (m[1] || m[0].replace(/^\//,'')) : u.pathname;
-      }
-    } catch(_) {}
-    if (/^\/?pages\//i.test(pageId)) return pageId.startsWith('/') ? pageId : ('/' + pageId);
-    return pageId.startsWith('/') ? pageId : ('/pages/' + pageId);
+  // --- утилиты ---
+  function extractN(any) {
+    const m = String(any || '').match(/usr(\d+)/i);
+    return m ? m[1] : null;
   }
-
-  async function fetchDoc(url) {
-    if (pageCache.has(url)) return pageCache.get(url);
-    ctl?.abort();
-    ctl = new AbortController();
-    const res = await fetch(url, { signal: ctl.signal, credentials: 'include' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-
-    const ct = res.headers.get('content-type') || '';
-    const m = ct.match(/charset=([^;]+)/i);
-    const charset = (m ? m[1] : DEFAULT_CHARSET).toLowerCase();
-
-    const buf  = await res.arrayBuffer();
-    const html = new TextDecoder(charset).decode(buf);
-    const doc  = new DOMParser().parseFromString(html, 'text/html');
-    pageCache.set(url, doc);
-    return doc;
+  function getPageIdFrom(el) {
+    const $el = $(el);
+    const idAttr   = $el.attr('id');          // usr4
+    const dataPage = $el.data('page');        // usr4
+    const href     = $el.attr('href') || '';  // /pages/usr4 или usr4
+    const fromHref = (href.match(/(?:^|\/)(usr\d+)(?=$|[/?#])/i) || [])[1];
+    return idAttr || dataPage || fromHref || href || '';
   }
 
   function openModal() {
-    const $modal = $(MODAL_SEL);
-    if (!$modal.length) return null;
-    $modal.css({ visibility: 'visible', opacity: 1 });
-    // если у темы есть фон модалки — блокируем клики, чтобы внешние делегаты не схлопнули окно
-    $('.reveal-modal-bg').css('pointer-events','none');
-    return $modal[0];
+    const $m = $(MODAL_SEL);
+    if (!$m.length) return null;
+    // некоторые темы скрывают через display:none — включим явно
+    $m.addClass('open').css({ display: 'block', visibility: 'visible', opacity: 1 });
+    return $m[0];
   }
-
   function closeModal() {
-    const $modal = $(MODAL_SEL);
-    if (!$modal.length) return;
+    const $m = $(MODAL_SEL);
+    if (!$m.length) return;
     if (lastFilterApi?.destroy) lastFilterApi.destroy();
     lastFilterApi = null;
     $(WRAP_SEL).empty();
-    $modal.css({ visibility: '', opacity: '' });
-    $('.reveal-modal-bg').css('pointer-events','');
+    $m.removeClass('open').css({ display: '', visibility: '', opacity: '' });
   }
 
   async function loadIntoModal(pageId) {
@@ -83,78 +56,79 @@
     const $wrap = $(WRAP_SEL);
     if (!$wrap.length) return;
 
-    // 1) мгновенный скелет
+    // 1) скелет — сразу
     $wrap.html(INSTANT_TEMPLATE);
 
-    try {
-      const url = normalizeUrl(pageId);
-      if (!url) throw new Error('Не удалось определить URL для "' + pageId + '"');
+    // 2) достаём usrN прямо из кликнутой ссылки/идентификатора
+    const N = extractN(pageId);
+    const charNow = $wrap[0].querySelector('.character[data-id]');
+    if (!N) {
+      warn('Не удалось определить usrN из', pageId);
+      charNow?.removeAttribute('data-id');
+      return; // скелет остаётся, чтобы было видно, что модалка открылась
+    }
+    charNow.setAttribute('data-id', N);
 
-      const doc = await fetchDoc(url);
-
-      // 2) найдём .character[data-id] на странице и проставим тот же data-id в наш скелет
-      const sourceCharacter = doc.querySelector('.character[data-id]');
-      if (!sourceCharacter) throw new Error('character[data-id] не найден на странице');
-      const N = sourceCharacter.getAttribute('data-id');
-      const charNow = $wrap[0].querySelector('.character[data-id]');
-      if (charNow) charNow.setAttribute('data-id', N);
-
-      // 3) подтянем skin + chrono внутрь этого корня
-      if (window.loadUserSections) {
+    // 3) подгружаем skin/chrono строго в пределах этой модалки
+    if (window.loadUserSections) {
+      try {
         await window.loadUserSections({ root: $wrap[0] });
-      } else {
-        warn('window.loadUserSections не найден — подключите collect_skin_n_chrono.js');
+      } catch (e) {
+        console.error('[Modal] loadUserSections error:', e);
       }
+    } else {
+      warn('window.loadUserSections не найден — подключите collect_skin_n_chrono.js');
+    }
 
-      // 4) активируем фильтры ТОЛЬКО в пределах этой модалки
-      if (window.ChronoFilter && typeof window.ChronoFilter.init === 'function') {
+    // 4) активируем фильтры локально (модульная версия)
+    try {
+      const filtersRoot = $wrap[0].querySelector('#filters');
+      if (filtersRoot && window.ChronoFilter?.init) {
         lastFilterApi = window.ChronoFilter.init({ root: $wrap[0] });
-      } else if (window.ChronoFilter?.apply) {
-        // если старая версия — хотя бы применим
+      } else if (filtersRoot && window.ChronoFilter?.apply) {
+        // старая версия — применим как есть
         window.ChronoFilter.apply();
-      } else {
-        warn('ChronoFilter.init не найден — подключите модульную chrono_filter.js');
       }
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      console.error('[Modal] Ошибка:', err);
-      $wrap.text('Ошибка загрузки');
+    } catch (e) {
+      warn('ChronoFilter init error:', e);
     }
   }
 
-  // Открытие по клику — защита от самозакрытия
+  // --- делегаты ---
+  // ВАЖНО: не используем stopImmediatePropagation глобально, чтобы не ломать тему;
+  // глушим только всплытие и default у наших ссылок
   $(document).on('click', '.modal-link', function (e) {
     e.preventDefault();
     e.stopPropagation();
-    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 
     if (isOpening) return;
     isOpening = true;
 
-    const href      = $(this).attr('href') || '';
-    const idAttr    = $(this).attr('id');
-    const dataPage  = $(this).data('page');
-    const fromHref  = (href.match(/(?:^|\/)usr\d+(?:$|(?=\/))/i) || [])[0] || (href.match(/pages\/(usr\d+)/i) || [])[1];
-    const pageId    = idAttr || dataPage || fromHref || href || '';
+    const pageId = getPageIdFrom(this);
     if (!pageId) { isOpening = false; return; }
 
     loadIntoModal(pageId).finally(() => {
-      setTimeout(() => { isOpening = false; }, 200);
+      setTimeout(() => { isOpening = false; }, 150);
     });
   });
 
-  // клики по контенту модалки не должны проламываться наружу
+  // клики внутри контента не проламываются наружу
   $(document).on('click', '#character .modal_wrap', function (e) {
     e.stopPropagation();
   });
 
-  // Закрытие модалки (крестик и Esc)
-  $(document).on('click', CLOSE_SEL, function () { closeModal(); });
+  // закрытие — крестик и Esc
+  $(document).on('click', CLOSE_SEL, function (e) {
+    e.preventDefault();
+    closeModal();
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
   });
 
-  // Программный вызов
-  window.openCharacterModal = function (pageId) { loadIntoModal(pageId); };
+  // программный вызов
+  window.openCharacterModal  = (pageId) => loadIntoModal(pageId);
   window.closeCharacterModal = closeModal;
+
+  if (DEBUG) log('modal ready');
 })();

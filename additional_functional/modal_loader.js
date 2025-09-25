@@ -1,134 +1,128 @@
-// modal.js — stable/safe версия без обязательного fetch
-(function () {
-  const MODAL_SEL = '#character';
-  const WRAP_SEL  = '#character > .modal_wrap';
-  const CLOSE_SEL = '#character .close-reveal-modal';
-  const DEBUG = false;
+// chrono_filter.js — модульная, корне-изолированная версия
+(() => {
+  function makeFilterAPI(root) {
+    const $  = (sel, r = root) => r.querySelector(sel);
+    const $$ = (sel, r = root) => Array.from(r.querySelectorAll(sel));
+    const parseDate = v => (v ? new Date(v) : null);
+    const getChecked = (box, name) =>
+      Array.from(box?.querySelectorAll(`input[name="${name}"]:checked`) || []).map(i => i.value);
 
-  const log  = (...a) => DEBUG && console.log('[Modal]', ...a);
-  const warn = (...a) => DEBUG && console.warn('[Modal]', ...a);
-
-  let lastFilterApi = null;
-  let isOpening = false;
-
-  const INSTANT_TEMPLATE =
-    '<div class="container">\n' +
-    '  <div class="character" data-id>шаблон1\n' +
-    '    <div class="skin_info"></div>\n' +
-    '    <div class="chrono_info"></div>\n' +
-    '  </div>\n' +
-    '</div>';
-
-  // --- утилиты ---
-  function extractN(any) {
-    const m = String(any || '').match(/usr(\d+)/i);
-    return m ? m[1] : null;
-  }
-  function getPageIdFrom(el) {
-    const $el = $(el);
-    const idAttr   = $el.attr('id');          // usr4
-    const dataPage = $el.data('page');        // usr4
-    const href     = $el.attr('href') || '';  // /pages/usr4 или usr4
-    const fromHref = (href.match(/(?:^|\/)(usr\d+)(?=$|[/?#])/i) || [])[1];
-    return idAttr || dataPage || fromHref || href || '';
-  }
-
-  function openModal() {
-    const $m = $(MODAL_SEL);
-    if (!$m.length) return null;
-    // некоторые темы скрывают через display:none — включим явно
-    $m.addClass('open').css({ display: 'block', visibility: 'visible', opacity: 1 });
-    return $m[0];
-  }
-  function closeModal() {
-    const $m = $(MODAL_SEL);
-    if (!$m.length) return;
-    if (lastFilterApi?.destroy) lastFilterApi.destroy();
-    lastFilterApi = null;
-    $(WRAP_SEL).empty();
-    $m.removeClass('open').css({ display: '', visibility: '', opacity: '' });
-  }
-
-  async function loadIntoModal(pageId) {
-    const rootModal = openModal();
-    if (!rootModal) return;
-
-    const $wrap = $(WRAP_SEL);
-    if (!$wrap.length) return;
-
-    // 1) скелет — сразу
-    $wrap.html(INSTANT_TEMPLATE);
-
-    // 2) достаём usrN прямо из кликнутой ссылки/идентификатора
-    const N = extractN(pageId);
-    const charNow = $wrap[0].querySelector('.character[data-id]');
-    if (!N) {
-      warn('Не удалось определить usrN из', pageId);
-      charNow?.removeAttribute('data-id');
-      return; // скелет остаётся, чтобы было видно, что модалка открылась
-    }
-    charNow.setAttribute('data-id', N);
-
-    // 3) подгружаем skin/chrono строго в пределах этой модалки
-    if (window.loadUserSections) {
-      try {
-        await window.loadUserSections({ root: $wrap[0] });
-      } catch (e) {
-        console.error('[Modal] loadUserSections error:', e);
-      }
-    } else {
-      warn('window.loadUserSections не найден — подключите collect_skin_n_chrono.js');
+    const filters = $('#filters');
+    const list    = $('#list');
+    if (!filters || !list) {
+      return { apply: () => [], reset: () => [], getVisible: () => [], destroy: () => {} };
     }
 
-    // 4) активируем фильтры локально (модульная версия)
-    try {
-      const filtersRoot = $wrap[0].querySelector('#filters');
-      if (filtersRoot && window.ChronoFilter?.init) {
-        lastFilterApi = window.ChronoFilter.init({ root: $wrap[0] });
-      } else if (filtersRoot && window.ChronoFilter?.apply) {
-        // старая версия — применим как есть
-        window.ChronoFilter.apply();
-      }
-    } catch (e) {
-      warn('ChronoFilter init error:', e);
+    const elDateStart = $('#dateStart');
+    const elDateEnd   = $('#dateEnd');
+    const elReset     = $('#resetBtn');
+
+    const typeBox     = $('#typeList');
+    const statusBox   = $('#statusList');
+    const maskBox     = $('#maskList');
+    const playerBox   = $('#playerList');
+    const locationBox = $('#locationList');
+
+    // дропдауны
+    function wireToggle(btnSel, listEl) {
+      const btn  = $(btnSel);
+      if (!btn || !listEl) return () => {};
+      const onBtn = (e) => { e.stopPropagation(); listEl.style.display = listEl.style.display === 'block' ? 'none' : 'block'; };
+      const onDoc = (e) => { if (!listEl.contains(e.target) && !btn.contains(e.target)) listEl.style.display = 'none'; };
+      btn.addEventListener('click', onBtn);
+      document.addEventListener('click', onDoc);
+      return () => { btn.removeEventListener('click', onBtn); document.removeEventListener('click', onDoc); };
     }
-  }
 
-  // --- делегаты ---
-  // ВАЖНО: не используем stopImmediatePropagation глобально, чтобы не ломать тему;
-  // глушим только всплытие и default у наших ссылок
-  $(document).on('click', '.modal-link', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
+    const unTypeTgl     = wireToggle('#typeToggle',     typeBox);
+    const unStatusTgl   = wireToggle('#statusToggle',   statusBox);
+    const unMaskTgl     = wireToggle('#maskToggle',     maskBox);
+    const unPlayerTgl   = wireToggle('#playerToggle',   playerBox);
+    const unLocationTgl = wireToggle('#locationToggle', locationBox);
 
-    if (isOpening) return;
-    isOpening = true;
-
-    const pageId = getPageIdFrom(this);
-    if (!pageId) { isOpening = false; return; }
-
-    loadIntoModal(pageId).finally(() => {
-      setTimeout(() => { isOpening = false; }, 150);
+    const episodes = $$('#list .episode').map(el => {
+      const masks   = (el.dataset.mask    || '').split(';').map(s => s.trim()).filter(Boolean);
+      const players = (el.dataset.players || '').split(';').map(s => s.trim()).filter(Boolean);
+      return {
+        el,
+        type:    (el.dataset.type    || '').trim(),
+        status:  (el.dataset.status  || '').trim(),
+        startL:  parseDate(el.dataset.startL),
+        startR:  parseDate(el.dataset.startR),
+        endL:    parseDate(el.dataset.endL),
+        endR:    parseDate(el.dataset.endR),
+        masks, players,
+        location: (el.dataset.location || '').trim()
+      };
     });
-  });
 
-  // клики внутри контента не проламываются наружу
-  $(document).on('click', '#character .modal_wrap', function (e) {
-    e.stopPropagation();
-  });
+    function apply() {
+      const ds = elDateStart?.value ? new Date(elDateStart.value) : null;
+      const de = elDateEnd?.value   ? new Date(elDateEnd.value)   : null;
 
-  // закрытие — крестик и Esc
-  $(document).on('click', CLOSE_SEL, function (e) {
-    e.preventDefault();
-    closeModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
-  });
+      const selType     = getChecked(typeBox,     'type');
+      const selStatus   = getChecked(statusBox,   'status');
+      const selMask     = getChecked(maskBox,     'mask');
+      const selPlayer   = getChecked(playerBox,   'player');
+      const selLocation = getChecked(locationBox, 'location');
 
-  // программный вызов
-  window.openCharacterModal  = (pageId) => loadIntoModal(pageId);
-  window.closeCharacterModal = closeModal;
+      const visible = [], hidden = [];
 
-  if (DEBUG) log('modal ready');
+      episodes.forEach(ep => {
+        let ok = true;
+        if (ok && ds && ep.endL   && ep.endL   < ds) ok = false;
+        if (ok && de && ep.startR && ep.startR > de) ok = false;
+        if (ok && selType.length     && !selType.includes(ep.type))           ok = false;
+        if (ok && selStatus.length   && !selStatus.includes(ep.status))       ok = false;
+        if (ok && selMask.length     && !ep.masks.some(m => selMask.includes(m)))   ok = false;
+        if (ok && selPlayer.length   && !ep.players.some(p => selPlayer.includes(p))) ok = false;
+        if (ok && selLocation.length && !selLocation.includes(ep.location))   ok = false;
+
+        ep.el.style.display = ok ? '' : 'none';
+        (ok ? visible : hidden).push(ep.el);
+      });
+
+      // событие — от корня модалки
+      root.dispatchEvent(new CustomEvent('chrono:filtered', { detail: { visible, hidden } }));
+      return visible;
+    }
+
+    function reset() {
+      if (elDateStart) elDateStart.value = '';
+      if (elDateEnd)   elDateEnd.value   = '';
+      $$('#filters .dropdown-list input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+      return apply();
+    }
+
+    function onChange(e) {
+      if (e.target.closest('#filters .dropdown-list') && e.target.matches('input[type="checkbox"]')) apply();
+    }
+    root.addEventListener('change', onChange);
+    elDateStart?.addEventListener('change', apply);
+    elDateEnd?.addEventListener('change', apply);
+    elReset?.addEventListener('click', (e) => { e.preventDefault(); reset(); });
+
+    apply();
+
+    return {
+      apply, reset,
+      getVisible: () => episodes.filter(ep => ep.el.style.display !== 'none').map(ep => ep.el),
+      destroy: () => {
+        root.removeEventListener('change', onChange);
+        elDateStart?.removeEventListener('change', apply);
+        elDateEnd?.removeEventListener('change', apply);
+        elReset?.removeEventListener('click', reset);
+        unTypeTgl(); unStatusTgl(); unMaskTgl(); unPlayerTgl(); unLocationTgl();
+      }
+    };
+  }
+
+  // Публичный API — то, что ждёт modal_loader
+  window.ChronoFilter = {
+    init({ root } = {}) { return makeFilterAPI(root || document); },
+    apply: () => [],
+    reset: () => [],
+    getVisible: () => [],
+    destroy: () => {}
+  };
 })();

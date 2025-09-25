@@ -1,25 +1,22 @@
-// chrono_filter.js — модальный, корне-изолированный вариант
+// chrono_filter.js — модульная, корне-изолированная версия
 (() => {
   function makeFilterAPI(root) {
     const $  = (sel, r = root) => r.querySelector(sel);
     const $$ = (sel, r = root) => Array.from(r.querySelectorAll(sel));
     const parseDate = v => (v ? new Date(v) : null);
-    const getChecked = (container, name) =>
-      Array.from(container.querySelectorAll(`input[name="${name}"]:checked`)).map(i => i.value);
+    const getChecked = (box, name) =>
+      Array.from(box?.querySelectorAll(`input[name="${name}"]:checked`) || []).map(i => i.value);
 
     const filters = $('#filters');
     const list    = $('#list');
     if (!filters || !list) {
-      // если в этом корне нет фильтров — отдадим пустое API
       return { apply: () => [], reset: () => [], getVisible: () => [], destroy: () => {} };
     }
 
-    // локальные элементы (только внутри root!)
     const elDateStart = $('#dateStart');
     const elDateEnd   = $('#dateEnd');
     const elReset     = $('#resetBtn');
 
-    // контейнеры для чекбоксов (как узлы, а не по id)
     const typeBox     = $('#typeList');
     const statusBox   = $('#statusList');
     const maskBox     = $('#maskList');
@@ -43,7 +40,6 @@
     const unPlayerTgl   = wireToggle('#playerToggle',   playerBox);
     const unLocationTgl = wireToggle('#locationToggle', locationBox);
 
-    // распарсим эпизоды ОДИН раз (внутри root)
     const episodes = $$('#list .episode').map(el => {
       const masks   = (el.dataset.mask    || '').split(';').map(s => s.trim()).filter(Boolean);
       const players = (el.dataset.players || '').split(';').map(s => s.trim()).filter(Boolean);
@@ -61,14 +57,14 @@
     });
 
     function apply() {
-      const ds = elDateStart && elDateStart.value ? new Date(elDateStart.value) : null;
-      const de = elDateEnd   && elDateEnd.value   ? new Date(elDateEnd.value)   : null;
+      const ds = elDateStart?.value ? new Date(elDateStart.value) : null;
+      const de = elDateEnd?.value   ? new Date(elDateEnd.value)   : null;
 
-      const selType     = typeBox     ? getChecked(typeBox,     'type')     : [];
-      const selStatus   = statusBox   ? getChecked(statusBox,   'status')   : [];
-      const selMask     = maskBox     ? getChecked(maskBox,     'mask')     : [];
-      const selPlayer   = playerBox   ? getChecked(playerBox,   'player')   : [];
-      const selLocation = locationBox ? getChecked(locationBox, 'location') : [];
+      const selType     = getChecked(typeBox,     'type');
+      const selStatus   = getChecked(statusBox,   'status');
+      const selMask     = getChecked(maskBox,     'mask');
+      const selPlayer   = getChecked(playerBox,   'player');
+      const selLocation = getChecked(locationBox, 'location');
 
       const visible = [], hidden = [];
 
@@ -86,7 +82,7 @@
         (ok ? visible : hidden).push(ep.el);
       });
 
-      // событие отсылаем из root (чтобы внешние слушатели могли отфильтровать по таргету)
+      // событие — от корня модалки
       root.dispatchEvent(new CustomEvent('chrono:filtered', { detail: { visible, hidden } }));
       return visible;
     }
@@ -98,16 +94,14 @@
       return apply();
     }
 
-    // слушатели только по корню
     function onChange(e) {
       if (e.target.closest('#filters .dropdown-list') && e.target.matches('input[type="checkbox"]')) apply();
     }
     root.addEventListener('change', onChange);
-    if (elDateStart) elDateStart.addEventListener('change', apply);
-    if (elDateEnd)   elDateEnd.addEventListener('change', apply);
-    if (elReset)     elReset.addEventListener('click', (e) => { e.preventDefault(); reset(); });
+    elDateStart?.addEventListener('change', apply);
+    elDateEnd?.addEventListener('change', apply);
+    elReset?.addEventListener('click', (e) => { e.preventDefault(); reset(); });
 
-    // первая прогонка
     apply();
 
     return {
@@ -115,24 +109,17 @@
       getVisible: () => episodes.filter(ep => ep.el.style.display !== 'none').map(ep => ep.el),
       destroy: () => {
         root.removeEventListener('change', onChange);
-        if (elDateStart) elDateStart.removeEventListener('change', apply);
-        if (elDateEnd)   elDateEnd.removeEventListener('change', apply);
-        if (elReset)     elReset.removeEventListener('click', reset);
+        elDateStart?.removeEventListener('change', apply);
+        elDateEnd?.removeEventListener('change', apply);
+        elReset?.removeEventListener('click', reset);
         unTypeTgl(); unStatusTgl(); unMaskTgl(); unPlayerTgl(); unLocationTgl();
       }
     };
   }
 
-  // ПУБЛИЧНЫЙ API
+  // Публичный API — то, что ждёт modal_loader
   window.ChronoFilter = {
-    // инициализация внутри конкретного корня модалки
-    init({ root } = {}) {
-      const r = root || document;
-      const api = makeFilterAPI(r);
-      // можно вернуть API, если нужно управлять извне
-      return api;
-    },
-    // заглушки на случай прямых вызовов
+    init({ root } = {}) { return makeFilterAPI(root || document); },
     apply: () => [],
     reset: () => [],
     getVisible: () => [],

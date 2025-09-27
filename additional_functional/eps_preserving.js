@@ -428,7 +428,7 @@ ${htmlBlocks.join('\n')}
 
   const zip = new SimpleZip();
   const failures = [];
-  const bundleName = `${safeName(document.title)}_bundle`;
+  const bundleName = `${safeName(document.title)}`;
 
   for (const href of threads){
     console.log('▶ Экспорт темы:', href);

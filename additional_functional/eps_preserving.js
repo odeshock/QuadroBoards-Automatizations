@@ -9,7 +9,9 @@
   const POST_SEPARATOR = '\n\n----------------\n\n';
   const TOPIC_SEP = `\n\n${'='.repeat(80)}\n\n`;
 
-  const QUIET_CSS_WARNINGS = true; // тихий режим для ошибок CSS
+  // стили: тихо и только same-origin, чтобы не было CORS-алертов в консоли
+  const QUIET_CSS_WARNINGS = true;
+  const CSS_SAME_ORIGIN_ONLY = true;
 
   // ===================== УТИЛИТЫ =====================
   const enc = new TextEncoder();
@@ -172,7 +174,7 @@
       try{ const u=abs(img.getAttribute('src'), pageUrl); img.setAttribute('src', u); imgSet.add(u);}catch{}
     });
 
-    // собрать IMG из BBCode/голых URL в тексте
+    // IMG из BBCode/голых URL в тексте
     const rawText = node.textContent || '';
     for (const re of [BBCODE_IMG_RE, PLAIN_IMG_URL_RE]) {
       let m; re.lastIndex = 0;
@@ -180,7 +182,7 @@
         try { imgSet.add(new URL(m[1] || m[0], pageUrl).href); } catch {}
       }
     }
-    // преобразовать BBCode в <img>
+    // BBCode -> <img>
     const bbcodeToImg = (html) => html.replace(BBCODE_IMG_RE, (_m, url) => `<img src="${url}">`);
 
     const content = bbcodeToImg(node.innerHTML);
@@ -193,27 +195,43 @@
   }
   const escapeHtml = (s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  // ---- ПОЛНЫЙ CSS СТРАНИЦЫ (тихий режим) ----
+  // ---- ПОЛНЫЙ CSS СТРАНИЦЫ (тихо + только same-origin) ----
   async function collectPageCSS(doc, pageUrl, fetched) {
     let css = '';
+
+    // inline <style>
     doc.querySelectorAll('style').forEach(st => {
-      try { css += rewriteCssUrls(st.textContent||'', pageUrl) + '\n'; }
-      catch(e){ if(!QUIET_CSS_WARNINGS) console.warn('inline <style> parse error', e?.message); }
+      try { css += rewriteCssUrls(st.textContent || '', pageUrl) + '\n'; }
+      catch(e){ /* тихо */ }
     });
+
+    // внешние стили
     const links = [...doc.querySelectorAll('link[rel~="stylesheet"][href]')];
     for (const ln of links) {
-      const href = abs(ln.getAttribute('href'), pageUrl);
-      if (fetched.has(href)) continue;
-      fetched.add(href);
+      const hrefAbs = abs(ln.getAttribute('href'), pageUrl);
+      if (fetched.has(hrefAbs)) continue;
+      fetched.add(hrefAbs);
+
+      if (CSS_SAME_ORIGIN_ONLY) {
+        try {
+          const same = new URL(hrefAbs, location.href).origin === location.origin;
+          if (!same) continue; // тихо пропускаем чужие домены
+        } catch { continue; }
+      }
+
       try {
-        const same = new URL(href, location.href).origin === location.origin;
-        const res = await fetch(href, same ? { credentials:'include' } : { mode:'cors', credentials:'omit' });
-        if (!res.ok) { if(!QUIET_CSS_WARNINGS) console.warn('CSS fetch fail', res.status, href); continue; }
+        const same = new URL(hrefAbs, location.href).origin === location.origin;
+        const res = await fetch(hrefAbs, same ? { credentials:'include' } : { mode:'cors', credentials:'omit' });
+        if (!res.ok) continue;                // тихо
         const text = await res.text();
-        css += rewriteCssUrls(text, href) + '\n';
-      } catch (e) { if(!QUIET_CSS_WARNINGS) console.warn('CSS fetch error', href, e?.message); }
+        css += rewriteCssUrls(text, hrefAbs) + '\n';
+      } catch {
+        // тихо
+      }
+
       await sleep(50);
     }
+
     return css.trim();
   }
   function rewriteCssUrls(cssText, baseUrl) {
@@ -245,11 +263,10 @@
       return new Blob([...this.parts,cent,eocd],{type:'application/zip'});}
   }
 
-  // ---------- экспорт темы (TXT + HTML + IMG + CSS) ----------
+  // ---------- экспорт темы ----------
   async function exportThread(threadUrl){
     const u = new URL(threadUrl, location.href);
     const id = u.searchParams.get('id') || '0';
-    const postN = (u.hash||'').match(/^#p(\d+)/i)?.[1] || null;
 
     const result = {
       title: '',
@@ -324,7 +341,7 @@
     }
     result.imagesCount = result.images.length;
 
-    // финальный HTML (полный CSS)
+    // финальный HTML
     const titleName = safeName(result.title || `topic_${id}`);
     const baseFrameCSS = `
 :root { --fg:#111; --bg:#fff; --muted:#666; --sep:#ddd; }
@@ -357,7 +374,7 @@ ${htmlBlocks.join('\n')}
       html = html.split(urlAbs).join(`${upPrefix}${local}`); // ../images/...
     }
 
-    result.folder = `${titleName} [${id}]`;        // <<< ШАБЛОН ПАПКИ
+    result.folder = `${titleName} [${id}]`;
     result.pageTxtName = `pages/${titleName}.txt`;
     result.pageTxtBytes = encodeUtf8WithBOM(finalText || '[empty]');
     result.pageHtmlName = htmlPath;
@@ -366,7 +383,7 @@ ${htmlBlocks.join('\n')}
     return result;
   }
 
-  // ---------- ссылки из текущего #pN-content ----------
+  // ---------- собрать ссылки из текущего #pN-content ----------
   function collectLinksFromCurrent() {
     const m = location.hash.match(/^#p(\d+)/i);
     if (!m) { console.warn('В URL нет #pN — не от чего отталкиваться'); return []; }
@@ -390,7 +407,7 @@ ${htmlBlocks.join('\n')}
       } catch {}
     });
 
-    // текстовые ссылки
+    // ссылки в тексте
     const text = clone.textContent || '';
     const URL_IN_TEXT = /\[url\]\s*(https?:\/\/[^\]\s]+viewtopic\.php\?id=\d+[^\]\s]*)\s*\[\/url\]|(https?:\/\/[^\s<>"']*viewtopic\.php\?id=\d+[^\s<>"']*)/ig;
     let mt;

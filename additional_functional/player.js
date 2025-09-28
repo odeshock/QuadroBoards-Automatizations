@@ -119,13 +119,13 @@
   btnTgl.addEventListener('click', toggle);
   btnPrev.addEventListener('click', prev);
   btnNext.addEventListener('click', () => next()); // сохраняем play/pause
-  document.addEventListener('keydown', e => {
-    const t = e.target;
-    if (t && (t.isContentEditable || ['INPUT','TEXTAREA'].includes(t.tagName))) return;
-    if (e.code === 'Space') { e.preventDefault(); toggle(); }
-    else if (e.code === 'ArrowRight') next();
-    else if (e.code === 'ArrowLeft')  prev();
-  });
+  // document.addEventListener('keydown', e => {
+  //   const t = e.target;
+  //   if (t && (t.isContentEditable || ['INPUT','TEXTAREA'].includes(t.tagName))) return;
+  //   if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  //   else if (e.code === 'ArrowRight') next();
+  //   else if (e.code === 'ArrowLeft')  prev();
+  // });
 
   // старт
   load(0,false);

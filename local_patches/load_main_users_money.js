@@ -1,5 +1,5 @@
 /*!
- * money-upd.js (verbose)
+ * money-upd.js (verbose, fixed)
  * Берёт номер из window.MoneyFieldUpdID (например "6"),
  * ищет <!-- main: usrN --> внутри <li id|class="pa-fld{N}">
  * и подставляет текст из /profile.php?id=N
@@ -75,31 +75,51 @@
   function processRoot(rootEl, idx) {
     log(`process root[${idx}]`, rootEl);
     const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_COMMENT, null);
-    let node;
+    let n;
     let found = 0;
-    while ((node = walker.nextNode())) {
-      const m = (node.nodeValue || '').match(commentRe);
-      if (m) {
-        found++;
-        const userId = m[1];
-        log(`найден комментарий usr${userId}`);
-        getValue(userId)
-          .then(v => { log(`замена usr${userId} → ${v}`); node.replaceWith(document.createTextNode(v)); })
-          .catch(e => err(`ошибка usr${userId}:`, e));
-      }
+    const jobs = [];
+    while ((n = walker.nextNode())) {
+      const txt = n.nodeValue || '';
+      const m = txt.match(commentRe);
+      if (!m) continue;
+      found++;
+      const userId = m[1];
+      log(`найден комментарий usr${userId}`);
+
+      // КЛЮЧЕВОЕ: захватываем конкретный узел в константу,
+      // чтобы асинхронный then не увидел уже "сменившуюся" переменную
+      const target = n;
+
+      const job = getValue(userId)
+        .then((v) => {
+          log(`замена usr${userId} → ${v}`);
+          // узел мог исчезнуть/быть заменён — проверим parentNode
+          if (target && target.parentNode) {
+            target.replaceWith(document.createTextNode(v));
+          } else {
+            log(`пропуск: комментарий usr${userId} уже не в DOM`);
+          }
+        })
+        .catch((e) => err(`ошибка usr${userId}:`, e));
+
+      jobs.push(job);
     }
     if (!found) log(`root[${idx}] без комментариев`);
+    return Promise.allSettled(jobs);
   }
 
   // ---------- запуск ----------
-  function run() {
+  async function run() {
     log('запуск');
     const roots = document.querySelectorAll(rootSelector);
     log('найдено элементов:', roots.length);
-    roots.forEach((el, i) => processRoot(el, i));
-    Promise.allSettled([...cache.values()]).then(() => {
-      log('готово. уникальных профилей:', cache.size, 'реальных запросов:', fetchCount);
-    });
+
+    const tasks = [];
+    roots.forEach((el, i) => tasks.push(processRoot(el, i)));
+    await Promise.allSettled(tasks);
+    await Promise.allSettled([...cache.values()]);
+
+    log('готово. уникальных профилей:', cache.size, 'реальных запросов:', fetchCount);
   }
 
   if (document.readyState === 'loading') {

@@ -1,22 +1,18 @@
 (() => {
-  // Проверяем наличие настроек
-  if (
-    typeof window.PROFILE_CHECK !== 'object' ||
-    typeof window.PROFILE_CHECK.MoneyFieldID !== 'string' ||
-    !window.PROFILE_CHECK.MoneyFieldID.trim()
-  ) {
-    console.log('[money] PROFILE_CHECK.MoneyFieldID не задан — скрипт не запускается');
+  // 1) Берём номер поля из глобального объекта
+  const idNum = window.MoneyFieldUpdID;
+  if (!idNum) {
+    console.log('[money] PROFILE_UPD.MoneyFieldID не задано — скрипт не запущен');
     return;
   }
 
-  const FIELD_ID = window.PROFILE_CHECK.MoneyFieldID.trim(); // например "pa-fld6"
+  const fieldName = `pa-fld${idNum}`;
+  const selector = `li#${CSS.escape(fieldName)}, li.${CSS.escape(fieldName)}`;
   const commentRe = /^\s*main:\s*usr(\d+)\s*$/i;
   const cache = new Map();
-  let fetchCount = 0;
 
-  async function fetchHtmlSmart(url) {
-    fetchCount++;
-    const resp = await fetch(url, { credentials: 'same-origin', redirect: 'follow' });
+  async function fetchHtml(url) {
+    const resp = await fetch(url, { credentials: 'same-origin' });
     const buf = await resp.arrayBuffer();
     let html = new TextDecoder('utf-8').decode(buf);
     if (/charset\s*=\s*windows-1251/i.test(html) || html.includes('�')) {
@@ -25,44 +21,27 @@
     return html;
   }
 
-  async function getValueFromProfile(userId) {
-    if (cache.has(userId)) return cache.get(userId);
-    const p = (async () => {
-      const html = await fetchHtmlSmart(`/profile.php?id=${userId}`);
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-
-      // Ищем либо по id, либо по классу
-      const li = doc.querySelector(`#${FIELD_ID}, .${FIELD_ID}`);
-      if (!li) throw new Error(`нет ${FIELD_ID} на профиле`);
-      const strong = li.querySelector('strong, b');
-      let value = strong?.textContent?.trim();
-      if (!value) {
-        const txt = (li.textContent || '').trim();
-        value = txt.split(':').slice(-1)[0].trim();
-      }
-      return value;
-    })();
-    cache.set(userId, p);
-    return p;
+  function getValue(uid) {
+    if (!cache.has(uid)) {
+      cache.set(uid, (async () => {
+        const html = await fetchHtml(`/profile.php?id=${uid}`);
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const li = doc.querySelector(`#${fieldName}, .${fieldName}`);
+        const strong = li?.querySelector('strong, b');
+        if (strong) return strong.textContent.trim();
+        const txt = (li?.textContent || '').trim();
+        return txt.split(':').slice(-1)[0].trim();
+      })());
+    }
+    return cache.get(uid);
   }
 
-  function processNode(node) {
-    node.childNodes.forEach((n) => {
-      if (n.nodeType === Node.COMMENT_NODE) {
-        const m = (n.nodeValue || '').match(commentRe);
-        if (m) {
-          const userId = m[1];
-          getValueFromProfile(userId).then((value) => {
-            n.replaceWith(document.createTextNode(value ?? ''));
-          }).catch((e) => console.error('[money] ошибка:', e));
-        }
-      } else if (n.childNodes?.length) {
-        processNode(n);
-      }
-    });
-  }
-
-  // выбираем все li с этим id или классом
-  document.querySelectorAll(`li#${FIELD_ID}, li.${FIELD_ID}`).forEach(processNode);
-
+  // Обходим все элементы и ищем комментарии в любом месте
+  document.querySelectorAll(selector).forEach(root => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+    for (let n; (n = walker.nextNode()); ) {
+      const m = (n.nodeValue || '').match(commentRe);
+      if (m) getValue(m[1]).then(v => n.replaceWith(document.createTextNode(v || '')));
+    }
+  });
 })();

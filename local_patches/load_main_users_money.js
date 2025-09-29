@@ -1,5 +1,5 @@
 /*!
- * money-upd.js — чистый текст
+ * money-upd.js — чистый текст + безопасная замена
  */
 (function () {
   'use strict';
@@ -11,6 +11,7 @@
   const esc = (CSS.escape || ((s) => s.replace(/[^a-zA-Z0-9_-]/g, '\\$&')));
   const sel = `li#${esc(fieldName)}, li.${esc(fieldName)}`;
   const re  = /^\s*main:\s*usr(\d+)\s*$/i;
+
   const cache = new Map();
   let fetchCount = 0;
 
@@ -44,22 +45,30 @@
   }
 
   function process(root) {
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
-    let n;
-    while ((n = w.nextNode())) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+    const matches = []; // заранее собираем {node, uid}
+
+    for (let n; (n = walker.nextNode()); ) {
       const m = (n.nodeValue || '').match(re);
-      if (m) {
-        const uid = m[1];
-        getValue(uid).then(val => {
-          if (n.parentNode) n.replaceWith(document.createTextNode(val));
-        });
-      }
+      if (m) matches.push({ node: n, uid: m[1] });
     }
+
+    matches.forEach(({ node, uid }) => {
+      // захватываем конкретный узел; далее только проверяем наличие в DOM
+      getValue(uid).then(val => {
+        if (node && node.isConnected && node.parentNode) {
+          node.replaceWith(document.createTextNode(val));
+        }
+      }).catch(e => console.error('[money-upd] usr'+uid+' error:', e));
+    });
   }
 
   function run() {
     document.querySelectorAll(sel).forEach(process);
-    console.log('[money-upd] уникальных профилей:', cache.size, 'запросов:', fetchCount);
+    // опционально: посмотреть, сколько было реальных запросов
+    Promise.allSettled([...cache.values()]).then(() => {
+      console.log('[money-upd] уникальных профилей:', cache.size, 'запросов:', fetchCount);
+    });
   }
 
   document.readyState === 'loading'

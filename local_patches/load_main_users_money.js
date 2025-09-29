@@ -65,10 +65,6 @@
 
   function run() {
     document.querySelectorAll(sel).forEach(process);
-    // опционально: посмотреть, сколько было реальных запросов
-    Promise.allSettled([...cache.values()]).then(() => {
-      console.log('[money-upd] уникальных профилей:', cache.size, 'запросов:', fetchCount);
-    });
   }
 
   document.readyState === 'loading'

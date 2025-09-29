@@ -2,7 +2,7 @@
   // 1) Берём номер поля из глобального объекта
   const idNum = window.MoneyFieldUpdID;
   if (!idNum) {
-    console.log('[money] PROFILE_UPD.MoneyFieldID не задано — скрипт не запущен');
+    console.log('[money] MoneyFieldUpdID не задано — скрипт не запущен');
     return;
   }
 

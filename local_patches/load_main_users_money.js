@@ -1,129 +1,159 @@
 /*!
- * money-upd.js (verbose, fixed)
- * Берёт номер из window.MoneyFieldUpdID (например "6"),
- * ищет <!-- main: usrN --> внутри <li id|class="pa-fld{N}">
- * и подставляет текст из /profile.php?id=N
+ * money-upd.js (fast + verbose + persistent cache)
+ * Читает номер из window.MoneyFieldUpdID (например "6"),
+ * заменяет <!-- main: usrN --> внутри <li id|class="pa-fld{N}">
+ * на текст из /profile.php?id=N, с кэшем localStorage.
  */
 (function () {
   'use strict';
 
-  // ---------- Конфиг ----------
-  const idNum = (typeof window.MoneyFieldUpdID === 'string')
-    ? window.MoneyFieldUpdID.trim()
-    : '';
-  const log = (...a) => console.log('[money-upd]', ...a);
-  const err = (...a) => console.error('[money-upd]', ...a);
+  // ===== Конфиг =====
+  const ID_NUM = (typeof window.MoneyFieldUpdID === 'string') ? window.MoneyFieldUpdID.trim() : '';
+  if (!ID_NUM) { console.log('[money-upd] старт отменён: MoneyFieldUpdID не задан'); return; }
 
-  if (!idNum) {
-    log('старт отменён: MoneyFieldUpdID не задан');
-    return;
-  }
-
-  const fieldName = `pa-fld${idNum}`;
+  const FIELD_NAME = `pa-fld${ID_NUM}`;
   const esc = (window.CSS && CSS.escape) ? CSS.escape : (s) => s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  const rootSelector = `li#${esc(fieldName)}, li.${esc(fieldName)}`;
-  log('конфиг:', { MoneyFieldUpdID: idNum, fieldName, rootSelector });
+  const ROOT_SEL = `li#${esc(FIELD_NAME)}, li.${esc(FIELD_NAME)}`;
+  const COMMENT_RE = /^\s*main:\s*usr(\d+)\s*$/i;
 
-  const commentRe = /^\s*main:\s*usr(\d+)\s*$/i;
-  const cache = new Map(); // userId -> Promise<string>
+  // кэш в памяти + persistent в localStorage
+  const LS_KEY = 'money-upd-cache::v1';
+  const TTL_MS = 24 * 60 * 60 * 1000; // 24ч; можно уменьшить, напр. 5 * 60 * 1000
   let fetchCount = 0;
 
-  // ---------- загрузка HTML профиля с авто-декодированием ----------
+  console.log('[money-upd] конфиг:', { MoneyFieldUpdID: ID_NUM, FIELD_NAME, ROOT_SEL, TTL_H: TTL_MS/3600000 });
+
+  function readLS() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (_) { return {}; }
+  }
+  function writeLS(obj) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(obj)); } catch (_) {}
+  }
+  const LS = readLS();            // { [userId]: {v: "20", ts: 1700000000000} }
+  const RAM = new Map();          // userId -> Promise<string>
+  const targets = new Map();      // userId -> Set<HTMLElement> (куда писать значение)
+
+  function getFromCache(uid) {
+    const rec = LS[uid];
+    if (!rec) return null;
+    if ((Date.now() - rec.ts) > TTL_MS) return null;
+    return String(rec.v);
+    }
+
+  function saveToCache(uid, val) {
+    LS[uid] = { v: String(val), ts: Date.now() };
+    writeLS(LS);
+  }
+
+  // «умное» чтение HTML (utf-8 / windows-1251)
   async function fetchHtml(url) {
     fetchCount++;
-    log('fetch →', url);
+    console.log('[money-upd] fetch →', url);
     const resp = await fetch(url, { credentials: 'same-origin', redirect: 'follow' });
-    log('status', resp.status);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    console.log('[money-upd] status', resp.status);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
     const buf = await resp.arrayBuffer();
     let html = new TextDecoder('utf-8').decode(buf);
     if (/charset\s*=\s*windows-1251/i.test(html) || html.includes('�')) {
-      try {
-        html = new TextDecoder('windows-1251').decode(buf);
-        log('декод windows-1251');
-      } catch {}
+      try { html = new TextDecoder('windows-1251').decode(buf); console.log('[money-upd] декод windows-1251'); } catch {}
     }
     return html;
   }
 
-  // ---------- получение значения из профиля ----------
-  function getValue(userId) {
-    if (cache.has(userId)) {
-      log(`cache hit usr${userId}`);
-      return cache.get(userId);
-    }
-    log(`cache miss usr${userId}`);
+  function getValue(uid) {
+    if (RAM.has(uid)) return RAM.get(uid);
     const p = (async () => {
-      const html = await fetchHtml(`/profile.php?id=${userId}`);
+      // 1) если есть свежий localStorage — вернём сразу (ускорение)
+      const cached = getFromCache(uid);
+      if (cached != null) {
+        console.log(`[money-upd] cache(localStorage) hit usr${uid} → "${cached}"`);
+        return cached;
+      }
+      console.log(`[money-upd] cache miss usr${uid} — идём в профиль`);
+      // 2) сеть
+      const html = await fetchHtml(`/profile.php?id=${uid}`);
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      const li = doc.querySelector(`#${esc(fieldName)}, .${esc(fieldName)}`);
-      if (!li) throw new Error(`нет поля ${fieldName} на профиле usr${userId}`);
+      const li = doc.querySelector(`#${esc(FIELD_NAME)}, .${esc(FIELD_NAME)}`);
+      if (!li) throw new Error(`на профиле usr${uid} нет ${FIELD_NAME}`);
       const strong = li.querySelector('strong, b');
       let value = strong?.textContent?.trim();
       if (!value) {
         const txt = (li.textContent || '').trim();
         value = txt.split(':').slice(-1)[0].trim();
       }
-      log(`usr${userId} → "${value}"`);
-      return value || '';
+      value = value || '';
+      saveToCache(uid, value); // положим в persistent-кэш
+      console.log(`[money-upd] usr${uid} ← "${value}" (saved to LS)`);
+      return value;
     })();
-    cache.set(userId, p);
+    RAM.set(uid, p);
     return p;
   }
 
-  // ---------- обработка одного <li> ----------
-  function processRoot(rootEl, idx) {
-    log(`process root[${idx}]`, rootEl);
-    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_COMMENT, null);
-    let n;
-    let found = 0;
-    const jobs = [];
-    while ((n = walker.nextNode())) {
-      const txt = n.nodeValue || '';
-      const m = txt.match(commentRe);
-      if (!m) continue;
-      found++;
-      const userId = m[1];
-      log(`найден комментарий usr${userId}`);
-
-      // КЛЮЧЕВОЕ: захватываем конкретный узел в константу,
-      // чтобы асинхронный then не увидел уже "сменившуюся" переменную
-      const target = n;
-
-      const job = getValue(userId)
-        .then((v) => {
-          log(`замена usr${userId} → ${v}`);
-          // узел мог исчезнуть/быть заменён — проверим parentNode
-          if (target && target.parentNode) {
-            target.replaceWith(document.createTextNode(v));
-          } else {
-            log(`пропуск: комментарий usr${userId} уже не в DOM`);
-          }
-        })
-        .catch((e) => err(`ошибка usr${userId}:`, e));
-
-      jobs.push(job);
-    }
-    if (!found) log(`root[${idx}] без комментариев`);
-    return Promise.allSettled(jobs);
+  // заменяем комментарий на спан-плейсхолдер (чтобы можно было обновить позже)
+  function replaceCommentWithSpan(commentNode, uid, initialText) {
+    const span = document.createElement('span');
+    span.className = 'money-upd-val';
+    span.dataset.usr = uid;
+    span.textContent = initialText;
+    commentNode.replaceWith(span);
+    if (!targets.has(uid)) targets.set(uid, new Set());
+    targets.get(uid).add(span);
+    return span;
   }
 
-  // ---------- запуск ----------
+  // основной проход
   async function run() {
-    log('запуск');
-    const roots = document.querySelectorAll(rootSelector);
-    log('найдено элементов:', roots.length);
+    console.log('[money-upd] запуск');
+    const roots = document.querySelectorAll(ROOT_SEL);
+    console.log('[money-upd] найдено элементов:', roots.length);
 
-    const tasks = [];
-    roots.forEach((el, i) => tasks.push(processRoot(el, i)));
-    await Promise.allSettled(tasks);
-    await Promise.allSettled([...cache.values()]);
+    const needFetch = new Set(); // какие userId надо дозакачать
 
-    log('готово. уникальных профилей:', cache.size, 'реальных запросов:', fetchCount);
+    roots.forEach((root, idx) => {
+      // ищем комментарии везде внутри root
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT, null);
+      let node;
+      let found = 0;
+      while ((node = walker.nextNode())) {
+        const m = (node.nodeValue || '').match(COMMENT_RE);
+        if (!m) continue;
+        found++;
+        const uid = m[1];
+        const cached = getFromCache(uid);
+        if (cached != null) {
+          // СРАЗУ показываем из кэша — моментальная подстановка
+          console.log(`[money-upd] root[${idx}] usr${uid} → мгновенно из LS: "${cached}"`);
+          replaceCommentWithSpan(node, uid, cached);
+          // но всё равно обновим фоном, если в RAM ещё нет запроса
+          needFetch.add(uid);
+        } else {
+          // ставим лёгкий плейсхолдер, чтобы не мигал комментарий
+          replaceCommentWithSpan(node, uid, '…');
+          needFetch.add(uid);
+        }
+      }
+      if (!found) console.log(`[money-upd] root[${idx}] без комментариев`);
+    });
+
+    // параллельно дозакачиваем всех уникальных uid и обновляем плейсхолдеры
+    await Promise.all([...needFetch].map(async (uid) => {
+      try {
+        const val = await getValue(uid);
+        const set = targets.get(uid);
+        if (set) {
+          set.forEach(el => { if (el && el.isConnected) el.textContent = val; });
+        }
+      } catch (e) {
+        console.error('[money-upd] ошибка загрузки usr' + uid, e);
+      }
+    }));
+
+    console.log('[money-upd] готово. уникальных профилей:', RAM.size, 'реальных запросов:', fetchCount);
   }
 
   if (document.readyState === 'loading') {
-    log('ждём DOMContentLoaded');
+    console.log('[money-upd] ждём DOMContentLoaded');
     document.addEventListener('DOMContentLoaded', run, { once: true });
   } else {
     run();

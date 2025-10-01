@@ -1,6 +1,4 @@
 (async () => {
-  console.log("Ну что ж, погнали собирать странички");
-  
   // ===================== НАСТРОЙКИ =====================
   const MAX_PAGES = 50;
   const REQUEST_DELAY_MS = 400;
@@ -289,14 +287,15 @@
     pages.push({url:u.href, doc:doc0});
     let next=findNextUrl(doc0,u.href);
     const seen=new Set([abs(u.href,location.href)]);
-    while (next && pages.length < MAX_PAGES && !seen.has(next)) {
+    while(next && pages.length<MAX_PAGES && !seen.has(next)){
       seen.add(next);
-      try {
-        const d = await fetchDocSmart(next);
-        pages.push({ url: next, doc: d });
-        next = findNextUrl(d, next);
-      } catch (e) {
-        result.failedPages.push(`[PAGE ERR] ${next} :: ${e?.message || 'fetch failed'}`);
+      try{
+        const d=await fetchDocSmart(next);
+        pages.push({url:next,doc:d});
+        next=findNextUrl(d,next);
+      }catch(e){
+        // ВАЖНО: логируем какую страницу не смогли открыть и почему, затем выходим
+        result.failedPages.push(`[PAGINATION] ${next} :: ${e?.message||'fetch failed'}`);
         break;
       }
       await sleep(REQUEST_DELAY_MS);
@@ -304,8 +303,8 @@
     result.pagesCount = pages.length;
 
     // текст+html+css+картинки
-    let finalText=''; 
-    const htmlBlocks=[]; 
+    let finalText='';
+    const htmlBlocks=[];
     const imgSet=new Set();
     let fullCSS = '';
     const fetchedStyles = new Set();

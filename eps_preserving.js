@@ -3,13 +3,15 @@
   const MAX_PAGES = 50;
   const REQUEST_DELAY_MS = 400;
 
+  // селектор блока темы внутри страницы темы:
   const TOPIC_SELECTOR = '.topic';
+
   const BLOCK_SPACER_LINES = 2;
   const BLOCK_SEP = '\n'.repeat(BLOCK_SPACER_LINES + 1);
   const POST_SEPARATOR = '\n\n----------------\n\n';
   const TOPIC_SEP = `\n\n${'='.repeat(80)}\n\n`;
 
-  // стили: тихо и только same-origin
+  // стили для inlining: тянем только same-origin, ошибки — тихо
   const CSS_SAME_ORIGIN_ONLY = true;
 
   // ===================== УТИЛИТЫ =====================
@@ -22,6 +24,7 @@
     .trim()
     .slice(0,160);
   const encodeUtf8WithBOM = (s)=>{const b=enc.encode(s);const out=new Uint8Array(3+b.length);out.set([0xEF,0xBB,0xBF],0);out.set(b,3);return out;};
+
   const BBCODE_IMG_RE = /\[(?:icon|img)\]\s*(https?:\/\/[^\]\s]+)\s*\[\/(?:icon|img)\]/ig;
   const PLAIN_IMG_URL_RE = /(https?:\/\/[^\s\]]+\.(?:png|jpe?g|gif|webp|bmp|svg|ico)(?:\?[^\s\]]*)?)/ig;
 
@@ -190,7 +193,7 @@
   <div class="topic-content">${content}</div>
 </section>`;
   }
-  const escapeHtml = (s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escapeHtml = (s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
 
   // ---- ПОЛНЫЙ CSS (тихо + same-origin) ----
   async function collectPageCSS(doc, pageUrl, fetched) {
@@ -208,7 +211,7 @@
       if (CSS_SAME_ORIGIN_ONLY) {
         try {
           const same = new URL(hrefAbs, location.href).origin === location.origin;
-          if (!same) continue; // тихо пропускаем чужие домены
+          if (!same) continue;
         } catch { continue; }
       }
 
@@ -252,10 +255,46 @@
       return new Blob([...this.parts,cent,eocd],{type:'application/zip'});}
   }
 
+  // ---------- НОРМАЛИЗАЦИЯ URL ТЕМЫ (pid → id) ----------
+  async function normalizeViewtopicUrl(raw) {
+    let u;
+    try { u = new URL(raw, location.href); }
+    catch { return null; }
+
+    if (!u.pathname.endsWith('/viewtopic.php') && !u.pathname.endsWith('viewtopic.php')) return null;
+
+    // если уже есть id — оставляем только id, якорь не нужен
+    if (u.searchParams.has('id')) {
+      return `${u.origin}${u.pathname}?id=${u.searchParams.get('id')}`;
+    }
+
+    // если pid — разово открываем, сервер вернёт конечный URL с id
+    if (u.searchParams.has('pid')) {
+      try {
+        const res = await fetch(u.href, { redirect: 'follow', credentials: 'include' });
+        const finalUrl = res.url || u.href;
+        const uu = new URL(finalUrl, location.href);
+        if (uu.searchParams.get('id')) {
+          return `${uu.origin}${uu.pathname}?id=${uu.searchParams.get('id')}`;
+        }
+        // если почему-то id не появился — последняя попытка: снять #pK и надеяться на сервер
+        return `${u.origin}${u.pathname}?pid=${u.searchParams.get('pid')}`;
+      } catch (e) {
+        console.warn('normalize pid→id failed:', u.href, e);
+        // вернём исходное — дальше экспорт отметит ошибку на ENTRY
+        return u.href;
+      }
+    }
+
+    return null;
+  }
+
   // ---------- экспорт одной темы ----------
   async function exportThread(threadUrl){
     const u = new URL(threadUrl, location.href);
-    const id = u.searchParams.get('id') || '0';
+
+    // вычислим id для имени папки, даже если пришёл pid
+    let idGuess = u.searchParams.get('id') || u.searchParams.get('pid') || '0';
 
     const result = {
       title: '',
@@ -278,11 +317,18 @@
     } catch (e) {
       result.failedPages.push(`[ENTRY] ${u.href} :: ${e?.message || 'fetch failed'}`);
       result.error = e?.message || 'fetch failed';
-      // Чтобы оркестратор мог записать это в отчёт, возвращаем результат
-      // (без файлов).
-      result.folder = `${safeName('topic')} [${id}]`;
+      result.folder = `${safeName('topic')} [${idGuess}]`;
       return result;
     }
+
+    // попробуем уточнить id из canonical
+    try {
+      const canon = doc0.querySelector('link[rel="canonical"]')?.getAttribute('href');
+      if (canon) {
+        const cu = new URL(canon, u.href);
+        idGuess = cu.searchParams.get('id') || idGuess;
+      }
+    } catch {}
 
     const pages=[];
     pages.push({url:u.href, doc:doc0});
@@ -314,7 +360,7 @@
       fullCSS += '\n' + await collectPageCSS(doc, pageUrl, fetchedStyles);
 
       const pageTitle=(doc.querySelector('title')?.textContent||'').trim();
-      if (!result.title) result.title = pageTitle || `topic_${id}`;
+      if (!result.title) result.title = pageTitle || `topic_${idGuess}`;
 
       const topics=[...doc.querySelectorAll(TOPIC_SELECTOR)];
       if(!topics.length){ result.failedPages.push(pageUrl); continue; }
@@ -351,7 +397,7 @@
     result.imagesCount = result.images.length;
 
     // финальный HTML
-    const titleName = safeName(result.title || `topic_${id}`);
+    const titleName = safeName(result.title || `topic_${idGuess}`);
     const baseFrameCSS = `
 :root { --fg:#111; --bg:#fff; --muted:#666; --sep:#ddd; }
 *{box-sizing:border-box}
@@ -383,7 +429,7 @@ ${htmlBlocks.join('\n')}
       html = html.split(urlAbs).join(`${upPrefix}${local}`);
     }
 
-    result.folder = `${titleName} [${id}]`;
+    result.folder = `${titleName} [${idGuess}]`;
     result.pageTxtName = `pages/${titleName}.txt`;
     result.pageTxtBytes = encodeUtf8WithBOM(finalText || '[empty]');
     result.pageHtmlName = htmlPath;
@@ -392,8 +438,8 @@ ${htmlBlocks.join('\n')}
     return result;
   }
 
-  // ---------- собрать ссылки из текущего #pN-content ----------
-  function collectLinksFromCurrent() {
+  // ---------- сбор ссылок из текущего #pN-content (поддержка id и pid) ----------
+  async function collectLinksFromCurrent() {
     const m = location.hash.match(/^#p(\d+)/i);
     if (!m) { console.warn('В URL нет #pN — не от чего отталкиваться'); return []; }
     const N = m[1];
@@ -403,36 +449,41 @@ ${htmlBlocks.join('\n')}
     const clone = host.cloneNode(true);
     try { inlineHiddenTemplates(clone); } catch {}
 
-    const out = [];
     const seen = new Set();
+    const out = [];
+
+    // помощник для добавления (с нормализацией)
+    const pushNormalized = async (hrefRaw) => {
+      const norm = await normalizeViewtopicUrl(hrefRaw);
+      if (!norm) return;
+      if (seen.has(norm)) return;
+      seen.add(norm);
+      out.push(norm);
+    };
 
     // <a href>
-    clone.querySelectorAll('a[href]').forEach(a => {
+    const anchors = [...clone.querySelectorAll('a[href]')];
+    for (const a of anchors) {
       const href = a.getAttribute('href') || '';
-      if (!/viewtopic\.php\?id=\d+/i.test(href)) return;
-      try {
-        const u = new URL(href, location.href).href;
-        if (!seen.has(u)) { seen.add(u); out.push(u); }
-      } catch {}
-    });
+      if (!/viewtopic\.php\?(?:id|pid)=\d+/i.test(href)) continue;
+      await pushNormalized(href);
+    }
 
     // ссылки в тексте
     const text = clone.textContent || '';
-    const URL_IN_TEXT = /\[url\]\s*(https?:\/\/[^\]\s]+viewtopic\.php\?id=\d+[^\]\s]*)\s*\[\/url\]|(https?:\/\/[^\s<>"']*viewtopic\.php\?id=\d+[^\s<>"']*)/ig;
+    const URL_IN_TEXT = /\[url\]\s*(https?:\/\/[^\]\s]+viewtopic\.php\?(?:id|pid)=\d+[^\]\s]*)\s*\[\/url\]|(https?:\/\/[^\s<>"']*viewtopic\.php\?(?:id|pid)=\d+[^\s<>"']*)/ig;
     let mt;
     while ((mt = URL_IN_TEXT.exec(text)) !== null) {
       const raw = (mt[1] || mt[2] || '').trim();
       if (!raw) continue;
-      try {
-        const u = new URL(raw, location.href).href;
-        if (!seen.has(u)) { seen.add(u); out.push(u); }
-      } catch {}
+      await pushNormalized(raw);
     }
+
     return out;
   }
 
   // ---------- Оркестратор ----------
-  const threads = collectLinksFromCurrent();
+  const threads = await collectLinksFromCurrent();
   if (!threads.length) { console.warn('Внутри соответствующего #pN-content не нашлось ссылок на темы'); return; }
 
   const zip = new SimpleZip();
@@ -457,7 +508,7 @@ ${htmlBlocks.join('\n')}
       }
 
       // добавляем в ZIP только если есть, что добавлять
-      if (r?.folder && r?.pageTxtBytes) zip.addFile(`${r.folder}/${r.pageTxtName}`, r.pageTxtBytes);
+      if (r?.folder && r?.pageTxtBytes)  zip.addFile(`${r.folder}/${r.pageTxtName}`, r.pageTxtBytes);
       if (r?.folder && r?.pageHtmlBytes) zip.addFile(`${r.folder}/${r.pageHtmlName}`, r.pageHtmlBytes);
       for (const img of r?.images || []) zip.addFile(`${r.folder}/${img.path}`, img.bytes);
 

@@ -1,3 +1,4 @@
+
 (async () => {
   // ===================== НАСТРОЙКИ =====================
   const MAX_PAGES = 50;
@@ -9,8 +10,7 @@
   const POST_SEPARATOR = '\n\n----------------\n\n';
   const TOPIC_SEP = `\n\n${'='.repeat(80)}\n\n`;
 
-  // стили: тихо и только same-origin, чтобы не было CORS-алертов в консоли
-  const QUIET_CSS_WARNINGS = true;
+  // стили: тихо и только same-origin
   const CSS_SAME_ORIGIN_ONLY = true;
 
   // ===================== УТИЛИТЫ =====================
@@ -23,7 +23,6 @@
     .trim()
     .slice(0,160);
   const encodeUtf8WithBOM = (s)=>{const b=enc.encode(s);const out=new Uint8Array(3+b.length);out.set([0xEF,0xBB,0xBF],0);out.set(b,3);return out;};
-
   const BBCODE_IMG_RE = /\[(?:icon|img)\]\s*(https?:\/\/[^\]\s]+)\s*\[\/(?:icon|img)\]/ig;
   const PLAIN_IMG_URL_RE = /(https?:\/\/[^\s\]]+\.(?:png|jpe?g|gif|webp|bmp|svg|ico)(?:\?[^\s\]]*)?)/ig;
 
@@ -182,7 +181,6 @@
         try { imgSet.add(new URL(m[1] || m[0], pageUrl).href); } catch {}
       }
     }
-    // BBCode -> <img>
     const bbcodeToImg = (html) => html.replace(BBCODE_IMG_RE, (_m, url) => `<img src="${url}">`);
 
     const content = bbcodeToImg(node.innerHTML);
@@ -195,17 +193,13 @@
   }
   const escapeHtml = (s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  // ---- ПОЛНЫЙ CSS СТРАНИЦЫ (тихо + только same-origin) ----
+  // ---- ПОЛНЫЙ CSS (тихо + same-origin) ----
   async function collectPageCSS(doc, pageUrl, fetched) {
     let css = '';
-
-    // inline <style>
     doc.querySelectorAll('style').forEach(st => {
       try { css += rewriteCssUrls(st.textContent || '', pageUrl) + '\n'; }
       catch(e){ /* тихо */ }
     });
-
-    // внешние стили
     const links = [...doc.querySelectorAll('link[rel~="stylesheet"][href]')];
     for (const ln of links) {
       const hrefAbs = abs(ln.getAttribute('href'), pageUrl);
@@ -220,18 +214,14 @@
       }
 
       try {
-        const same = new URL(hrefAbs, location.href).origin === location.origin;
-        const res = await fetch(hrefAbs, same ? { credentials:'include' } : { mode:'cors', credentials:'omit' });
-        if (!res.ok) continue;                // тихо
+        const res = await fetch(hrefAbs, { credentials:'include' });
+        if (!res.ok) continue;
         const text = await res.text();
         css += rewriteCssUrls(text, hrefAbs) + '\n';
-      } catch {
-        // тихо
-      }
+      } catch { /* тихо */ }
 
       await sleep(50);
     }
-
     return css.trim();
   }
   function rewriteCssUrls(cssText, baseUrl) {
@@ -263,7 +253,7 @@
       return new Blob([...this.parts,cent,eocd],{type:'application/zip'});}
   }
 
-  // ---------- экспорт темы ----------
+  // ---------- экспорт одной темы ----------
   async function exportThread(threadUrl){
     const u = new URL(threadUrl, location.href);
     const id = u.searchParams.get('id') || '0';
@@ -278,12 +268,24 @@
       images: [],
       failedPages: [],
       pagesCount: 0,
-      imagesCount: 0
+      imagesCount: 0,
+      error: null,
     };
 
-    // страницы
+    // первая страница темы (ENTRY) — ловим отдельно
+    let doc0;
+    try {
+      doc0 = await fetchDocSmart(u.href);
+    } catch (e) {
+      result.failedPages.push(`[ENTRY] ${u.href} :: ${e?.message || 'fetch failed'}`);
+      result.error = e?.message || 'fetch failed';
+      // Чтобы оркестратор мог записать это в отчёт, возвращаем результат
+      // (без файлов).
+      result.folder = `${safeName('topic')} [${id}]`;
+      return result;
+    }
+
     const pages=[];
-    let doc0=await fetchDocSmart(u.href);
     pages.push({url:u.href, doc:doc0});
     let next=findNextUrl(doc0,u.href);
     const seen=new Set([abs(u.href,location.href)]);
@@ -294,7 +296,7 @@
         pages.push({url:next,doc:d});
         next=findNextUrl(d,next);
       }catch(e){
-        // ВАЖНО: логируем какую страницу не смогли открыть и почему, затем выходим
+        // ЛОГИРУЕМ, какую страницу не смогли открыть, и выходим
         result.failedPages.push(`[PAGINATION] ${next} :: ${e?.message||'fetch failed'}`);
         break;
       }
@@ -379,7 +381,7 @@ ${htmlBlocks.join('\n')}
     const htmlPath = `pages/${titleName}.html`;
     const upPrefix = '../'.repeat(Math.max(0, htmlPath.split('/').length - 1));
     for (const [urlAbs, local] of filenameByUrl.entries()) {
-      html = html.split(urlAbs).join(`${upPrefix}${local}`); // ../images/...
+      html = html.split(urlAbs).join(`${upPrefix}${local}`);
     }
 
     result.folder = `${titleName} [${id}]`;
@@ -442,18 +444,24 @@ ${htmlBlocks.join('\n')}
     console.log('▶ Экспорт темы:', href);
     try{
       const r = await exportThread(href);
-      const folder = r.folder; // "TITLE [ID]"
 
-      // pages/
-      zip.addFile(`${folder}/${r.pageTxtName}`, r.pageTxtBytes);
-      zip.addFile(`${folder}/${r.pageHtmlName}`, r.pageHtmlBytes);
-      // images/
-      for (const img of r.images) zip.addFile(`${folder}/${img.path}`, img.bytes);
+      // фиксируем проблемы этой темы
+      if (r?.error) failures.push(`THREAD ENTRY ERROR :: ${href} :: ${r.error}`);
+      if (r?.failedPages?.length) {
+        failures.push(`--- ${href}\n${r.failedPages.map(s=>'  - '+s).join('\n')}`);
+      }
 
-      if (!r.pageTxtBytes || (new TextDecoder().decode(r.pageTxtBytes.slice(3))).trim()==='[empty]') {
+      // пустой текст — тоже сигнал
+      const txt = r?.pageTxtBytes ? new TextDecoder().decode(r.pageTxtBytes.slice(3)) : '';
+      if (!txt || txt.trim() === '[empty]') {
         failures.push(`EMPTY TEXT :: ${href}`);
       }
-      if (r.failedPages.length) failures.push(`--- ${href}\n${r.failedPages.map(s=>'  - '+s).join('\n')}`);
+
+      // добавляем в ZIP только если есть, что добавлять
+      if (r?.folder && r?.pageTxtBytes) zip.addFile(`${r.folder}/${r.pageTxtName}`, r.pageTxtBytes);
+      if (r?.folder && r?.pageHtmlBytes) zip.addFile(`${r.folder}/${r.pageHtmlName}`, r.pageHtmlBytes);
+      for (const img of r?.images || []) zip.addFile(`${r.folder}/${img.path}`, img.bytes);
+
     }catch(e){
       failures.push(`THREAD ERROR :: ${href} :: ${e.message}`);
     }
@@ -461,7 +469,7 @@ ${htmlBlocks.join('\n')}
 
   const report =
 `Экспорт из блока ${location.hash || '(без хеша)'}
-Всего тем: ${threads.length}
+Всего тем (ссылок): ${threads.length}
 Дата: ${new Date().toISOString()}
 Источник: ${location.href}
 

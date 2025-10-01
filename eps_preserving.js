@@ -98,11 +98,22 @@
       if(q && sc){ try{ q.innerHTML=sc.textContent||''; sc.remove(); }catch{} }
     });
 
-    // 3) НОВОЕ: статические спойлеры форума: .quote-box.spoiler-box > blockquote
-    // просто делаем их видимыми, чтобы контент ушёл в TXT/HTML
-    root.querySelectorAll('.quote-box.spoiler-box blockquote').forEach(bq=>{
+    // 3) статические спойлеры форума: .quote-box.spoiler-box > blockquote
+    root.querySelectorAll('.quote-box.spoiler-box').forEach(box=>{
+      // убираем инлайн-обработчики
+      box.querySelectorAll('[onclick]').forEach(n=>{ try{ n.removeAttribute('onclick'); }catch{} });
+      // помечаем как раскрытый (если у движка проверка класса)
+      try{ box.classList.add('visible','spoiler-open'); }catch{}
+      const bq = box.querySelector('blockquote');
+      if (!bq) return;
       try{
-        bq.style.removeProperty('display');
+        // принудительно раскрыть, даже если в чужом CSS есть !important
+        bq.style.setProperty('display','block','important');
+        bq.style.setProperty('visibility','visible','important');
+        bq.style.setProperty('opacity','1','important');
+        bq.style.setProperty('overflow','visible','important');
+        bq.style.removeProperty('max-height');
+        bq.style.removeProperty('height');
         bq.classList.add('spoiler-visible');
       }catch{}
     });
@@ -423,6 +434,8 @@ h2.topic-title{font-size:18px;margin:24px 0 8px}
 img{max-width:100%;height:auto}
 blockquote{border-left:3px solid var(--sep);padding:0 0 0 12px;margin:8px 0}
 table{border-collapse:collapse} td,th{border:1px solid var(--sep);padding:4px 8px}
+/* раскрыть форумные спойлеры всегда */
+.quote-box.spoiler-box blockquote{display:block !important; visibility:visible !important; opacity:1 !important; overflow:visible !important; max-height:none !important}
 `;
     const stylesFinal = `${baseFrameCSS}\n/* ---- Inlined from pages ---- */\n${fullCSS || ''}`;
 

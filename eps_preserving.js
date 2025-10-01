@@ -11,7 +11,7 @@
   const POST_SEPARATOR = '\n\n----------------\n\n';
   const TOPIC_SEP = `\n\n${'='.repeat(80)}\n\n`;
 
-  // стили для inlining: тянем только same-origin, ошибки — тихо
+  // тянем только same-origin стили (тихо)
   const CSS_SAME_ORIGIN_ONLY = true;
 
   // ===================== УТИЛИТЫ =====================
@@ -79,15 +79,32 @@
 
   // ---- раскрытие спойлеров/шаблонов ----
   function inlineHiddenTemplates(root){
+    // 1) шаблоны в <script type="text/html|text/template">
     root.querySelectorAll('script[type="text/html"], script[type="text/template"]').forEach(sc=>{
-      try{ const tmp=document.createElement('div'); tmp.innerHTML=sc.textContent||'';
-        const frag=document.createDocumentFragment(); while(tmp.firstChild) frag.appendChild(tmp.firstChild); sc.replaceWith(frag);}catch{}
+      try{
+        const tmp=document.createElement('div');
+        tmp.innerHTML=sc.textContent||'';
+        const frag=document.createDocumentFragment();
+        while(tmp.firstChild) frag.appendChild(tmp.firstChild);
+        sc.replaceWith(frag);
+      }catch{}
     });
+
+    // 2) старые toggleSpoiler: <div onclick="toggleSpoiler"> + <blockquote> + <script>
     root.querySelectorAll('div[onclick*="toggleSpoiler"]').forEach(div=>{
       const q = (div.nextElementSibling && div.nextElementSibling.tagName==='BLOCKQUOTE') ? div.nextElementSibling : null;
-      const sc = q && q.nextElementSibling && q.nextElementSibling.tagName==='SCRIPT' &&
-                 /^(text\/html|text\/template)$/i.test(q.nextElementSibling.type) ? q.nextElementSibling : null;
+      const sc = q && q.nextElementSibling && q.nextElementSibling.tagName==='SCRIPT'
+                 && /^(text\/html|text\/template)$/i.test(q.nextElementSibling.type) ? q.nextElementSibling : null;
       if(q && sc){ try{ q.innerHTML=sc.textContent||''; sc.remove(); }catch{} }
+    });
+
+    // 3) НОВОЕ: статические спойлеры форума: .quote-box.spoiler-box > blockquote
+    // просто делаем их видимыми, чтобы контент ушёл в TXT/HTML
+    root.querySelectorAll('.quote-box.spoiler-box blockquote').forEach(bq=>{
+      try{
+        bq.style.removeProperty('display');
+        bq.classList.add('spoiler-visible');
+      }catch{}
     });
   }
 
@@ -211,10 +228,10 @@
       if (CSS_SAME_ORIGIN_ONLY) {
         try {
           const same = new URL(hrefAbs, location.href).origin === location.origin;
-          if (!same) continue;
+          if (!same) continue; // тихо
         } catch { continue; }
-      }
 
+      }
       try {
         const res = await fetch(hrefAbs, { credentials:'include' });
         if (!res.ok) continue;
@@ -239,7 +256,7 @@
   function dtToDos(d){const time=((d.getHours()<<11)|(d.getMinutes()<<5)|(Math.floor(d.getSeconds()/2)))&0xFFFF;
     const date=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;return {time,date};}
   function U16(v){const b=new Uint8Array(2);b[0]=v&255;b[1]=(v>>>8)&255;return b;}
-  function U32(v){const b=new Uint8Array(4);b[0]=v&255;b[1]=(v>>>8)&255;b[2]=(v>>>16)&255;b[3]=(v>>>24)&255;return b;}
+  function U32(v){const b=new Uint8Array(4);b[0]=v&255;b[1]=(v>>>8)&255;b[2]=(v>>>16)&255;b[3]=(v>>>24);return b;}
   class SimpleZip{
     constructor(){this.parts=[];this.central=[];this.offset=0;}
     _cat(arr){const n=arr.reduce((s,a)=>s+a.length,0);const u=new Uint8Array(n);let o=0;for(const a of arr){u.set(a,o);o+=a.length;}return u;}
@@ -263,7 +280,7 @@
 
     if (!u.pathname.endsWith('/viewtopic.php') && !u.pathname.endsWith('viewtopic.php')) return null;
 
-    // если уже есть id — оставляем только id, якорь не нужен
+    // если уже есть id — оставляем только id
     if (u.searchParams.has('id')) {
       return `${u.origin}${u.pathname}?id=${u.searchParams.get('id')}`;
     }
@@ -277,12 +294,10 @@
         if (uu.searchParams.get('id')) {
           return `${uu.origin}${uu.pathname}?id=${uu.searchParams.get('id')}`;
         }
-        // если почему-то id не появился — последняя попытка: снять #pK и надеяться на сервер
-        return `${u.origin}${u.pathname}?pid=${u.searchParams.get('pid')}`;
+        return `${u.origin}${u.pathname}?pid=${u.searchParams.get('pid')}`; // fallback
       } catch (e) {
         console.warn('normalize pid→id failed:', u.href, e);
-        // вернём исходное — дальше экспорт отметит ошибку на ENTRY
-        return u.href;
+        return u.href; // пускай exportThread отметит ENTRY-ошибку
       }
     }
 
@@ -293,7 +308,7 @@
   async function exportThread(threadUrl){
     const u = new URL(threadUrl, location.href);
 
-    // вычислим id для имени папки, даже если пришёл pid
+    // для имени папки используем id, если нет — pid
     let idGuess = u.searchParams.get('id') || u.searchParams.get('pid') || '0';
 
     const result = {
@@ -310,7 +325,7 @@
       error: null,
     };
 
-    // первая страница темы (ENTRY) — ловим отдельно
+    // первая страница темы (ENTRY)
     let doc0;
     try {
       doc0 = await fetchDocSmart(u.href);
@@ -321,7 +336,7 @@
       return result;
     }
 
-    // попробуем уточнить id из canonical
+    // уточним id из canonical
     try {
       const canon = doc0.querySelector('link[rel="canonical"]')?.getAttribute('href');
       if (canon) {
@@ -341,7 +356,6 @@
         pages.push({url:next,doc:d});
         next=findNextUrl(d,next);
       }catch(e){
-        // ЛОГИРУЕМ, какую страницу не смогли открыть, и выходим
         result.failedPages.push(`[PAGINATION] ${next} :: ${e?.message||'fetch failed'}`);
         break;
       }
@@ -438,7 +452,7 @@ ${htmlBlocks.join('\n')}
     return result;
   }
 
-  // ---------- сбор ссылок из текущего #pN-content (поддержка id и pid) ----------
+  // ---------- сбор ссылок из текущего #pN-content (id и pid) ----------
   async function collectLinksFromCurrent() {
     const m = location.hash.match(/^#p(\d+)/i);
     if (!m) { console.warn('В URL нет #pN — не от чего отталкиваться'); return []; }
@@ -452,7 +466,6 @@ ${htmlBlocks.join('\n')}
     const seen = new Set();
     const out = [];
 
-    // помощник для добавления (с нормализацией)
     const pushNormalized = async (hrefRaw) => {
       const norm = await normalizeViewtopicUrl(hrefRaw);
       if (!norm) return;
@@ -503,9 +516,7 @@ ${htmlBlocks.join('\n')}
 
       // пустой текст — тоже сигнал
       const txt = r?.pageTxtBytes ? new TextDecoder().decode(r.pageTxtBytes.slice(3)) : '';
-      if (!txt || txt.trim() === '[empty]') {
-        failures.push(`EMPTY TEXT :: ${href}`);
-      }
+      if (!txt || txt.trim() === '[empty]') failures.push(`EMPTY TEXT :: ${href}`);
 
       // добавляем в ZIP только если есть, что добавлять
       if (r?.folder && r?.pageTxtBytes)  zip.addFile(`${r.folder}/${r.pageTxtName}`, r.pageTxtBytes);

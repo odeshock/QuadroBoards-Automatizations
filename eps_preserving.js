@@ -287,9 +287,16 @@
     pages.push({url:u.href, doc:doc0});
     let next=findNextUrl(doc0,u.href);
     const seen=new Set([abs(u.href,location.href)]);
-    while(next && pages.length<MAX_PAGES && !seen.has(next)){
+    while (next && pages.length < MAX_PAGES && !seen.has(next)) {
       seen.add(next);
-      try{ const d=await fetchDocSmart(next); pages.push({url:next,doc:d}); next=findNextUrl(d,next);}catch{break;}
+      try {
+        const d = await fetchDocSmart(next);
+        pages.push({ url: next, doc: d });
+        next = findNextUrl(d, next);
+      } catch (e) {
+        result.failedPages.push(`[PAGE ERR] ${next} :: ${e?.message || 'fetch failed'}`);
+        break;
+      }
       await sleep(REQUEST_DELAY_MS);
     }
     result.pagesCount = pages.length;

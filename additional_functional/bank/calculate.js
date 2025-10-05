@@ -12,7 +12,7 @@
     const tabPanels = document.querySelectorAll('.tab-panel');
 
     tabButtons.forEach((btn) => {
-      btn.addEventListener('click', () => {
+      if (btn) btn.addEventListener('click', () => {
         if (btn.classList.contains('is-active')) return;
         const target = btn.getAttribute('data-tab-target');
 
@@ -364,7 +364,7 @@
 
             const removeBtn = wrap.querySelector('.btn-remove-extra');
             if (removeBtn) {
-              removeBtn.addEventListener('click', () => {
+              if (removeBtn) removeBtn.addEventListener('click', () => {
                 wrap.remove();
                 refreshExtraFields();
                 updateAmountSummary();
@@ -401,7 +401,7 @@
         : null;
 
       if (addExtraBtn && addExtraField) {
-        addExtraBtn.addEventListener('click', () => {
+        if (addExtraBtn) addExtraBtn.addEventListener('click', () => {
           addExtraField();
         });
       }
@@ -426,7 +426,7 @@
           const removeBtn = group.querySelector('[data-gift-remove]');
           if (!removeBtn || removeBtn.dataset.bound) return;
           removeBtn.dataset.bound = 'true';
-          removeBtn.addEventListener('click', () => {
+          if (removeBtn) removeBtn.addEventListener('click', () => {
             if (getGiftGroups().length <= 1) return;
             group.remove();
             refreshGiftGroups();
@@ -507,7 +507,7 @@
         refreshGiftGroups();
 
         if (giftAddBtn) {
-          giftAddBtn.addEventListener('click', () => {
+          if (giftAddBtn) giftAddBtn.addEventListener('click', () => {
             addGiftGroup();
           });
         }
@@ -552,7 +552,7 @@
     }
 
     // где-нибудь после объявления openModal (или в конце файла):
-window.addEventListener('message', (event) => {
+if (window) window.addEventListener('message', (event) => {
   // защита по происхождению (если iframe того же домена)
   if (event.origin !== location.origin) return;
 
@@ -583,7 +583,7 @@ window.addEventListener('message', (event) => {
       delete form.dataset.currentMultiplier;
     }
 
-    document.addEventListener('click', (e) => {
+    if (document) document.addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-add');
       if (!btn) return;
       const selector = btn.getAttribute('data-form');
@@ -618,15 +618,15 @@ window.addEventListener('message', (event) => {
       }
     });
 
-    btnClose.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', (e) => {
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (backdrop) backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) closeModal();
     });
-    document.addEventListener('keydown', (e) => {
+    if (document) document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && backdrop.hasAttribute('open')) closeModal();
     });
 
-    log.addEventListener('click', (e) => {
+    if (log) log.addEventListener('click', (e) => {
       const actionBtn = e.target.closest('[data-action]');
       if (!actionBtn) return;
       const { action, groupId, entryId } = actionBtn.dataset;
@@ -666,7 +666,7 @@ window.addEventListener('message', (event) => {
       }
     });
 
-    form.addEventListener('submit', (e) => {
+    if (form) form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!form.reportValidity()) return;
 
@@ -804,7 +804,7 @@ async function runEvery100Messages(modalRoot) {
       btn.className = 'btn primary';
       btn.textContent = 'Сохранить';
       btn.setAttribute('data-save-100msgs', '');
-      btn.addEventListener('click', () => {
+      if (btn) btn.addEventListener('click', () => {
         localStorage.setItem('userMessageCount', String(rounded));
         const note = document.createElement('span');
         note.className = 'hint';
@@ -819,7 +819,7 @@ async function runEvery100Messages(modalRoot) {
 
 
 // Делегирование клика по кнопкам "Добавить начисление"
-document.addEventListener('click', (e) => {
+if (document) document.addEventListener('click', (e) => {
   const btn = e.target.closest('.btn-add');
   if (!btn) return;
 
@@ -845,10 +845,10 @@ document.addEventListener('click', (e) => {
 });
 
 
-console.log("blya");
+console.log("blya111");
 
 // === слушатель сообщений от iframe ===
-window.addEventListener('message', (event) => {
+if (window) window.addEventListener('message', (event) => {
   const data = event.data || {};
   if (data.type === 'fmv:add' && data.payload) {
     try {

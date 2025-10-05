@@ -758,8 +758,8 @@ async function runEvery100Messages(modalRoot) {
   const accrual = diff / 100;
 
   const lines = [
-    `<strong>Прежнее значение:</strong> ${oldValue}`,
-    `<strong>Новое значение:</strong> ${newValue}${newValue !== rounded ? ` → округлено до сотен: ${rounded}` : ''}`,
+    `<strong>Последнее обработанное значение:</strong> ${oldValue}`,
+    `<strong>Новое значение:</strong> ${rounded}${newValue !== rounded ? ` (${newValue} округлено до сотен)` : ''}`,
   ];
   if (diff === 0) lines.push('<strong>Нет новых начислений<strong');
   else lines.push(`в .form-footer начисление: (${rounded} - ${oldValue}) / 100 = ${accrual}`);

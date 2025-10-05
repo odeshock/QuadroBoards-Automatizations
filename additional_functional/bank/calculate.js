@@ -737,43 +737,20 @@ async function runEvery100Messages(modalRoot) {
   const statusEl = modalRoot.querySelector('#modal-fields .muted-note');
   if (statusEl) statusEl.textContent = 'идет поиск…';
 
-  function findOldValue() {
-    // TODO: заменить на реальную функцию поиска
-    return null;
-  }
-
-  const oldValue = parseInt((findOldValue() ?? localStorage.getItem('userMessageCount') ?? '0'), 10);
+  
   const userId = UserID;
   if (!userId) {
     if (statusEl) statusEl.textContent = 'Ошибка: не найден UserID';
     return;
   }
 
-    let doc;
-    try {
-      const url = `/profile.php?id=${userId}`;
-      if (window.FMV && typeof FMV.fetchDoc === 'function') {
-        // Универсальный путь: корректная детекция кодировки + готовый Document
-        doc = await FMV.fetchDoc(url); // helpers → FMV.fetchDoc → fetchHtml → DOMParser
-      } else if (typeof fetchCP1251Doc === 'function') {
-        // Запасной для старых страниц/форумов на CP1251
-        doc = await fetchCP1251Doc(url);
-      } else {
-        // Самый последний fallback (нежелателен, но на случай отсутствия helpers)
-        const resp = await fetch(url, { credentials: 'include' });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const html = await resp.text();
-        doc = new DOMParser().parseFromString(html, 'text/html');
-      }
-    } catch (err) {
-      if (statusEl) statusEl.textContent = 'Ошибка загрузки профиля';
-      console.error(err);
-      return;
+    const oldValue = 100MSG_OLD;
+    const newValue = 100MSG_NEW;
+    if (!oldValue || !newValue) {
+      if (statusEl) statusEl.textContent = 'Ошибка: данные 100msg не работают';
+     return;
     }
-
-
-  const m = strong.textContent.trim().match(/^(\d+)\s*-/);
-  const newValue = m ? parseInt(m[1], 10) : 0;
+    
   const rounded = Math.floor(newValue / 100) * 100;
 
   const diff = rounded - oldValue;

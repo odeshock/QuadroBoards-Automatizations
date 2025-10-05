@@ -731,3 +731,98 @@
     });
 
     renderLog();
+
+
+async function runEvery100Messages(modalRoot) {
+  const statusEl = modalRoot.querySelector('#modal-fields .muted-note');
+  if (statusEl) statusEl.textContent = 'идет поиск…';
+
+  function findOldValue() {
+    // TODO: заменить на реальную функцию поиска
+    return null;
+  }
+
+  const oldValue = parseInt((findOldValue() ?? localStorage.getItem('userMessageCount') ?? '0'), 10);
+  const userId = window.UserID ?? window.userID;
+  if (!userId) {
+    if (statusEl) statusEl.textContent = 'Ошибка: не найден UserID';
+    return;
+  }
+
+  const resp = await fetch(`/profile.php?id=${userId}`, { credentials: 'include' });
+  if (!resp.ok) {
+    if (statusEl) statusEl.textContent = 'Ошибка загрузки профиля';
+    return;
+  }
+
+  const html = await resp.text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const strong = doc.querySelector('#pa-posts strong');
+  if (!strong) {
+    if (statusEl) statusEl.textContent = 'Не найден #pa-posts';
+    return;
+  }
+
+  const m = strong.textContent.trim().match(/^(\d+)\s*-/);
+  const newValue = m ? parseInt(m[1], 10) : 0;
+  const rounded = Math.floor(newValue / 100) * 100;
+
+  const diff = rounded - oldValue;
+  const accrual = diff / 100;
+
+  const lines = [
+    `— прежнее значение: ${oldValue}`,
+    `— новое значение: ${newValue}${newValue !== rounded ? ` → округлено до сотен: ${rounded}` : ''}`,
+  ];
+  if (diff === 0) lines.push('нет новых начислений');
+  else lines.push(`в .form-footer начисление: (${rounded} - ${oldValue}) / 100 = ${accrual}`);
+
+  if (statusEl) statusEl.textContent = lines.join('\n');
+
+  if (diff !== 0) {
+    const footer = modalRoot.querySelector('.form-footer');
+    if (footer && !footer.querySelector('[data-save-100msgs]')) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn primary';
+      btn.textContent = 'Сохранить';
+      btn.setAttribute('data-save-100msgs', '');
+      btn.addEventListener('click', () => {
+        localStorage.setItem('userMessageCount', String(rounded));
+        const note = document.createElement('span');
+        note.className = 'hint';
+        note.style.marginLeft = '8px';
+        note.textContent = `Сохранено (${rounded})`;
+        footer.appendChild(note);
+      });
+      footer.querySelector('div[style]')?.appendChild(btn);
+    }
+  }
+}
+
+
+// Делегирование клика по кнопкам "Добавить начисление"
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-add');
+  if (!btn) return;
+
+  const formSel = btn.getAttribute('data-form');
+  if (formSel === '#form-income-100msgs') {
+    const modal = document.querySelector('.modal');
+    const fields = modal?.querySelector('#modal-fields');
+    if (!fields) return;
+
+    const once = new MutationObserver((list, obs) => {
+      if (fields.querySelector('#form-income-100msgs')) {
+        obs.disconnect();
+        runEvery100Messages(modal);
+      }
+    });
+    once.observe(fields, { childList: true, subtree: true });
+
+    // fallback — если форма уже вставилась
+    if (fields.querySelector('#form-income-100msgs')) {
+      runEvery100Messages(modal);
+    }
+  }
+});

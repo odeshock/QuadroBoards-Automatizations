@@ -846,3 +846,15 @@ document.addEventListener('click', (e) => {
 
 
 console.log("blya");
+
+// === слушатель сообщений от iframe ===
+window.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'fmv:add' && data.payload) {
+    try {
+      openModal(data.payload);
+    } catch (err) {
+      console.error('Ошибка при открытии модалки из iframe:', err);
+    }
+  }
+});

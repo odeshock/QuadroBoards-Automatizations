@@ -732,6 +732,28 @@
 
     renderLog();
 
+function getUserId() {
+  // 1) строго глобальные варианты
+  if (typeof UserID !== 'undefined' && Number.isFinite(+UserID)) return +UserID;
+  if (typeof window !== 'undefined' && Number.isFinite(+window.UserID)) return +window.UserID;
+  if (typeof window !== 'undefined' && Number.isFinite(+window.userID)) return +window.userID;
+
+  // 2) из data-атрибута
+  const rootWithId = document.querySelector('[data-user-id]');
+  const fromData = rootWithId ? parseInt(rootWithId.dataset.userId, 10) : NaN;
+  if (Number.isFinite(fromData)) return fromData;
+
+  // 3) из ссылок вида /profile.php?id=N или ?user_id=N (как запасной канал)
+  const aProfile = document.querySelector('a[href*="/profile.php?id="]');
+  const m1 = aProfile && aProfile.href.match(/[?&]id=(\d+)/);
+  if (m1) return parseInt(m1[1], 10);
+
+  const aPosts = document.querySelector('a[href*="user_id="]');
+  const m2 = aPosts && aPosts.href.match(/[?&]user_id=(\d+)/);
+  if (m2) return parseInt(m2[1], 10);
+
+  return null;
+}
 
 async function runEvery100Messages(modalRoot) {
   const statusEl = modalRoot.querySelector('#modal-fields .muted-note');
@@ -743,11 +765,11 @@ async function runEvery100Messages(modalRoot) {
   }
 
   const oldValue = parseInt((findOldValue() ?? localStorage.getItem('userMessageCount') ?? '0'), 10);
-  const userId = window.UserID ?? window.userID;
-  if (!userId) {
-    if (statusEl) statusEl.textContent = 'Ошибка: не найден UserID';
-    return;
-  }
+  const userId = getUserId();
+    if (!userId) {
+      if (statusEl) statusEl.textContent = 'Ошибка: не найден UserID';
+      return;
+    }
 
   const resp = await fetch(`/profile.php?id=${userId}`, { credentials: 'include' });
   if (!resp.ok) {

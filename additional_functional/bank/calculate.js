@@ -743,7 +743,7 @@ async function runEvery100Messages(modalRoot) {
   }
 
   const oldValue = parseInt((findOldValue() ?? localStorage.getItem('userMessageCount') ?? '0'), 10);
-  const userId = window.UserID ?? window.userID;
+  const userId = UserID;
   if (!userId) {
     if (statusEl) statusEl.textContent = 'Ошибка: не найден UserID';
     return;

@@ -758,13 +758,13 @@ async function runEvery100Messages(modalRoot) {
   const accrual = diff / 100;
 
   const lines = [
-    `— прежнее значение: ${oldValue}`,
-    `— новое значение: ${newValue}${newValue !== rounded ? ` → округлено до сотен: ${rounded}` : ''}`,
+    `<strong>Прежнее значение:</strong> ${oldValue}`,
+    `<strong>Новое значение:</strong> ${newValue}${newValue !== rounded ? ` → округлено до сотен: ${rounded}` : ''}`,
   ];
-  if (diff === 0) lines.push('нет новых начислений');
+  if (diff === 0) lines.push('<strong>Нет новых начислений<strong');
   else lines.push(`в .form-footer начисление: (${rounded} - ${oldValue}) / 100 = ${accrual}`);
 
-  if (statusEl) statusEl.textContent = lines.join('\n');
+  if (statusEl) statusEl.innerHTML = lines.join('<br>');
 
   if (diff !== 0) {
     const footer = modalRoot.querySelector('.form-footer');

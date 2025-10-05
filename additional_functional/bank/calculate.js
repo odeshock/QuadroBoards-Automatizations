@@ -551,6 +551,23 @@
       backdrop.removeAttribute('aria-hidden');
     }
 
+    // где-нибудь после объявления openModal (или в конце файла):
+window.addEventListener('message', (event) => {
+  // защита по происхождению (если iframe того же домена)
+  if (event.origin !== location.origin) return;
+
+  const data = event.data || {};
+  if (data.type === 'fmv:add' && data.payload) {
+    // просто перекинем в твою функцию
+    try {
+      openModal(data.payload); // openModal(config) — уже есть в твоём коде:contentReference[oaicite:2]{index=2}
+    } catch (err) {
+      console.error('Не удалось открыть модалку по сообщению из iframe:', err);
+    }
+  }
+});
+
+
     function closeModal() {
       backdrop.removeAttribute('open');
       backdrop.setAttribute('aria-hidden', 'true');

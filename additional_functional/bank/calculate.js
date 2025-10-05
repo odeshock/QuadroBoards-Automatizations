@@ -800,6 +800,7 @@ async function runEvery100Messages(modalRoot) {
   }
 }
 
+console.log('100msgs');
 
 // Делегирование клика по кнопкам "Добавить начисление"
 document.addEventListener('click', (e) => {

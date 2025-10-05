@@ -12,7 +12,7 @@
     const tabPanels = document.querySelectorAll('.tab-panel');
 
     tabButtons.forEach((btn) => {
-      if (btn) btn.addEventListener('click', () => {
+      btn.addEventListener('click', () => {
         if (btn.classList.contains('is-active')) return;
         const target = btn.getAttribute('data-tab-target');
 
@@ -364,7 +364,7 @@
 
             const removeBtn = wrap.querySelector('.btn-remove-extra');
             if (removeBtn) {
-              if (removeBtn) removeBtn.addEventListener('click', () => {
+              removeBtn.addEventListener('click', () => {
                 wrap.remove();
                 refreshExtraFields();
                 updateAmountSummary();
@@ -401,7 +401,7 @@
         : null;
 
       if (addExtraBtn && addExtraField) {
-        if (addExtraBtn) addExtraBtn.addEventListener('click', () => {
+        addExtraBtn.addEventListener('click', () => {
           addExtraField();
         });
       }
@@ -426,7 +426,7 @@
           const removeBtn = group.querySelector('[data-gift-remove]');
           if (!removeBtn || removeBtn.dataset.bound) return;
           removeBtn.dataset.bound = 'true';
-          if (removeBtn) removeBtn.addEventListener('click', () => {
+          removeBtn.addEventListener('click', () => {
             if (getGiftGroups().length <= 1) return;
             group.remove();
             refreshGiftGroups();
@@ -507,7 +507,7 @@
         refreshGiftGroups();
 
         if (giftAddBtn) {
-          if (giftAddBtn) giftAddBtn.addEventListener('click', () => {
+          giftAddBtn.addEventListener('click', () => {
             addGiftGroup();
           });
         }
@@ -551,23 +551,6 @@
       backdrop.removeAttribute('aria-hidden');
     }
 
-    // где-нибудь после объявления openModal (или в конце файла):
-if (window) window.addEventListener('message', (event) => {
-  // защита по происхождению (если iframe того же домена)
-  if (event.origin !== location.origin) return;
-
-  const data = event.data || {};
-  if (data.type === 'fmv:add' && data.payload) {
-    // просто перекинем в твою функцию
-    try {
-      openModal(data.payload); // openModal(config) — уже есть в твоём коде:contentReference[oaicite:2]{index=2}
-    } catch (err) {
-      console.error('Не удалось открыть модалку по сообщению из iframe:', err);
-    }
-  }
-});
-
-
     function closeModal() {
       backdrop.removeAttribute('open');
       backdrop.setAttribute('aria-hidden', 'true');
@@ -583,7 +566,7 @@ if (window) window.addEventListener('message', (event) => {
       delete form.dataset.currentMultiplier;
     }
 
-    if (document) document.addEventListener('click', (e) => {
+    document.addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-add');
       if (!btn) return;
       const selector = btn.getAttribute('data-form');
@@ -618,15 +601,15 @@ if (window) window.addEventListener('message', (event) => {
       }
     });
 
-    if (btnClose) btnClose.addEventListener('click', closeModal);
-    if (backdrop) backdrop.addEventListener('click', (e) => {
+    btnClose.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) closeModal();
     });
-    if (document) document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && backdrop.hasAttribute('open')) closeModal();
     });
 
-    if (log) log.addEventListener('click', (e) => {
+    log.addEventListener('click', (e) => {
       const actionBtn = e.target.closest('[data-action]');
       if (!actionBtn) return;
       const { action, groupId, entryId } = actionBtn.dataset;
@@ -666,7 +649,7 @@ if (window) window.addEventListener('message', (event) => {
       }
     });
 
-    if (form) form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!form.reportValidity()) return;
 
@@ -804,7 +787,7 @@ async function runEvery100Messages(modalRoot) {
       btn.className = 'btn primary';
       btn.textContent = 'Сохранить';
       btn.setAttribute('data-save-100msgs', '');
-      if (btn) btn.addEventListener('click', () => {
+      btn.addEventListener('click', () => {
         localStorage.setItem('userMessageCount', String(rounded));
         const note = document.createElement('span');
         note.className = 'hint';
@@ -816,45 +799,3 @@ async function runEvery100Messages(modalRoot) {
     }
   }
 }
-
-
-// Делегирование клика по кнопкам "Добавить начисление"
-if (document) document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.btn-add');
-  if (!btn) return;
-
-  const formSel = btn.getAttribute('data-form');
-  if (formSel === '#form-income-100msgs') {
-    const modal = document.querySelector('.modal');
-    const fields = modal?.querySelector('#modal-fields');
-    if (!fields) return;
-
-    const once = new MutationObserver((list, obs) => {
-      if (fields.querySelector('#form-income-100msgs')) {
-        obs.disconnect();
-        runEvery100Messages(modal);
-      }
-    });
-    once.observe(fields, { childList: true, subtree: true });
-
-    // fallback — если форма уже вставилась
-    if (fields.querySelector('#form-income-100msgs')) {
-      runEvery100Messages(modal);
-    }
-  }
-});
-
-
-console.log("blya111");
-
-// === слушатель сообщений от iframe ===
-if (window) window.addEventListener('message', (event) => {
-  const data = event.data || {};
-  if (data.type === 'fmv:add' && data.payload) {
-    try {
-      openModal(data.payload);
-    } catch (err) {
-      console.error('Ошибка при открытии модалки из iframe:', err);
-    }
-  }
-});

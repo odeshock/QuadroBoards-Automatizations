@@ -757,6 +757,20 @@ async function runEvery100Messages(modalRoot) {
   const diff = rounded - oldValue;
   const accrual = diff / 100;
 
+    // base amount берём из dataset (кнопка у 100 сообщений уже прокидывает data-amount="10")
+    const baseRaw = form.dataset.amount || '';
+    const baseNum = parseNumericAmount(baseRaw);
+    
+    // если есть начисление, показываем формулу и фиксируем множитель
+    if (Number.isFinite(baseNum) && accrual > 0) {
+      // 1) метка и формула в хедере модалки
+      const total = baseNum * accrual;
+      modalAmount.textContent = `${formatNumber(baseNum)} x ${accrual} = ${formatNumber(total)}`;
+    
+      // 2) сохраняемый множитель
+      form.dataset.currentMultiplier = String(accrual);
+    }
+
   const lines = [
     `<strong>Последнее обработанное значение:</strong> ${oldValue}`,
     `<strong>Новое значение:</strong> ${newValue}${newValue !== rounded ? ` → округлено до сотен: ${rounded}` : ''}`,

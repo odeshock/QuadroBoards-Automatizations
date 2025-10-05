@@ -822,30 +822,4 @@ async function runEvery100Messages(modalRoot) {
   }
 }
 
-console.log('100msgs3');
-
-// Делегирование клика по кнопкам "Добавить начисление"
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.btn-add');
-  if (!btn) return;
-
-  const formSel = btn.getAttribute('data-form');
-  if (formSel === '#form-income-100msgs') {
-    const modal = document.querySelector('.modal');
-    const fields = modal?.querySelector('#modal-fields');
-    if (!fields) return;
-
-    const once = new MutationObserver((list, obs) => {
-      if (fields.querySelector('#form-income-100msgs')) {
-        obs.disconnect();
-        runEvery100Messages(modal);
-      }
-    });
-    once.observe(fields, { childList: true, subtree: true });
-
-    // fallback — если форма уже вставилась
-    if (fields.querySelector('#form-income-100msgs')) {
-      runEvery100Messages(modal);
-    }
-  }
-});
+console.log('100msgs4');

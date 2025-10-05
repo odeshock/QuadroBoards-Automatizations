@@ -749,19 +749,28 @@ async function runEvery100Messages(modalRoot) {
     return;
   }
 
-  const resp = await fetch(`/profile.php?id=${userId}`, { credentials: 'include' });
-  if (!resp.ok) {
-    if (statusEl) statusEl.textContent = 'Ошибка загрузки профиля';
-    return;
-  }
+    let doc;
+    try {
+      const url = `/profile.php?id=${userId}`;
+      if (window.FMV && typeof FMV.fetchDoc === 'function') {
+        // Универсальный путь: корректная детекция кодировки + готовый Document
+        doc = await FMV.fetchDoc(url); // helpers → FMV.fetchDoc → fetchHtml → DOMParser
+      } else if (typeof fetchCP1251Doc === 'function') {
+        // Запасной для старых страниц/форумов на CP1251
+        doc = await fetchCP1251Doc(url);
+      } else {
+        // Самый последний fallback (нежелателен, но на случай отсутствия helpers)
+        const resp = await fetch(url, { credentials: 'include' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const html = await resp.text();
+        doc = new DOMParser().parseFromString(html, 'text/html');
+      }
+    } catch (err) {
+      if (statusEl) statusEl.textContent = 'Ошибка загрузки профиля';
+      console.error(err);
+      return;
+    }
 
-  const html = await resp.text();
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const strong = doc.querySelector('#pa-posts strong');
-  if (!strong) {
-    if (statusEl) statusEl.textContent = 'Не найден #pa-posts';
-    return;
-  }
 
   const m = strong.textContent.trim().match(/^(\d+)\s*-/);
   const newValue = m ? parseInt(m[1], 10) : 0;

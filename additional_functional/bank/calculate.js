@@ -747,7 +747,7 @@ async function runEvery100Messages(modalRoot) {
     const oldValue = MSG100_OLD;
     const newValue = MSG100_NEW;
     console.log(oldValue, newValue);
-    if (oldValue === underfined || newValue === underfined) {
+    if (oldValue === null || newValue === null) {
       if (statusEl) statusEl.textContent = 'Ошибка: данные 100msg не работают';
      return;
     }

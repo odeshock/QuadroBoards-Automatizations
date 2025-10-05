@@ -735,6 +735,7 @@ renderLog();
 
 function safeGetParentUserId() {
     try {
+        console.log(window.parent);
         if (window.parent && Number.isFinite(+window.parent.UserID)) {
           return +window.parent.UserID;
         }

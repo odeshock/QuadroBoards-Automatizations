@@ -339,3 +339,48 @@
       color: #111827;
     }
     .list-caption strong{ font-weight: 600; }
+
+    /* Combobox for ANKETA admin */
+  .combo { position: relative; }
+  .suggest {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    z-index: 10;
+    display: none;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    max-height: 220px;
+    overflow: auto;
+    margin-top: 6px;
+  }
+  .suggest-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .suggest-item:hover { background: #f3f4f6; }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px; 
+    margin-top: 4px;      
+  }
+
+  .chip {
+    display: inline-block;
+    background: #f3f4f6;
+    border-radius: 9999px;
+    padding: 6px 12px;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .chip input[type="number"] { width: 90px; }

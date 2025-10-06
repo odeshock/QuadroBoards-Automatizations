@@ -13,11 +13,22 @@
     const MSG_TIMEOUT_MS = 180000;
     const REP_TIMEOUT_MS = 180000;
     const POS_TIMEOUT_MS = 180000;
+    const MONTH_TIMEOUT_MS = 180000;
     const COUNTER_POLL_INTERVAL_MS = 500;
     const ADS_TIMEOUT_MS = 180000;
     const PERSONAL_TIMEOUT_MS = 180000;
     const PLOT_TIMEOUT_MS = 180000;
     const FIRST_POST_TIMEOUT_MS = 180000;
+    const FORM_TIMEOUT_MS = 180000;
+    const PROMO_TIMEOUT_MS = 180000;
+    const NEEDED_TIMEOUT_MS = 180000;
+    const BEST_EPISODE_TIMEOUT_MS = 180000;
+    const BEST_POST_TIMEOUT_MS = 180000;
+    const BEST_WRITER_TIMEOUT_MS   = 180000;
+    const BEST_ACTIVIST_TIMEOUT_MS = 180000;
+    const TOPUP_TIMEOUT_MS = 180000;
+    const AMS_TIMEOUT_MS = 180000;
+
     let counterWatcher = null;
 
     const counterConfigs = {
@@ -50,13 +61,24 @@
         logDiffLabel: 'Новый учитанный позитив',
         timeout: POS_TIMEOUT_MS,
         step: 100
-      }
+      },
+      'form-income-month': {
+        prefix: 'month',
+        oldVar: 'MONTH_OLD',
+        newVar: 'MONTH_NEW',
+        unitLabel: 'месяцев',
+        diffNoteLabel: 'новых месяцев пребывания',
+        logDiffLabel: 'Новые учтённые месяцы пребывания',
+        timeout: MONTH_TIMEOUT_MS,
+        step: 1
+      },
     };
 
     const counterPrefixMap = {
       msg: counterConfigs['form-income-100msgs'],
       rep: counterConfigs['form-income-100rep'],
-      pos: counterConfigs['form-income-100pos']
+      pos: counterConfigs['form-income-100pos'],
+      month: counterConfigs['form-income-month']
     };
 
     tabButtons.forEach((btn) => {
@@ -81,6 +103,7 @@
         });
       });
     });
+    
 
     function cleanupCounterWatcher() {
       if (counterWatcher && typeof counterWatcher.cancel === 'function') {
@@ -124,6 +147,30 @@
       field.value = value;
     }
 
+    // ==== ВИРТУАЛЬНЫЕ ДАТЫ: расчёт полных месяцев ====
+    const pad2 = (n) => String(n).padStart(2, '0');
+
+    function roundNewToAnchorDOM(OLD, NEW) {
+      let [y2, m2, d2] = NEW.map(Number);
+      const d1 = Number(OLD[2]);
+      if (d2 < d1) {
+        m2 -= 1;
+        if (m2 === 0) { m2 = 12; y2 -= 1; }
+      }
+      return [y2, m2, d1];
+    }
+
+    function fullMonthsDiffVirtualDOM(OLD, NEW) {
+      const [y1, m1] = OLD.map(Number);
+      const [yr, mr] = roundNewToAnchorDOM(OLD, NEW);
+      return Math.max(0, (yr - y1) * 12 + (mr - m1));
+    }
+
+    function fmtYMD([y, m, d]) {
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+
+
     const numberFormatter = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
     const formatNumber = (value) => numberFormatter.format(value);
     const parseNumericAmount = (raw) => {
@@ -155,6 +202,7 @@
         entryEl.className = 'entry';
         entryEl.dataset.groupId = group.id;
 
+        // ====== header ======
         const header = document.createElement('div');
         header.className = 'entry-header';
 
@@ -174,17 +222,17 @@
           const meta = document.createElement('span');
           meta.className = 'entry-meta';
 
-          // 1) Спец-формат: "фикс + xнадбавка" (например "5 + x10")
+          // формат "фикс + xнадбавка" (например "5 + x10")
           const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
           if (m) {
             const fix = Number(m[1]);
             const bonus = Number(m[2]);
 
-            // Собираем по всем записям группы
+            // суммируем по всем записям группы
             let totalCount = 0;
             let totalThousands = 0;
             group.entries.forEach((item) => {
-              // Личные посты — без капа
+              // личные посты — без капа
               const rawPersonal = item?.data?.personal_posts_json;
               if (rawPersonal) {
                 try {
@@ -196,9 +244,9 @@
                       return s + Math.floor(Math.max(0, n) / 1000);
                     }, 0);
                   }
-                } catch(_) {}
+                } catch (_) {}
               }
-              // Сюжетные посты — с капом 3к на пост
+              // сюжетные посты — кап 3к на пост
               const rawPlot = item?.data?.plot_posts_json;
               if (rawPlot) {
                 try {
@@ -208,10 +256,10 @@
                     totalThousands += arr.reduce((s, it) => {
                       const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
                       const k = Math.floor(Math.max(0, n) / 1000);
-                      return s + Math.min(k, 3); // кап 3
+                      return s + Math.min(k, 3);
                     }, 0);
                   }
-                } catch(_) {}
+                } catch (_) {}
               }
             });
 
@@ -219,7 +267,7 @@
             meta.textContent = `${group.amountLabel}: ${fix} x ${totalCount} + ${bonus} x ${totalThousands} = ${total.toLocaleString('ru-RU')}`;
             header.appendChild(meta);
           } else {
-            // 2) Обычный числовой случай (как было)
+            // обычное число/строка
             const amountNumber = parseNumericAmount(group.amount);
             if (amountNumber !== null) {
               const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
@@ -249,6 +297,7 @@
 
         entryEl.appendChild(header);
 
+        // ====== items ======
         const itemsWrap = document.createElement('div');
         itemsWrap.className = 'entry-items';
 
@@ -258,6 +307,7 @@
           itemEl.dataset.entryId = item.id;
           itemEl.dataset.groupId = group.id;
 
+          // header у записи
           const itemHeader = document.createElement('div');
           itemHeader.className = 'entry-item-header';
 
@@ -268,17 +318,14 @@
           itemHeader.appendChild(itemTitle);
 
           const removeTitleIfEmpty = () => {
-            // есть ли в этой записи хотя бы один пункт данных?
             const hasData = itemEl.querySelector('.entry-list li');
             if (!hasData && itemTitle && itemTitle.textContent.trim() === 'Данные') {
-              itemTitle.remove(); // убираем заголовок «Данные», кнопки остаются
+              itemTitle.remove();
             }
           };
 
-
           const actions = document.createElement('div');
           actions.className = 'entry-actions';
-
           const editBtn = document.createElement('button');
           editBtn.type = 'button';
           editBtn.dataset.action = 'edit';
@@ -298,8 +345,10 @@
           itemHeader.appendChild(actions);
           itemEl.appendChild(itemHeader);
 
+          // список данных
           const list = document.createElement('ol');
           list.className = 'entry-list';
+
           const formatEntryKey = (key) => {
             const recipientMatch = key.match(/^recipient_(\d+)$/);
             if (recipientMatch) return recipientMatch[1] === '1' ? 'Получатель' : `Получатель ${recipientMatch[1]}`;
@@ -307,33 +356,35 @@
             if (fromMatch) return fromMatch[1] === '1' ? 'От кого' : `От кого ${fromMatch[1]}`;
             const wishMatch = key.match(/^wish_(\d+)$/);
             if (wishMatch) return wishMatch[1] === '1' ? 'Комментарий' : `Комментарий ${wishMatch[1]}`;
-            const counterMatch = key.match(/^(msg|rep|pos)_(old|new|rounded|diff)$/);
+            const counterMatch = key.match(/^(msg|rep|pos|month)_(old|new|rounded|diff)$/);
             if (counterMatch) {
               const [, prefix, suffix] = counterMatch;
               const cfg = counterPrefixMap[prefix];
               if (cfg) {
                 if (suffix === 'old') return 'Предыдущее значение';
                 if (suffix === 'new') return 'Новое значение';
-                if (suffix === 'rounded') return 'Новое значение (округлено)';
+                if (suffix === 'rounded')
+                return cfg.prefix === 'month'
+                  ? 'Новое значение (условно округлено)'
+                  : 'Новое значение (округлено)';
                 if (suffix === 'diff') return cfg.logDiffLabel || 'Новый учитанный объем';
               }
             }
             return key;
           };
-          
-          // спец-рендер для листовки
+
+          // ===== спец-рендеры =====
+          // листовка
           if (item.data && item.data.flyer_links_json) {
             try {
               const links = JSON.parse(item.data.flyer_links_json);
               if (Array.isArray(links) && links.length) {
                 const list = document.createElement('ol');
-                
                 const removeTitleIfEmpty = () => {
                   if (list.children.length === 0 && itemTitle && itemTitle.textContent.trim() === 'Данные') {
-                    itemTitle.remove(); // убираем только текст "Данные", кнопки в header остаются
+                    itemTitle.remove();
                   }
                 };
-
                 list.className = 'entry-list';
                 links.forEach(({ src, text }) => {
                   if (!src) return;
@@ -345,12 +396,12 @@
                 });
                 itemEl.appendChild(list);
                 itemsWrap.appendChild(itemEl);
-                return; // уже отрисовали "Данные" для этой записи
+                return;
               }
-            } catch (e) { /* ignore */ }
+            } catch(_) {}
           }
 
-          // спец-рендер для личных постов
+          // личные посты
           if (item.data && item.data.personal_posts_json) {
             try {
               const items = JSON.parse(item.data.personal_posts_json);
@@ -374,10 +425,10 @@
                 removeTitleIfEmpty();
                 return;
               }
-            } catch(e) { /* ignore */ }
+            } catch(_) {}
           }
 
-          // спец-рендер для сюжетных постов
+          // сюжетные посты
           if (item.data && item.data.plot_posts_json) {
             try {
               const items = JSON.parse(item.data.plot_posts_json);
@@ -401,15 +452,64 @@
                 removeTitleIfEmpty();
                 return;
               }
-            } catch (e) { /* ignore */ }
+            } catch(_) {}
+          }
+
+          // ===== Докупить кредиты: склеиваем recipient_i + topup_i =====
+          const isTopup = (item.template_id === 'form-income-topup' || item.template_id === 'form-income-ams') ||
+                (/Докупить кредиты|Персональные начисления/i.test(group.title || ''));
+
+
+          if (isTopup) {
+            const dataObj = item.data || {};
+            const idxs = Object.keys(dataObj)
+              .map(k => k.match(/^recipient_(\d+)$/))
+              .filter(Boolean)
+              .map(m => m[1])
+              .sort((a, b) => Number(a) - Number(b));
+
+            idxs.forEach((idx) => {
+              const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
+              if (!rid) return;
+
+              const user = window.USERS_LIST?.find(u => String(u.id) === rid);
+              const displayName = user ? `<strong>${user.name}</strong> (id: ${user.id})` : `id: ${rid}`;
+
+              const rawAmount = String(dataObj[`topup_${idx}`] ?? '').trim();
+              const amountNum = parseNumericAmount(rawAmount);
+              const amountText = (amountNum !== null && rawAmount) ? formatNumber(amountNum) : (rawAmount || '—');
+
+              const li = document.createElement('li');
+              li.innerHTML = `${displayName} — ${amountText}`;
+              list.appendChild(li);
+            });
           }
 
 
-          Object.entries(item.data).forEach(([key, value]) => {
+          // ===== остальные поля =====
+          Object.entries(item.data || {}).forEach(([key, value]) => {
+            // пары recipient/topup уже отрисованы для топапа
+            if (isTopup && (/^recipient_\d+$/.test(key) || /^topup_\d+$/.test(key))) return;
+
+            // для прочих форм recipient_i показываем только имя
+            if (!isTopup && /^recipient_\d+$/.test(key)) {
+              const rid = String(value ?? '').trim();
+              if (!rid) return;
+              const user = window.USERS_LIST?.find(u => String(u.id) === rid);
+              const li = document.createElement('li');
+              li.innerHTML = user ? `<strong>${user.name}</strong> (id: ${user.id})` : `id: ${rid}`;
+              list.appendChild(li);
+              return;
+            }
+
+            // пустые значения не выводим (чтобы не было "— —")
+            if (value === undefined || value === null || String(value).trim() === '') return;
+
             const li = document.createElement('li');
             const raw = typeof value === 'string' ? value.trim() : value;
-            const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
 
+            // URL-поля
+            const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
             if (isUrl) {
               const link = document.createElement('a');
               link.href = raw;
@@ -423,12 +523,13 @@
               keySpan.textContent = formatEntryKey(key);
               const valueSpan = document.createElement('span');
               valueSpan.className = 'value';
-              valueSpan.textContent = raw || '—';
+              valueSpan.textContent = (raw ?? '—');
               li.append(keySpan, document.createTextNode(' — '), valueSpan);
             }
 
             list.appendChild(li);
           });
+
           removeTitleIfEmpty();
 
           itemEl.appendChild(list);
@@ -439,6 +540,660 @@
         log.appendChild(entryEl);
       });
     }
+
+
+    function setupAdminRecipientsFlow({ timeoutMs, data }) {
+      // 1) убрать лишние инфо-плашки из шаблона
+      (() => {
+        modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
+          .forEach(el => el.remove());
+        const maybeInfo = Array.from(modalFields.children)
+          .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
+        if (maybeInfo) maybeInfo.remove();
+      })();
+
+      // 2) показать «ждём…» (якорь для ошибок)
+      const waitNote = document.createElement('p');
+      waitNote.className = 'muted-note admin-wait-note';
+      waitNote.textContent = 'Пожалуйста, подождите...';
+      modalFields.prepend(waitNote);
+
+      const hideWait = () => { const el = modalFields.querySelector('.admin-wait-note'); if (el) el.remove(); };
+      const showError = (msg) => {
+        let err = modalFields.querySelector('.note-error.admin-error');
+        if (!err) {
+          err = document.createElement('p');
+          err.className = 'note-error admin-error';
+          const anchor = modalFields.querySelector('.admin-wait-note');
+          if (anchor) anchor.insertAdjacentElement('afterend', err);
+          else modalFields.prepend(err);
+        }
+        err.textContent = msg || 'Произошла ошибка. Попробуйте обновить страницу.';
+      };
+      const clearError = () => { const err = modalFields.querySelector('.note-error.admin-error'); if (err) err.remove(); };
+
+      let canceled = false;
+      const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+      counterWatcher = { cancel };
+
+      const fail = () => {
+        if (canceled) return;
+        hideWait();
+        showError('Произошла ошибка. Попробуйте обновить страницу.');
+        btnSubmit.style.display = 'none';
+        btnSubmit.disabled = true;
+        cancel();
+      };
+
+      const renderAdminPicker = (users) => {
+        if (!Array.isArray(users)) return fail();
+
+        hideWait();
+        clearError();
+
+        const wrap = document.createElement('div');
+        wrap.className = 'field';
+
+        const chosen = document.createElement('div');
+        chosen.className = 'chips';
+        wrap.appendChild(chosen);
+
+        const block = document.createElement('div');
+        block.className = 'field anketa-combobox';
+
+        const label = document.createElement('label');
+        label.textContent = 'Кому начислить*';
+        block.appendChild(label);
+
+        const box = document.createElement('div');
+        box.className = 'combo';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Начните вводить имя или id...';
+        input.setAttribute('autocomplete', 'off');
+
+        const list = document.createElement('div');
+        list.className = 'suggest';
+        list.setAttribute('role', 'listbox');
+
+        box.appendChild(input);
+        box.appendChild(list);
+        block.appendChild(box);
+        wrap.appendChild(block);
+        modalFields.appendChild(wrap);
+
+        const norm = (s) => String(s ?? '').trim().toLowerCase();
+        const picked = new Set();
+
+        const syncHiddenFields = () => {
+          modalFields.querySelectorAll('input[type="hidden"][name^="recipient_"]').forEach(n => n.remove());
+          let i = 1;
+          picked.forEach((id) => {
+            const hid = document.createElement('input');
+            hid.type = 'hidden';
+            hid.name = `recipient_${i++}`;
+            hid.value = String(id);
+            modalFields.appendChild(hid);
+          });
+          btnSubmit.style.display = picked.size ? '' : 'none';
+          btnSubmit.disabled = picked.size === 0;
+        };
+
+        const addChip = (user) => {
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = `${user.name} (id: ${user.id})`;
+          chip.title = 'Нажмите, чтобы удалить';
+          chip.style.cursor = 'pointer';
+          chip.addEventListener('click', () => {
+            picked.delete(String(user.id));
+            chip.remove();
+            syncHiddenFields();
+          });
+          chosen.appendChild(chip);
+        };
+
+        const portalList = list;
+        portalList.style.position = 'fixed';
+        portalList.style.zIndex = '9999';
+        let portalMounted = false;
+        const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
+        const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
+        const positionPortal = () => {
+          const r = input.getBoundingClientRect();
+          portalList.style.left = `${r.left}px`;
+          portalList.style.top  = `${r.bottom + 6}px`;
+          portalList.style.width = `${r.width}px`;
+        };
+        const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
+        const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
+
+        const buildItem = (u) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'suggest-item';
+          item.setAttribute('role', 'option');
+          item.textContent = `${u.name} (id: ${u.id})`;
+          item.addEventListener('click', () => {
+            const sid = String(u.id);
+            if (picked.has(sid)) { closeSuggest(); input.value = ''; return; }
+            picked.add(sid);
+            addChip(u);
+            syncHiddenFields();
+            input.value = '';
+            closeSuggest();
+            input.focus();
+          });
+          return item;
+        };
+
+        const doSearch = () => {
+          const q = norm(input.value);
+          portalList.innerHTML = '';
+          if (!q) { closeSuggest(); return; }
+          const res = users
+            .filter(u => norm(u.name).includes(q) || String(u.id).includes(q))
+            .slice(0, 20);
+          if (!res.length) { closeSuggest(); return; }
+          res.forEach(u => portalList.appendChild(buildItem(u)));
+          openSuggest();
+        };
+
+        input.addEventListener('input', doSearch);
+        input.addEventListener('focus', doSearch);
+        document.addEventListener('click', (e) => {
+          if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
+        });
+        window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
+        window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
+
+        // Prefill из data
+        if (data) {
+          const ids = Object.keys(data)
+            .filter(k => /^recipient_\d+$/.test(k))
+            .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10))
+            .map(k => String(data[k]).trim())
+            .filter(Boolean);
+
+          ids.forEach((id) => {
+            if (picked.has(id)) return;
+            const u = Array.isArray(users) ? users.find(x => String(x.id) === id) : null;
+            if (u) {
+              picked.add(String(u.id));
+              addChip(u);
+            } else {
+              picked.add(id);
+              addChip({ name: 'Неизвестный', id });
+            }
+          });
+
+          syncHiddenFields();
+        }
+
+        if (!picked.size) {
+          btnSubmit.style.display = 'none';
+          btnSubmit.disabled = true;
+        }
+      };
+
+      const to = setTimeout(() => {
+        if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) return fail();
+        return fail();
+      }, timeoutMs);
+
+      const poll = setInterval(() => {
+        if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
+        if (Array.isArray(window.USERS_LIST)) {
+          clearTimeout(to);
+          clearInterval(poll);
+          renderAdminPicker(window.USERS_LIST);
+        }
+      }, COUNTER_POLL_INTERVAL_MS);
+    }
+
+    function setupAdminSingleRecipientFlow({ timeoutMs, data }) {
+      // удалить инфо-элементы
+      (() => {
+        modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
+          .forEach(el => el.remove());
+        const maybeInfo = Array.from(modalFields.children)
+          .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
+        if (maybeInfo) maybeInfo.remove();
+      })();
+
+      // "ждём..."
+      const waitNote = document.createElement('p');
+      waitNote.className = 'muted-note admin-wait-note';
+      waitNote.textContent = 'Пожалуйста, подождите...';
+      modalFields.prepend(waitNote);
+
+      const hideWait = () => { const el = modalFields.querySelector('.admin-wait-note'); if (el) el.remove(); };
+      const showError = (msg) => {
+        let err = modalFields.querySelector('.note-error.admin-error');
+        if (!err) {
+          err = document.createElement('p');
+          err.className = 'note-error admin-error';
+          const anchor = modalFields.querySelector('.admin-wait-note');
+          if (anchor) anchor.insertAdjacentElement('afterend', err);
+          else modalFields.prepend(err);
+        }
+        err.textContent = msg || 'Произошла ошибка. Попробуйте обновить страницу.';
+      };
+
+      let canceled = false;
+      const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+      counterWatcher = { cancel };
+
+      const fail = () => {
+        if (canceled) return;
+        hideWait();
+        showError('Произошла ошибка. Попробуйте обновить страницу.');
+        btnSubmit.style.display = 'none';
+        btnSubmit.disabled = true;
+        cancel();
+      };
+
+      const renderAdminPicker = (users) => {
+        if (!Array.isArray(users)) return fail();
+
+        hideWait();
+        const wrap = document.createElement('div');
+        wrap.className = 'field';
+
+        const chosen = document.createElement('div');
+        chosen.className = 'chips';
+        wrap.appendChild(chosen);
+
+        const block = document.createElement('div');
+        block.className = 'field anketa-combobox';
+
+        const label = document.createElement('label');
+        label.textContent = 'Кому начислить*';
+        block.appendChild(label);
+
+        const box = document.createElement('div');
+        box.className = 'combo';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Начните вводить имя или id...';
+        input.setAttribute('autocomplete', 'off');
+
+        const list = document.createElement('div');
+        list.className = 'suggest';
+        list.setAttribute('role', 'listbox');
+
+        box.appendChild(input);
+        box.appendChild(list);
+        block.appendChild(box);
+        wrap.appendChild(block);
+        modalFields.appendChild(wrap);
+
+        // единственный выбранный id (строка)
+        let pickedId = '';
+
+        const syncHiddenFields = () => {
+          modalFields.querySelectorAll('input[type="hidden"][name^="recipient_"]').forEach(n => n.remove());
+          if (pickedId) {
+            const hid = document.createElement('input');
+            hid.type = 'hidden';
+            hid.name = 'recipient_1';
+            hid.value = pickedId;
+            modalFields.appendChild(hid);
+          }
+          btnSubmit.style.display = pickedId ? '' : 'none';
+          btnSubmit.disabled = !pickedId;
+        };
+
+        const renderChip = (user) => {
+          chosen.innerHTML = '';
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = `${user.name} (id: ${user.id})`;
+          chip.title = 'Нажмите, чтобы удалить';
+          chip.style.cursor = 'pointer';
+          chip.addEventListener('click', () => {
+            pickedId = '';
+            chosen.innerHTML = '';
+            syncHiddenFields();
+          });
+          chosen.appendChild(chip);
+        };
+
+        const portalList = list;
+        portalList.style.position = 'fixed';
+        portalList.style.zIndex = '9999';
+        let portalMounted = false;
+        const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
+        const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
+        const positionPortal = () => {
+          const r = input.getBoundingClientRect();
+          portalList.style.left = `${r.left}px`;
+          portalList.style.top  = `${r.bottom + 6}px`;
+          portalList.style.width = `${r.width}px`;
+        };
+        const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
+        const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
+
+        const buildItem = (u) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'suggest-item';
+          item.setAttribute('role', 'option');
+          item.textContent = `${u.name} (id: ${u.id})`;
+          item.addEventListener('click', () => {
+            pickedId = String(u.id);
+            renderChip(u);
+            syncHiddenFields();
+            input.value = '';
+            closeSuggest();
+            input.focus();
+          });
+          return item;
+        };
+
+        const norm = (s) => String(s ?? '').trim().toLowerCase();
+        const doSearch = () => {
+          const q = norm(input.value);
+          portalList.innerHTML = '';
+          if (!q) { closeSuggest(); return; }
+          const res = users
+            .filter(u => norm(u.name).includes(q) || String(u.id).includes(q))
+            .slice(0, 20);
+          if (!res.length) { closeSuggest(); return; }
+          res.forEach(u => portalList.appendChild(buildItem(u)));
+          openSuggest();
+        };
+
+        input.addEventListener('input', doSearch);
+        input.addEventListener('focus', doSearch);
+        document.addEventListener('click', (e) => {
+          if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
+        });
+        window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
+        window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
+
+        // Prefill из data (берём только первого)
+        if (data) {
+          const ids = Object.keys(data)
+            .filter(k => /^recipient_\d+$/.test(k))
+            .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10))
+            .map(k => String(data[k]).trim())
+            .filter(Boolean);
+          const first = ids[0];
+          if (first) {
+            const u = users.find(x => String(x.id) === first);
+            if (u) { pickedId = String(u.id); renderChip(u); }
+            else   { pickedId = first; renderChip({ name: 'Неизвестный', id: first }); }
+          }
+          syncHiddenFields();
+        }
+
+        // изначально скрыта
+        if (!pickedId) {
+          btnSubmit.style.display = 'none';
+          btnSubmit.disabled = true;
+        }
+      };
+
+      const to = setTimeout(fail, timeoutMs);
+      const poll = setInterval(() => {
+        if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
+        if (Array.isArray(window.USERS_LIST)) {
+          clearTimeout(to);
+          clearInterval(poll);
+          renderAdminPicker(window.USERS_LIST);
+        }
+      }, COUNTER_POLL_INTERVAL_MS);
+    }
+
+    function setupAdminTopupFlow({ timeoutMs, data }) {
+      // === 1) Удаляем дисклеймер и прочие инфо-элементы — у админа их быть НЕ должно ===
+      modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info]')
+        .forEach(el => el.remove());
+      const maybeInfo = Array.from(modalFields.children)
+        .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
+      if (maybeInfo) maybeInfo.remove();
+
+      // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
+      const waitNote = document.createElement('p');
+      waitNote.className = 'muted-note admin-wait-note';
+      waitNote.textContent = 'Пожалуйста, подождите...';
+      modalFields.prepend(waitNote);
+
+      const hideWait = () => {
+        const el = modalFields.querySelector('.admin-wait-note');
+        if (el) el.remove();
+      };
+      const showError = (msg) => {
+        hideWait();
+        let err = modalFields.querySelector('.note-error.admin-error');
+        if (!err) {
+          err = document.createElement('p');
+          err.className = 'note-error admin-error';
+          modalFields.prepend(err);
+        }
+        err.textContent = msg || 'Произошла ошибка. Попробуйте обновить страницу.';
+        btnSubmit.style.display = 'none';
+        btnSubmit.disabled = true;
+      };
+
+      let canceled = false;
+      const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+      counterWatcher = { cancel };
+
+      const fail = () => {
+        if (canceled) return;
+        showError('Произошла ошибка. Попробуйте обновить страницу.');
+        cancel();
+      };
+
+      // === 3) Когда USERS_LIST готов — рисуем пикер с суммой на каждого ===
+      const renderAdminPicker = (users) => {
+        if (!Array.isArray(users)) return fail();
+
+        hideWait();
+
+        // Каркас
+        const wrap = document.createElement('div');
+        wrap.className = 'field';
+
+        const chosen = document.createElement('div');
+        chosen.className = 'chips';
+        wrap.appendChild(chosen);
+
+        const block = document.createElement('div');
+        block.className = 'field anketa-combobox';
+
+        const label = document.createElement('label');
+        label.textContent = 'Кому начислить и сколько*';
+        block.appendChild(label);
+
+        const box = document.createElement('div');
+        box.className = 'combo';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Начните вводить имя или id...';
+        input.setAttribute('autocomplete', 'off');
+
+        const list = document.createElement('div');
+        list.className = 'suggest';
+        list.setAttribute('role', 'listbox');
+
+        box.appendChild(input);
+        box.appendChild(list);
+        block.appendChild(box);
+        wrap.appendChild(block);
+        modalFields.appendChild(wrap);
+
+        // Выбранные: Map<id, { id, name, amountInput, el }>
+        const picked = new Map();
+
+        const isValidAmount = (raw) => {
+          const num = parseNumericAmount(raw); // уже объявлена выше в файле:contentReference[oaicite:1]{index=1}
+          return Number.isFinite(num) && num > 0;
+        };
+
+        const syncHiddenFields = () => {
+          // очищаем прошлые скрытые
+          modalFields
+            .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="topup_"]')
+            .forEach(n => n.remove());
+
+          // пересобираем пары recipient_i + topup_i только для валидных сумм
+          let i = 1;
+          for (const { id, amountInput } of picked.values()) {
+            const val = amountInput?.value ?? '';
+            if (!isValidAmount(val)) continue;
+            const hidR = document.createElement('input');
+            hidR.type = 'hidden';
+            hidR.name = `recipient_${i}`;
+            hidR.value = String(id);
+
+            const hidA = document.createElement('input');
+            hidA.type = 'hidden';
+            hidA.name = `topup_${i}`;
+            hidA.value = String(val).trim().replace(',', '.');
+
+            modalFields.append(hidR, hidA);
+            i++;
+          }
+
+          const hasAny = i > 1;
+          btnSubmit.style.display = hasAny ? '' : 'none';
+          btnSubmit.disabled = !hasAny;
+        };
+
+        const removeChip = (id) => {
+          const item = picked.get(id);
+          if (item && item.el) item.el.remove();
+          picked.delete(id);
+          syncHiddenFields();
+        };
+
+        const addChip = (user, prefillAmount = '') => {
+          const sid = String(user.id);
+          if (picked.has(sid)) return;
+
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.style.display = 'inline-flex';
+          chip.style.alignItems = 'center';
+          chip.style.gap = '8px';
+
+          const text = document.createElement('span');
+          text.textContent = `${user.name} (id: ${user.id})`;
+
+          const amount = document.createElement('input');
+          amount.type = 'number';
+          amount.min = '0';
+          amount.step = '0.1';
+          amount.placeholder = 'сколько';
+          amount.value = prefillAmount || '';
+          amount.style.width = '90px';
+          amount.addEventListener('input', syncHiddenFields);
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.textContent = '×';
+          del.title = 'Удалить';
+          del.style.border = 'none';
+          del.style.background = 'transparent';
+          del.style.cursor = 'pointer';
+          del.style.fontSize = '16px';
+          del.addEventListener('click', () => removeChip(sid));
+
+          chip.append(text, amount, del);
+          chosen.appendChild(chip);
+
+          picked.set(sid, { id: sid, name: user.name, amountInput: amount, el: chip });
+          syncHiddenFields();
+        };
+
+        // Подсказки (портал)
+        const portalList = list;
+        portalList.style.position = 'fixed';
+        portalList.style.zIndex = '9999';
+        let portalMounted = false;
+        const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
+        const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
+        const positionPortal = () => {
+          const r = input.getBoundingClientRect();
+          portalList.style.left = `${r.left}px`;
+          portalList.style.top  = `${r.bottom + 6}px`;
+          portalList.style.width = `${r.width}px`;
+        };
+        const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
+        const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
+
+        const norm = (s) => String(s ?? '').trim().toLowerCase();
+        const buildItem = (u) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'suggest-item';
+          item.setAttribute('role', 'option');
+          item.textContent = `${u.name} (id: ${u.id})`;
+          item.addEventListener('click', () => {
+            addChip(u);
+            input.value = '';
+            closeSuggest();
+            input.focus();
+          });
+          return item;
+        };
+        const doSearch = () => {
+          const q = norm(input.value);
+          portalList.innerHTML = '';
+          if (!q) { closeSuggest(); return; }
+          const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
+          if (!res.length) { closeSuggest(); return; }
+          res.forEach(u => portalList.appendChild(buildItem(u)));
+          openSuggest();
+        };
+        input.addEventListener('input', doSearch);
+        input.addEventListener('focus', doSearch);
+        document.addEventListener('click', (e) => {
+          if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
+        });
+        window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
+        window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
+
+        // Prefill из data: recipient_i + topup_i
+        if (data) {
+          const ids = Object.keys(data)
+            .filter(k => /^recipient_\d+$/.test(k))
+            .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10));
+          ids.forEach((rk) => {
+            const idx = rk.slice(10);
+            const rid = String(data[rk]).trim();
+            if (!rid) return;
+            const amount = String(data[`topup_${idx}`] ?? '').trim();
+            const u = users.find(x => String(x.id) === rid);
+            if (u) addChip(u, amount);
+            else   addChip({ id: rid, name: 'Неизвестный' }, amount);
+          });
+          syncHiddenFields();
+        }
+
+        // изначально submit скрыт, пока нет валидных пар
+        btnSubmit.style.display = 'none';
+        btnSubmit.disabled = true;
+      };
+
+      // === 4) Ждём USERS_LIST с таймаутом ===
+      const to = setTimeout(fail, timeoutMs);
+      const poll = setInterval(() => {
+        if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
+        if (Array.isArray(window.USERS_LIST)) {
+          clearTimeout(to);
+          clearInterval(poll);
+          renderAdminPicker(window.USERS_LIST);
+        }
+      }, COUNTER_POLL_INTERVAL_MS);
+    }
+
 
     function openModal(config) {
       const {
@@ -484,6 +1239,121 @@
       cleanupCounterWatcher();
       modalFields.innerHTML = template.innerHTML;
 
+    // === Баннер FMV в подписи на Рено ===
+    if (
+      template.id === 'form-income-banner-reno' &&
+      typeof window.BANNER_RENO_FLAG !== 'undefined' &&
+      window.BANNER_RENO_FLAG === false
+    ) {
+      // заменяем содержимое формы на текст
+      modalFields.innerHTML = '<p><strong>Начисление за баннер на Рено уже производилось.</strong></p>';
+
+      // скрываем кнопку "Сохранить", как у info-модалок
+      btnSubmit.style.display = 'none';
+    }
+
+    // === Баннер FMV в подписи на Маяке ===
+    if (
+      template.id === 'form-income-banner-mayak' &&
+      typeof window.BANNER_MAYAK_FLAG !== 'undefined' &&
+      window.BANNER_MAYAK_FLAG === false
+    ) {
+      modalTitle.textContent = 'Баннер FMV в подписи на Маяке';
+      modalFields.innerHTML = '<p><strong>Начисление за баннер на Маяке уже производилось.</strong></p>';
+      btnSubmit.style.display = 'none';
+
+      backdrop.setAttribute('open', '');
+      return;
+    }
+
+
+    // === ANKETA (за приём анкеты): режимы для админа/не админа ===
+    if (template.id === 'form-income-anketa') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none';
+      } else {
+        setupAdminRecipientsFlow({ timeoutMs: FORM_TIMEOUT_MS, data });
+      }
+    }
+
+    // === AKCION: «Взятие акционного персонажа» — поведение как у анкеты ===
+    if (template.id === 'form-income-akcion') {
+      if (!window.IS_ADMIN) {
+        // не админ — просто инфо-окно (кнопка скрыта уже через data-info)
+        btnSubmit.style.display = 'none';
+      } else {
+        // админ — тот же выбор получателей, как у анкеты
+        setupAdminRecipientsFlow({ timeoutMs: PROMO_TIMEOUT_MS, data });
+      }
+    }
+
+    // === NEEDCHAR: «Взятие нужного персонажа» — поведение как у анкеты ===
+    if (template.id === 'form-income-needchar') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none';
+      } else {
+        setupAdminRecipientsFlow({ timeoutMs: NEEDED_TIMEOUT_MS, data });
+      }
+    }
+
+    // === TOPUP: «Докупить кредиты» — как анкета, но на каждого указываем сумму
+    if (template.id === 'form-income-topup') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none'; // инфо-режим (data-info)
+      } else {
+        setupAdminTopupFlow({ timeoutMs: TOPUP_TIMEOUT_MS, data });
+      }
+    }
+
+    // === AMS: «Выдать денежку дополнительно» — как докупка, но на каждого указываем сумму
+    if (template.id === 'form-income-ams') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none'; // инфо-режим (data-info)
+      } else {
+        setupAdminTopupFlow({ timeoutMs: AMS_TIMEOUT_MS, data });
+
+      }
+    }
+
+    // === BEST-EPISODE: «Эпизод полумесяца» — поведение как у анкеты ===
+    if (template.id === 'form-income-episode-of') {
+      if (!window.IS_ADMIN) {
+        // не админ — просто инфо-окно (submit скрыт за счёт data-info)
+        btnSubmit.style.display = 'none';
+      } else {
+        // админ — тот же выбор получателей, как у анкеты
+        setupAdminRecipientsFlow({ timeoutMs: BEST_EPISODE_TIMEOUT_MS, data });
+      }
+    }
+
+    // === BEST-POST: «Пост полумесяца» — как «Эпизод полумесяца», но один получатель ===
+    if (template.id === 'form-income-post-of') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none'; // инфо-окно для не-админов (data-info)
+      } else {
+        setupAdminSingleRecipientFlow({ timeoutMs: BEST_POST_TIMEOUT_MS, data });
+      }
+    }
+
+    // === BEST-WRITER: «Постописец полумесяца» — как «Пост полумесяца», 1 получатель
+    if (template.id === 'form-income-writer') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none'; // инфо-окно
+      } else {
+        setupAdminSingleRecipientFlow({ timeoutMs: BEST_WRITER_TIMEOUT_MS, data });
+      }
+    }
+
+    // === BEST-ACTIVIST: «Активист полумесяца» — как «Пост полумесяца», 1 получатель
+    if (template.id === 'form-income-activist') {
+      if (!window.IS_ADMIN) {
+        btnSubmit.style.display = 'none';
+      } else {
+        setupAdminSingleRecipientFlow({ timeoutMs: BEST_ACTIVIST_TIMEOUT_MS, data });
+      }
+    }
+
+
     // === FIRST POST: ждём FIRST_POST_FLAG, PLOT_POSTS и PERSONAL_POSTS ===
     if (template.id === 'form-income-firstpost') {
       // якорь "подождите..."
@@ -521,7 +1391,7 @@
 
         // 1) уже начисляли
         if (flag === false) {
-          show('**Начисление за первый пост на профиле уже производились.**', { hideBtn: true });
+          show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
           cancel(); return;
         }
 
@@ -951,13 +1821,17 @@
         }
       }, COUNTER_POLL_INTERVAL_MS);
     }
-
-
+    
       const isNeedRequest = template.id === 'form-income-needrequest';
-      if (isNeedRequest) {
+      const isRpgTop      = template.id === 'form-income-rpgtop';
+      const isEpPersonal  = template.id === 'form-income-ep-personal';
+      const isEpPlot      = template.id === 'form-income-ep-plot';
+
+      if (isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) {
         const grid = modalFields.querySelector('.grid-2');
         if (grid) grid.classList.remove('grid-2');
       }
+
 
       const scrollContainer = modalFields.parentElement;
       const addExtraBtn = modalFields.querySelector('[data-add-extra]');
@@ -968,8 +1842,14 @@
       const extraLabelBase = addExtraBtn ? addExtraBtn.getAttribute('data-extra-label') : null;
       const extraPlaceholderCustom = addExtraBtn ? addExtraBtn.getAttribute('data-extra-placeholder') : null;
       const extraStartAttr = addExtraBtn ? Number.parseInt(addExtraBtn.getAttribute('data-extra-start'), 10) : NaN;
+      const labelOverride = isRpgTop ? 'Ссылка на скриншот' : null;
+      const typeOverride = isRpgTop ? 'url' : null;
       const extraPrefix = extraPrefixAttr || (isNeedRequest ? 'need_extra_' : 'extra_');
-      const baseIndex = Number.isFinite(extraStartAttr) ? extraStartAttr : (isNeedRequest ? 2 : 1);
+      const baseIndex = Number.isFinite(extraStartAttr)
+        ? extraStartAttr
+        : ((isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) ? 2 : 1);
+
+
 
       const getExtraFields = () => Array.from(modalFields.querySelectorAll('.extra-field'));
       const getGiftGroups = () => giftContainer ? Array.from(giftContainer.querySelectorAll('[data-gift-group]')) : [];
@@ -1028,10 +1908,20 @@
           input.id = nameAttr;
           input.required = true;
           if (label) {
-            const computedLabel = extraLabelBase
-              ? `${extraLabelBase} ${suffix}`
-              : (isNeedRequest ? `Ссылка на «нужного» ${suffix}` : `Доп. поле ${suffix}`);
+            let computedLabel;
+            if (extraLabelBase) {
+              computedLabel = `${extraLabelBase} ${suffix}`;
+            } else if (template.id === 'form-income-needrequest') {
+              computedLabel = `Ссылка на «нужного» ${suffix}`;
+            } else if (template.id === 'form-income-rpgtop') {
+              computedLabel = `Ссылка на скрин ${suffix}`;
+            } else if (template.id === 'form-income-ep-personal' || template.id === 'form-income-ep-plot') {
+              computedLabel = `Ссылка на эпизод ${suffix}`;
+            } else {
+              computedLabel = `Доп. поле ${suffix}`;
+            }
             label.textContent = computedLabel;
+
             label.setAttribute('for', nameAttr);
           }
         });
@@ -1060,19 +1950,32 @@
           const nameAttr = `${extraPrefix}${suffix}`;
           const wrap = document.createElement('div');
           wrap.className = 'field extra-field';
-          const labelText = extraLabelBase
-            ? `${extraLabelBase} ${suffix}`
-            : (isNeedRequest ? `Ссылка на «нужного» ${suffix}` : `Доп. поле ${suffix}`);
-          const placeholderAttr = extraPlaceholderCustom
-            ? ` placeholder="${extraPlaceholderCustom}"`
-            : '';
+
+          const label = document.createElement('label');
+
+          let labelText = '';
+          if (template.id === 'form-income-needrequest') {
+            labelText = `Ссылка на «нужного» ${suffix}`;
+          } else if (template.id === 'form-income-rpgtop') {
+            labelText = `Ссылка на скрин ${suffix}`;
+          } else if (template.id === 'form-income-ep-personal' || template.id === 'form-income-ep-plot') {
+            labelText = `Ссылка на эпизод ${suffix}`;
+          } else {
+            labelText = `Доп. поле ${suffix}`;
+          }
+          label.textContent = labelText;
+
+          const inputType = typeOverride || (isNeedRequest ? 'url' : 'text');
+          const placeholderAttr = extraPlaceholderCustom ? ` placeholder="${extraPlaceholderCustom}"` : '';
+
           wrap.innerHTML = `
             <label for="${nameAttr}">${labelText}</label>
             <div class="extra-input">
-              <input id="${nameAttr}" name="${nameAttr}" type="${isNeedRequest ? 'url' : 'text'}"${placeholderAttr} required>
+              <input id="${nameAttr}" name="${nameAttr}" type="${inputType}"${placeholderAttr} required>
               <button type="button" class="btn-remove-extra" aria-label="Удалить поле" title="Удалить поле">×</button>
             </div>
           `;
+
           addExtraBtn.parentElement.insertAdjacentElement('beforebegin', wrap);
 
           const input = wrap.querySelector('input, textarea, select');
@@ -1235,12 +2138,17 @@
         setHiddenField(`${cfg.prefix}_diff`, diff);
         form.dataset.currentMultiplier = String(units);
 
-        const lines = [
-          `**Последнее обработанное значение:** ${oldVal}`,
-          newVal !== rounded
-            ? `**Новое значение:** ${newVal} **→ округлено до сотен:** ${rounded}`
-            : `**Новое значение:** ${newVal}`
-        ];
+       const roundLabel = cfg.prefix === 'month'
+        ? 'условно округлено'
+        : 'округлено до сотен';
+
+      const lines = [
+        `**Последнее обработанное значение:** ${oldVal}`,
+        newVal !== rounded
+          ? `**Новое значение:** ${newVal} **→ ${roundLabel}:** ${rounded}`
+          : `**Новое значение:** ${newVal}`
+      ];
+
 
         if (diff === 0) {
           lines.push('', `**Для новых начислений не хватает ${cfg.unitLabel}.**`);
@@ -1296,24 +2204,67 @@
 
         const poll = () => {
           if (controller.cancelled) return;
+
           const rawOld = window[cfg.oldVar];
           const rawNew = window[cfg.newVar];
-          const oldVal = Number(rawOld);
-          const newVal = Number(rawNew);
-          const valid = Number.isFinite(oldVal) && Number.isFinite(newVal);
-          if (valid) {
-            const rounded = Math.floor(newVal / cfg.step) * cfg.step;
-            const diffRaw = rounded - oldVal;
-            const diff = diffRaw > 0 ? diffRaw : 0;
-            concludeSuccess(oldVal, newVal, rounded, diff);
-            return;
+
+          // ВЕТКА ДЛЯ МЕСЯЦЕВ: MONTH_OLD/MONTH_NEW — массивы [yyyy,mm,dd] или строка "yyyy-mm-dd"
+          if (cfg.prefix === 'month') {
+            const parseArr = (raw) => {
+              if (Array.isArray(raw)) return raw.map(Number);
+              if (typeof raw === 'string') {
+                const s = raw.trim();
+                // поддержим JSON-подобную строку вида "[2025,02,31]"
+                if (s.startsWith('[')) {
+                  try {
+                    const a = JSON.parse(s);
+                    if (Array.isArray(a)) return a.map(Number);
+                  } catch (_) {}
+                }
+                const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+              }
+              return null;
+            };
+
+            const OLD = parseArr(rawOld);
+            const NEW = parseArr(rawNew);
+
+            if (OLD && NEW && OLD.length === 3 && NEW.length === 3) {
+              // НЕ валидируем даты намеренно — требование пользователя
+              const newRoundedArr = roundNewToAnchorDOM(OLD, NEW);
+              const diff = fullMonthsDiffVirtualDOM(OLD, NEW);
+
+              // В общий рендер отдаём строки дат, diff — число
+              concludeSuccess(
+                fmtYMD(OLD),
+                fmtYMD(NEW),
+                fmtYMD(newRoundedArr),
+                Math.max(0, Number(diff) || 0)
+              );
+              return;
+            }
+          } else {
+            // СТАРАЯ ЧИСЛОВАЯ ВЕТКА (сообщения/репа/позитив)
+            const oldVal = Number(rawOld);
+            const newVal = Number(rawNew);
+            const valid = Number.isFinite(oldVal) && Number.isFinite(newVal);
+            if (valid) {
+              const rounded = Math.floor(newVal / cfg.step) * cfg.step;
+              const diffRaw = rounded - oldVal;
+              const diff = diffRaw > 0 ? diffRaw : 0;
+              concludeSuccess(oldVal, newVal, rounded, diff);
+              return;
+            }
           }
+
           if (performance.now() - startTime >= cfg.timeout) {
             concludeError();
             return;
           }
           controller.timer = setTimeout(poll, COUNTER_POLL_INTERVAL_MS);
         };
+
 
         poll();
       };
@@ -1323,15 +2274,29 @@
       let shouldStartWatcher = isCounterForm;
       if (isCounterForm && data) {
         const cfg = counterConfig;
-        const oldVal = Number(data[`${cfg.prefix}_old`]);
-        const newVal = Number(data[`${cfg.prefix}_new`]);
-        const roundedVal = Number(data[`${cfg.prefix}_rounded`] ?? data[`${cfg.prefix}_new`]);
-        const diffVal = Number(data[`${cfg.prefix}_diff`]);
-        if ([oldVal, newVal, roundedVal, diffVal].every(Number.isFinite)) {
-          renderCounterOutcome(cfg, oldVal, newVal, roundedVal, diffVal);
-          counterResultApplied = false; // allow fresh data after render
+
+        if (cfg.prefix === 'month') {
+          const oldVal = data[`${cfg.prefix}_old`];
+          const newVal = data[`${cfg.prefix}_new`];
+          const roundedVal = data[`${cfg.prefix}_rounded`] ?? data[`${cfg.prefix}_new`];
+          const diffVal = Number(data[`${cfg.prefix}_diff`]);
+
+          if (oldVal && newVal && roundedVal && Number.isFinite(diffVal)) {
+            renderCounterOutcome(cfg, oldVal, newVal, roundedVal, diffVal);
+            counterResultApplied = false;
+          }
+        } else {
+          const oldVal = Number(data[`${cfg.prefix}_old`]);
+          const newVal = Number(data[`${cfg.prefix}_new`]);
+          const roundedVal = Number(data[`${cfg.prefix}_rounded`] ?? data[`${cfg.prefix}_new`]);
+          const diffVal = Number(data[`${cfg.prefix}_diff`]);
+          if ([oldVal, newVal, roundedVal, diffVal].every(Number.isFinite)) {
+            renderCounterOutcome(cfg, oldVal, newVal, roundedVal, diffVal);
+            counterResultApplied = false;
+          }
         }
       }
+
 
       if (shouldStartWatcher) {
         startCounterWatcher(counterConfig);
@@ -1553,182 +2518,7 @@
       renderLog();
       closeModal();
     });
+    
 
     renderLog();
 
-(function () {
-  // ===== Настройки =====
-  // Корневой контейнер формы голосования
-  const FORM_SEL = '#form-income-rpgtop';
-  // Селектор первой «базы» для подтверждения (существующее поле)
-  const BASE_PROOF_NAME = 'proof'; // name="proof"
-
-  // ===== Вспомогалки =====
-  const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-
-  // Кнопка "добавить ещё" из вашей формы (если уже есть логика data-add-extra — используем её)
-  function clickAddExtra() {
-    const btn = $(`${FORM_SEL} [data-add-extra]`);
-    if (btn) btn.click();
-    else {
-      // Фолбэк: создаём поле вручную
-      const wrap = document.createElement('div');
-      const idx = getProofInputs().length + 1;
-      wrap.className = 'field';
-      wrap.innerHTML = `
-        <label>Подтверждение (скрин/ссылка) ${idx}</label>
-        <input type="url" name="proof_${idx}" required placeholder="Ссылка на скриншот или пост">
-      `;
-      $(FORM_SEL).appendChild(wrap);
-    }
-  }
-
-  function getProofInputs() {
-    return $$(`${FORM_SEL} input[name="${BASE_PROOF_NAME}"], ${FORM_SEL} input[name^="${BASE_PROOF_NAME}_"]`);
-  }
-
-  // Возвращает input для следующего добавленного подтверждения
-  function ensureNextProofInput() {
-    // ищем пустое поле среди уже существующих
-    const empty = getProofInputs().find(inp => !inp.value?.trim());
-    if (empty) return empty;
-
-    // иначе создаём новое
-    clickAddExtra();
-
-    // пытаемся найти последнее добавленное поле по имени
-    const inputs = getProofInputs();
-    return inputs[inputs.length - 1];
-  }
-
-  // Добавляет URL в следующее поле подтверждения
-  function addProofUrl(url) {
-    const input = ensureNextProofInput();
-    if (!input) return;
-    input.value = url;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  // Нормализация src -> абсолютный URL
-  function toAbsUrl(src) {
-    try { return new URL(src, location.href).href; } catch { return src; }
-  }
-
-  // ===== Вызов штатного Загрузчика =====
-  // Поддержка IPS 4.x (есть глобальный IPS и CKEDITOR)
-  function openIpsUploader() {
-    // 1) Пробуем штатную кнопку «скрепка/загрузки» под редактором
-    // Обычно это input[type="file"] внутри блока вложений
-    let fileInput = document.querySelector('.ipsAttachmentUpload input[type="file"], [data-role="attachmentUpload"] input[type="file"]');
-    if (fileInput) {
-      fileInput.click();
-      return true;
-    }
-
-    // 2) Пробуем кнопку тулбара "Изображение" CKEditor (русская локаль)
-    let imgBtn = document.querySelector('.cke_button__image, .cke_button[aria-label*="Изображение"], .cke_button[aria-label*="image"]');
-    if (imgBtn) {
-      imgBtn.click();
-      return true;
-    }
-
-    // 3) Пробуем открыть «галерею» уже загруженных (как на скриншоте) — у IPS это ссылка "Вставить другие носители"
-    let otherSrc = document.querySelector('[data-action="insertOtherMedia"], [data-action="insertExistingAttachment"]');
-    if (otherSrc) {
-      otherSrc.click();
-      return true;
-    }
-
-    // 4) Жёсткий фолбэк: ищем ЛЮБОЙ input[type=file] в компоуз-области и кликаем
-    let anyFile = document.querySelector('.ipsComposeArea input[type="file"]');
-    if (anyFile) {
-      anyFile.click();
-      return true;
-    }
-
-    return false;
-  }
-
-  // ===== Отслеживаем вставку картинок в редактор и переносим URL в форму =====
-  const seen = new Set();
-
-  // CKEditor (IPS)
-  function bindCkeditorWatcher() {
-    if (!window.CKEDITOR || !CKEDITOR.instances) return false;
-
-    const instances = Object.values(CKEDITOR.instances);
-    if (!instances.length) return false;
-
-    instances.forEach(instance => {
-      // На любое изменение проверяем содержимое на новые <img>
-      instance.on('change', () => {
-        const html = instance.getData() || '';
-        // Достаём src из <img ... src="...">
-        const urls = Array.from(html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)).map(m => toAbsUrl(m[1]));
-        urls.forEach(u => {
-          if (!seen.has(u)) {
-            seen.add(u);
-            addProofUrl(u);
-          }
-        });
-      });
-
-      // Дополнительно ловим вставку (drag&drop, пейст)
-      instance.on('afterCommandExec', (evt) => {
-        if (evt.data && /image|upload/i.test(String(evt.data.name))) {
-          setTimeout(() => instance.fire('change'), 500);
-        }
-      });
-    });
-
-    return true;
-  }
-
-  // Контент-editable без CKEditor (универсальный фолбэк)
-  function bindContentObserver() {
-    const editable = document.querySelector('[contenteditable="true"], .ipsComposeArea_editor, .cke_wysiwyg_div');
-    if (!editable) return false;
-
-    const obs = new MutationObserver(() => {
-      const imgs = editable.querySelectorAll('img[src]');
-      imgs.forEach(img => {
-        const url = toAbsUrl(img.getAttribute('src'));
-        if (!seen.has(url)) {
-          seen.add(url);
-          addProofUrl(url);
-        }
-      });
-    });
-    obs.observe(editable, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
-    return true;
-  }
-
-  // ===== Инициализация =====
-  function init() {
-    // Кнопка «Загрузить скриншоты»
-    const btn = $('#rt-open-uploader');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        const ok = openIpsUploader();
-        if (!ok) {
-          // Если не нашли специфичные элементы IPS — пытаемся найти любой file input в области редактора
-          const ok2 = openIpsUploader();
-          if (!ok2) alert('Не удалось открыть встроенный загрузчик. Попробуйте загрузить в редактор вручную — ссылки подхватятся автоматически.');
-        }
-      });
-    }
-
-    // Подписываемся на редактор
-    const boundCKE = bindCkeditorWatcher();
-    if (!boundCKE) bindContentObserver();
-  }
-
-  // Ждём DOM
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();

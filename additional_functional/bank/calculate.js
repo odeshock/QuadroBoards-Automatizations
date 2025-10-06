@@ -17,6 +17,7 @@ const COUNTER_POLL_INTERVAL_MS = 500;
 const ADS_TIMEOUT_MS = 180000;
 const PERSONAL_TIMEOUT_MS = 180000;
 const PLOT_TIMEOUT_MS = 180000;
+const FIRST_POST_TIMEOUT_MS = 180000;
 let counterWatcher = null;
 
 const counterConfigs = {
@@ -266,6 +267,15 @@ function renderLog() {
       itemTitle.textContent = baseTitle;
       itemHeader.appendChild(itemTitle);
 
+      const removeTitleIfEmpty = () => {
+        // есть ли в этой записи хотя бы один пункт данных?
+        const hasData = itemEl.querySelector('.entry-list li');
+        if (!hasData && itemTitle && itemTitle.textContent.trim() === 'Данные') {
+          itemTitle.remove(); // убираем заголовок «Данные», кнопки остаются
+        }
+      };
+
+
       const actions = document.createElement('div');
       actions.className = 'entry-actions';
 
@@ -317,6 +327,13 @@ function renderLog() {
           const links = JSON.parse(item.data.flyer_links_json);
           if (Array.isArray(links) && links.length) {
             const list = document.createElement('ol');
+            
+            const removeTitleIfEmpty = () => {
+              if (list.children.length === 0 && itemTitle && itemTitle.textContent.trim() === 'Данные') {
+                itemTitle.remove(); // убираем только текст "Данные", кнопки в header остаются
+              }
+            };
+
             list.className = 'entry-list';
             links.forEach(({ src, text }) => {
               if (!src) return;
@@ -354,7 +371,8 @@ function renderLog() {
             });
             itemEl.appendChild(list);
             itemsWrap.appendChild(itemEl);
-            return; // "Данные" уже отрисованы для этой записи
+            removeTitleIfEmpty();
+            return;
           }
         } catch(e) { /* ignore */ }
       }
@@ -380,7 +398,8 @@ function renderLog() {
             });
             itemEl.appendChild(list);
             itemsWrap.appendChild(itemEl);
-            return; // уже отрисовали "Данные" для этой записи — не показываем raw JSON
+            removeTitleIfEmpty();
+            return;
           }
         } catch (e) { /* ignore */ }
       }
@@ -410,6 +429,7 @@ function renderLog() {
 
         list.appendChild(li);
       });
+      removeTitleIfEmpty();
 
       itemEl.appendChild(list);
       itemsWrap.appendChild(itemEl);
@@ -463,6 +483,83 @@ function openModal(config) {
 
   cleanupCounterWatcher();
   modalFields.innerHTML = template.innerHTML;
+
+// === FIRST POST: ждём FIRST_POST_FLAG, PLOT_POSTS и PERSONAL_POSTS ===
+if (template.id === 'form-income-firstpost') {
+  // якорь "подождите..."
+  const waitEl = updateNote('Пожалуйста, подождите...');
+
+  let canceled = false;
+  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  counterWatcher = { cancel };
+
+  const fail = () => {
+    if (canceled) return;
+    updateNote('Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    btnSubmit.style.display = 'none';
+    cancel();
+  };
+
+  const show = (html, { ok = false, hideBtn = true } = {}) => {
+    const el = updateNote(html);
+    if (ok && el) el.style.color = 'var(--ok)'; // зелёный для «Поздравляем…»
+    btnSubmit.style.display = hideBtn ? 'none' : '';
+    btnSubmit.disabled = hideBtn ? true : false;
+  };
+
+  const succeed = () => {
+    if (canceled) return;
+
+    const flag = window.FIRST_POST_FLAG;
+    const personal = window.PERSONAL_POSTS;
+    const plot = window.PLOT_POSTS;
+
+    // строгая проверка типов
+    if (typeof flag !== 'boolean' || !Array.isArray(personal) || !Array.isArray(plot)) {
+      fail(); return;
+    }
+
+    // 1) уже начисляли
+    if (flag === false) {
+      show('**Начисление за первый пост на профиле уже производились.**', { hideBtn: true });
+      cancel(); return;
+    }
+
+    // 2) флаг true, но оба массива пустые
+    if (flag === true && personal.length === 0 && plot.length === 0) {
+      show('**Для начисления не хватает поста.**', { hideBtn: true });
+      cancel(); return;
+    }
+
+    // 3) флаг true и хотя бы один массив непустой — успех
+    show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
+    cancel();
+  };
+
+  // ждём, пока ВСЕ три сущности вообще появятся
+  const appeared = () =>
+    typeof window.FIRST_POST_FLAG !== 'undefined' &&
+    typeof window.PERSONAL_POSTS !== 'undefined' &&
+    typeof window.PLOT_POSTS !== 'undefined';
+
+  const to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
+  const poll = setInterval(() => {
+    if (!appeared()) return;
+
+    clearTimeout(to);
+    clearInterval(poll);
+
+    // если что-то появилось, но тип неверный — сразу ошибка
+    if (typeof window.FIRST_POST_FLAG !== 'boolean' ||
+        (typeof window.PERSONAL_POSTS !== 'undefined' && !Array.isArray(window.PERSONAL_POSTS)) ||
+        (typeof window.PLOT_POSTS !== 'undefined' && !Array.isArray(window.PLOT_POSTS))) {
+      fail(); return;
+    }
+
+    succeed();
+  }, COUNTER_POLL_INTERVAL_MS);
+}
+
 
 // === PERSONAL POST: ждём PERSONAL_POSTS и рендерим список ===
 if (template.id === 'form-income-personalpost') {

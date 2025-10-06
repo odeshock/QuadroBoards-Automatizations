@@ -886,15 +886,33 @@ if (template.id === 'form-income-flyer') {
     const note = updateNote('');
     if (note) note.remove();
 
+    // НЕ удаляем «Пожалуйста, подождите...», а вставляем список ПОД ним
+    const waitEl = modalFields.querySelector('.muted-note');
+
+    // заголовок «Список листовок:»
+    const caption = document.createElement('p');
+    caption.className = 'list-caption';
+    caption.innerHTML = '<strong>Список листовок:</strong>';
+
+    // контейнер со скроллом + нумерованный список (как в «Личный пост»)
     const wrap = document.createElement('div');
     wrap.className = 'field';
     wrap.innerHTML = `
       <div style="max-height:320px; overflow:auto">
         <ol class="entry-list" id="flyer-preview"></ol>
       </div>`;
-    modalFields.appendChild(wrap);
-
     const ol = wrap.querySelector('#flyer-preview');
+
+    // вставляем ПОД «Пожалуйста, подождите...»
+    if (waitEl && waitEl.parentNode) {
+      waitEl.insertAdjacentElement('afterend', caption);
+      caption.insertAdjacentElement('afterend', wrap);
+    } else {
+      // если по каким-то причинам .muted-note нет — просто добавим в конец
+      modalFields.appendChild(caption);
+      modalFields.appendChild(wrap);
+    }
+
     links.forEach(({ src, text }) => {
       const li = document.createElement('li');
       const a = document.createElement('a');

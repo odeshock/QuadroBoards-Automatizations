@@ -15,6 +15,8 @@ const REP_TIMEOUT_MS = 180000;
 const POS_TIMEOUT_MS = 180000;
 const COUNTER_POLL_INTERVAL_MS = 500;
 const ADS_TIMEOUT_MS = 180000;
+const PERSONAL_TIMEOUT_MS = 180000;
+const PLOT_TIMEOUT_MS = 180000;
 let counterWatcher = null;
 
 const counterConfigs = {
@@ -170,19 +172,67 @@ function renderLog() {
     if (group.amount) {
       const meta = document.createElement('span');
       meta.className = 'entry-meta';
-      const amountNumber = parseNumericAmount(group.amount);
-      if (amountNumber !== null) {
-        const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
-        if (multiplier > 1) {
-          const total = amountNumber * multiplier;
-          meta.textContent = `${group.amountLabel}: ${formatNumber(amountNumber)} x ${multiplier} = ${formatNumber(total)}`;
-        } else {
-          meta.textContent = `${group.amountLabel}: ${formatNumber(amountNumber)}`;
-        }
+
+      // 1) Спец-формат: "фикс + xнадбавка" (например "5 + x10")
+      const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
+      if (m) {
+        const fix = Number(m[1]);
+        const bonus = Number(m[2]);
+
+        // Собираем по всем записям группы
+        let totalCount = 0;
+        let totalThousands = 0;
+        group.entries.forEach((item) => {
+          // Личные посты — без капа
+          const rawPersonal = item?.data?.personal_posts_json;
+          if (rawPersonal) {
+            try {
+              const arr = JSON.parse(rawPersonal);
+              if (Array.isArray(arr) && arr.length) {
+                totalCount += arr.length;
+                totalThousands += arr.reduce((s, it) => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  return s + Math.floor(Math.max(0, n) / 1000);
+                }, 0);
+              }
+            } catch(_) {}
+          }
+          // Сюжетные посты — с капом 3к на пост
+          const rawPlot = item?.data?.plot_posts_json;
+          if (rawPlot) {
+            try {
+              const arr = JSON.parse(rawPlot);
+              if (Array.isArray(arr) && arr.length) {
+                totalCount += arr.length;
+                totalThousands += arr.reduce((s, it) => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  const k = Math.floor(Math.max(0, n) / 1000);
+                  return s + Math.min(k, 3); // кап 3
+                }, 0);
+              }
+            } catch(_) {}
+          }
+        });
+
+        const total = fix * totalCount + bonus * totalThousands;
+        meta.textContent = `${group.amountLabel}: ${fix} x ${totalCount} + ${bonus} x ${totalThousands} = ${total.toLocaleString('ru-RU')}`;
+        header.appendChild(meta);
       } else {
-        meta.textContent = `${group.amountLabel}: ${group.amount}`;
+        // 2) Обычный числовой случай (как было)
+        const amountNumber = parseNumericAmount(group.amount);
+        if (amountNumber !== null) {
+          const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+          if (multiplier > 1) {
+            const total = amountNumber * multiplier;
+            meta.textContent = `${group.amountLabel}: ${formatNumber(amountNumber)} x ${multiplier} = ${formatNumber(total)}`;
+          } else {
+            meta.textContent = `${group.amountLabel}: ${formatNumber(amountNumber)}`;
+          }
+        } else {
+          meta.textContent = `${group.amountLabel}: ${group.amount}`;
+        }
+        header.appendChild(meta);
       }
-      header.appendChild(meta);
     }
 
     if (group.entries.length > 1) {
@@ -283,6 +333,59 @@ function renderLog() {
         } catch (e) { /* ignore */ }
       }
 
+      // спец-рендер для личных постов
+      if (item.data && item.data.personal_posts_json) {
+        try {
+          const items = JSON.parse(item.data.personal_posts_json);
+          if (Array.isArray(items) && items.length) {
+            const list = document.createElement('ol');
+            list.className = 'entry-list';
+            items.forEach(({ src, text, symbols_num }) => {
+              if (!src) return;
+              const li = document.createElement('li');
+              const a = document.createElement('a');
+              a.href = src;
+              a.textContent = text || src;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
+              li.appendChild(a);
+              li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
+              list.appendChild(li);
+            });
+            itemEl.appendChild(list);
+            itemsWrap.appendChild(itemEl);
+            return; // "Данные" уже отрисованы для этой записи
+          }
+        } catch(e) { /* ignore */ }
+      }
+
+      // спец-рендер для сюжетных постов
+      if (item.data && item.data.plot_posts_json) {
+        try {
+          const items = JSON.parse(item.data.plot_posts_json);
+          if (Array.isArray(items) && items.length) {
+            const list = document.createElement('ol');
+            list.className = 'entry-list';
+            items.forEach(({ src, text, symbols_num }) => {
+              if (!src) return;
+              const li = document.createElement('li');
+              const a = document.createElement('a');
+              a.href = src;
+              a.textContent = text || src;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
+              li.appendChild(a);
+              li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
+              list.appendChild(li);
+            });
+            itemEl.appendChild(list);
+            itemsWrap.appendChild(itemEl);
+            return; // уже отрисовали "Данные" для этой записи — не показываем raw JSON
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+
       Object.entries(item.data).forEach(([key, value]) => {
         const li = document.createElement('li');
         const raw = typeof value === 'string' ? value.trim() : value;
@@ -360,6 +463,279 @@ function openModal(config) {
 
   cleanupCounterWatcher();
   modalFields.innerHTML = template.innerHTML;
+
+// === PERSONAL POST: ждём PERSONAL_POSTS и рендерим список ===
+if (template.id === 'form-income-personalpost') {
+  // 1) Сначала создаём "Пожалуйста, подождите..." и держим ссылку на элемент
+  const waitEl = updateNote('Пожалуйста, подождите...');
+
+  // 2) Теперь формируем блок "Система подсчета" и вставляем его ПЕРЕД waitEl
+  (() => {
+    const raw = form.dataset.amount || '5 + x10';
+    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
+    const fix = m ? Number(m[1]) : 5;
+    const bonus = m ? Number(m[2]) : 10;
+
+    const info = document.createElement('div');
+    info.className = 'calc-info';
+    info.innerHTML =
+      `<strong>Система подсчета:</strong><br>
+      — фиксированная выплата за пост — ${fix},<br>
+      — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`;
+
+    if (waitEl && waitEl.parentNode) {
+      waitEl.parentNode.insertBefore(info, waitEl); // ← вставляем строго над "подождите"
+    } else {
+      modalFields.appendChild(info); // запасной вариант
+    }
+  })();
+
+  // вытаскиваем {src, text, symbols_num} (поддерживаем вложенные словари link/a)
+  const pickItem = (it) => {
+    const d = (it && (it.link || it.a || it)) || it || null;
+    const src = d && typeof d.src === 'string' ? d.src : null;
+    const text = d && (d.text || src);
+    const symbols = Number.isFinite(d?.symbols_num) ? d.symbols_num : (parseInt(d?.symbols_num, 10) || 0);
+    return src ? { src, text, symbols_num: Math.max(0, symbols) } : null;
+  };
+
+  // таймеры ожидания
+  let canceled = false;
+  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  counterWatcher = { cancel };
+
+  const setSummary = (count, thousandsSum) => {
+    // amount для пункта "Личный пост" = "5 + x10" в разметке (фикс 5, надбавка 10).
+    // Заберём числа из form.dataset.amount на всякий случай:
+    const raw = form.dataset.amount || '5 + x10';
+    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
+    const fix = m ? Number(m[1]) : 5;
+    const bonus = m ? Number(m[2]) : 10;
+
+    const total = fix * count + bonus * thousandsSum;
+    modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
+    modalAmount.textContent = `${fix} x ${count} + ${bonus} x ${thousandsSum} = ${total.toLocaleString('ru-RU')}`;
+  };
+
+  const fail = () => {
+    if (canceled) return;
+    updateNote('Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    // прячем кнопку — это info-форма
+    btnSubmit.style.display = 'none';
+    setHiddenField('personal_posts_json', '');
+    cancel();
+  };
+
+  const succeed = (posts) => {
+    if (canceled) return;
+
+    // пустой массив → сообщение и НЕТ кнопки «Сохранить»
+    if (!Array.isArray(posts) || posts.length === 0) {
+      updateNote('**Для новых начислений не хватает новых постов.**');
+      btnSubmit.style.display = 'none';
+      setHiddenField('personal_posts_json', '');
+      setSummary(0, 0);
+      cancel();
+      return;
+    }
+
+    // нормальный случай
+    const items = posts.map(pickItem).filter(Boolean);
+    setHiddenField('personal_posts_json', JSON.stringify(items));
+
+    // предпросмотр списка (вертикальный скролл)
+    const note = updateNote('');
+    if (note) note.remove();
+    
+    // Заголовок над списком
+    const caption = document.createElement('p');
+    caption.className = 'list-caption';
+    caption.innerHTML = '<strong>Список постов:</strong>';
+    modalFields.appendChild(caption);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.innerHTML = `
+      <div style="max-height:320px; overflow:auto">
+        <ol class="entry-list" id="personal-preview"></ol>
+      </div>`;
+    modalFields.appendChild(wrap);
+
+    const ol = wrap.querySelector('#personal-preview');
+    items.forEach(({ src, text, symbols_num }) => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = src;
+      a.textContent = text || src;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      li.appendChild(a);
+      const note = document.createTextNode(` [${symbols_num} символов]`);
+      li.appendChild(note);
+      ol.appendChild(li);
+    });
+
+    // сумма «тысяч» = Σ floor(symbols_num / 1000)
+    const thousandsSum = items.reduce((s, it) => s + Math.floor(it.symbols_num / 1000), 0);
+
+    // показываем формулу «фикс x count + надбавка x Σтысяч»
+    setSummary(items.length, thousandsSum);
+
+    // для единообразия сохраним множитель (может пригодиться дальше)
+    form.dataset.currentMultiplier = String(items.length);
+
+    // если всё успешно — показываем кнопку "Сохранить"
+    btnSubmit.style.display = '';
+    btnSubmit.disabled = false;
+
+    // завершаем наблюдатель
+    cancel();
+
+  };
+
+  // ждём PERSONAL_POSTS не дольше 3 минут
+  const to = setTimeout(fail, PERSONAL_TIMEOUT_MS);
+  const poll = setInterval(() => {
+    if (typeof window.PERSONAL_POSTS !== 'undefined' && !Array.isArray(window.PERSONAL_POSTS)) {
+      fail(); return;
+    }
+    if (Array.isArray(window.PERSONAL_POSTS)) {
+      clearTimeout(to); clearInterval(poll);
+      succeed(window.PERSONAL_POSTS);
+    }
+  }, 500);
+}
+
+// === PLOT POST: ждём PLOT_POSTS и рендерим список (кап 3к на пост) ===
+if (template.id === 'form-income-plotpost') {
+  // якорь "подождите..."
+  const waitEl = updateNote('Пожалуйста, подождите...');
+
+  // Пояснение «Система подсчёта» — берём числа из data-amount (в HTML: "20 + x5")
+  (() => {
+    const raw = form.dataset.amount || '20 + x5';
+    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
+    const fix = m ? Number(m[1]) : 20;
+    const bonus = m ? Number(m[2]) : 5;
+
+    const info = document.createElement('div');
+    info.className = 'calc-info';
+    info.innerHTML =
+      `<strong>Система подсчета:</strong><br>
+      — фиксированная выплата за пост — ${fix},<br>
+      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`;
+
+    if (waitEl && waitEl.parentNode) {
+      waitEl.parentNode.insertBefore(info, waitEl);
+    } else {
+      modalFields.appendChild(info);
+    }
+  })();
+
+  // извлекаем {src, text, symbols_num}
+  const pickItem = (it) => {
+    const d = (it && (it.link || it.a || it)) || it || null;
+    const src = d && typeof d.src === 'string' ? d.src : null;
+    const text = d && (d.text || src);
+    const symbols = Number.isFinite(d?.symbols_num) ? d.symbols_num : (parseInt(d?.symbols_num, 10) || 0);
+    return src ? { src, text, symbols_num: Math.max(0, symbols) } : null;
+  };
+
+  let canceled = false;
+  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  counterWatcher = { cancel };
+
+  const setSummary = (count, thousandsSumCapped) => {
+    // "20 + x5" из HTML разметки для «Сюжетный пост»
+    const raw = form.dataset.amount || '20 + x5';
+    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
+    const fix = m ? Number(m[1]) : 20;
+    const bonus = m ? Number(m[2]) : 5;
+    const total = fix * count + bonus * thousandsSumCapped;
+    modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
+    modalAmount.textContent = `${fix} x ${count} + ${bonus} x ${thousandsSumCapped} = ${total.toLocaleString('ru-RU')}`;
+  };
+
+  const fail = () => {
+    if (canceled) return;
+    updateNote('Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    btnSubmit.style.display = 'none';
+    setHiddenField('plot_posts_json', '');
+    cancel();
+  };
+
+  const succeed = (posts) => {
+    if (canceled) return;
+
+    // пустой массив → сообщение и НЕТ кнопки «Сохранить»
+    if (!Array.isArray(posts) || posts.length === 0) {
+      updateNote('**Для новых начислений не хватает новых постов.**');
+      btnSubmit.style.display = 'none';
+      setHiddenField('plot_posts_json', '');
+      setSummary(0, 0);
+      cancel();
+      return;
+    }
+
+    // нормальный случай
+    const items = posts.map(pickItem).filter(Boolean);
+    setHiddenField('plot_posts_json', JSON.stringify(items));
+
+    // убираем «подождите…»
+    const n = updateNote('');
+    if (n) n.remove();
+
+    // Заголовок «Список постов:»
+    const caption = document.createElement('p');
+    caption.className = 'list-caption';
+    caption.innerHTML = '<strong>Список постов:</strong>';
+    modalFields.appendChild(caption);
+
+    // список со скроллом
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.innerHTML = `
+      <div style="max-height:320px; overflow:auto">
+        <ol class="entry-list" id="plot-preview"></ol>
+      </div>`;
+    modalFields.appendChild(wrap);
+
+    const ol = wrap.querySelector('#plot-preview');
+    items.forEach(({ src, text, symbols_num }) => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = src; a.textContent = text || src;
+      a.target = '_blank'; a.rel = 'noopener noreferrer';
+      li.appendChild(a);
+      li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
+      ol.appendChild(li);
+    });
+
+    // Σ min(floor(symbols/1000), 3) по постам
+    const thousandsSumCapped = items.reduce((s, it) => {
+      const k = Math.floor(it.symbols_num / 1000);
+      return s + Math.min(Math.max(0, k), 3);
+    }, 0);
+
+    // формула
+    setSummary(items.length, thousandsSumCapped);
+
+    form.dataset.currentMultiplier = String(items.length);
+    btnSubmit.style.display = '';
+    btnSubmit.disabled = false;
+    cancel();
+  };
+
+  // ждём PLOT_POSTS не дольше 3 минут (используем уже заданный таймаут)
+  const to = setTimeout(fail, PLOT_TIMEOUT_MS);
+  const poll = setInterval(() => {
+    if (typeof window.PLOT_POSTS !== 'undefined' && !Array.isArray(window.PLOT_POSTS)) { fail(); return; }
+    if (Array.isArray(window.PLOT_POSTS)) {
+      clearTimeout(to); clearInterval(poll);
+      succeed(window.PLOT_POSTS);
+    }
+  }, 500);
+}
 
   // === FLYER: ждём ADS_POSTS и рисуем список ===
 if (template.id === 'form-income-flyer') {

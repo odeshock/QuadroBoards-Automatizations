@@ -1,38 +1,6 @@
 // ============================================================================
 // components.js — UI и модальные функции
 // ============================================================================
-
-import {
-  COUNTER_POLL_INTERVAL_MS,
-  FORM_TIMEOUT_MS,
-  PROMO_TIMEOUT_MS,
-  NEEDED_TIMEOUT_MS,
-  TOPUP_TIMEOUT_MS,
-  AMS_TIMEOUT_MS,
-  TRANSFER_TIMEOUT_MS,
-  GIFT_TIMEOUT_MS,
-  BEST_EPISODE_TIMEOUT_MS,
-  BEST_POST_TIMEOUT_MS,
-  BEST_WRITER_TIMEOUT_MS,
-  BEST_ACTIVIST_TIMEOUT_MS,
-  FIRST_POST_TIMEOUT_MS,
-  PERSONAL_TIMEOUT_MS,
-  PLOT_TIMEOUT_MS,
-  ADS_TIMEOUT_MS,
-  counterConfigs,
-  counterPrefixMap
-} from './config.js';
-
-import {
-  formatNumber,
-  parseNumericAmount,
-  roundNewToAnchorDOM,
-  fullMonthsDiffVirtualDOM,
-  fmtYMD,
-  submissionGroups,
-  formatEntryKey
-} from './services.js';
-
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================

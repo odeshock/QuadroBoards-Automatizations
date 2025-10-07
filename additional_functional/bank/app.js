@@ -2,6 +2,11 @@
 // app.js — Основная точка входа
 // ============================================================================
 
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, updateGiftDiscountEntry } from './services.js';
+import { renderLog, openModal, closeModal } from './components.js';
+import { injectTemplates } from './templates.js';
+import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems } from './data.js';
+
 // ============================================================================
 // DOM REFERENCES
 // ============================================================================

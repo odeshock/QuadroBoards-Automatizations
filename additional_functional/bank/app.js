@@ -188,6 +188,15 @@ log.addEventListener('click', (e) => {
     if (!entryId) return;
     const entry = group.entries.find((item) => item.id === entryId);
     if (!entry) return;
+
+    // Для подарков и оформления берём giftId и giftIcon из данных записи (первого получателя)
+    let editGiftId = group.giftId;
+    let editGiftIcon = group.giftIcon;
+    if (entry.data && entry.data.gift_id_1) {
+      editGiftId = entry.data.gift_id_1;
+      editGiftIcon = entry.data.gift_icon_1 || editGiftIcon;
+    }
+
     handleOpenModal({
       templateSelector: group.templateSelector,
       title: group.title,
@@ -196,8 +205,8 @@ log.addEventListener('click', (e) => {
       amountLabel: group.amountLabel,
       giftPrice1: group.giftPrice1,
       giftPrice5: group.giftPrice5,
-      giftId: group.giftId,
-      giftIcon: group.giftIcon,
+      giftId: editGiftId,
+      giftIcon: editGiftIcon,
       data: entry.data,
       entryId: entry.id,
       groupId: group.id
@@ -369,6 +378,146 @@ function initializeAccessControl() {
     }
   });
 }
+
+// ============================================================================
+// RENDER LISTS
+// ============================================================================
+
+function renderIncomeList() {
+  const container = document.querySelector('#tab-bank .panel:first-child .list');
+  if (!container) return;
+
+  incomeItems.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.setAttribute('role', 'listitem');
+    div.innerHTML = `
+      <div class="title">${item.title}</div>
+      <div class="price">${item.amount}</div>
+      <button class="btn-add" data-form="${item.form}" data-kind="income" data-amount="${item.amount}">+</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function renderExpenseList() {
+  const container = document.querySelector('#tab-bank .panel:last-child .list');
+  if (!container) return;
+
+  expenseItems.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.setAttribute('role', 'listitem');
+    div.innerHTML = `
+      <div class="title">${item.title}</div>
+      <div class="price">${item.amount}</div>
+      <button class="btn-add" data-form="${item.form}" data-kind="expense" data-amount="${item.amount}">+</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function renderGiftsList() {
+  const container = document.querySelector('#tab-gifts .gift-grid');
+  if (!container) return;
+
+  giftItems.forEach(item => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'gift-card btn-add';
+    btn.setAttribute('data-form', item.id === 'custom' ? '#form-gift-custom' : '#form-gift-present');
+    btn.setAttribute('data-kind', 'expense');
+    btn.setAttribute('data-amount', String(item.price1));
+    btn.setAttribute('data-title', item.title);
+    btn.setAttribute('data-gift-id', item.id);
+    btn.setAttribute('data-gift-icon', item.icon);
+    btn.setAttribute('data-gift-price-1', String(item.price1));
+    btn.setAttribute('data-gift-price-5', String(item.price5));
+    btn.innerHTML = `
+      <span class="gift-icon">${item.icon}</span>
+      <span class="gift-id">#${item.id}</span>
+    `;
+    container.appendChild(btn);
+  });
+}
+
+// Функции для рендеринга оформления
+function renderDesignLists() {
+  // Иконки
+  const iconContainer = document.querySelector('#tab-design .design-column:nth-child(1) .gift-grid');
+  if (iconContainer) {
+    iconItems.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'gift-card btn-add';
+      btn.setAttribute('data-form', item.id === 'icon-custom' ? '#form-icon-custom' : '#form-icon-present');
+      btn.setAttribute('data-kind', 'expense');
+      btn.setAttribute('data-amount', String(item.price1));
+      btn.setAttribute('data-gift-id', item.id);
+      btn.setAttribute('data-gift-icon', item.icon);
+      btn.setAttribute('data-gift-price-1', String(item.price1));
+      btn.setAttribute('data-gift-price-5', String(item.price5));
+      btn.innerHTML = `
+        <span class="gift-icon">${item.icon}</span>
+        <span class="gift-id">#${item.id}</span>
+      `;
+      iconContainer.appendChild(btn);
+    });
+  }
+
+  // Плашки
+  const badgeContainer = document.querySelector('#tab-design .design-column:nth-child(2) .gift-grid');
+  if (badgeContainer) {
+    badgeItems.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'gift-card btn-add';
+      btn.setAttribute('data-form', item.id === 'badge-custom' ? '#form-badge-custom' : '#form-badge-present');
+      btn.setAttribute('data-kind', 'expense');
+      btn.setAttribute('data-amount', String(item.price1));
+      btn.setAttribute('data-gift-id', item.id);
+      btn.setAttribute('data-gift-icon', item.icon);
+      btn.setAttribute('data-gift-price-1', String(item.price1));
+      btn.setAttribute('data-gift-price-5', String(item.price5));
+      btn.innerHTML = `
+        <span class="gift-icon">${item.icon}</span>
+        <span class="gift-id">#${item.id}</span>
+      `;
+      badgeContainer.appendChild(btn);
+    });
+  }
+
+  // Фоны
+  const bgContainer = document.querySelector('#tab-design .design-column:nth-child(3) .gift-grid');
+  if (bgContainer) {
+    backgroundItems.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'gift-card btn-add';
+      btn.setAttribute('data-form', item.id === 'bg-custom' ? '#form-bg-custom' : '#form-bg-present');
+      btn.setAttribute('data-kind', 'expense');
+      btn.setAttribute('data-amount', String(item.price1));
+      btn.setAttribute('data-gift-id', item.id);
+      btn.setAttribute('data-gift-icon', item.icon);
+      btn.setAttribute('data-gift-price-1', String(item.price1));
+      btn.setAttribute('data-gift-price-5', String(item.price5));
+      btn.innerHTML = `
+        <span class="gift-icon">${item.icon}</span>
+        <span class="gift-id">#${item.id}</span>
+      `;
+      bgContainer.appendChild(btn);
+    });
+  }
+}
+
+// Инжектим шаблоны форм
+injectTemplates();
+
+// Рендерим списки
+renderIncomeList();
+renderExpenseList();
+renderGiftsList();
+renderDesignLists();
 
 renderLog(log);
 

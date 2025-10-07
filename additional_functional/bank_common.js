@@ -263,7 +263,149 @@ async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src
       })));
     } catch { console.log(finalArr); }
     window.__scrapedPosts = finalArr;
-    console.log("%cГотово. Результат в window.__scrapedPosts","color:#06c");
     return finalArr;
   }
+}
+
+
+async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300 } = {}) {
+  if (!author) throw new Error("author обязателен");
+  if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
+
+  const targetAuthor = String(author).trim();
+  const forumsParam = forums.join(",");
+  const basePath = "/search.php";
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  const buildSearchUrl = (p) => {
+    const u = new URL(basePath, location.origin);
+    u.search = new URLSearchParams({
+      action: "search", author: targetAuthor, forums: forumsParam,
+      sort_dir: "DESC", show_as: "topics", p: String(p)
+    }).toString();
+    return u.toString();
+  };
+
+  async function getDoc(url) {
+    if (window.FMV?.fetchDoc) return await window.FMV.fetchDoc(url);
+    if (typeof fetchCP1251Doc === "function") return await fetchCP1251Doc(url);
+    if (typeof fetchHtml === "function") {
+      const html = await fetchHtml(url);
+      return new DOMParser().parseFromString(html, "text/html");
+    }
+    const res = await fetch(url, { credentials: "include" });
+    const html = await res.text();
+    return new DOMParser().parseFromString(html, "text/html");
+  }
+
+  const hash = (s) => { let h=0; for (const c of s) { h=((h<<5)-h)+c.charCodeAt(0); h|=0; } return h; };
+
+  function getDirectChildAnchor(el) {
+    for (const ch of el.children) if (ch.tagName === "A") return ch;
+    return null;
+  }
+
+  function extractTopicPageLinks(doc) {
+    const cons = [...doc.querySelectorAll(".tclcon")];
+    const out = [];
+    for (const con of cons) {
+      let name = con.querySelector(".byuser-username")?.textContent?.trim();
+      if (!name) {
+        const tr = con.closest("tr");
+        name = tr?.querySelector(".tcr .byuser-username")?.textContent?.trim() || "";
+      }
+      if (name !== targetAuthor) continue;
+
+      const a = getDirectChildAnchor(con);
+      const href = a?.getAttribute("href");
+      if (!href) continue;
+
+      out.push(new URL(href, location.href).href);
+    }
+    return out;
+  }
+
+  function normalizeToViewtopicIdHref(hrefAbs) {
+    try {
+      const u = new URL(hrefAbs, location.href);
+      if ((u.pathname === "/viewtopic.php" || u.pathname.endsWith("/viewtopic.php")) && u.searchParams.has("id")) {
+        const nu = new URL("/viewtopic.php", u.origin);
+        nu.searchParams.set("id", u.searchParams.get("id"));
+        return nu.href;
+      }
+      if (u.searchParams.has("id")) {
+        const nu = new URL("/viewtopic.php", u.origin);
+        nu.searchParams.set("id", u.searchParams.get("id"));
+        return nu.href;
+      }
+      return u.href;
+    } catch { return hrefAbs; }
+  }
+
+  function findFirstPostPermalink(doc, topicUrl) {
+    let a = doc.querySelector(".post.topicpost a.permalink");
+    if (a?.getAttribute("href")) return new URL(a.getAttribute("href"), topicUrl).href;
+
+    a = doc.querySelector(".post.topicpost h3 a[href*='#p']");
+    if (a?.getAttribute("href")) return new URL(a.getAttribute("href"), topicUrl).href;
+
+    a = doc.querySelector(".post.topicpost a[href*='#p']");
+    if (a?.getAttribute("href")) return new URL(a.getAttribute("href"), topicUrl).href;
+
+    try {
+      const topicId = new URL(topicUrl).searchParams.get("id");
+      if (topicId) {
+        for (const link of doc.querySelectorAll("a[href*='#p']")) {
+          const abs = new URL(link.getAttribute("href"), topicUrl);
+          if (abs.pathname.endsWith("/viewtopic.php") && abs.searchParams.get("id") === topicId) {
+            return abs.href;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  const doc1 = await getDoc(buildSearchUrl(1));
+  const links1 = extractTopicPageLinks(doc1);
+  const sig1 = hash(links1.join("\n"));
+  const topics = [...links1];
+  await sleep(delayMs);
+
+  for (let p = 2; p <= maxPages; p++) {
+    const doc = await getDoc(buildSearchUrl(p));
+    const links = extractTopicPageLinks(doc);
+    const sig = hash(links.join("\n"));
+    if (sig === sig1) break;
+    topics.push(...links);
+    await sleep(delayMs);
+  }
+
+  const uniqTopics = [...new Set(topics)];
+  const firstPostLinks = [];
+
+  for (const rawTopic of uniqTopics) {
+    const topicUrl = normalizeToViewtopicIdHref(rawTopic);
+    try {
+      const doc = await getDoc(topicUrl);
+      const perm = findFirstPostPermalink(doc, topicUrl);
+      if (perm) {
+        // преобразуем в формат с pid=K#pK
+        const m = perm.match(/#p(\d+)/);
+        if (m) {
+          const pid = m[1];
+          const base = new URL(perm, topicUrl);
+          const nu = new URL("/viewtopic.php", base.origin);
+          nu.searchParams.set("pid", pid);
+          firstPostLinks.push(`${nu.href}#p${pid}`);
+        } else {
+          firstPostLinks.push(perm);
+        }
+      }
+    } catch {}
+    await sleep(delayMs);
+  }
+
+  window.__scrapedTopicFirstPosts = firstPostLinks;
+  return firstPostLinks;
 }

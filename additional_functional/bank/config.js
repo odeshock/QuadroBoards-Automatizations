@@ -3,29 +3,29 @@
 // ============================================================================
 
 // Timeouts для различных форм (3 минуты = 180000 мс)
-const MSG_TIMEOUT_MS = 180000;
-const REP_TIMEOUT_MS = 180000;
-const POS_TIMEOUT_MS = 180000;
-const MONTH_TIMEOUT_MS = 180000;
-const COUNTER_POLL_INTERVAL_MS = 500;
-const ADS_TIMEOUT_MS = 180000;
-const PERSONAL_TIMEOUT_MS = 180000;
-const PLOT_TIMEOUT_MS = 180000;
-const FIRST_POST_TIMEOUT_MS = 180000;
-const FORM_TIMEOUT_MS = 180000;
-const PROMO_TIMEOUT_MS = 180000;
-const NEEDED_TIMEOUT_MS = 180000;
-const BEST_EPISODE_TIMEOUT_MS = 180000;
-const BEST_POST_TIMEOUT_MS = 180000;
-const BEST_WRITER_TIMEOUT_MS = 180000;
-const BEST_ACTIVIST_TIMEOUT_MS = 180000;
-const TOPUP_TIMEOUT_MS = 180000;
-const AMS_TIMEOUT_MS = 180000;
-const TRANSFER_TIMEOUT_MS = 180000;
-const GIFT_TIMEOUT_MS = 180000;
+export const MSG_TIMEOUT_MS = 180000;
+export const REP_TIMEOUT_MS = 180000;
+export const POS_TIMEOUT_MS = 180000;
+export const MONTH_TIMEOUT_MS = 180000;
+export const COUNTER_POLL_INTERVAL_MS = 500;
+export const ADS_TIMEOUT_MS = 180000;
+export const PERSONAL_TIMEOUT_MS = 180000;
+export const PLOT_TIMEOUT_MS = 180000;
+export const FIRST_POST_TIMEOUT_MS = 180000;
+export const FORM_TIMEOUT_MS = 180000;
+export const PROMO_TIMEOUT_MS = 180000;
+export const NEEDED_TIMEOUT_MS = 180000;
+export const BEST_EPISODE_TIMEOUT_MS = 180000;
+export const BEST_POST_TIMEOUT_MS = 180000;
+export const BEST_WRITER_TIMEOUT_MS = 180000;
+export const BEST_ACTIVIST_TIMEOUT_MS = 180000;
+export const TOPUP_TIMEOUT_MS = 180000;
+export const AMS_TIMEOUT_MS = 180000;
+export const TRANSFER_TIMEOUT_MS = 180000;
+export const GIFT_TIMEOUT_MS = 180000;
 
 // Конфигурация для счётчиков (сообщения, репутация, позитив, месяцы)
-const counterConfigs = {
+export const counterConfigs = {
   'form-income-100msgs': {
     prefix: 'msg',
     oldVar: 'MSG100_OLD',
@@ -69,7 +69,7 @@ const counterConfigs = {
 };
 
 // Маппинг префиксов на конфигурации
-const counterPrefixMap = {
+export const counterPrefixMap = {
   msg: counterConfigs['form-income-100msgs'],
   rep: counterConfigs['form-income-100rep'],
   pos: counterConfigs['form-income-100pos'],

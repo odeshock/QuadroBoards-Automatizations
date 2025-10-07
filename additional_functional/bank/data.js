@@ -1,5 +1,5 @@
 // Данные для доходов, расходов и подарков
-const incomeItems = [
+export const incomeItems = [
   { title: 'Приём анкеты', amount: 110, form: '#form-income-anketa' },
   { title: 'Взятие акционного персонажа', amount: 60, form: '#form-income-akcion' },
   { title: 'Взятие нужного персонажа', amount: 60, form: '#form-income-needchar' },
@@ -30,7 +30,7 @@ const incomeItems = [
   { title: 'Раз в месяц в топ RPG', amount: 30, form: '#form-income-rpgtop' }
 ];
 
-const expenseItems = [
+export const expenseItems = [
   { title: 'Выкуп внешности для заявки на 1 месяц', amount: 140, form: '#form-exp-face-1m' },
   { title: 'Выкуп внешности для заявки на 3 месяца', amount: 350, form: '#form-exp-face-3m' },
   { title: 'Выкуп внешности для заявки на 6 месяцев', amount: 560, form: '#form-exp-face-6m' },
@@ -59,22 +59,22 @@ const expenseItems = [
   { title: 'Перевод средств другому (комиссия)', amount: 10, form: '#form-exp-transfer' }
 ];
 
-const giftItems = [
+export const giftItems = [
   { id: 'custom', icon: '✨', title: 'Индивидуальный подарок', price1: 100, price5: 400 },
   { id: 'gift-1', icon: '🎁', title: 'Подарить подарок', price1: 60, price5: 140 }
 ];
 
-const iconItems = [
+export const iconItems = [
   { id: 'icon-custom', icon: '✨', title: 'Индивидуальная иконка', price1: 120, price5: 480 },
   { id: 'icon-1', icon: '🎨', title: 'Иконка 1', price1: 30, price5: 70 }
 ];
 
-const badgeItems = [
+export const badgeItems = [
   { id: 'badge-custom', icon: '✨', title: 'Индивидуальная плашка', price1: 190, price5: 760 },
   { id: 'badge-1', icon: '🏷️', title: 'Плашка 1', price1: 45, price5: 105 }
 ];
 
-const backgroundItems = [
+export const backgroundItems = [
   { id: 'bg-custom', icon: '✨', title: 'Индивидуальный фон', price1: 155, price5: 620 },
   { id: 'bg-1', icon: '🌆', title: 'Фон 1', price1: 40, price5: 90 }
 ];

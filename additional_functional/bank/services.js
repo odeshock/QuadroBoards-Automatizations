@@ -1,16 +1,19 @@
 // ============================================================================
 // services.js — Бизнес-логика: данные, расчёты, утилиты
 // ============================================================================
+
+import { counterPrefixMap } from './config.js';
+
 // ============================================================================
 // УТИЛИТЫ — форматирование и парсинг
 // ============================================================================
 
-const pad2 = (n) => String(n).padStart(2, '0');
+export const pad2 = (n) => String(n).padStart(2, '0');
 
-const numberFormatter = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
-const formatNumber = (value) => numberFormatter.format(value);
+export const numberFormatter = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+export const formatNumber = (value) => numberFormatter.format(value);
 
-const parseNumericAmount = (raw) => {
+export const parseNumericAmount = (raw) => {
   if (raw === undefined || raw === null) return null;
   const normalized = String(raw).trim().replace(/\s+/g, '').replace(',', '.');
   if (!normalized) return null;
@@ -21,7 +24,7 @@ const parseNumericAmount = (raw) => {
 // УТИЛИТЫ — работа с датами (для расчёта месяцев)
 // ============================================================================
 
-function roundNewToAnchorDOM(OLD, NEW) {
+export function roundNewToAnchorDOM(OLD, NEW) {
   let [y2, m2, d2] = NEW.map(Number);
   const d1 = Number(OLD[2]);
   if (d2 < d1) {
@@ -31,13 +34,13 @@ function roundNewToAnchorDOM(OLD, NEW) {
   return [y2, m2, d1];
 }
 
-function fullMonthsDiffVirtualDOM(OLD, NEW) {
+export function fullMonthsDiffVirtualDOM(OLD, NEW) {
   const [y1, m1] = OLD.map(Number);
   const [yr, mr] = roundNewToAnchorDOM(OLD, NEW);
   return Math.max(0, (yr - y1) * 12 + (mr - m1));
 }
 
-function fmtYMD([y, m, d]) {
+export function fmtYMD([y, m, d]) {
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
 
@@ -45,19 +48,19 @@ function fmtYMD([y, m, d]) {
 // УПРАВЛЕНИЕ ДАННЫМИ — хранение групп и записей
 // ============================================================================
 
-const submissionGroups = [];
-let groupSeq = 0;
-let entrySeq = 0;
+export const submissionGroups = [];
+export let groupSeq = 0;
+export let entrySeq = 0;
 
-const buildGroupKey = ({ templateSelector = '', title = '', amount = '', amountLabel = '', kind = '', giftId = '' }) =>
+export const buildGroupKey = ({ templateSelector = '', title = '', amount = '', amountLabel = '', kind = '', giftId = '' }) =>
   [templateSelector, title, amount, amountLabel, kind, giftId].join('||');
 
-function incrementGroupSeq() {
+export function incrementGroupSeq() {
   groupSeq += 1;
   return groupSeq;
 }
 
-function incrementEntrySeq() {
+export function incrementEntrySeq() {
   entrySeq += 1;
   return entrySeq;
 }
@@ -66,7 +69,7 @@ function incrementEntrySeq() {
 // УТИЛИТЫ — форматирование ключей для отображения в логе
 // ============================================================================
 
-function formatEntryKey(key) {
+export function formatEntryKey(key) {
   if (key === 'quantity') return 'Количество';
   if (key === 'reason') return 'Комментарий';
 
@@ -101,7 +104,7 @@ function formatEntryKey(key) {
 // ============================================================================
 
 // Подсчитывает общее количество подарков (получателей) во всех группах подарков
-function countTotalGifts() {
+export function countTotalGifts() {
   let total = 0;
   submissionGroups.forEach((group) => {
     const isGift = group.templateSelector === '#form-gift-present' ||
@@ -121,7 +124,7 @@ function countTotalGifts() {
 }
 
 // Подсчитывает общее количество индивидуальных подарков
-function countTotalCustomGifts() {
+export function countTotalCustomGifts() {
   let total = 0;
   submissionGroups.forEach((group) => {
     const isCustomGift = group.templateSelector === '#form-gift-custom' ||
@@ -141,7 +144,7 @@ function countTotalCustomGifts() {
 }
 
 // Обновляет объект скидки: создаёт если >= 5 подарков, удаляет если < 5
-function updateGiftDiscountEntry() {
+export function updateGiftDiscountEntry() {
   const totalGifts = countTotalGifts();
   const totalCustomGifts = countTotalCustomGifts();
 

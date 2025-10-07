@@ -2,7 +2,7 @@ async function scrapeUsers() {
   const PATH = "/userlist.php?sort_by=registered";
   const MAX_PAGES = 1000;
   const DELAY_MS = 300;
-  const CELL_SELECTOR = ".tcl.username";
+  const CELL_SELECTOR = "td.tcl.username span.usersname";
   const LINK_SELECTOR = "a[href*='id=']";
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));

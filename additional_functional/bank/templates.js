@@ -1,5 +1,5 @@
 // Шаблоны модальных окон
-const formTemplates = {
+export const formTemplates = {
   // ДОХОДЫ (info)
   'form-income-anketa': '<div class="info">Начисление производит администратор при приеме анкеты. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
   'form-income-akcion': '<div class="info">Начисление производит администратор при приеме анкеты. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
@@ -106,7 +106,7 @@ const infoForms = [
 ];
 
 // Функция для инжекта шаблонов в DOM
-function injectTemplates() {
+export function injectTemplates() {
   const container = document.getElementById('modal-forms-container');
   if (!container) return;
 

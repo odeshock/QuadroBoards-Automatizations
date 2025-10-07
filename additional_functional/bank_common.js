@@ -42,3 +42,57 @@ async function scrapeUsers() {
   window.scrapedUsers = result;
   return result;
 }
+
+async function fetchProfileInfo(userId = window.UserID) {
+  if (userId == null) throw new Error("UserID не задан (ни аргументом, ни в window.UserID)");
+
+  const url = `/profile.php?id=${encodeURIComponent(userId)}`;
+  const res = await fetch(url, { credentials: "same-origin" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} для ${url}`);
+  const html = await res.text();
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  // утилиты
+  const txt = (sel) =>
+    (doc.querySelector(sel)?.textContent || "")
+      .replace(/\u00A0/g, " ")  // NBSP -> space
+      .trim();
+
+  const firstSignedInt = (s) => {
+    if (!s) return null;
+    // поддержка "1 234", "1 234", "1.234", "+123", "-45"
+    const norm = s.replace(/[^\d+-]/g, ""); // оставляем цифры и знак
+    const m = norm.match(/^[+-]?\d+/);
+    return m ? Number(m[0]) : null;
+  };
+
+  // дата "dd.mm.yyyy" -> [yyyy, mm, dd]
+  const dateToArray = (s) => {
+    const m = (s || "").match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (!m) return null;
+    const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
+    return [yyyy, mm, dd];
+  };
+
+  // сообщения: берём всё ДО первого " - ", затем число
+  const parseMessages = (s) => {
+    const head = (s || "").split(" - ")[0];
+    return firstSignedInt(head);
+  };
+
+  // извлекаем поля
+  const dateStr = txt("li#pa-register-date strong");
+  const respectStr = txt("li#pa-respect strong");
+  const positiveStr = txt("li#pa-positive strong");
+  const messagesStr = txt("li#pa-posts strong");
+
+  const profile = {
+    id: Number(userId),
+    date: dateToArray(dateStr),                 // [yyyy, mm, dd] или null
+    respect: firstSignedInt(respectStr),        // число или null
+    positive: firstSignedInt(positiveStr),      // число или null
+    messages: parseMessages(messagesStr)        // число или null
+  };
+
+  return profile;
+}

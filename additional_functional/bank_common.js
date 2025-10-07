@@ -96,3 +96,174 @@ async function fetchProfileInfo(userId = window.UserID) {
 
   return profile;
 }
+
+
+/**
+ * scrapePosts(author, forums, stopOnFirstNonEmpty?, last_src?, options?)
+ *
+ * @param {string} author — логин автора (обязательно)
+ * @param {Array<string>|string} forums — список ID форумов (обязательно)
+ * @param {boolean} [stopOnFirstNonEmpty=false] — true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
+ * @param {string}  [last_src=""] — пост-граница; сам пост не обрабатываем
+ * @param {Object}  [options]
+ * @param {number}  [options.maxPages=999]
+ * @param {number}  [options.delayMs=300]
+ * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
+ */
+async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src = "", { maxPages = 999, delayMs = 300 } = {}) {
+  if (!author) throw new Error("author обязателен");
+  if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
+
+  const basePath    = "/search.php";
+  const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const buildUrl = (p) => {
+    const u = new URL(basePath, location.origin);
+    u.search = new URLSearchParams({ action:"search", author, forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
+    return u.toString();
+  };
+
+  async function getDoc(url) {
+    if (window.FMV?.fetchDoc) return await window.FMV.fetchDoc(url);
+    if (typeof fetchCP1251Doc === "function") return await fetchCP1251Doc(url);
+    if (typeof fetchHtml === "function") {
+      const html = await fetchHtml(url);
+      return new DOMParser().parseFromString(html, "text/html");
+    }
+    const res = await fetch(url, { credentials: "include" });
+    const html = await res.text();
+    return new DOMParser().parseFromString(html, "text/html");
+  }
+  const hash = (s) => { let h=0; for (const c of s) { h=((h<<5)-h)+c.charCodeAt(0); h|=0; } return h; };
+
+  // ---------- HTML → чистый текст ----------
+  const htmlToMultilineText = (html = "") => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+
+    // скрытые цитаты -> только blockquote
+    tmp.querySelectorAll(".quote-box.hide-box").forEach(box => {
+      const bq = box.querySelector("blockquote");
+      if (bq) { const repl = document.createElement("div"); repl.innerHTML = bq.innerHTML; box.replaceWith(repl); }
+    });
+    // убрать шапки цитат
+    tmp.querySelectorAll("cite").forEach(n => n.remove());
+    // code-box -> только текст из <pre>
+    tmp.querySelectorAll(".code-box").forEach(box => {
+      const pre = box.querySelector("pre"); const codeText = pre ? pre.textContent : "";
+      const repl = document.createElement("div"); repl.textContent = codeText || ""; box.replaceWith(repl);
+    });
+    // служебные/скрытые
+    tmp.querySelectorAll(".custom_tag, .hidden_tag, characters, location, order").forEach(n => n.remove());
+    // script type="text/html" -> парсим и соблюдаем <p>/<br>
+    tmp.querySelectorAll('script[type="text/html"]').forEach(s => {
+      const innerTmp = document.createElement("div"); innerTmp.innerHTML = s.textContent || "";
+      innerTmp.querySelectorAll("p, br").forEach(el => el.insertAdjacentText("afterend", "\n"));
+      let t = (innerTmp.textContent || "").replace(/\u00A0/g, " ").replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n");
+      s.insertAdjacentText("beforebegin", t ? `\n${t}\n` : ""); s.remove();
+    });
+    // переносы для блочных
+    const blockTags = ["ADDRESS","ARTICLE","ASIDE","BLOCKQUOTE","DIV","DL","DT","DD","FIELDSET","FIGCAPTION","FIGURE","FOOTER","FORM","H1","H2","H3","H4","H5","H6","HEADER","HR","LI","MAIN","NAV","OL","P","PRE","SECTION","TABLE","THEAD","TBODY","TFOOT","TR","UL","BR"];
+    tmp.querySelectorAll(blockTags.join(",")).forEach(el => { if (el.tagName==="BR") el.insertAdjacentText("beforebegin","\n"); else el.insertAdjacentText("afterend","\n"); });
+
+    // нормализация
+    let t = (tmp.textContent || "").replace(/\u00A0/g," ");
+    t = t.replace(/\[\/?indent\]/gi,"").replace(/\[\/?float(?:=[^\]]+)?\]/gi,"").replace(/\[DiceFM[^\]]*?\]/gi,"");
+    t = t.replace(/[ \t]+\n/g,"\n").replace(/\n[ \t]+/g,"\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n");
+
+    const out=[]; for (const raw of t.split("\n")) { const line = raw.trim(); if (line==="") { if (out.length && out[out.length-1] !== "") out.push(""); } else out.push(line); }
+    return out.join("\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n").replace(/^\n+|\n+$/g,"").trim();
+  };
+  const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
+
+  const extractOne = (post) => {
+    const span = post.querySelector("h3 > span");
+    const a = span ? span.querySelectorAll("a") : [];
+    const title = a[1]?.textContent?.trim() || "";
+    const src   = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
+    const contentEl = post.querySelector(".post-content");
+    let html = contentEl?.innerHTML?.trim() || "";
+    html = expandBBHtmlToText(html);
+    const text = htmlToMultilineText(html);
+    return { title, src, text, html, symbols_num: text.length };
+  };
+  const extractPosts = (doc) => [...doc.querySelectorAll(".post")].map(extractOne);
+  const pageSignature = (items) => hash(items.map(i=>i.src).join("\n"));
+
+  // ---------- режим A: первый непустой ДО last_src ----------
+  async function findFirstNonEmptyBeforeLastSrc() {
+    const doc1 = await getDoc(buildUrl(1)); const posts1 = extractPosts(doc1);
+    if (!posts1.length) return finalize([]);
+    const baseSig = pageSignature(posts1);
+
+    for (const post of posts1) {
+      if (last_src && post.src === last_src) return finalize([]);
+      if (post.symbols_num > 0) return finalize([post]);
+    }
+    await sleep(delayMs);
+
+    for (let p=2; p<=maxPages; p++) {
+      const doc = await getDoc(buildUrl(p)); const posts = extractPosts(doc);
+      if (!posts.length) break;
+      if (pageSignature(posts) === baseSig) break;
+      for (const post of posts) {
+        if (last_src && post.src === last_src) return finalize([]);
+        if (post.symbols_num > 0) return finalize([post]);
+      }
+      await sleep(delayMs);
+    }
+    return finalize([]);
+  }
+
+  // ---------- режим B: собрать ВСЕ ДО last_src (или всё, если он не задан) ----------
+  async function collectAllBeforeLastSrc() {
+    const acc = [];
+
+    const doc1 = await getDoc(buildUrl(1)); const posts1 = extractPosts(doc1);
+    if (!posts1.length) return finalize([]);
+    const baseSig = pageSignature(posts1);
+
+    const pushUntilBorder = (list) => {
+      for (const post of list) {
+        if (last_src && post.src === last_src) return true; // встретили границу -> прекращаем набор
+        acc.push(post);
+      }
+      return false;
+    };
+
+    if (pushUntilBorder(posts1)) return finalize(acc);
+    await sleep(delayMs);
+
+    for (let p=2; p<=maxPages; p++) {
+      const doc = await getDoc(buildUrl(p)); const posts = extractPosts(doc);
+      if (!posts.length) break;
+      if (pageSignature(posts) === baseSig) break;
+      if (pushUntilBorder(posts)) return finalize(acc);
+      await sleep(delayMs);
+    }
+    return finalize(acc);
+  }
+
+  // ------ запуск нужного режима ------
+  if (stopOnFirstNonEmpty) {
+    return await findFirstNonEmptyBeforeLastSrc();
+  } else {
+    return await collectAllBeforeLastSrc();
+  }
+
+  // ------ финализация: reverse + вывод ------
+  function finalize(arr) {
+    const finalArr = arr.slice().reverse();
+    try {
+      console.table(finalArr.map(r => ({
+        title: r.title,
+        src: r.src,
+        symbols_num: r.symbols_num,
+        textPreview: r.text.slice(0,120).replace(/\s+/g," ")
+      })));
+    } catch { console.log(finalArr); }
+    window.__scrapedPosts = finalArr;
+    console.log("%cГотово. Результат в window.__scrapedPosts","color:#06c");
+    return finalArr;
+  }
+}

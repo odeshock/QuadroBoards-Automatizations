@@ -1,6 +1,7 @@
 // ============================================================================
 // components.js — UI и модальные функции
 // ============================================================================
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -96,9 +97,12 @@ function renderLog(log) {
     title.style.alignItems = 'center';
     title.style.gap = '8px';
 
-    // Для подарков добавляем иконку и ID в заголовок
+    // Для подарков и оформления добавляем иконку и ID в заголовок
+    const designSelectors = ['#form-icon-custom', '#form-icon-present', '#form-badge-custom', '#form-badge-present', '#form-bg-custom', '#form-bg-present'];
     const isGiftGroup = group.templateSelector === '#form-gift-present' || /Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(group.title || '');
-    if (isGiftGroup && group.entries.length > 0) {
+    const isDesignGroup = designSelectors.includes(group.templateSelector);
+
+    if ((isGiftGroup || isDesignGroup) && group.entries.length > 0) {
       const firstEntry = group.entries[0];
       const dataObj = firstEntry.data || {};
       // Используем giftId из группы (если есть) или из первого получателя
@@ -106,7 +110,21 @@ function renderLog(log) {
       const giftId = String(group.giftId ?? dataObj['gift_id_1'] ?? '').trim();
 
       if (giftId) {
-        title.textContent = `#${index + 1} · Подарить подарок (#${giftId})`;
+        let itemTitle = '';
+        const isCustom = giftId.includes('custom');
+
+        if (group.templateSelector?.includes('icon')) {
+          itemTitle = isCustom ? 'Индивидуальная иконка' : `Иконка из коллекции (#${giftId})`;
+        } else if (group.templateSelector?.includes('badge')) {
+          itemTitle = isCustom ? 'Индивидуальная плашка' : `Плашка из коллекции (#${giftId})`;
+        } else if (group.templateSelector?.includes('bg')) {
+          itemTitle = isCustom ? 'Индивидуальный фон' : `Фон из коллекции (#${giftId})`;
+        } else {
+          // Подарки
+          itemTitle = `Подарок из коллекции (#${giftId})`;
+        }
+
+        title.textContent = `#${index + 1} · ${itemTitle}`;
       } else {
         title.textContent = `#${index + 1} · ${group.title}`;
       }
@@ -212,8 +230,13 @@ function renderLog(log) {
         });
         meta.textContent = `${group.amountLabel}: ${formatNumber(totalDiscount)}`;
         header.appendChild(meta);
-      } else if (group.templateSelector === '#form-gift-present' || group.templateSelector === '#form-gift-custom' || /Подарить подарок|Индивидуальный подарок/i.test(group.title || '')) {
-        // Подарки: цена_1 × количество получателей
+      } else if (
+        group.templateSelector === '#form-gift-present' ||
+        group.templateSelector === '#form-gift-custom' ||
+        ['#form-icon-custom', '#form-icon-present', '#form-badge-custom', '#form-badge-present', '#form-bg-custom', '#form-bg-present'].includes(group.templateSelector) ||
+        /Подарить подарок|Индивидуальный подарок/i.test(group.title || '')
+      ) {
+        // Подарки и Оформление: цена_1 × количество получателей
         let totalGifts = 0;
         const giftPrice1 = Number.parseInt(group.giftPrice1, 10) || 100;
 
@@ -227,6 +250,27 @@ function renderLog(log) {
         });
 
         const totalCost = giftPrice1 * totalGifts;
+        meta.textContent = `${group.amountLabel}: ${formatNumber(totalCost > 0 ? totalCost : group.amount)}`;
+        header.appendChild(meta);
+      } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
+        // Бонусы/Маска/Жилет: базовая цена × сумма всех quantity
+        let totalQuantity = 0;
+        const basePrice = parseNumericAmount(group.amount) || 0;
+
+        group.entries.forEach((item) => {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1]);
+
+          idxs.forEach((idx) => {
+            const qty = Number(dataObj[`quantity_${idx}`]) || 0;
+            totalQuantity += qty;
+          });
+        });
+
+        const totalCost = basePrice * totalQuantity;
         meta.textContent = `${group.amountLabel}: ${formatNumber(totalCost > 0 ? totalCost : group.amount)}`;
         header.appendChild(meta);
       } else {
@@ -450,6 +494,15 @@ function renderLog(log) {
       }
 
       // ===== Докупить кредиты / Персональные начисления: склеиваем recipient_i + topup_i (+ comment_i для AMS) =====
+      const bonusMaskCleanIds = [
+        'form-exp-bonus1d1', 'form-exp-bonus2d1',
+        'form-exp-bonus1w1', 'form-exp-bonus2w1',
+        'form-exp-bonus1m1', 'form-exp-bonus2m1',
+        'form-exp-bonus1m3', 'form-exp-bonus2m3',
+        'form-exp-mask', 'form-exp-clean'
+      ];
+      const isBonusMaskClean = bonusMaskCleanIds.includes(item.template_id);
+
       const isTopup = (item.template_id === 'form-income-topup' || item.template_id === 'form-income-ams') ||
             (/Докупить кредиты|Персональные начисления/i.test(group.title || ''));
       const isAMS = (item.template_id === 'form-income-ams') || (/Персональные начисления/i.test(group.title || ''));
@@ -493,6 +546,80 @@ function renderLog(log) {
         });
       }
 
+      // ===== Бонусы/Маска/Жилет: recipient_i + quantity_i + from_i + wish_i =====
+      if (isBonusMaskClean) {
+        const dataObj = item.data || {};
+        const idxs = Object.keys(dataObj)
+          .map(k => k.match(/^recipient_(\d+)$/))
+          .filter(Boolean)
+          .map(m => m[1])
+          .sort((a, b) => Number(a) - Number(b));
+
+        const basePrice = parseNumericAmount(group.amount) || 0;
+
+        idxs.forEach((idx) => {
+          const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
+          if (!rid) return;
+
+          const user = window.USERS_LIST?.find(u => String(u.id) === rid);
+          const displayName = user ? `<strong>${user.name}</strong> (id: ${user.id})` : `id: ${rid}`;
+
+          const from = String(dataObj[`from_${idx}`] ?? '').trim();
+          const wish = String(dataObj[`wish_${idx}`] ?? '').trim();
+          const qty = Number(dataObj[`quantity_${idx}`] ?? '1') || 1;
+
+          const li = document.createElement('li');
+
+          // Получатель
+          const recipient = document.createElement('span');
+          recipient.innerHTML = displayName;
+          li.append(recipient);
+
+          // От кого: комментарий (как у подарков)
+          if (from || wish) {
+            const sep2 = document.createTextNode(' — ');
+            li.append(sep2);
+
+            if (from && wish) {
+              const fromText = document.createElement('span');
+              fromText.style.fontStyle = 'italic';
+              fromText.textContent = from;
+
+              const colonText = document.createTextNode(': ');
+
+              const wishText = document.createElement('span');
+              wishText.style.color = 'var(--muted, #666)';
+              wishText.textContent = wish;
+
+              li.append(fromText, colonText, wishText);
+            } else if (from) {
+              const fromText = document.createElement('span');
+              fromText.style.fontStyle = 'italic';
+              fromText.textContent = from;
+              li.append(fromText);
+            } else if (wish) {
+              const wishText = document.createElement('span');
+              wishText.style.color = 'var(--muted, #666)';
+              wishText.textContent = wish;
+              li.append(wishText);
+            }
+          }
+
+          // Количество и стоимость
+          const cost = basePrice * qty;
+          const sep3 = document.createTextNode(' — ');
+          const costText = document.createElement('span');
+          if (qty > 1) {
+            costText.textContent = `${qty} × ${formatNumber(basePrice)} = ${formatNumber(cost)}`;
+          } else {
+            costText.textContent = formatNumber(cost);
+          }
+          li.append(sep3, costText);
+
+          list.appendChild(li);
+        });
+      }
+
       // ===== Перевод средств: выводим каждого получателя с суммой (без комиссии) =====
       if (isTransfer) {
         const dataObj = item.data || {};
@@ -519,11 +646,16 @@ function renderLog(log) {
         });
       }
 
-      // ===== Подарки: выводим каждого получателя с информацией о подарке =====
-      const isGift = (item.template_id === 'form-gift-present') ||
+      // ===== Подарки и Оформление: выводим каждого получателя с информацией =====
+      const designTemplates = ['form-icon-custom', 'form-icon-present', 'form-badge-custom', 'form-badge-present', 'form-bg-custom', 'form-bg-present'];
+      const isDesign = designTemplates.includes(item.template_id);
+      const isDesignCustom = isDesign && item.template_id.includes('custom');
+      const isDesignRegular = isDesign && !item.template_id.includes('custom');
+
+      const isGift = (item.template_id === 'form-gift-present' || isDesignRegular) ||
             (/Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(group.title || ''));
 
-      const isCustomGift = (item.template_id === 'form-gift-custom') ||
+      const isCustomGift = (item.template_id === 'form-gift-custom' || isDesignCustom) ||
             (/Индивидуальный подарок/i.test(group.title || ''));
 
       if (isGift) {
@@ -673,6 +805,9 @@ function renderLog(log) {
           // пары recipient/topup/comment уже отрисованы для топапа
           if (isTopup && (/^recipient_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^comment_\d+$/.test(key))) return;
 
+          // пары recipient/from/wish/quantity уже отрисованы для бонусов/маски/жилета
+          if (isBonusMaskClean && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^quantity_\d+$/.test(key))) return;
+
           // пары recipient/amount уже отрисованы для переводов
           if (isTransfer && (/^recipient_\d+$/.test(key) || /^amount_\d+$/.test(key))) return;
 
@@ -681,7 +816,7 @@ function renderLog(log) {
           if (isCustomGift && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // для прочих форм recipient_i показываем только имя
-          if (!isTopup && !isGift && /^recipient_\d+$/.test(key)) {
+          if (!isTopup && !isGift && !isCustomGift && !isBonusMaskClean && /^recipient_\d+$/.test(key)) {
             const rid = String(value ?? '').trim();
             if (!rid) return;
             const user = window.USERS_LIST?.find(u => String(u.id) === rid);
@@ -694,8 +829,33 @@ function renderLog(log) {
           // пустые значения не выводим (чтобы не было "— —")
           if (value === undefined || value === null || String(value).trim() === '') return;
 
-          const li = document.createElement('li');
           const raw = typeof value === 'string' ? value.trim() : value;
+
+          // Для reason (Отказ от персонажа, Смена персонажа) - выводим напрямую с переносами, без нумерации
+          if (key === 'reason') {
+            const div = document.createElement('div');
+            div.style.whiteSpace = 'pre-wrap';
+            div.textContent = raw;
+            list.appendChild(div);
+            return;
+          }
+
+          // Для link в "Третий персонаж" - выводим ссылку напрямую, без <li>
+          const isThirdChar = item.template_id === 'form-exp-thirdchar';
+          if (isThirdChar && key === 'link') {
+            const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
+            if (isUrl) {
+              const link = document.createElement('a');
+              link.href = raw;
+              link.textContent = raw;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              list.appendChild(link);
+              return;
+            }
+          }
+
+          const li = document.createElement('li');
 
           // URL-поля
           const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
@@ -2452,6 +2612,402 @@ function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data
 // OPEN MODAL
 // ============================================================================
 
+// ============================================================================
+// SETUP BONUS/MASK/CLEAN FLOW - Бонусы, Маска, Жилет
+// ============================================================================
+
+function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice }) {
+  // === 1) Удаляем существующие поля формы ===
+  modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
+    .forEach(el => el.remove());
+
+  const disclaimer = document.createElement('div');
+  disclaimer.className = 'info';
+  disclaimer.textContent = 'Можете выбрать себя или другого игрока';
+  modalFields.insertBefore(disclaimer, modalFields.firstChild);
+
+  // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
+  const waitNote = document.createElement('p');
+  waitNote.className = 'muted-note admin-wait-note';
+  waitNote.textContent = 'Пожалуйста, подождите...';
+  modalFields.appendChild(waitNote);
+
+  const hideWait = () => {
+    const el = modalFields.querySelector('.admin-wait-note');
+    if (el) el.remove();
+  };
+
+  const showError = (msg) => {
+    hideWait();
+    let err = modalFields.querySelector('.note-error.admin-error');
+    if (!err) {
+      err = document.createElement('p');
+      err.className = 'note-error admin-error';
+      err.style.color = 'var(--danger)';
+      disclaimer.insertAdjacentElement('afterend', err);
+    }
+    err.textContent = msg || 'Произошла ошибка. Пожалуйста, обновите страницу.';
+    btnSubmit.style.display = 'none';
+    btnSubmit.disabled = true;
+  };
+
+  let canceled = false;
+  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  counterWatcher = { cancel };
+
+  const fail = () => {
+    if (canceled) return;
+    showError('Произошла ошибка. Пожалуйста, обновите страницу.');
+    cancel();
+  };
+
+  const updateTotalCost = (itemGroups) => {
+    let totalQuantity = 0;
+    itemGroups.forEach(group => {
+      const qty = Number(group.quantityInput.value) || 0;
+      totalQuantity += qty;
+    });
+
+    const price = Number.parseInt(basePrice, 10) || 0;
+    const totalCost = price * totalQuantity;
+
+    if (modalAmount) {
+      if (totalQuantity > 0) {
+        modalAmount.textContent = `${price} × ${totalQuantity} = ${formatNumber(totalCost)}`;
+      } else {
+        modalAmount.textContent = '';
+      }
+    }
+
+    return { totalQuantity, totalCost };
+  };
+
+  const renderPicker = (users) => {
+    if (!Array.isArray(users)) return fail();
+
+    hideWait();
+
+    const groupsContainer = document.createElement('div');
+    groupsContainer.className = 'gift-groups';
+    groupsContainer.setAttribute('data-gift-container', '');
+    modalFields.appendChild(groupsContainer);
+
+    const itemGroups = [];
+    let groupCounter = 0;
+
+    const syncHiddenFields = () => {
+      modalFields
+        .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="from_"], input[type="hidden"][name^="wish_"], input[type="hidden"][name^="quantity_"]')
+        .forEach(n => n.remove());
+
+      itemGroups.forEach((group, index) => {
+        const i = index + 1;
+        const qty = Number(group.quantityInput.value) || 0;
+        if (qty <= 0) return;
+
+        const hidR = document.createElement('input');
+        hidR.type = 'hidden';
+        hidR.name = `recipient_${i}`;
+        hidR.value = String(group.recipientId);
+
+        const hidFrom = document.createElement('input');
+        hidFrom.type = 'hidden';
+        hidFrom.name = `from_${i}`;
+        hidFrom.value = group.fromInput.value.trim();
+
+        const hidWish = document.createElement('input');
+        hidWish.type = 'hidden';
+        hidWish.name = `wish_${i}`;
+        hidWish.value = group.wishInput.value.trim();
+
+        const hidQty = document.createElement('input');
+        hidQty.type = 'hidden';
+        hidQty.name = `quantity_${i}`;
+        hidQty.value = String(qty);
+
+        modalFields.append(hidR, hidFrom, hidWish, hidQty);
+      });
+
+      const stats = updateTotalCost(itemGroups);
+      const hasAny = stats.totalQuantity > 0;
+      btnSubmit.style.display = hasAny ? '' : 'none';
+      btnSubmit.disabled = !hasAny;
+    };
+
+    const removeGroup = (group) => {
+      const idx = itemGroups.indexOf(group);
+      if (idx > -1) itemGroups.splice(idx, 1);
+      if (group.el) group.el.remove();
+
+      // Обновляем состояние кнопок удаления после удаления
+      updateRemoveButtons();
+      syncHiddenFields();
+    };
+
+    const updateRemoveButtons = () => {
+      const allRemoveBtns = groupsContainer.querySelectorAll('.gift-remove');
+      allRemoveBtns.forEach((btn, i) => {
+        // Первая группа всегда недоступна для удаления
+        btn.disabled = i === 0;
+      });
+    };
+
+    const addGroup = (user, prefillQty = '', prefillFrom = '', prefillWish = '', isFirst = false) => {
+      groupCounter++;
+      const idx = groupCounter;
+
+      const groupEl = document.createElement('div');
+      groupEl.className = 'gift-group';
+      groupEl.setAttribute('data-gift-group', '');
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn-remove-extra gift-remove';
+      removeBtn.setAttribute('data-gift-remove', '');
+      removeBtn.setAttribute('aria-label', 'Удалить получателя');
+      removeBtn.textContent = '×';
+      removeBtn.disabled = isFirst;
+
+      // Получатель
+      const recipientField = document.createElement('div');
+      recipientField.className = 'field gift-field';
+      recipientField.setAttribute('data-gift-label', 'recipient');
+      const recipientLabel = document.createElement('label');
+      recipientLabel.setAttribute('for', `bonus-recipient-${idx}`);
+      recipientLabel.textContent = 'Получатель *';
+      const recipientInput = document.createElement('input');
+      recipientInput.id = `bonus-recipient-${idx}`;
+      recipientInput.setAttribute('data-gift-recipient', '');
+      recipientInput.name = `recipient_${idx}`;
+      recipientInput.type = 'text';
+      recipientInput.value = `${user.name} (id: ${user.id})`;
+      recipientInput.required = true;
+      recipientInput.readOnly = true;
+      recipientField.append(recipientLabel, recipientInput);
+
+      // Количество
+      const quantityField = document.createElement('div');
+      quantityField.className = 'field gift-field';
+      const qtyLabel = document.createElement('label');
+      qtyLabel.setAttribute('for', `bonus-quantity-${idx}`);
+      qtyLabel.textContent = 'Количество *';
+      const qtyInput = document.createElement('input');
+      qtyInput.id = `bonus-quantity-${idx}`;
+      qtyInput.type = 'number';
+      qtyInput.min = '1';
+      qtyInput.value = prefillQty || '1';
+      qtyInput.required = true;
+      quantityField.append(qtyLabel, qtyInput);
+
+      // От кого
+      const fromField = document.createElement('div');
+      fromField.className = 'field gift-field';
+      fromField.setAttribute('data-gift-label', 'from');
+      const fromLabel = document.createElement('label');
+      fromLabel.setAttribute('for', `bonus-from-${idx}`);
+      fromLabel.textContent = 'От кого';
+      const fromInput = document.createElement('input');
+      fromInput.id = `bonus-from-${idx}`;
+      fromInput.setAttribute('data-gift-from', '');
+      fromInput.name = `from_${idx}`;
+      fromInput.type = 'text';
+      fromInput.value = prefillFrom || '';
+      fromInput.placeholder = 'От ...';
+      fromField.append(fromLabel, fromInput);
+
+      // Комментарий
+      const wishField = document.createElement('div');
+      wishField.className = 'field gift-field';
+      wishField.setAttribute('data-gift-label', 'wish');
+      const wishLabel = document.createElement('label');
+      wishLabel.setAttribute('for', `bonus-wish-${idx}`);
+      wishLabel.textContent = 'Комментарий';
+      const wishInput = document.createElement('input');
+      wishInput.id = `bonus-wish-${idx}`;
+      wishInput.setAttribute('data-gift-wish', '');
+      wishInput.name = `wish_${idx}`;
+      wishInput.type = 'text';
+      wishInput.value = prefillWish || '';
+      wishInput.placeholder = 'Комментарий';
+      wishField.append(wishLabel, wishInput);
+
+      groupEl.append(removeBtn, recipientField, quantityField, fromField, wishField);
+      groupsContainer.appendChild(groupEl);
+
+      const group = {
+        recipientId: user.id,
+        recipientName: user.name,
+        quantityInput: qtyInput,
+        fromInput: fromInput,
+        wishInput: wishInput,
+        el: groupEl
+      };
+
+      itemGroups.push(group);
+
+      qtyInput.addEventListener('input', syncHiddenFields);
+      fromInput.addEventListener('input', syncHiddenFields);
+      wishInput.addEventListener('input', syncHiddenFields);
+      removeBtn.addEventListener('click', () => removeGroup(group));
+
+      // Обновляем состояние кнопок удаления
+      updateRemoveButtons();
+      syncHiddenFields();
+      return group;
+    };
+
+    // Кнопка "+ Еще"
+    const addMoreBtn = document.createElement('button');
+    addMoreBtn.type = 'button';
+    addMoreBtn.className = 'btn';
+    addMoreBtn.textContent = '+ Еще';
+    addMoreBtn.setAttribute('data-add-gift-group', '');
+
+    const addMoreField = document.createElement('div');
+    addMoreField.className = 'field';
+    addMoreField.appendChild(addMoreBtn);
+    modalFields.appendChild(addMoreField);
+
+    // Поиск пользователей
+    const searchField = document.createElement('div');
+    searchField.className = 'field anketa-combobox';
+    searchField.style.display = 'none';
+    searchField.style.marginTop = '12px';
+
+    const searchLabel = document.createElement('label');
+    searchLabel.textContent = 'Найти получателя';
+
+    const comboBox = document.createElement('div');
+    comboBox.className = 'combo';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Начните вводить имя или id...';
+    searchInput.setAttribute('autocomplete', 'off');
+
+    const suggestList = document.createElement('div');
+    suggestList.className = 'suggest';
+    suggestList.setAttribute('role', 'listbox');
+    suggestList.style.position = 'fixed';
+    suggestList.style.zIndex = '9999';
+    suggestList.style.display = 'none';
+
+    comboBox.append(searchInput, suggestList);
+    searchField.append(searchLabel, comboBox);
+    modalFields.appendChild(searchField);
+
+    let portalMounted = false;
+    const mountPortal = () => { if (!portalMounted) { document.body.appendChild(suggestList); portalMounted = true; } };
+    const unmountPortal = () => { if (portalMounted) { suggestList.remove(); portalMounted = false; } };
+    const positionPortal = () => {
+      const r = searchInput.getBoundingClientRect();
+      suggestList.style.left = `${r.left}px`;
+      suggestList.style.top = `${r.bottom + 6}px`;
+      suggestList.style.width = `${r.width}px`;
+    };
+    const closeSuggest = () => { suggestList.style.display = 'none'; unmountPortal(); };
+    const openSuggest = () => { mountPortal(); positionPortal(); suggestList.style.display = 'block'; };
+
+    const norm = (s) => String(s ?? '').trim().toLowerCase();
+    const doSearch = () => {
+      const q = norm(searchInput.value);
+      suggestList.innerHTML = '';
+      if (!q) {
+        closeSuggest();
+        return;
+      }
+
+      const matches = users.filter(u => {
+        const addedIds = itemGroups.map(g => String(g.recipientId));
+        if (addedIds.includes(String(u.id))) return false;
+        return norm(u.name).includes(q) || String(u.id).includes(q);
+      }).slice(0, 10);
+
+      if (matches.length === 0) {
+        closeSuggest();
+        return;
+      }
+
+      matches.forEach(u => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'suggest-item';
+        item.setAttribute('role', 'option');
+        item.textContent = `${u.name} (id: ${u.id})`;
+        item.addEventListener('click', () => {
+          // Первая группа (если групп ещё нет) будет недоступна для удаления
+          const isFirst = itemGroups.length === 0;
+          addGroup(u, '1', '', '', isFirst);
+          searchInput.value = '';
+          closeSuggest();
+          searchField.style.display = 'none';
+        });
+        suggestList.appendChild(item);
+      });
+
+      openSuggest();
+    };
+
+    searchInput.addEventListener('input', doSearch);
+    searchInput.addEventListener('focus', doSearch);
+    searchInput.addEventListener('blur', () => setTimeout(closeSuggest, 200));
+
+    addMoreBtn.addEventListener('click', () => {
+      searchField.style.display = 'block';
+      searchInput.focus();
+    });
+
+    // Восстановление данных при редактировании
+    if (data && typeof data === 'object') {
+      const recipientKeys = Object.keys(data)
+        .filter(k => /^recipient_\d+$/.test(k))
+        .map(k => k.match(/^recipient_(\d+)$/)[1])
+        .sort((a, b) => Number(a) - Number(b));
+
+      recipientKeys.forEach((idx, i) => {
+        const rid = String(data[`recipient_${idx}`] ?? '').trim();
+        if (!rid) return;
+        const user = users.find(u => String(u.id) === rid);
+        if (!user) return;
+
+        const qty = String(data[`quantity_${idx}`] ?? '1');
+        const from = String(data[`from_${idx}`] ?? '');
+        const wish = String(data[`wish_${idx}`] ?? '');
+
+        addGroup(user, qty, from, wish, i === 0);
+      });
+    } else {
+      // При создании новой записи показываем поле поиска сразу для первого получателя
+      searchField.style.display = 'block';
+      searchInput.focus();
+    }
+
+    syncHiddenFields();
+  };
+
+  // === 3) Ждём USERS_LIST ===
+  let counter = 0;
+  const poll = setInterval(() => {
+    if (canceled) return;
+    if (window.USERS_LIST && Array.isArray(window.USERS_LIST)) {
+      clearInterval(poll);
+      clearTimeout(to);
+      renderPicker(window.USERS_LIST);
+    } else {
+      counter++;
+    }
+  }, 100);
+
+  const to = setTimeout(() => {
+    if (!canceled) {
+      clearInterval(poll);
+      fail();
+    }
+  }, timeoutMs);
+
+  return counterWatcher;
+}
+
 function openModal({
   backdrop,
   modalTitle,
@@ -2481,7 +3037,23 @@ function openModal({
   const template = document.querySelector(templateSelector);
   if (!template) return { counterWatcher };
 
-  const resolvedTitle = title || 'Пункт';
+  let resolvedTitle = title || 'Пункт';
+
+  // Для подарков и оформления используем специальные заголовки
+  if (giftId) {
+    const isCustom = giftId.includes('custom');
+
+    if (templateSelector?.includes('icon')) {
+      resolvedTitle = isCustom ? 'Индивидуальная иконка' : `Иконка из коллекции (#${giftId})`;
+    } else if (templateSelector?.includes('badge')) {
+      resolvedTitle = isCustom ? 'Индивидуальная плашка' : `Плашка из коллекции (#${giftId})`;
+    } else if (templateSelector?.includes('bg')) {
+      resolvedTitle = isCustom ? 'Индивидуальный фон' : `Фон из коллекции (#${giftId})`;
+    } else if (templateSelector?.includes('gift')) {
+      resolvedTitle = `Подарок из коллекции (#${giftId})`;
+    }
+  }
+
   const resolvedAmountLabel = amountLabel || (kind === 'expense' ? 'Стоимость' : 'Начисление');
 
   modalTitle.textContent = resolvedTitle;
@@ -2590,6 +3162,18 @@ if (template.id === 'form-income-ams') {
   }
 }
 
+// === BONUSES, MASK, CLEAN: выбор получателя + количество + от кого + комментарий
+const bonusMaskCleanForms = [
+  'form-exp-bonus1d1', 'form-exp-bonus2d1',
+  'form-exp-bonus1w1', 'form-exp-bonus2w1',
+  'form-exp-bonus1m1', 'form-exp-bonus2m1',
+  'form-exp-bonus1m3', 'form-exp-bonus2m3',
+  'form-exp-mask', 'form-exp-clean'
+];
+if (bonusMaskCleanForms.includes(template.id)) {
+  counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: amount });
+}
+
 // === TRANSFER: «Перевод средств другому (комиссия)» — выбор пользователей + сумма с комиссией 10 галлеонов за каждого
 if (template.id === 'form-exp-transfer') {
   counterWatcher = setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TRANSFER_TIMEOUT_MS, data, modalAmount });
@@ -2616,6 +3200,29 @@ if (template.id === 'form-gift-present') {
     giftPrice1: config.giftPrice1,
     giftPrice5: config.giftPrice5
   });
+}
+
+// === DESIGN: Оформление (иконки, плашки, фоны) — как подарки ===
+const designForms = ['form-icon-custom', 'form-icon-present', 'form-badge-custom', 'form-badge-present', 'form-bg-custom', 'form-bg-present'];
+if (designForms.includes(template.id)) {
+  const isCustom = template.id.includes('custom');
+  counterWatcher = isCustom
+    ? setupCustomGiftFlow({
+        modalFields, btnSubmit, counterWatcher,
+        timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
+        giftId: config.giftId,
+        giftIcon: config.giftIcon,
+        giftPrice1: config.giftPrice1,
+        giftPrice5: config.giftPrice5
+      })
+    : setupGiftFlow({
+        modalFields, btnSubmit, counterWatcher,
+        timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
+        giftId: config.giftId,
+        giftIcon: config.giftIcon,
+        giftPrice1: config.giftPrice1,
+        giftPrice5: config.giftPrice5
+      });
 }
 
 // === BEST-EPISODE: «Эпизод полумесяца» — поведение как у анкеты ===

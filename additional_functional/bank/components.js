@@ -1,11 +1,43 @@
 // ============================================================================
 // components.js — UI и модальные функции
 // ============================================================================
+
+import {
+  COUNTER_POLL_INTERVAL_MS,
+  FORM_TIMEOUT_MS,
+  PROMO_TIMEOUT_MS,
+  NEEDED_TIMEOUT_MS,
+  TOPUP_TIMEOUT_MS,
+  AMS_TIMEOUT_MS,
+  TRANSFER_TIMEOUT_MS,
+  GIFT_TIMEOUT_MS,
+  BEST_EPISODE_TIMEOUT_MS,
+  BEST_POST_TIMEOUT_MS,
+  BEST_WRITER_TIMEOUT_MS,
+  BEST_ACTIVIST_TIMEOUT_MS,
+  FIRST_POST_TIMEOUT_MS,
+  PERSONAL_TIMEOUT_MS,
+  PLOT_TIMEOUT_MS,
+  ADS_TIMEOUT_MS,
+  counterConfigs,
+  counterPrefixMap
+} from './config.js';
+
+import {
+  formatNumber,
+  parseNumericAmount,
+  roundNewToAnchorDOM,
+  fullMonthsDiffVirtualDOM,
+  fmtYMD,
+  submissionGroups,
+  formatEntryKey
+} from './services.js';
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
-function cleanupCounterWatcher(counterWatcher, modalFields, form) {
+export function cleanupCounterWatcher(counterWatcher, modalFields, form) {
   if (counterWatcher && typeof counterWatcher.cancel === 'function') {
     counterWatcher.cancel();
   }
@@ -15,7 +47,7 @@ function cleanupCounterWatcher(counterWatcher, modalFields, form) {
   return counterWatcher;
 }
 
-function updateNote(modalFields, content, { error = false } = {}) {
+export function updateNote(modalFields, content, { error = false } = {}) {
   const note = modalFields.querySelector('.muted-note, .note-error') || modalFields.querySelector('.gift-note');
   if (!note) return null;
   const original = content;
@@ -32,7 +64,7 @@ function updateNote(modalFields, content, { error = false } = {}) {
   return note;
 }
 
-function setHiddenField(modalFields, name, value) {
+export function setHiddenField(modalFields, name, value) {
   let field = modalFields.querySelector(`input[type="hidden"][data-auto-field="${name}"]`);
   if (value === undefined || value === null || value === '') {
     if (field) field.remove();
@@ -52,7 +84,7 @@ function setHiddenField(modalFields, name, value) {
 // RENDER LOG
 // ============================================================================
 
-function renderLog(log) {
+export function renderLog(log) {
   log.innerHTML = '';
   if (!submissionGroups.length) {
     const empty = document.createElement('div');
@@ -894,7 +926,7 @@ function renderLog(log) {
 // ADMIN FLOWS
 // ============================================================================
 
-function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data }) {
+export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data }) {
   // 1) убрать лишние инфо-плашки из шаблона
   (() => {
     modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
@@ -1106,7 +1138,7 @@ function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, time
   return counterWatcher;
 }
 
-function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data }) {
+export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data }) {
   // удалить инфо-элементы
   (() => {
     modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
@@ -1304,7 +1336,7 @@ function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher,
   return counterWatcher;
 }
 
-function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false }) {
+export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false }) {
   // === 1) Удаляем дисклеймер и прочие инфо-элементы — у админа их быть НЕ должно ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info]')
     .forEach(el => el.remove());
@@ -1589,7 +1621,7 @@ function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs
 // SETUP TRANSFER FLOW - Перевод средств другому (комиссия)
 // ============================================================================
 
-function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount }) {
+export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount }) {
   // === 1) Удаляем существующие поля формы ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field')
     .forEach(el => el.remove());
@@ -1865,7 +1897,7 @@ function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, 
 // SETUP CUSTOM GIFT FLOW - Индивидуальные подарки
 // ============================================================================
 
-function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, giftPrice1, giftPrice5 }) {
+export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, giftPrice1, giftPrice5 }) {
   // Удаляем всё кроме дисклеймера
   modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
     .forEach(el => el.remove());
@@ -2246,7 +2278,7 @@ function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs
 // SETUP GIFT FLOW - Подарки
 // ============================================================================
 
-function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, giftPrice1, giftPrice5 }) {
+export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, giftPrice1, giftPrice5 }) {
   // === 1) Удаляем существующие поля формы ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
     .forEach(el => el.remove());
@@ -2615,7 +2647,7 @@ function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data
 // SETUP BONUS/MASK/CLEAN FLOW - Бонусы, Маска, Жилет
 // ============================================================================
 
-function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice }) {
+export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice }) {
   // === 1) Удаляем существующие поля формы ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
     .forEach(el => el.remove());
@@ -3007,7 +3039,7 @@ function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeo
   return counterWatcher;
 }
 
-function openModal({
+export function openModal({
   backdrop,
   modalTitle,
   modalFields,
@@ -4294,7 +4326,7 @@ if (template.id === 'form-income-flyer') {
 // CLOSE MODAL
 // ============================================================================
 
-function closeModal({ backdrop, form, modalFields, counterWatcher }) {
+export function closeModal({ backdrop, form, modalFields, counterWatcher }) {
   counterWatcher = cleanupCounterWatcher(counterWatcher, modalFields, form);
   backdrop.removeAttribute('open');
   backdrop.setAttribute('aria-hidden', 'true');

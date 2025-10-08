@@ -60,7 +60,7 @@ async function fetchProfileInfo(userId = window.UserID) {
 
   const firstSignedInt = (s) => {
     if (!s) return null;
-    // поддержка "1 234", "1 234", "1.234", "+123", "-45"
+    // поддержка "1 234", "1.234", "+123", "-45"
     const norm = s.replace(/[^\d+-]/g, ""); // оставляем цифры и знак
     const m = norm.match(/^[+-]?\d+/);
     return m ? Number(m[0]) : null;
@@ -85,17 +85,25 @@ async function fetchProfileInfo(userId = window.UserID) {
   const respectStr = txt("li#pa-respect strong");
   const positiveStr = txt("li#pa-positive strong");
   const messagesStr = txt("li#pa-posts strong");
+  const moneyStr = txt("li#pa-fld6 strong");
+
+  const moneyVal = (() => {
+    const n = firstSignedInt(moneyStr);
+    return Number.isFinite(n) ? n : 0;
+  })();
 
   const profile = {
     id: Number(userId),
     date: dateToArray(dateStr),                 // [yyyy, mm, dd] или null
     respect: firstSignedInt(respectStr),        // число или null
     positive: firstSignedInt(positiveStr),      // число или null
-    messages: parseMessages(messagesStr)        // число или null
+    messages: parseMessages(messagesStr),       // число или null
+    money: moneyVal                             // число или 0
   };
 
   return profile;
 }
+
 
 
 /**

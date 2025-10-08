@@ -193,7 +193,7 @@ export function renderLog(log) {
   if (!submissionGroups.length) {
     const empty = document.createElement('div');
     empty.className = 'log-empty';
-    empty.textContent = 'Пока нет сохранённых карточек.';
+    empty.textContent = 'Пока нет выбранных операций.';
     log.appendChild(empty);
     return;
   }

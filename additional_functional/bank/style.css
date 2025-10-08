@@ -334,7 +334,11 @@
       display: list-item;    
     }
     .entry-list .key { color: var(--muted);}
-    .entry-list a { color: var(--accent); text-decoration: underline; word-break: break-all; }
+    .entry-list a {
+      /* color: var(--accent);
+      text-decoration: underline; */
+      word-break: break-all;
+    }
     .entry-actions { display: flex; gap: 8px; }
     .entry-actions button {
       appearance: none;

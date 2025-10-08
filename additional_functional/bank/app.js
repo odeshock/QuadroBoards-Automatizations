@@ -6,6 +6,14 @@ import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, 
 import { renderLog, openModal, closeModal } from './components.js';
 import { injectTemplates } from './templates.js';
 import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems } from './data.js';
+import {
+  ADMIN_ALLOWED_ITEMS,
+  TEXT_MESSAGES,
+  FORM_GIFT_PRESENT,
+  FORM_GIFT_CUSTOM,
+  REGEX
+} from './constants.js';
+import { parseNumericAmount } from './utils.js';
 
 // ============================================================================
 // DOM REFERENCES
@@ -82,19 +90,6 @@ function handleCloseModal() {
 // ============================================================================
 // ADMIN ACCESS CONTROL
 // ============================================================================
-
-// Список пунктов, доступных для IS_ADMIN = true
-const ADMIN_ALLOWED_ITEMS = [
-  'Приём анкеты',
-  'Взятие акционного персонажа',
-  'Взятие нужного персонажа',
-  'Докупить кредиты',
-  'Постописец полумесяца',
-  'Пост полумесяца',
-  'Эпизод полумесяца',
-  'Активист полумесяца',
-  'Выдать денежку дополнительно'
-];
 
 function isItemAllowedForAdmin(titleText) {
   if (typeof window.IS_ADMIN === 'undefined' || !window.IS_ADMIN) {
@@ -234,13 +229,13 @@ log.addEventListener('click', (e) => {
     if (!entryId) return;
 
     // Подтверждение удаления
-    const confirmed = confirm('Вы уверены, что хотите удалить эту запись?');
+    const confirmed = confirm(TEXT_MESSAGES.CONFIRM_DELETE);
     if (!confirmed) return;
 
     const entryIndex = group.entries.findIndex((item) => item.id === entryId);
     if (entryIndex !== -1) {
-      const isGift = group.templateSelector === '#form-gift-present' ||
-                     /Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(group.title || '');
+      const isGift = group.templateSelector === FORM_GIFT_PRESENT ||
+                     REGEX.GIFT_TITLE.test(group.title || '');
 
       group.entries.splice(entryIndex, 1);
       if (!group.entries.length) {
@@ -296,7 +291,7 @@ form.addEventListener('submit', (e) => {
   const normalizedMultiplier = Number.isFinite(multiplierValue) && multiplierValue >= 0 ? multiplierValue : 1;
 
   // Для подарков всегда создаём новую группу (не группируем)
-  const isGift = meta.templateSelector === '#form-gift-present' || meta.templateSelector === '#form-gift-custom';
+  const isGift = meta.templateSelector === FORM_GIFT_PRESENT || meta.templateSelector === FORM_GIFT_CUSTOM;
 
   if (editingGroupId) {
     group = submissionGroups.find((item) => item.id === editingGroupId) || null;
@@ -385,7 +380,7 @@ function initializeAccessControl() {
       btn.classList.add('btn-disabled');
       btn.style.opacity = '0.3';
       btn.style.cursor = 'not-allowed';
-      btn.title = 'Недоступно для администратора';
+      btn.title = TEXT_MESSAGES.ADMIN_RESTRICTED;
     }
   });
 }

@@ -1,68 +1,100 @@
-// Данные для доходов, расходов и подарков
-// Режимы расчета:
+// ============================================================================
+// data.js — Данные для доходов, расходов и подарков
+// ============================================================================
+
+import {
+  FORM_INCOME_ANKETA, FORM_INCOME_AKCION, FORM_INCOME_NEEDCHAR, FORM_INCOME_NEEDREQUEST,
+  FORM_INCOME_FIRSTPOST, FORM_INCOME_PERSONALPOST, FORM_INCOME_PLOTPOST,
+  FORM_INCOME_EP_PERSONAL, FORM_INCOME_EP_PLOT, FORM_INCOME_100MSGS, FORM_INCOME_100REP,
+  FORM_INCOME_100POS, FORM_INCOME_MONTH, FORM_INCOME_FLYER, FORM_INCOME_CONTEST,
+  FORM_INCOME_AVATAR, FORM_INCOME_DESIGN_OTHER, FORM_INCOME_RUN_CONTEST, FORM_INCOME_MASTERING,
+  FORM_INCOME_RPGTOP, FORM_INCOME_BANNER_RENO, FORM_INCOME_BANNER_MAYAK,
+  FORM_INCOME_ACTIVIST, FORM_INCOME_WRITER, FORM_INCOME_EPISODE_OF, FORM_INCOME_POST_OF,
+  FORM_INCOME_TOPUP, FORM_INCOME_AMS,
+  FORM_EXP_FACE_1M, FORM_EXP_FACE_3M, FORM_EXP_FACE_6M,
+  FORM_EXP_CHAR_1M, FORM_EXP_CHAR_3M, FORM_EXP_CHAR_6M,
+  FORM_EXP_FACE_OWN_1M, FORM_EXP_FACE_OWN_3M, FORM_EXP_FACE_OWN_6M,
+  FORM_EXP_NEED_1W, FORM_EXP_NEED_2W, FORM_EXP_NEED_1M,
+  FORM_EXP_MASK, FORM_EXP_BONUS1D1, FORM_EXP_BONUS2D1, FORM_EXP_BONUS1W1, FORM_EXP_BONUS2W1,
+  FORM_EXP_BONUS1M1, FORM_EXP_BONUS2M1, FORM_EXP_BONUS1M3, FORM_EXP_BONUS2M3,
+  FORM_EXP_THIRDCHAR, FORM_EXP_CHANGECHAR, FORM_EXP_REFUSE, FORM_EXP_CLEAN, FORM_EXP_TRANSFER,
+  CALC_MODES
+} from './constants.js';
+
+// ============================================================================
+// РЕЖИМЫ РАСЧЕТА
+// ============================================================================
 // - price_per_item: итого = price × items
 // - price_per_item_w_bonus: итого = price × items + bonus × additional_items
 // - entered_amount: итого = sum(entered_amount), показ entered_amount у каждого получателя
 // - price_w_entered_amount: итого = sum(entered_amount) + price × items
 
+// ============================================================================
+// ДОХОДЫ
+// ============================================================================
+
 export const incomeItems = [
-  { title: 'Приём анкеты', amount: 'ч', price: 110, mode: 'price_per_item', form: '#form-income-anketa' },
-  { title: 'Взятие акционного персонажа', amount: 'ч', price: 60, mode: 'price_per_item', form: '#form-income-akcion' },
-  { title: 'Взятие нужного персонажа', amount: 'ч', price: 60, mode: 'price_per_item', form: '#form-income-needchar' },
-  { title: 'Размещение заявки на «нужного»', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-needrequest' },
-  { title: 'Первый пост на профиле', amount: 'ч', price: 100, mode: 'price_per_item', form: '#form-income-firstpost' },
-  { title: 'Личный пост', amount: 'ч', price: 5, bonus: 10, mode: 'price_per_item_w_bonus', form: '#form-income-personalpost' },
-  { title: 'Сюжетный пост', amount: 'ч', price: 20, bonus: 5, mode: 'price_per_item_w_bonus', form: '#form-income-plotpost' },
-  { title: 'Завершённый личный эпизод', amount: 'ч', price: 5, mode: 'price_per_item', form: '#form-income-ep-personal' },
-  { title: 'Завершённый сюжетный эпизод', amount: 'ч', price: 20, mode: 'price_per_item', form: '#form-income-ep-plot' },
-  { title: 'Каждые 100 сообщений', amount: 'ч', price: 400, mode: 'price_per_item', form: '#form-income-100msgs' },
-  { title: 'Каждые 100 репутации', amount: 'ч', price: 400, mode: 'price_per_item', form: '#form-income-100rep' },
-  { title: 'Каждые 100 позитива', amount: 'ч', price: 60, mode: 'price_per_item', form: '#form-income-100pos' },
-  { title: 'Каждый игровой месяц', amount: 'ч', price: 150, mode: 'price_per_item', form: '#form-income-month' },
-  { title: 'Каждая листовка', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-flyer' },
-  { title: 'Участие в конкурсе', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-contest' },
-  { title: 'Аватарка для галереи', amount: 'ч', price: 10, mode: 'price_per_item', form: '#form-income-avatar' },
-  { title: 'Другой дизайн для галереи', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-design-other' },
-  { title: 'Проведение конкурса', amount: 'ч', price: 50, mode: 'price_per_item', form: '#form-income-run-contest' },
-  { title: 'Мастеринг сюжета', amount: 'ч', price: 10, mode: 'price_per_item', form: '#form-income-mastering' },
-  { title: 'Голос в RPG-top (раз в неделю)', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-rpgtop' },
-  { title: 'Баннер FMV в подписи на Рено', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-banner-reno' },
-  { title: 'Баннер FMV в подписи на Маяке', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-income-banner-mayak' },
-  { title: 'Активист полумесяца', amount: 'ч', price: 80, mode: 'price_per_item', form: '#form-income-activist' },
-  { title: 'Постописец полумесяца', amount: 'ч', price: 80, mode: 'price_per_item', form: '#form-income-writer' },
-  { title: 'Эпизод полумесяца', amount: 'ч', price: 100, mode: 'price_per_item', form: '#form-income-episode-of' },
-  { title: 'Пост полумесяца', amount: 'ч', price: 50, mode: 'price_per_item', form: '#form-income-post-of' },
-  { title: 'Докупить кредиты', amount: 'ч', price: 0, mode: 'entered_amount', form: '#form-income-topup' },
-  { title: 'Выдать денежку дополнительно', amount: 'ч', price: 0, mode: 'entered_amount', form: '#form-income-ams' },
+  { title: 'Приём анкеты', amount: 'ч', price: 110, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_ANKETA },
+  { title: 'Взятие акционного персонажа', amount: 'ч', price: 60, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_AKCION },
+  { title: 'Взятие нужного персонажа', amount: 'ч', price: 60, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_NEEDCHAR },
+  { title: 'Размещение заявки на «нужного»', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_NEEDREQUEST },
+  { title: 'Первый пост на профиле', amount: 'ч', price: 100, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_FIRSTPOST },
+  { title: 'Личный пост', amount: 'ч', price: 5, bonus: 10, mode: CALC_MODES.PRICE_PER_ITEM_W_BONUS, form: FORM_INCOME_PERSONALPOST },
+  { title: 'Сюжетный пост', amount: 'ч', price: 20, bonus: 5, mode: CALC_MODES.PRICE_PER_ITEM_W_BONUS, form: FORM_INCOME_PLOTPOST },
+  { title: 'Завершённый личный эпизод', amount: 'ч', price: 5, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_EP_PERSONAL },
+  { title: 'Завершённый сюжетный эпизод', amount: 'ч', price: 20, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_EP_PLOT },
+  { title: 'Каждые 100 сообщений', amount: 'ч', price: 400, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_100MSGS },
+  { title: 'Каждые 100 репутации', amount: 'ч', price: 400, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_100REP },
+  { title: 'Каждые 100 позитива', amount: 'ч', price: 60, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_100POS },
+  { title: 'Каждый игровой месяц', amount: 'ч', price: 150, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_MONTH },
+  { title: 'Каждая листовка', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_FLYER },
+  { title: 'Участие в конкурсе', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_CONTEST },
+  { title: 'Аватарка для галереи', amount: 'ч', price: 10, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_AVATAR },
+  { title: 'Другой дизайн для галереи', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_DESIGN_OTHER },
+  { title: 'Проведение конкурса', amount: 'ч', price: 50, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_RUN_CONTEST },
+  { title: 'Мастеринг сюжета', amount: 'ч', price: 10, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_MASTERING },
+  { title: 'Голос в RPG-top (раз в неделю)', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_RPGTOP },
+  { title: 'Баннер FMV в подписи на Рено', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_BANNER_RENO },
+  { title: 'Баннер FMV в подписи на Маяке', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_BANNER_MAYAK },
+  { title: 'Активист полумесяца', amount: 'ч', price: 80, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_ACTIVIST },
+  { title: 'Постописец полумесяца', amount: 'ч', price: 80, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_WRITER },
+  { title: 'Эпизод полумесяца', amount: 'ч', price: 100, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_EPISODE_OF },
+  { title: 'Пост полумесяца', amount: 'ч', price: 50, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_POST_OF },
+  { title: 'Докупить кредиты', amount: 'ч', price: 0, mode: CALC_MODES.ENTERED_AMOUNT, form: FORM_INCOME_TOPUP },
+  { title: 'Выдать денежку дополнительно', amount: 'ч', price: 0, mode: CALC_MODES.ENTERED_AMOUNT, form: FORM_INCOME_AMS },
 ];
 
+// ============================================================================
+// РАСХОДЫ
+// ============================================================================
+
 export const expenseItems = [
-  { title: 'Выкуп внешности для заявки на 1 месяц', amount: 'ч', price: 140, mode: 'price_per_item', form: '#form-exp-face-1m' },
-  { title: 'Выкуп внешности для заявки на 3 месяца', amount: 'ч', price: 350, mode: 'price_per_item', form: '#form-exp-face-3m' },
-  { title: 'Выкуп внешности для заявки на 6 месяцев', amount: 'ч', price: 560, mode: 'price_per_item', form: '#form-exp-face-6m' },
-  { title: 'Выкуп персонажа для заявки на 1 месяц', amount: 'ч', price: 430, mode: 'price_per_item', form: '#form-exp-char-1m' },
-  { title: 'Выкуп персонажа для заявки на 3 месяца', amount: 'ч', price: 1075, mode: 'price_per_item', form: '#form-exp-char-3m' },
-  { title: 'Выкуп персонажа для заявки на 6 месяцев', amount: 'ч', price: 1720, mode: 'price_per_item', form: '#form-exp-char-6m' },
-  { title: 'Выкуп внешности для собственного пользования на 1 месяц', amount: 'ч', price: 70, mode: 'price_per_item', form: '#form-exp-face-own-1m' },
-  { title: 'Выкуп внешности для собственного пользования на 3 месяца', amount: 'ч', price: 175, mode: 'price_per_item', form: '#form-exp-face-own-3m' },
-  { title: 'Выкуп внешности для собственного пользования на 6 месяцев', amount: 'ч', price: 280, mode: 'price_per_item', form: '#form-exp-face-own-6m' },
-  { title: 'Выкуп места в шапке для одного нужного на 1 неделю', amount: 'ч', price: 20, mode: 'price_per_item', form: '#form-exp-need-1w' },
-  { title: 'Выкуп места в шапке для одного нужного на 2 недели', amount: 'ч', price: 30, mode: 'price_per_item', form: '#form-exp-need-2w' },
-  { title: 'Выкуп места в шапке для одного нужного на 1 месяц', amount: 'ч', price: 50, mode: 'price_per_item', form: '#form-exp-need-1m' },
-  { title: 'Маска-смена внешности', amount: 'ч', price: 80, mode: 'price_per_item', form: '#form-exp-mask' },
-  { title: 'Бонус +1 день к эпизоду (1 день)', amount: 'ч', price: 40, mode: 'price_per_item', form: '#form-exp-bonus1d1' },
-  { title: 'Бонус +2 дня к эпизоду (1 день)', amount: 'ч', price: 80, mode: 'price_per_item', form: '#form-exp-bonus2d1' },
-  { title: 'Бонус +1 день к эпизоду (1 неделя)', amount: 'ч', price: 190, mode: 'price_per_item', form: '#form-exp-bonus1w1' },
-  { title: 'Бонус +2 дня к эпизоду (1 неделя)', amount: 'ч', price: 380, mode: 'price_per_item', form: '#form-exp-bonus2w1' },
-  { title: 'Бонус +1 день к эпизоду (1 месяц)', amount: 'ч', price: 600, mode: 'price_per_item', form: '#form-exp-bonus1m1' },
-  { title: 'Бонус +2 дня к эпизоду (1 месяц)', amount: 'ч', price: 1200, mode: 'price_per_item', form: '#form-exp-bonus2m1' },
-  { title: 'Бонус +1 день к эпизоду (3 месяца)', amount: 'ч', price: 1500, mode: 'price_per_item', form: '#form-exp-bonus1m3' },
-  { title: 'Бонус +2 дня к эпизоду (3 месяца)', amount: 'ч', price: 3000, mode: 'price_per_item', form: '#form-exp-bonus2m3' },
-  { title: 'Третий персонаж', amount: 'ч', price: 150, mode: 'price_per_item', form: '#form-exp-thirdchar' },
-  { title: 'Смена персонажа', amount: 'ч', price: 120, mode: 'price_per_item', form: '#form-exp-changechar' },
-  { title: 'Отказ от персонажа', amount: 'ч', price: 100, mode: 'price_per_item', form: '#form-exp-refuse' },
-  { title: 'Спасительный жилет-билет от чистки', amount: 'ч', price: 55, mode: 'price_per_item', form: '#form-exp-clean' },
-  { title: 'Перевод средств другому (комиссия)', amount: 'ч', price: 10, mode: 'price_w_entered_amount', form: '#form-exp-transfer' }
+  { title: 'Выкуп внешности для заявки на 1 месяц', amount: 'ч', price: 140, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_FACE_1M },
+  { title: 'Выкуп внешности для заявки на 3 месяца', amount: 'ч', price: 350, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_FACE_3M },
+  { title: 'Выкуп внешности для заявки на 6 месяцев', amount: 'ч', price: 560, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_FACE_6M },
+  { title: 'Выкуп персонажа для заявки на 1 месяц', amount: 'ч', price: 430, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_CHAR_1M },
+  { title: 'Выкуп персонажа для заявки на 3 месяца', amount: 'ч', price: 1075, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_CHAR_3M },
+  { title: 'Выкуп персонажа для заявки на 6 месяцев', amount: 'ч', price: 1720, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_CHAR_6M },
+  { title: 'Выкуп внешности для собственного пользования на 1 месяц', amount: 'ч', price: 70, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_FACE_OWN_1M },
+  { title: 'Выкуп внешности для собственного пользования на 3 месяца', amount: 'ч', price: 175, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_FACE_OWN_3M },
+  { title: 'Выкуп внешности для собственного пользования на 6 месяцев', amount: 'ч', price: 280, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_FACE_OWN_6M },
+  { title: 'Выкуп места в шапке для одного нужного на 1 неделю', amount: 'ч', price: 20, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_NEED_1W },
+  { title: 'Выкуп места в шапке для одного нужного на 2 недели', amount: 'ч', price: 30, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_NEED_2W },
+  { title: 'Выкуп места в шапке для одного нужного на 1 месяц', amount: 'ч', price: 50, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_NEED_1M },
+  { title: 'Маска-смена внешности', amount: 'ч', price: 80, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_MASK },
+  { title: 'Бонус +1 день к эпизоду (1 день)', amount: 'ч', price: 40, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS1D1 },
+  { title: 'Бонус +2 дня к эпизоду (1 день)', amount: 'ч', price: 80, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS2D1 },
+  { title: 'Бонус +1 день к эпизоду (1 неделя)', amount: 'ч', price: 190, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS1W1 },
+  { title: 'Бонус +2 дня к эпизоду (1 неделя)', amount: 'ч', price: 380, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS2W1 },
+  { title: 'Бонус +1 день к эпизоду (1 месяц)', amount: 'ч', price: 600, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS1M1 },
+  { title: 'Бонус +2 дня к эпизоду (1 месяц)', amount: 'ч', price: 1200, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS2M1 },
+  { title: 'Бонус +1 день к эпизоду (3 месяца)', amount: 'ч', price: 1500, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS1M3 },
+  { title: 'Бонус +2 дня к эпизоду (3 месяца)', amount: 'ч', price: 3000, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_BONUS2M3 },
+  { title: 'Третий персонаж', amount: 'ч', price: 150, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_THIRDCHAR },
+  { title: 'Смена персонажа', amount: 'ч', price: 120, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_CHANGECHAR },
+  { title: 'Отказ от персонажа', amount: 'ч', price: 100, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_REFUSE },
+  { title: 'Спасительный жилет-билет от чистки', amount: 'ч', price: 55, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_EXP_CLEAN },
+  { title: 'Перевод средств другому (комиссия)', amount: 'ч', price: 10, mode: CALC_MODES.PRICE_W_ENTERED_AMOUNT, form: FORM_EXP_TRANSFER }
 ];
 
 export const giftItems = [

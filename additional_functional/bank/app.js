@@ -138,6 +138,11 @@ document.addEventListener('click', (e) => {
   const giftPrice1 = btn.getAttribute('data-gift-price-1');
   const giftPrice5 = btn.getAttribute('data-gift-price-5');
 
+  // Данные из data.js (price, bonus, mode)
+  const price = btn.getAttribute('data-price');
+  const bonus = btn.getAttribute('data-bonus');
+  const mode = btn.getAttribute('data-mode');
+
   const meta = {
     templateSelector: selector,
     title: titleText,
@@ -147,7 +152,10 @@ document.addEventListener('click', (e) => {
     giftId,
     giftIcon,
     giftPrice1,
-    giftPrice5
+    giftPrice5,
+    price: price !== null ? Number(price) : null,
+    bonus: bonus !== null ? Number(bonus) : null,
+    mode
   };
 
   const key = buildGroupKey(meta);
@@ -205,7 +213,7 @@ log.addEventListener('click', (e) => {
     handleOpenModal({
       templateSelector: group.templateSelector,
       title: group.title,
-      amount: group.baseAmount || group.amount,
+      amount: group.amount, // только для отображения
       kind: group.kind,
       amountLabel: group.amountLabel,
       giftPrice1: group.giftPrice1,
@@ -214,7 +222,10 @@ log.addEventListener('click', (e) => {
       giftIcon: editGiftIcon,
       data: entry.data,
       entryId: entry.id,
-      groupId: group.id
+      groupId: group.id,
+      price: group.price,
+      bonus: group.bonus,
+      mode: group.mode
     });
     return;
   }
@@ -261,28 +272,21 @@ form.addEventListener('submit', (e) => {
   const editingEntryId = form.dataset.editingId || null;
   const editingGroupId = form.dataset.groupId || null;
 
-  // Если есть quantity, умножаем amount
-  const quantity = obj.quantity ? Number(obj.quantity) : null;
-  const baseAmount = form.dataset.baseAmount || form.dataset.amount || '';
-  let finalAmount = baseAmount;
-
-  if (quantity && quantity >= 1) {
-    const baseAmountNum = parseFloat(baseAmount);
-    if (!isNaN(baseAmountNum)) {
-      finalAmount = String(baseAmountNum * quantity);
-    }
-  }
+  // amount используется только для отображения в UI
+  const displayAmount = form.dataset.amount || '';
 
   const meta = {
     templateSelector: form.dataset.templateSelector,
     title: form.dataset.title || modalTitle.textContent,
-    amount: finalAmount,
-    baseAmount: baseAmount,
+    amount: displayAmount, // только для отображения
     amountLabel: form.dataset.amountLabel || modalAmountLabel.textContent,
     kind: form.dataset.kind || '',
     giftPrice1: form.dataset.giftPrice1 || '',
     giftPrice5: form.dataset.giftPrice5 || '',
-    giftId: form.dataset.giftId || ''
+    giftId: form.dataset.giftId || '',
+    price: form.dataset.price ? Number(form.dataset.price) : null,
+    bonus: form.dataset.bonus ? Number(form.dataset.bonus) : null,
+    mode: form.dataset.mode || ''
   };
 
   const key = buildGroupKey(meta);
@@ -314,13 +318,15 @@ form.addEventListener('submit', (e) => {
     group.key = key;
     group.templateSelector = meta.templateSelector;
     group.title = meta.title;
-    group.amount = meta.amount;
-    group.baseAmount = meta.baseAmount;
+    group.amount = meta.amount; // только для отображения
     group.amountLabel = meta.amountLabel;
     group.kind = meta.kind;
     group.giftPrice1 = meta.giftPrice1;
     group.giftPrice5 = meta.giftPrice5;
     group.giftId = meta.giftId;
+    group.price = meta.price;
+    group.bonus = meta.bonus;
+    group.mode = meta.mode;
   }
 
   let entryRecord = null;
@@ -396,11 +402,22 @@ function renderIncomeList() {
     const div = document.createElement('div');
     div.className = 'item';
     div.setAttribute('role', 'listitem');
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-add';
+    btn.setAttribute('data-form', item.form);
+    btn.setAttribute('data-kind', 'income');
+    btn.setAttribute('data-amount', String(item.amount));
+    if (item.price !== undefined) btn.setAttribute('data-price', String(item.price));
+    if (item.bonus !== undefined) btn.setAttribute('data-bonus', String(item.bonus));
+    if (item.mode) btn.setAttribute('data-mode', item.mode);
+    btn.textContent = '+';
+
     div.innerHTML = `
       <div class="title">${item.title}</div>
       <div class="price">${item.amount}</div>
-      <button class="btn-add" data-form="${item.form}" data-kind="income" data-amount="${item.amount}">+</button>
     `;
+    div.appendChild(btn);
     container.appendChild(div);
   });
 }
@@ -413,11 +430,22 @@ function renderExpenseList() {
     const div = document.createElement('div');
     div.className = 'item';
     div.setAttribute('role', 'listitem');
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-add';
+    btn.setAttribute('data-form', item.form);
+    btn.setAttribute('data-kind', 'expense');
+    btn.setAttribute('data-amount', String(item.amount));
+    if (item.price !== undefined) btn.setAttribute('data-price', String(item.price));
+    if (item.bonus !== undefined) btn.setAttribute('data-bonus', String(item.bonus));
+    if (item.mode) btn.setAttribute('data-mode', item.mode);
+    btn.textContent = '+';
+
     div.innerHTML = `
       <div class="title">${item.title}</div>
       <div class="price">${item.amount}</div>
-      <button class="btn-add" data-form="${item.form}" data-kind="expense" data-amount="${item.amount}">+</button>
     `;
+    div.appendChild(btn);
     container.appendChild(div);
   });
 }

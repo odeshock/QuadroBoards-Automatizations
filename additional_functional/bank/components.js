@@ -37,6 +37,110 @@ import {
 // HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * Универсальная функция расчета стоимости на основе режима из data.js
+ * @param {string} mode - режим расчета ('price_per_item', 'price_per_item_w_bonus', 'entered_amount', 'price_w_entered_amount')
+ * @param {number} price - базовая цена за единицу
+ * @param {number} bonus - бонус за дополнительные единицы
+ * @param {number} items - количество основных единиц
+ * @param {number} additional_items - количество дополнительных единиц
+ * @param {number} entered_amount - введенная сумма
+ * @returns {number} итоговая стоимость
+ */
+export function calculateCost(mode, price, bonus = 0, items = 0, additional_items = 0, entered_amount = 0) {
+  switch (mode) {
+    case 'price_per_item':
+      // итого = price × items
+      return price * items;
+
+    case 'price_per_item_w_bonus':
+      // итого = price × items + bonus × additional_items
+      return price * items + bonus * additional_items;
+
+    case 'entered_amount':
+      // итого = sum(entered_amount)
+      return entered_amount;
+
+    case 'price_w_entered_amount':
+      // итого = sum(entered_amount) + price × items
+      return entered_amount + price * items;
+
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Универсальная функция для форматированного отображения расчета стоимости в modalAmount
+ * @param {string} mode - режим расчета
+ * @param {number} price - базовая цена за единицу
+ * @param {number} bonus - бонус за дополнительные единицы
+ * @param {number} items - количество основных единиц
+ * @param {number} additional_items - количество дополнительных единиц
+ * @param {number} entered_amount - введенная сумма
+ * @returns {string} форматированная строка для отображения
+ */
+export function formatCostDisplay(mode, price, bonus = 0, items = 0, additional_items = 0, entered_amount = 0) {
+  const total = calculateCost(mode, price, bonus, items, additional_items, entered_amount);
+
+  switch (mode) {
+    case 'price_per_item':
+      // Формат: "price × items = total"
+      if (items === 0) return '';
+      if (items === 1) return formatNumber(total);
+      return `${formatNumber(price)} × ${items} = ${formatNumber(total)}`;
+
+    case 'price_per_item_w_bonus':
+      // Формат: "price × items + bonus × additional_items = total"
+      if (items === 0 && additional_items === 0) return '';
+      if (additional_items === 0) {
+        if (items === 1) return formatNumber(total);
+        return `${formatNumber(price)} × ${items} = ${formatNumber(total)}`;
+      }
+      return `${formatNumber(price)} × ${items} + ${formatNumber(bonus)} × ${additional_items} = ${formatNumber(total)}`;
+
+    case 'entered_amount':
+      // Формат: просто сумма
+      if (entered_amount === 0) return '';
+      return formatNumber(entered_amount);
+
+    case 'price_w_entered_amount':
+      // Формат: "entered_amount + price × items = total"
+      if (entered_amount === 0 && items === 0) return '';
+      if (items === 0) return formatNumber(entered_amount);
+      return `${formatNumber(entered_amount)} + ${formatNumber(price)} × ${items} = ${formatNumber(total)}`;
+
+    default:
+      return '';
+  }
+}
+
+/**
+ * Универсальная функция для обновления modalAmount на основе mode и данных формы
+ * @param {HTMLElement} modalAmount - элемент для отображения стоимости
+ * @param {HTMLFormElement} form - форма с dataset
+ * @param {Object} params - параметры для расчета
+ * @param {number} params.items - количество основных единиц
+ * @param {number} params.additional_items - количество дополнительных единиц
+ * @param {number} params.entered_amount - введенная сумма
+ */
+export function updateModalAmount(modalAmount, form, params = {}) {
+  const mode = form.dataset.mode || '';
+  const price = Number(form.dataset.price) || 0;
+  const bonus = Number(form.dataset.bonus) || 0;
+
+  const { items = 0, additional_items = 0, entered_amount = 0 } = params;
+
+  // Если mode не указан, показываем базовый amount
+  if (!mode) {
+    modalAmount.textContent = form.dataset.amount || '';
+    return;
+  }
+
+  const displayText = formatCostDisplay(mode, price, bonus, items, additional_items, entered_amount);
+  modalAmount.textContent = displayText;
+}
+
 export function cleanupCounterWatcher(counterWatcher, modalFields, form) {
   if (counterWatcher && typeof counterWatcher.cancel === 'function') {
     counterWatcher.cancel();
@@ -177,11 +281,12 @@ export function renderLog(log) {
       const meta = document.createElement('span');
       meta.className = 'entry-meta';
 
-      // формат "фикс + xнадбавка" (например "5 + x10")
+      // формат "фикс + xнадбавка" (например "5 + x10") или используем mode
       const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
-      if (m) {
-        const fix = Number(m[1]);
-        const bonus = Number(m[2]);
+      if (m || group.mode === 'price_per_item_w_bonus') {
+        // Берем price и bonus из group или парсим из amount
+        const price = group.price !== null && group.price !== undefined ? Number(group.price) : (m ? Number(m[1]) : 0);
+        const bonus = group.bonus !== null && group.bonus !== undefined ? Number(group.bonus) : (m ? Number(m[2]) : 0);
 
         // суммируем по всем записям группы
         let totalCount = 0;
@@ -218,8 +323,9 @@ export function renderLog(log) {
           }
         });
 
-        const total = fix * totalCount + bonus * totalThousands;
-        meta.textContent = `${group.amountLabel}: ${total.toLocaleString('ru-RU')}`;
+        // Используем calculateCost для получения только итоговой суммы
+        const total = calculateCost('price_per_item_w_bonus', price, bonus, totalCount, totalThousands, 0);
+        meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
         header.appendChild(meta);
       } else if (group.templateSelector === '#form-exp-transfer' || /Перевод средств другому/i.test(group.title || '')) {
         // Специальная логика для переводов: сумма + комиссия
@@ -243,11 +349,10 @@ export function renderLog(log) {
           });
         });
 
-        const commission = recipientCount * 10;
-        const totalCost = totalAmount + commission;
-
+        // Используем calculateCost для получения только итоговой суммы
         if (recipientCount > 0) {
-          meta.textContent = `${group.amountLabel}: ${formatNumber(totalCost)}`;
+          const total = calculateCost('price_w_entered_amount', 10, 0, recipientCount, 0, totalAmount);
+          meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
         } else {
           meta.textContent = `${group.amountLabel}: ${group.amount}`;
         }
@@ -280,13 +385,17 @@ export function renderLog(log) {
           totalGifts += idxs.filter(idx => String(dataObj[`recipient_${idx}`] || '').trim()).length;
         });
 
-        const totalCost = giftPrice1 * totalGifts;
-        meta.textContent = `${group.amountLabel}: ${formatNumber(totalCost > 0 ? totalCost : group.amount)}`;
+        // Используем calculateCost для получения только итоговой суммы
+        if (totalGifts > 0) {
+          const total = calculateCost('price_per_item', giftPrice1, 0, totalGifts, 0, 0);
+          meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+        } else {
+          meta.textContent = `${group.amountLabel}: ${group.amount}`;
+        }
         header.appendChild(meta);
       } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
         // Бонусы/Маска/Жилет: базовая цена × сумма всех quantity
         let totalQuantity = 0;
-        const basePrice = parseNumericAmount(group.amount) || 0;
 
         group.entries.forEach((item) => {
           const dataObj = item.data || {};
@@ -301,18 +410,43 @@ export function renderLog(log) {
           });
         });
 
-        const totalCost = basePrice * totalQuantity;
-        meta.textContent = `${group.amountLabel}: ${formatNumber(totalCost > 0 ? totalCost : group.amount)}`;
-        header.appendChild(meta);
-      } else {
-        // обычное число/строка
-        const amountNumber = parseNumericAmount(group.amount);
-        if (amountNumber !== null) {
-          const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
-          const total = amountNumber * multiplier;
+        // Используем calculateCost для получения только итоговой суммы
+        const mode = group.mode || 'price_per_item';
+        const price = group.price !== null && group.price !== undefined ? Number(group.price) : (parseNumericAmount(group.amount) || 0);
+
+        if (totalQuantity > 0) {
+          const total = calculateCost(mode, price, 0, totalQuantity, 0, 0);
           meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
         } else {
           meta.textContent = `${group.amountLabel}: ${group.amount}`;
+        }
+        header.appendChild(meta);
+      } else {
+        // Используем mode для расчета стоимости
+        const mode = group.mode;
+        const price = group.price !== null && group.price !== undefined ? Number(group.price) : null;
+        const bonus = group.bonus !== null && group.bonus !== undefined ? Number(group.bonus) : null;
+
+        if (mode && price !== null) {
+          // Для mode='price_per_item' используем totalEntryMultiplier как items
+          if (mode === 'price_per_item') {
+            const items = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+            const total = calculateCost(mode, price, bonus || 0, items, 0, 0);
+            meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+          } else {
+            // Для других режимов пока показываем просто amount
+            meta.textContent = `${group.amountLabel}: ${group.amount}`;
+          }
+        } else {
+          // Старая логика для форм без mode (обратная совместимость)
+          const amountNumber = parseNumericAmount(group.amount);
+          if (amountNumber !== null) {
+            const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+            const total = amountNumber * multiplier;
+            meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+          } else {
+            meta.textContent = `${group.amountLabel}: ${group.amount}`;
+          }
         }
         header.appendChild(meta);
       }
@@ -1647,18 +1781,20 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
       }
     }
 
-    const commission = count * 10;
-    const totalCost = totalAmount + commission;
-
     if (modalAmount) {
       if (count > 0) {
-        // Формат: "сумма чисел + 10 x количество = итого"
-        modalAmount.textContent = `${formatNumber(totalAmount)} + 10 × ${count} = ${formatNumber(totalCost)}`;
+        // Используем режим 'price_w_entered_amount': entered_amount + price × items
+        updateModalAmount(modalAmount, { dataset: { mode: 'price_w_entered_amount', price: '10', bonus: '0' } }, {
+          items: count,
+          entered_amount: totalAmount
+        });
       } else {
         modalAmount.textContent = '';
       }
     }
 
+    const commission = count * 10;
+    const totalCost = totalAmount + commission;
     return { totalAmount, commission, totalCost, count };
   };
 
@@ -1921,16 +2057,16 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
   const updateTotalCost = (giftGroups) => {
     const totalCount = giftGroups.length;
     const price1 = Number.parseInt(giftPrice1, 10) || 100;
-    const totalCost = price1 * totalCount;
 
     if (modalAmount) {
       if (totalCount > 0) {
-        modalAmount.textContent = `${price1} × ${totalCount} = ${formatNumber(totalCost)}`;
+        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price1), bonus: '0' } }, { items: totalCount });
       } else {
         modalAmount.textContent = '';
       }
     }
 
+    const totalCost = price1 * totalCount;
     return { totalCount, totalCost };
   };
 
@@ -2294,16 +2430,16 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
   const updateTotalCost = (giftGroups) => {
     const totalCount = giftGroups.length;
     const price1 = Number.parseInt(giftPrice1, 10) || 60;
-    const totalCost = price1 * totalCount;
 
     if (modalAmount) {
       if (totalCount > 0) {
-        modalAmount.textContent = `${price1} × ${totalCount} = ${formatNumber(totalCost)}`;
+        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price1), bonus: '0' } }, { items: totalCount });
       } else {
         modalAmount.textContent = '';
       }
     }
 
+    const totalCost = price1 * totalCount;
     return { totalCount, totalCost };
   };
 
@@ -2714,10 +2850,9 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
         totalQuantity += qty;
       });
 
-      const totalCost = price * totalQuantity;
       if (modalAmount) {
         if (totalQuantity > 0) {
-          modalAmount.textContent = `${price} × ${totalQuantity} = ${formatNumber(totalCost)}`;
+          updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } }, { items: totalQuantity });
         } else {
           modalAmount.textContent = '';
         }
@@ -3018,7 +3153,10 @@ export function openModal({
     giftIcon,
     data = null,
     entryId = null,
-    groupId = null
+    groupId = null,
+    price = null,
+    bonus = null,
+    mode = null
   } = config;
 
   const template = document.querySelector(templateSelector);
@@ -3044,19 +3182,55 @@ export function openModal({
   const resolvedAmountLabel = amountLabel || (kind === 'expense' ? 'Стоимость' : 'Начисление');
 
   modalTitle.textContent = resolvedTitle;
-  modalAmount.textContent = amount || '';
   modalAmountLabel.textContent = resolvedAmountLabel;
 
   form.dataset.templateSelector = templateSelector;
   form.dataset.kind = kind || '';
-  form.dataset.amount = amount || '';
-  form.dataset.baseAmount = amount || '';
+  form.dataset.amount = amount || ''; // только для отображения в modalAmount при открытии
   form.dataset.amountLabel = resolvedAmountLabel;
   form.dataset.title = resolvedTitle;
   form.dataset.giftPrice1 = giftPrice1 || '';
   form.dataset.giftPrice5 = giftPrice5 || '';
   form.dataset.giftId = giftId || '';
   form.dataset.giftIcon = giftIcon || '';
+  form.dataset.price = price !== null ? String(price) : '';
+  form.dataset.bonus = bonus !== null ? String(bonus) : '';
+  form.dataset.mode = mode || '';
+
+  // Для форм с mode сразу показываем правильный расчет
+  // Для форм без mode показываем amount (будет обновлено специфичной логикой)
+  if (mode && price !== null) {
+    // Определяем начальное количество items
+    let initialItems = 0;
+
+    // Для форм с quantity по умолчанию items=1 (будет взято из input)
+    const hasQuantityField = templateSelector?.includes('exp-face') ||
+                             templateSelector?.includes('exp-char') ||
+                             templateSelector?.includes('exp-need');
+
+    if (hasQuantityField) {
+      initialItems = 1;
+    }
+
+    // Для форм с получателями (бонусы, маска, жилет, подарки) показываем базовую цену
+    const hasRecipientField = templateSelector?.includes('bonus') ||
+                              templateSelector?.includes('mask') ||
+                              templateSelector?.includes('clean') ||
+                              templateSelector?.includes('gift') ||
+                              templateSelector?.includes('icon') ||
+                              templateSelector?.includes('badge') ||
+                              templateSelector?.includes('bg');
+
+    if (initialItems === 0 && hasRecipientField) {
+      // Показываем просто price за единицу
+      modalAmount.textContent = formatNumber(price);
+    } else {
+      updateModalAmount(modalAmount, form, { items: initialItems });
+    }
+  } else {
+    modalAmount.textContent = amount || '';
+  }
+
   if (entryId) {
     form.dataset.editingId = entryId;
   } else {
@@ -3347,16 +3521,14 @@ if (template.id === 'form-income-personalpost') {
 
   // 2) Теперь формируем блок "Система подсчета" и вставляем его ПЕРЕД waitEl
   (() => {
-    const raw = form.dataset.amount || '5 + x10';
-    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
-    const fix = m ? Number(m[1]) : 5;
-    const bonus = m ? Number(m[2]) : 10;
+    const price = Number(form.dataset.price) || 5;
+    const bonus = Number(form.dataset.bonus) || 10;
 
     const info = document.createElement('div');
     info.className = 'calc-info';
     info.innerHTML =
       `<strong>Система подсчета:</strong><br>
-      — фиксированная выплата за пост — ${fix},<br>
+      — фиксированная выплата за пост — ${price},<br>
       — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`;
 
     if (waitEl && waitEl.parentNode) {
@@ -3381,16 +3553,11 @@ if (template.id === 'form-income-personalpost') {
   counterWatcher = { cancel };
 
   const setSummary = (count, thousandsSum) => {
-    // amount для пункта "Личный пост" = "5 + x10" в разметке (фикс 5, надбавка 10).
-    // Заберём числа из form.dataset.amount на всякий случай:
-    const raw = form.dataset.amount || '5 + x10';
-    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
-    const fix = m ? Number(m[1]) : 5;
-    const bonus = m ? Number(m[2]) : 10;
-
-    const total = fix * count + bonus * thousandsSum;
     modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
-    modalAmount.textContent = `${fix} x ${count} + ${bonus} x ${thousandsSum} = ${total.toLocaleString('ru-RU')}`;
+    updateModalAmount(modalAmount, form, {
+      items: count,
+      additional_items: thousandsSum
+    });
   };
 
   const fail = () => {
@@ -3487,18 +3654,16 @@ if (template.id === 'form-income-plotpost') {
   // якорь "подождите..."
   const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
 
-  // Пояснение «Система подсчёта» — берём числа из data-amount (в HTML: "20 + x5")
+  // Пояснение «Система подсчёта»
   (() => {
-    const raw = form.dataset.amount || '20 + x5';
-    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
-    const fix = m ? Number(m[1]) : 20;
-    const bonus = m ? Number(m[2]) : 5;
+    const price = Number(form.dataset.price) || 20;
+    const bonus = Number(form.dataset.bonus) || 5;
 
     const info = document.createElement('div');
     info.className = 'calc-info';
     info.innerHTML =
       `<strong>Система подсчета:</strong><br>
-      — фиксированная выплата за пост — ${fix},<br>
+      — фиксированная выплата за пост — ${price},<br>
       — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`;
 
     if (waitEl && waitEl.parentNode) {
@@ -3522,14 +3687,11 @@ if (template.id === 'form-income-plotpost') {
   counterWatcher = { cancel };
 
   const setSummary = (count, thousandsSumCapped) => {
-    // "20 + x5" из HTML разметки для «Сюжетный пост»
-    const raw = form.dataset.amount || '20 + x5';
-    const m = raw.match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
-    const fix = m ? Number(m[1]) : 20;
-    const bonus = m ? Number(m[2]) : 5;
-    const total = fix * count + bonus * thousandsSumCapped;
     modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
-    modalAmount.textContent = `${fix} x ${count} + ${bonus} x ${thousandsSumCapped} = ${total.toLocaleString('ru-RU')}`;
+    updateModalAmount(modalAmount, form, {
+      items: count,
+      additional_items: thousandsSumCapped
+    });
   };
 
   const fail = () => {
@@ -3641,9 +3803,18 @@ if (template.id === 'form-income-flyer') {
   };
 
   const updateAmountSummary = (multiplier) => {
+    form.dataset.currentMultiplier = String(multiplier);
+
+    // Для форм с mode используем новую универсальную функцию
+    const mode = form.dataset.mode;
+    if (mode === 'price_per_item' && form.dataset.price) {
+      updateModalAmount(modalAmount, form, { items: multiplier });
+      return;
+    }
+
+    // Старая логика для форм без mode
     const amountRaw = amount || '';
     const amountNumber = parseNumericAmount(amountRaw);
-    form.dataset.currentMultiplier = String(multiplier);
     if (amountNumber === null) {
       modalAmount.textContent = amountRaw;
       return;
@@ -3803,6 +3974,15 @@ if (template.id === 'form-income-flyer') {
     modalAmountLabel.textContent = resolvedAmountLabel;
     const multiplier = multiplierOverride !== null ? multiplierOverride : computeMultiplier();
     form.dataset.currentMultiplier = String(multiplier);
+
+    // Для форм с mode используем новую универсальную функцию
+    const mode = form.dataset.mode;
+    if (mode === 'price_per_item' && form.dataset.price) {
+      updateModalAmount(modalAmount, form, { items: multiplier });
+      return;
+    }
+
+    // Старая логика для форм без mode
     if (amountNumber === null) {
       modalAmount.textContent = amountRaw;
       return;
@@ -4262,14 +4442,27 @@ if (template.id === 'form-income-flyer') {
 
   // Пересчет для форм с quantity (после восстановления data)
   const quantityInput = modalFields.querySelector('input[name="quantity"]');
-  if (quantityInput && amountNumber !== null) {
-    const updateQuantityAmount = () => {
-      const qty = Number(quantityInput.value) || 1;
-      const total = amountNumber * qty;
-      modalAmount.textContent = `${formatNumber(amountNumber)} × ${qty} = ${formatNumber(total)}`;
-    };
-    quantityInput.addEventListener('input', updateQuantityAmount);
-    updateQuantityAmount();
+  if (quantityInput) {
+    const mode = form.dataset.mode;
+
+    // Для форм с mode используем универсальную функцию
+    if (mode === 'price_per_item') {
+      const updateQuantityAmount = () => {
+        const qty = Number(quantityInput.value) || 1;
+        updateModalAmount(modalAmount, form, { items: qty });
+      };
+      quantityInput.addEventListener('input', updateQuantityAmount);
+      updateQuantityAmount();
+    } else if (amountNumber !== null) {
+      // Старая логика для форм без mode (для обратной совместимости)
+      const updateQuantityAmount = () => {
+        const qty = Number(quantityInput.value) || 1;
+        const total = amountNumber * qty;
+        modalAmount.textContent = `${formatNumber(amountNumber)} × ${qty} = ${formatNumber(total)}`;
+      };
+      quantityInput.addEventListener('input', updateQuantityAmount);
+      updateQuantityAmount();
+    }
   }
 
   backdrop.setAttribute('open', '');
@@ -4296,5 +4489,8 @@ export function closeModal({ backdrop, form, modalFields, counterWatcher }) {
   delete form.dataset.editingId;
   delete form.dataset.groupId;
   delete form.dataset.currentMultiplier;
+  delete form.dataset.price;
+  delete form.dataset.bonus;
+  delete form.dataset.mode;
   return counterWatcher;
 }

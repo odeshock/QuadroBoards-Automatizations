@@ -1,9 +1,9 @@
 // Шаблоны модальных окон
 export const formTemplates = {
   // ДОХОДЫ (info)
-  'form-income-anketa': '<div class="info">Начисление производит администратор при приеме анкеты. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
-  'form-income-akcion': '<div class="info">Начисление производит администратор при приеме анкеты. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
-  'form-income-needchar': '<div class="info">Начисление производит администратор при приеме анкеты. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  'form-income-anketa': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  'form-income-akcion': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  'form-income-needchar': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
   'form-income-firstpost': '<div class="info">За вас все посчитает скрипт, просто дайте ему время. Если у вас возникнут вопросы по подсчету или что-то окажется не учтено, пожалуйста, напишите в Приемную — мы обязательно поможем.</div><p class="muted-note">Пожалуйста, подождите...</p>',
   'form-income-personalpost': '<div class="info">За вас все посчитает скрипт, просто дайте ему время. Если у вас возникнут вопросы по подсчету или что-то окажется не учтено, пожалуйста, напишите в Приемную — мы обязательно поможем.</div><p class="muted-note">Пожалуйста, подождите...</p>',
   'form-income-plotpost': '<div class="info">За вас все посчитает скрипт, просто дайте ему время. Если у вас возникнут вопросы по подсчету или что-то окажется не учтено, пожалуйста, напишите в Приемную — мы обязательно поможем.</div><p class="muted-note">Пожалуйста, подождите...</p>',
@@ -14,11 +14,11 @@ export const formTemplates = {
   'form-income-flyer': '<div class="info">За вас все посчитает скрипт, просто дайте ему время. Если у вас возникнут вопросы по подсчету или что-то окажется не учтено, пожалуйста, напишите в Приемную — мы обязательно поможем.</div><p class="muted-note">Пожалуйста, подождите...</p>',
   'form-income-topup': '<div class="info">Начисление производит администратор 1го и 16го числа каждого месяца. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div>',
   'form-income-ams': '<div class="info">Начисление в частных случаях по потребности производит администратор.</div>',
-  'form-income-writer': '<div class="info">Начисление производит администратор после публикации соответствующей новости. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
-  'form-income-post-of': '<div class="info">Начисление производит администратор после публикации соответствующей новости. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
-  'form-income-episode-of': '<div class="info">Начисление производит администратор после публикации соответствующей новости. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
-  'form-income-activist': '<div class="info">Начисление производит администратор после публикации соответствующей новости. Если вам случайно забыли начислить, пожалуйста, напишите в Приемную — мы обязательно разберемся.</div><p class="muted-note"></p>',
-
+  'form-income-writer': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  'form-income-post-of': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  'form-income-episode-of': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  'form-income-activist': '<div class="info">Начисление производит администратор при приёме анкеты. Если Вам случайно забыли начислить, пожалуйста, напишите в Приёмную — мы обязательно разберемся.</div><p class="muted-note"></p>',
+  
   // ДОХОДЫ (формы)
   'form-income-needrequest': '<div class="grid-2"><div class="field"><label for="need-link">Ссылка на «нужного»</label><input id="need-link" name="need" type="url" required></div></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="need">+ Еще</button></div>',
   'form-income-ep-personal': '<div class="grid-2"><div class="field"><label for="ep-link">Ссылка на эпизод</label><input id="ep-link" name="ep" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="ep">+ Еще</button></div></div>',
@@ -28,8 +28,8 @@ export const formTemplates = {
   'form-income-design-other': '<div class="info">Учитываются только работы, опубликованные в графической теме. Если несколько работ выложено в одном комментарии, укажите этот комментарий несколько раз. Если выложено несколько версий одной работы с минимальными различиями, учитывается только одна из них.</div><div class="field"><label for="do-link">Ссылка на граф.тему *</label><input id="do-link" name="link" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на граф.тему" data-extra-start="2">+ Еще</button></div>',
   'form-income-run-contest': '<div class="field"><label for="rc">Ссылка на конкурс *</label><input id="rc" name="contest" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на конкурс" data-extra-start="2">+ Еще</button></div>',
   'form-income-mastering': '<div class="field"><label for="ms">Ссылка на эпизод *</label><input id="ms" name="ep" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на эпизод" data-extra-start="2">+ Еще</button></div>',
-  'form-income-banner-reno': '<div class="field"><label for="reno">Ссылка на скрин</label><input id="reno" name="profile" type="url" required></div>',
-  'form-income-banner-mayak': '<div class="field"><label for="mayak">Ссылка на скрин</label><input id="mayak" name="profile" type="url" required></div>',
+  'form-income-banner-reno': '<div class="field"><label for="reno">Ссылка на скрин</label><input id="reno" name="url" type="url" required></div>',
+  'form-income-banner-mayak': '<div class="field"><label for="mayak">Ссылка на скрин</label><input id="mayak" name="url" type="url" required></div>',
   'form-income-rpgtop': '<div class="info">Загрузите свои скриншоты в «Мои загрузки» и вставьте ссылки на них сюда.</div><div class="grid-2"><div class="field"><label for="need-link">Ссылка на скрин</label><input id="need-link" name="need" type="url" required></div></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="need">+ Еще</button></div>',
 
   // РАСХОДЫ
@@ -63,9 +63,9 @@ export const formTemplates = {
   'form-exp-bonus1m3': '<div class="info">Можете выбрать себя или другого игрока</div><p class="muted-note">Пожалуйста, подождите...</p>',
   'form-exp-bonus2m3': '<div class="info">Можете выбрать себя или другого игрока</div><p class="muted-note">Пожалуйста, подождите...</p>',
 
-  'form-exp-thirdchar': '<div class="info">Предварительно согласуйте в Приемной и приложите ссылку на комментарий</div><div class="field"><label for="tc-link">Ссылка на комментарий *</label><input id="tc-link" name="link" type="url" required></div>',
-  'form-exp-changechar': '<div class="field"><label for="new">Имя нового персонажа на английском *</label><input id="new" name="reason" type="text" required></div>',
-  'form-exp-refuse': '<div class="info">Если у вас несколько профилей, останется только один</div><div class="field"><label for="rf-r">Комментарий *</label><textarea id="rf-r" name="reason" required placeholder="Укажите, какой фантастической тварью Вы хотите стать и, если у вас несколько профилей, какой один оставить."></textarea></div>',
+  'form-exp-thirdchar': '<div class="info">Предварительно согласуйте в Приемной и приложите ссылку на комментарий</div><div class="field"><label for="tc-link">Ссылка на комментарий *</label><input id="tc-link" name="url" type="url" required></div>',
+  'form-exp-changechar': '<div class="field"><label for="new">Имя нового персонажа на английском *</label><input id="new" name="text" type="text" required></div>',
+  'form-exp-refuse': '<div class="info">Если у вас несколько профилей, останется только один</div><div class="field"><label for="rf-r">Комментарий *</label><textarea id="rf-r" name="comment" required placeholder="Укажите, какой фантастической тварью Вы хотите стать и, если у вас несколько профилей, какой один оставить."></textarea></div>',
   'form-exp-clean': '<div class="info">Можете выбрать себя или другого игрока</div><p class="muted-note">Пожалуйста, подождите...</p>',
   'form-exp-transfer': '<div class="grid-2"><div class="field"><label for="tr-to">Кому перевод *</label><input id="tr-to" name="to" type="text" required></div><div class="field"><label for="tr-sum">Сумма перевода *</label><input id="tr-sum" name="amount" type="number" min="1" required></div></div>',
 

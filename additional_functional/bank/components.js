@@ -678,7 +678,7 @@ export function renderLog(log) {
 
       // ===== Определяем тип формы для правильного рендеринга =====
       const tid = item.template_id;
-      const BASE_URL = 'https://fmv-forum.ru/forum';
+      const BASE_URL = 'http://followmyvoice.rusff.me/';
 
       // Группа 1: Формы с получателями (листом)
       const group1Templates = [

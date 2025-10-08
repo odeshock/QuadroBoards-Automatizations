@@ -99,27 +99,31 @@ export const expenseItems = [
 
 export const giftItems = [
   { id: 'custom', icon: '✨', title: 'Индивидуальный подарок', price1: 100, price5: 400 },
-  { id: '1', icon: '<img src="https://i.ibb.co/3cHvbLW/piksy.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
-  { id: '2', icon: '<img src="https://i.ibb.co/njG4qpB/animsl2.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
-  { id: '3', icon: '<img src="https://i.ibb.co/4265yGb/Thunderbird1.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
-  { id: '4', icon: '<img src="https://i.ibb.co/pRkBCwq/Hippogriff11.png">', title: 'Подарить подарок', price1: 60, price5: 140 }
+  { id: '1', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/999003.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
+  { id: '2', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/427793.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
+  { id: '3', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/899654.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
+  { id: '4', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/772108.png">', title: 'Подарить подарок', price1: 60, price5: 140 }
 ];
 
 export const iconItems = [
   { id: 'icon-custom', icon: '✨', title: 'Индивидуальная иконка', price1: 120, price5: 480 },
   { id: '1', icon: '<img class="icon" src="https://static.thenounproject.com/png/2185221-200.png">', title: 'Иконка 1', price1: 30, price5: 70 },
   { id: '2', icon: '<img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png">', title: 'Иконка 1', price1: 30, price5: 70 },
+  { id: '3', icon: '<img class="icon" src="https://upforme.ru/uploads/001c/8a/af/3/35168.png">', title: 'Иконка 1', price1: 30, price5: 70 },
 ];
 
 export const badgeItems = [
   { id: 'badge-custom', icon: '✨', title: 'Индивидуальная плашка', price1: 190, price5: 760 },
-  { id: 'badge-1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
-  { id: 'badge-2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
-  { id: 'badge-3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
-  { id: 'badge-4', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 }
+  { id: '1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
+  { id: '2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
+  { id: '3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
+  { id: '4', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 }
 ];
 
 export const backgroundItems = [
   { id: 'bg-custom', icon: '✨', title: 'Индивидуальный фон', price1: 155, price5: 620 },
-  { id: 'bg-1', icon: '🌆', title: 'Фон 1', price1: 40, price5: 90 }
+  { id: '1', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/123607.png">', title: 'Фон 1', price1: 40, price5: 90 },
+  { id: '2', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/275271.png">', title: 'Фон 1', price1: 40, price5: 90 },
+  { id: '3', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/235283.png">', title: 'Фон 1', price1: 40, price5: 90 },
+  { id: '4', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/305050.png">', title: 'Фон 1', price1: 40, price5: 90 }
 ];

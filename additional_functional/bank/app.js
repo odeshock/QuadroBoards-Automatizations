@@ -461,10 +461,7 @@ function renderGiftsList() {
     btn.setAttribute('data-gift-icon', item.icon);
     btn.setAttribute('data-gift-price-1', String(item.price1));
     btn.setAttribute('data-gift-price-5', String(item.price5));
-    btn.innerHTML = `
-      <span class="gift-icon">${item.icon}</span>
-      <span class="gift-id">#${item.id}</span>
-    `;
+    btn.innerHTML = item.icon;
     container.appendChild(btn);
   });
 }
@@ -515,7 +512,7 @@ function renderDesignLists() {
     backgroundItems.forEach(item => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'gift-card btn-add';
+      btn.className = 'bg btn-add';
       btn.setAttribute('data-form', item.id === 'bg-custom' ? '#form-bg-custom' : '#form-bg-present');
       btn.setAttribute('data-kind', 'expense');
       btn.setAttribute('data-amount', String(item.price1));
@@ -523,10 +520,7 @@ function renderDesignLists() {
       btn.setAttribute('data-gift-icon', item.icon);
       btn.setAttribute('data-gift-price-1', String(item.price1));
       btn.setAttribute('data-gift-price-5', String(item.price5));
-      btn.innerHTML = `
-        <span class="gift-icon">${item.icon}</span>
-        <span class="gift-id">#${item.id}</span>
-      `;
+      btn.innerHTML = item.icon;
       bgContainer.appendChild(btn);
     });
   }

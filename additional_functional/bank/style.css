@@ -64,7 +64,12 @@
     .tab-panel { display: none; }
     .tab-panel.is-active { display: block; }
 
-    .gift-grid, .badge-grid, .bg-grid {
+    .gift-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 5px;
+    }
+    .badge-grid, .bg-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 16px;
@@ -109,6 +114,11 @@
     .badge-grid button {
       padding: 0;
     }
+
+    .bg-grid button {
+      padding: 0;
+    }
+
 
     .design-grid {
       display: grid;
@@ -182,6 +192,10 @@
     }
     .gift-group .gift-remove[disabled] {
       display: none;
+    }
+
+    .gift-grid button {
+      padding: 0;
     }
 
     .grid {
@@ -645,4 +659,14 @@
   .icon-prw .modal-link * {
     width: auto;
     height: auto;
+  }
+
+  .icon-prw .back {
+    width: 220px;
+    height: auto;
+  }
+
+  .icon-prw .gift {
+    height: 114px;
+    width: auto;
   }

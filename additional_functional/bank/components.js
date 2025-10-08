@@ -1646,7 +1646,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
       const amount = document.createElement('input');
       amount.type = 'number';
       amount.min = '0';
-      amount.step = '0.1';
+      amount.step = '1';
       amount.placeholder = 'сколько';
       amount.value = prefillAmount || '';
       amount.style.width = '90px';
@@ -1964,7 +1964,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
       const amount = document.createElement('input');
       amount.type = 'number';
       amount.min = '0';
-      amount.step = '0.1';
+      amount.step = '1';
       amount.placeholder = 'сколько';
       amount.value = prefillAmount || '';
       amount.style.width = '90px';

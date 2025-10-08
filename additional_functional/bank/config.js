@@ -2,27 +2,30 @@
 // config.js — Константы и конфигурации
 // ============================================================================
 
-// Timeouts для различных форм (3 минуты = 180000 мс)
-export const MSG_TIMEOUT_MS = 180000;
-export const REP_TIMEOUT_MS = 180000;
-export const POS_TIMEOUT_MS = 180000;
-export const MONTH_TIMEOUT_MS = 180000;
+// Базовые таймауты (3 минуты = 180000 мс)
+export const DEFAULT_TIMEOUT_MS = 180000;
 export const COUNTER_POLL_INTERVAL_MS = 500;
-export const ADS_TIMEOUT_MS = 180000;
-export const PERSONAL_TIMEOUT_MS = 180000;
-export const PLOT_TIMEOUT_MS = 180000;
-export const FIRST_POST_TIMEOUT_MS = 180000;
-export const FORM_TIMEOUT_MS = 180000;
-export const PROMO_TIMEOUT_MS = 180000;
-export const NEEDED_TIMEOUT_MS = 180000;
-export const BEST_EPISODE_TIMEOUT_MS = 180000;
-export const BEST_POST_TIMEOUT_MS = 180000;
-export const BEST_WRITER_TIMEOUT_MS = 180000;
-export const BEST_ACTIVIST_TIMEOUT_MS = 180000;
-export const TOPUP_TIMEOUT_MS = 180000;
-export const AMS_TIMEOUT_MS = 180000;
-export const TRANSFER_TIMEOUT_MS = 180000;
-export const GIFT_TIMEOUT_MS = 180000;
+
+// Используем единый таймаут для всех форм
+export const MSG_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const REP_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const POS_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const MONTH_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const ADS_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const PERSONAL_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const PLOT_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const FIRST_POST_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const FORM_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const PROMO_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const NEEDED_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const BEST_EPISODE_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const BEST_POST_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const BEST_WRITER_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const BEST_ACTIVIST_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const TOPUP_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const AMS_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const TRANSFER_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const GIFT_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 
 // Конфигурация для счётчиков (сообщения, репутация, позитив, месяцы)
 export const counterConfigs = {

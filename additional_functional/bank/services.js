@@ -3,46 +3,31 @@
 // ============================================================================
 
 import { counterPrefixMap } from './config.js';
+import {
+  REGEX,
+  TEXT_MESSAGES,
+  FORM_GIFT_PRESENT,
+  FORM_GIFT_CUSTOM,
+  FORM_GIFT_DISCOUNT
+} from './constants.js';
+import {
+  pad2,
+  formatNumber,
+  parseNumericAmount,
+  roundNewToAnchorDOM,
+  fullMonthsDiffVirtualDOM,
+  fmtYMD
+} from './utils.js';
 
-// ============================================================================
-// УТИЛИТЫ — форматирование и парсинг
-// ============================================================================
-
-export const pad2 = (n) => String(n).padStart(2, '0');
-
-export const numberFormatter = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
-export const formatNumber = (value) => numberFormatter.format(value);
-
-export const parseNumericAmount = (raw) => {
-  if (raw === undefined || raw === null) return null;
-  const normalized = String(raw).trim().replace(/\s+/g, '').replace(',', '.');
-  if (!normalized) return null;
-  return /^-?\d+(?:\.\d+)?$/.test(normalized) ? Number(normalized) : null;
+// Реэкспортируем для обратной совместимости
+export {
+  pad2,
+  formatNumber,
+  parseNumericAmount,
+  roundNewToAnchorDOM,
+  fullMonthsDiffVirtualDOM,
+  fmtYMD
 };
-
-// ============================================================================
-// УТИЛИТЫ — работа с датами (для расчёта месяцев)
-// ============================================================================
-
-export function roundNewToAnchorDOM(OLD, NEW) {
-  let [y2, m2, d2] = NEW.map(Number);
-  const d1 = Number(OLD[2]);
-  if (d2 < d1) {
-    m2 -= 1;
-    if (m2 === 0) { m2 = 12; y2 -= 1; }
-  }
-  return [y2, m2, d1];
-}
-
-export function fullMonthsDiffVirtualDOM(OLD, NEW) {
-  const [y1, m1] = OLD.map(Number);
-  const [yr, mr] = roundNewToAnchorDOM(OLD, NEW);
-  return Math.max(0, (yr - y1) * 12 + (mr - m1));
-}
-
-export function fmtYMD([y, m, d]) {
-  return `${y}-${pad2(m)}-${pad2(d)}`;
-}
 
 // ============================================================================
 // УПРАВЛЕНИЕ ДАННЫМИ — хранение групп и записей
@@ -70,19 +55,19 @@ export function incrementEntrySeq() {
 // ============================================================================
 
 export function formatEntryKey(key) {
-  if (key === 'quantity') return 'Количество';
-  if (key === 'reason') return 'Комментарий';
+  if (key === 'quantity') return TEXT_MESSAGES.QUANTITY_LABEL;
+  if (key === 'reason') return TEXT_MESSAGES.COMMENT_LABEL;
 
-  const recipientMatch = key.match(/^recipient_(\d+)$/);
-  if (recipientMatch) return recipientMatch[1] === '1' ? 'Получатель' : `Получатель ${recipientMatch[1]}`;
+  const recipientMatch = key.match(REGEX.RECIPIENT);
+  if (recipientMatch) return recipientMatch[1] === '1' ? TEXT_MESSAGES.RECIPIENT_LABEL : `${TEXT_MESSAGES.RECIPIENT_LABEL} ${recipientMatch[1]}`;
 
-  const fromMatch = key.match(/^from_(\d+)$/);
-  if (fromMatch) return fromMatch[1] === '1' ? 'От кого' : `От кого ${fromMatch[1]}`;
+  const fromMatch = key.match(REGEX.FROM);
+  if (fromMatch) return fromMatch[1] === '1' ? TEXT_MESSAGES.FROM_LABEL : `${TEXT_MESSAGES.FROM_LABEL} ${fromMatch[1]}`;
 
-  const wishMatch = key.match(/^wish_(\d+)$/);
-  if (wishMatch) return wishMatch[1] === '1' ? 'Комментарий' : `Комментарий ${wishMatch[1]}`;
+  const wishMatch = key.match(REGEX.WISH);
+  if (wishMatch) return wishMatch[1] === '1' ? TEXT_MESSAGES.COMMENT_LABEL : `${TEXT_MESSAGES.COMMENT_LABEL} ${wishMatch[1]}`;
 
-  const counterMatch = key.match(/^(msg|rep|pos|month)_(old|new|rounded|diff)$/);
+  const counterMatch = key.match(REGEX.COUNTER);
   if (counterMatch) {
     const [, prefix, suffix] = counterMatch;
     const cfg = counterPrefixMap[prefix];
@@ -107,13 +92,13 @@ export function formatEntryKey(key) {
 export function countTotalGifts() {
   let total = 0;
   submissionGroups.forEach((group) => {
-    const isGift = group.templateSelector === '#form-gift-present' ||
-                   /Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(group.title || '');
+    const isGift = group.templateSelector === FORM_GIFT_PRESENT ||
+                   REGEX.GIFT_TITLE.test(group.title || '');
     if (!isGift) return;
 
     group.entries.forEach((item) => {
       const dataObj = item.data || {};
-      const recipientKeys = Object.keys(dataObj).filter(k => /^recipient_\d+$/.test(k));
+      const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
       recipientKeys.forEach((key) => {
         const rid = String(dataObj[key] ?? '').trim();
         if (rid) total++;
@@ -127,13 +112,13 @@ export function countTotalGifts() {
 export function countTotalCustomGifts() {
   let total = 0;
   submissionGroups.forEach((group) => {
-    const isCustomGift = group.templateSelector === '#form-gift-custom' ||
-                         /Индивидуальный подарок/i.test(group.title || '');
+    const isCustomGift = group.templateSelector === FORM_GIFT_CUSTOM ||
+                         REGEX.CUSTOM_GIFT_TITLE.test(group.title || '');
     if (!isCustomGift) return;
 
     group.entries.forEach((item) => {
       const dataObj = item.data || {};
-      const recipientKeys = Object.keys(dataObj).filter(k => /^recipient_\d+$/.test(k));
+      const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
       recipientKeys.forEach((key) => {
         const rid = String(dataObj[key] ?? '').trim();
         if (rid) total++;
@@ -150,10 +135,10 @@ export function updateGiftDiscountEntry() {
 
   // Находим существующую группу скидки
   const discountKey = buildGroupKey({
-    templateSelector: '#gift-discount',
-    title: 'Автоматические скидки',
+    templateSelector: FORM_GIFT_DISCOUNT,
+    title: TEXT_MESSAGES.AUTO_DISCOUNTS_TITLE,
     amount: '',
-    amountLabel: 'Скидка',
+    amountLabel: TEXT_MESSAGES.DISCOUNT_LABEL,
     kind: 'income'
   });
 
@@ -174,8 +159,8 @@ export function updateGiftDiscountEntry() {
       let giftPrice5 = 140;
 
       const firstGiftGroup = submissionGroups.find(g =>
-        g.templateSelector === '#form-gift-present' ||
-        /Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(g.title || '')
+        g.templateSelector === FORM_GIFT_PRESENT ||
+        REGEX.GIFT_TITLE.test(g.title || '')
       );
 
       if (firstGiftGroup) {
@@ -210,8 +195,8 @@ export function updateGiftDiscountEntry() {
       let customPrice5 = 400;
 
       const firstCustomGiftGroup = submissionGroups.find(g =>
-        g.templateSelector === '#form-gift-custom' ||
-        /Индивидуальный подарок/i.test(g.title || '')
+        g.templateSelector === FORM_GIFT_CUSTOM ||
+        REGEX.CUSTOM_GIFT_TITLE.test(g.title || '')
       );
 
       if (firstCustomGiftGroup) {
@@ -243,10 +228,10 @@ export function updateGiftDiscountEntry() {
       const newGroup = {
         id: incrementGroupSeq(),
         key: discountKey,
-        templateSelector: '#gift-discount',
-        title: 'Автоматические скидки',
+        templateSelector: FORM_GIFT_DISCOUNT,
+        title: TEXT_MESSAGES.AUTO_DISCOUNTS_TITLE,
         amount: totalDiscount,
-        amountLabel: 'Скидка',
+        amountLabel: TEXT_MESSAGES.DISCOUNT_LABEL,
         kind: 'income',
         entries,
         isDiscount: true

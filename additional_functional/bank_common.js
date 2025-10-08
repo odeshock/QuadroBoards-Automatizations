@@ -53,20 +53,16 @@ async function fetchProfileInfo(userId = window.UserID) {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   // утилиты
-  const txt = (sel) =>
-    (doc.querySelector(sel)?.textContent || "")
-      .replace(/\u00A0/g, " ")  // NBSP -> space
-      .trim();
+  const txt = (sel, root = doc) =>
+    (root.querySelector(sel)?.textContent || "").replace(/\u00A0/g, " ").trim();
 
   const firstSignedInt = (s) => {
     if (!s) return null;
-    // поддержка "1 234", "1.234", "+123", "-45"
-    const norm = s.replace(/[^\d+-]/g, ""); // оставляем цифры и знак
+    const norm = String(s).replace(/[^\d+-]/g, "");
     const m = norm.match(/^[+-]?\d+/);
     return m ? Number(m[0]) : null;
   };
 
-  // дата "dd.mm.yyyy" -> [yyyy, mm, dd]
   const dateToArray = (s) => {
     const m = (s || "").match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
     if (!m) return null;
@@ -74,35 +70,43 @@ async function fetchProfileInfo(userId = window.UserID) {
     return [yyyy, mm, dd];
   };
 
-  // сообщения: берём всё ДО первого " - ", затем число
-  const parseMessages = (s) => {
-    const head = (s || "").split(" - ")[0];
-    return firstSignedInt(head);
-  };
+  const parseMessages = (s) => firstSignedInt((s || "").split(" - ")[0]);
 
-  // извлекаем поля
-  const dateStr = txt("li#pa-register-date strong");
-  const respectStr = txt("li#pa-respect strong");
-  const positiveStr = txt("li#pa-positive strong");
-  const messagesStr = txt("li#pa-posts strong");
-  const moneyStr = txt("li#pa-fld6 strong");
+  // --- money: одна строка — получаем СТРОКУ через код 2 (или фолбэк)
+  const moneyStr = await (async () => {
+    const api = window.MainUsrFieldResolver?.getFieldValue;
+    if (api) {
+      try { return await api({ doc, fieldId: 6 }); } // pa-fld6
+      catch (e) { console.warn("[fetchProfileInfo] getFieldValue error:", e); }
+    }
+    // фолбэк, если код 2 недоступен
+    const strong = txt("li#pa-fld6 strong");
+    if (strong) return strong;
+    const raw = txt("li#pa-fld6");
+    return raw ? raw.split(":").slice(-1)[0].trim() : "";
+  })();
 
   const moneyVal = (() => {
     const n = firstSignedInt(moneyStr);
     return Number.isFinite(n) ? n : 0;
   })();
 
-  const profile = {
-    id: Number(userId),
-    date: dateToArray(dateStr),                 // [yyyy, mm, dd] или null
-    respect: firstSignedInt(respectStr),        // число или null
-    positive: firstSignedInt(positiveStr),      // число или null
-    messages: parseMessages(messagesStr),       // число или null
-    money: moneyVal                             // число или 0
-  };
+  // остальные поля
+  const dateStr = txt("li#pa-register-date strong");
+  const respectStr = txt("li#pa-respect strong");
+  const positiveStr = txt("li#pa-positive strong");
+  const messagesStr = txt("li#pa-posts strong");
 
-  return profile;
+  return {
+    id: Number(userId),
+    date: dateToArray(dateStr),                 // [yyyy, mm, dd] | null
+    respect: firstSignedInt(respectStr),        // number | null
+    positive: firstSignedInt(positiveStr),      // number | null
+    messages: parseMessages(messagesStr),       // number | null
+    money: moneyVal                             // number (или 0)
+  };
 }
+
 
 
 

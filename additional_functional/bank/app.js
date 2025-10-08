@@ -472,12 +472,12 @@ function renderGiftsList() {
 // Функции для рендеринга оформления
 function renderDesignLists() {
   // Иконки
-  const iconContainer = document.querySelector('#tab-design .design-column:nth-child(1) .gift-grid');
+  const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {
     iconItems.forEach(item => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'gift-card btn-add';
+      btn.className = 'icon btn-add';
       btn.setAttribute('data-form', item.id === 'icon-custom' ? '#form-icon-custom' : '#form-icon-present');
       btn.setAttribute('data-kind', 'expense');
       btn.setAttribute('data-amount', String(item.price1));
@@ -485,21 +485,18 @@ function renderDesignLists() {
       btn.setAttribute('data-gift-icon', item.icon);
       btn.setAttribute('data-gift-price-1', String(item.price1));
       btn.setAttribute('data-gift-price-5', String(item.price5));
-      btn.innerHTML = `
-        <span class="gift-icon">${item.icon}</span>
-        <span class="gift-id">#${item.id}</span>
-      `;
+      btn.innerHTML = item.icon;
       iconContainer.appendChild(btn);
     });
   }
 
   // Плашки
-  const badgeContainer = document.querySelector('#tab-design .design-column:nth-child(2) .gift-grid');
+  const badgeContainer = document.querySelector('#tab-design .badge-grid');
   if (badgeContainer) {
     badgeItems.forEach(item => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'gift-card btn-add';
+      btn.className = 'badge btn-add';
       btn.setAttribute('data-form', item.id === 'badge-custom' ? '#form-badge-custom' : '#form-badge-present');
       btn.setAttribute('data-kind', 'expense');
       btn.setAttribute('data-amount', String(item.price1));
@@ -507,16 +504,13 @@ function renderDesignLists() {
       btn.setAttribute('data-gift-icon', item.icon);
       btn.setAttribute('data-gift-price-1', String(item.price1));
       btn.setAttribute('data-gift-price-5', String(item.price5));
-      btn.innerHTML = `
-        <span class="gift-icon">${item.icon}</span>
-        <span class="gift-id">#${item.id}</span>
-      `;
+      btn.innerHTML = item.icon;
       badgeContainer.appendChild(btn);
     });
   }
 
   // Фоны
-  const bgContainer = document.querySelector('#tab-design .design-column:nth-child(3) .gift-grid');
+  const bgContainer = document.querySelector('#tab-design .bg-grid');
   if (bgContainer) {
     backgroundItems.forEach(item => {
       const btn = document.createElement('button');

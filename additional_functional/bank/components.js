@@ -2120,29 +2120,6 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 
     hideWait();
 
-    // Превью подарка
-    const preview = document.createElement('div');
-    preview.className = 'gift-preview';
-    preview.style.padding = '12px';
-    preview.style.marginBottom = '16px';
-    preview.style.borderRadius = '8px';
-    preview.style.background = 'var(--bg-alt, #f5f5f5)';
-    preview.style.display = 'flex';
-    preview.style.alignItems = 'center';
-    preview.style.gap = '12px';
-    preview.style.fontSize = '14px';
-
-    const iconSpan = document.createElement('span');
-    iconSpan.style.fontSize = '32px';
-    iconSpan.textContent = giftIcon || '✨';
-
-    const idSpan = document.createElement('span');
-    idSpan.style.fontWeight = '600';
-    idSpan.textContent = `ID: ${giftId || 'custom'}`;
-
-    preview.append(iconSpan, idSpan);
-    modalFields.appendChild(preview);
-
     const groupsContainer = document.createElement('div');
     groupsContainer.className = 'gift-groups';
     groupsContainer.setAttribute('data-gift-container', '');
@@ -2496,19 +2473,11 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
 
     // Превью подарка (иконка + ID)
     const preview = document.createElement('div');
-    preview.className = 'gift-preview';
-    preview.style.padding = '12px';
-    preview.style.marginBottom = '16px';
-    preview.style.borderRadius = '8px';
-    preview.style.background = 'var(--bg-alt, #f5f5f5)';
-    preview.style.display = 'flex';
-    preview.style.alignItems = 'center';
-    preview.style.gap = '12px';
-    preview.style.fontSize = '14px';
+    preview.className = 'preview';
 
     const iconSpan = document.createElement('span');
-    iconSpan.style.fontSize = '32px';
-    iconSpan.textContent = giftIcon || '';
+    iconSpan.className = 'icon-prw';
+    iconSpan.innerHTML = giftIcon || '';
 
     const idSpan = document.createElement('span');
     idSpan.style.fontWeight = '600';

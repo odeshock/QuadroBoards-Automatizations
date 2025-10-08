@@ -351,7 +351,8 @@ export function renderLog(log) {
 
         // Используем calculateCost для получения только итоговой суммы
         if (recipientCount > 0) {
-          const total = calculateCost('price_w_entered_amount', 10, 0, recipientCount, 0, totalAmount);
+          const price = group.price !== null && group.price !== undefined ? Number(group.price) : 10;
+          const total = calculateCost('price_w_entered_amount', price, 0, recipientCount, 0, totalAmount);
           meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
         } else {
           meta.textContent = `${group.amountLabel}: ${group.amount}`;
@@ -1772,10 +1773,15 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 // SETUP TRANSFER FLOW - Перевод средств другому (комиссия)
 // ============================================================================
 
-export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount }) {
+export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice = null }) {
   // === 1) Удаляем существующие поля формы ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field')
     .forEach(el => el.remove());
+
+  // Устанавливаем начальное значение modalAmount
+  if (modalAmount && basePrice !== null) {
+    modalAmount.textContent = formatNumber(basePrice);
+  }
 
   // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
   const waitNote = document.createElement('p');
@@ -1829,16 +1835,23 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
     if (modalAmount) {
       if (count > 0) {
         // Используем режим 'price_w_entered_amount': entered_amount + price × items
-        updateModalAmount(modalAmount, { dataset: { mode: 'price_w_entered_amount', price: '10', bonus: '0' } }, {
+        const priceStr = basePrice !== null ? String(basePrice) : '0';
+        updateModalAmount(modalAmount, { dataset: { mode: 'price_w_entered_amount', price: priceStr, bonus: '0' } }, {
           items: count,
           entered_amount: totalAmount
         });
       } else {
-        modalAmount.textContent = '';
+        // Показываем базовую цену, если нет получателей
+        if (basePrice !== null) {
+          modalAmount.textContent = formatNumber(basePrice);
+        } else {
+          modalAmount.textContent = '';
+        }
       }
     }
 
-    const commission = count * 10;
+    const commissionPerPerson = basePrice;
+    const commission = count * commissionPerPerson;
     const totalCost = totalAmount + commission;
     return { totalAmount, commission, totalCost, count };
   };
@@ -3357,7 +3370,7 @@ if (bonusMaskCleanForms.includes(template.id)) {
 
 // === TRANSFER: «Перевод средств другому (комиссия)» — выбор пользователей + сумма с комиссией 10 галлеонов за каждого
 if (template.id === 'form-exp-transfer') {
-  counterWatcher = setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TRANSFER_TIMEOUT_MS, data, modalAmount });
+  counterWatcher = setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TRANSFER_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 
 // === GIFT: «Подарить подарок» — выбор пользователей с опциональными полями "от кого" и "комментарий"
@@ -4004,6 +4017,20 @@ if (template.id === 'form-income-flyer') {
     const mode = form.dataset.mode;
     if (mode === 'price_per_item' && form.dataset.price) {
       updateModalAmount(modalAmount, form, { items: multiplier });
+      return;
+    }
+
+    // Для topup/ams (mode='entered_amount') показываем просто price
+    if (mode === 'entered_amount' && form.dataset.price) {
+      const priceNum = Number(form.dataset.price);
+      modalAmount.textContent = formatNumber(priceNum);
+      return;
+    }
+
+    // Для transfer (mode='price_w_entered_amount') показываем просто price
+    if (mode === 'price_w_entered_amount' && form.dataset.price) {
+      const priceNum = Number(form.dataset.price);
+      modalAmount.textContent = formatNumber(priceNum);
       return;
     }
 

@@ -87,6 +87,7 @@
       transition: transform .05s ease, background .2s ease, border-color .2s ease;
       width: 30px;
       height: 30px;
+      padding: 4px;
     }
     .icon-grid button:hover { border-color: #93c5fd; background: #eff6ff; }
     .icon-grid button:active { transform: translateY(1px) scale(.98); }
@@ -103,6 +104,10 @@
       object-fit: contain;
       max-height: 100%;
       max-width: 100%;
+    }
+
+    .badge-grid button {
+      padding: 0;
     }
 
     .design-grid {
@@ -242,7 +247,7 @@
       border: 1px solid var(--border);
       background: #f9fafb;
       color: var(--text);
-      /* padding: 8px 12px; */
+      padding: 8px 12px;
       border-radius: 12px;
       cursor: pointer;
       transition: transform .05s ease, background .2s ease, border-color .2s ease;

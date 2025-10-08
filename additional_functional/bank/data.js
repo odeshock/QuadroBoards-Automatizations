@@ -116,7 +116,7 @@ export const badgeItems = [
   { id: 'badge-1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
   { id: 'badge-2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
   { id: 'badge-3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 },
-  { id: 'badge-3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 }
+  { id: 'badge-4', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 1', price1: 45, price5: 105 }
 ];
 
 export const backgroundItems = [

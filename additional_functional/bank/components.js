@@ -2112,6 +2112,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
     cancel();
   };
 
+  
   const updateTotalCost = (giftGroups) => {
     const totalCount = giftGroups.length;
     const price1 = Number.parseInt(giftPrice1, 10) || 100;

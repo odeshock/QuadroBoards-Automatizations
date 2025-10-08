@@ -7,27 +7,27 @@ export const incomeItems = [
   { title: 'Первый пост на профиле', amount: 100, form: '#form-income-firstpost' },
   { title: 'Личный пост', amount: '5 + x10', form: '#form-income-personalpost' },
   { title: 'Сюжетный пост', amount: '20 + x5', form: '#form-income-plotpost' },
-  { title: 'Личный эпизод', amount: 5, form: '#form-income-ep-personal' },
-  { title: 'Сюжетный эпизод', amount: 20, form: '#form-income-ep-plot' },
-  { title: '100 сообщений', amount: '400 / 100 мс', form: '#form-income-100msgs' },
-  { title: '100 репутации', amount: '400 / 100 р', form: '#form-income-100rep' },
-  { title: '100 позитива', amount: '100 / 100 п', form: '#form-income-100pos' },
-  { title: 'Один игровой месяц', amount: '150 / м', form: '#form-income-month' },
-  { title: 'Листовка', amount: 30, form: '#form-income-flyer' },
+  { title: 'Завершённый личный эпизод', amount: 5, form: '#form-income-ep-personal' },
+  { title: 'Завершённый сюжетный эпизод', amount: 20, form: '#form-income-ep-plot' },
+  { title: 'Каждые 100 сообщений', amount: 400, form: '#form-income-100msgs' },
+  { title: 'Каждые 100 репутации', amount: 400, form: '#form-income-100rep' },
+  { title: 'Каждые 100 позитива', amount: 60, form: '#form-income-100pos' },
+  { title: 'Каждый игровой месяц', amount: 150, form: '#form-income-month' },
+  { title: 'Каждая листовка', amount: 30, form: '#form-income-flyer' },
   { title: 'Участие в конкурсе', amount: 30, form: '#form-income-contest' },
   { title: 'Аватарка для галереи', amount: 10, form: '#form-income-avatar' },
   { title: 'Другой дизайн для галереи', amount: 30, form: '#form-income-design-other' },
-  { title: 'Докупить кредиты', amount: 'по потребности', form: '#form-income-topup' },
-  { title: 'Выдать денежку дополнительно', amount: 'по потребности', form: '#form-income-ams' },
   { title: 'Проведение конкурса', amount: 50, form: '#form-income-run-contest' },
-  { title: 'Мастеринг', amount: 30, form: '#form-income-mastering' },
-  { title: 'Постописец полумесяца', amount: 80, form: '#form-income-writer' },
-  { title: 'Пост полумесяца', amount: 50, form: '#form-income-post-of' },
-  { title: 'Эпизод полумесяца', amount: 100, form: '#form-income-episode-of' },
-  { title: 'Активист полумесяца', amount: 80, form: '#form-income-activist' },
+  { title: 'Мастеринг сюжета', amount: 30, form: '#form-income-mastering' },
+  { title: 'Голос в RPG-top (раз в неделю)', amount: 30, form: '#form-income-rpgtop' },
   { title: 'Баннер FMV в подписи на Рено', amount: 30, form: '#form-income-banner-reno' },
   { title: 'Баннер FMV в подписи на Маяке', amount: 30, form: '#form-income-banner-mayak' },
-  { title: 'Раз в месяц в топ RPG', amount: 30, form: '#form-income-rpgtop' }
+  { title: 'Активист полумесяца', amount: 80, form: '#form-income-activist' },
+  { title: 'Постописец полумесяца', amount: 80, form: '#form-income-writer' },
+  { title: 'Эпизод полумесяца', amount: 100, form: '#form-income-episode-of' },
+  { title: 'Пост полумесяца', amount: 50, form: '#form-income-post-of' },
+  { title: 'Докупить кредиты', amount: 'по потребности', form: '#form-income-topup' },
+  { title: 'Выдать денежку дополнительно', amount: 'по потребности', form: '#form-income-ams' },
 ];
 
 export const expenseItems = [
@@ -61,12 +61,19 @@ export const expenseItems = [
 
 export const giftItems = [
   { id: 'custom', icon: '✨', title: 'Индивидуальный подарок', price1: 100, price5: 400 },
-  { id: 'gift-1', icon: '🎁', title: 'Подарить подарок', price1: 60, price5: 140 }
+  { id: '1', icon: '<img src="https://i.ibb.co/3cHvbLW/piksy.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
+  { id: '2', icon: '<img src="https://i.ibb.co/njG4qpB/animsl2.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
+  { id: '3', icon: '<img src="https://i.ibb.co/4265yGb/Thunderbird1.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
+  { id: '4', icon: '<img src="https://i.ibb.co/pRkBCwq/Hippogriff11.png">', title: 'Подарить подарок', price1: 60, price5: 140 }
 ];
 
 export const iconItems = [
   { id: 'icon-custom', icon: '✨', title: 'Индивидуальная иконка', price1: 120, price5: 480 },
-  { id: 'icon-1', icon: '🎨', title: 'Иконка 1', price1: 30, price5: 70 }
+  { id: '1', icon: '<img src="https://i.ibb.co/DPrgbYx1/42.png">', title: 'Иконка 1', price1: 30, price5: 70 },
+  { id: '2', icon: '<img src="https://upforme.ru/uploads/001c/14/5b/440/110503.png">', title: 'Иконка 1', price1: 30, price5: 70 },
+  { id: '3', icon: '<img src="https://upforme.ru/uploads/001c/14/5b/6/566301.png">', title: 'Иконка 1', price1: 30, price5: 70 },
+  { id: '4', icon: '<img src="https://upforme.ru/uploads/001c/14/5b/6/592300.png">', title: 'Иконка 1', price1: 30, price5: 70 },
+  { id: '5', icon: '<img src="https://upforme.ru/uploads/001c/14/5b/440/453346.png">', title: 'Иконка 1', price1: 30, price5: 70 }
 ];
 
 export const badgeItems = [

@@ -70,6 +70,8 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 16px;
+      max-height: 500px;
+      overflow-y: auto;
     }
 
     .design-grid {
@@ -161,6 +163,8 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow: hidden;
+      max-height: 500px;
+      overflow-y: auto;
     }
 
     .panel header {

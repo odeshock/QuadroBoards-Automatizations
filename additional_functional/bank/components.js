@@ -3973,6 +3973,11 @@ if (template.id === 'form-income-flyer') {
   const isRpgTop      = template.id === 'form-income-rpgtop';
   const isEpPersonal  = template.id === 'form-income-ep-personal';
   const isEpPlot      = template.id === 'form-income-ep-plot';
+  const isContest     = template.id === 'form-income-contest';
+  const isAvatar      = template.id === 'form-income-avatar';
+  const isDesignOther = template.id === 'form-income-design-other';
+  const isRunContest  = template.id === 'form-income-run-contest';
+  const isMastering   = template.id === 'form-income-mastering';
 
   if (isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) {
     const grid = modalFields.querySelector('.grid-2');
@@ -3989,8 +3994,8 @@ if (template.id === 'form-income-flyer') {
   const extraLabelBase = addExtraBtn ? addExtraBtn.getAttribute('data-extra-label') : null;
   const extraPlaceholderCustom = addExtraBtn ? addExtraBtn.getAttribute('data-extra-placeholder') : null;
   const extraStartAttr = addExtraBtn ? Number.parseInt(addExtraBtn.getAttribute('data-extra-start'), 10) : NaN;
-  const labelOverride = isRpgTop ? 'Ссылка на скриншот' : null;
-  const typeOverride = isRpgTop ? 'url' : null;
+  const requiresUrlType = isRpgTop || isEpPersonal || isEpPlot || isContest || isAvatar || isDesignOther || isRunContest || isMastering;
+  const typeOverride = requiresUrlType ? 'url' : null;
   const extraPrefix = extraPrefixAttr || (isNeedRequest ? 'need_extra_' : 'extra_');
   const baseIndex = Number.isFinite(extraStartAttr)
     ? extraStartAttr

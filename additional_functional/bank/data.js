@@ -60,8 +60,8 @@ export const incomeItems = [
   { title: 'Постописец полумесяца', amount: 'ч', price: 80, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_WRITER },
   { title: 'Эпизод полумесяца', amount: 'ч', price: 100, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_EPISODE_OF },
   { title: 'Пост полумесяца', amount: 'ч', price: 50, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_POST_OF },
-  { title: 'Докупить кредиты', amount: 'ч', price: 0, mode: CALC_MODES.ENTERED_AMOUNT, form: FORM_INCOME_TOPUP },
-  { title: 'Выдать денежку дополнительно', amount: 'ч', price: 0, mode: CALC_MODES.ENTERED_AMOUNT, form: FORM_INCOME_AMS },
+  { title: 'Докупить кредиты', amount: 'ч', price: 1, mode: CALC_MODES.ENTERED_AMOUNT, form: FORM_INCOME_TOPUP },
+  { title: 'Выдать денежку дополнительно', amount: 'ч', price: 1, mode: CALC_MODES.ENTERED_AMOUNT, form: FORM_INCOME_AMS },
 ];
 
 // ============================================================================

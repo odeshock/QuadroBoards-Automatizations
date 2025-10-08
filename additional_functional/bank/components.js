@@ -428,9 +428,27 @@ export function renderLog(log) {
         const bonus = group.bonus !== null && group.bonus !== undefined ? Number(group.bonus) : null;
 
         if (mode && price !== null) {
-          // Для mode='price_per_item' используем totalEntryMultiplier как items
+          // Для mode='price_per_item' считаем items
           if (mode === 'price_per_item') {
-            const items = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+            // Для форм с полем quantity суммируем quantity из всех entries
+            let totalQuantity = 0;
+            let totalRecipients = 0;
+
+            group.entries.forEach((item) => {
+              const dataObj = item.data || {};
+              if (dataObj.quantity !== undefined) {
+                totalQuantity += Number(dataObj.quantity) || 0;
+              }
+
+              // Считаем количество получателей (recipient_N полей)
+              const recipientKeys = Object.keys(dataObj).filter(k => k.startsWith('recipient_'));
+              totalRecipients += recipientKeys.length;
+            });
+
+            // Если есть quantity в данных, используем его
+            // Если есть recipients, используем их количество
+            // Иначе используем multiplier
+            const items = totalQuantity > 0 ? totalQuantity : (totalRecipients > 0 ? totalRecipients : (totalEntryMultiplier > 0 ? totalEntryMultiplier : 1));
             const total = calculateCost(mode, price, bonus || 0, items, 0, 0);
             meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
           } else {
@@ -749,8 +767,14 @@ export function renderLog(log) {
           // NAME с ссылкой
           let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
 
-          // NUM_INFO
-          if (quantity) {
+          // NUM_INFO: показываем либо quantity, либо price (для админ-форм начислений)
+          const adminRecipientForms = ['form-income-anketa', 'form-income-akcion', 'form-income-needchar', 'form-income-episode-of'];
+          const showPrice = adminRecipientForms.includes(tid) && !quantity;
+
+          if (showPrice && group.price) {
+            // Для админ-форм начислений показываем price рядом с именем
+            htmlContent += ` — ${formatNumber(group.price)}`;
+          } else if (quantity) {
             const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
             if (qtyNum !== null) {
               htmlContent += ` — ${formatNumber(qtyNum)}`;
@@ -816,10 +840,14 @@ export function renderLog(log) {
 
           const itemEl = document.createElement('div');
           itemEl.className = 'entry-item';
-
+          itemEl.style.flexDirection = 'row';
+          
           let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
 
-          if (quantity) {
+          // Для group2Templates (Активист, Постописец, Пост) показываем price
+          if (!quantity && group.price) {
+            htmlContent += ` — ${formatNumber(group.price)}`;
+          } else if (quantity) {
             const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
             if (qtyNum !== null) {
               htmlContent += ` — ${formatNumber(qtyNum)}`;
@@ -1032,7 +1060,7 @@ export function renderLog(log) {
 // ADMIN FLOWS
 // ============================================================================
 
-export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data }) {
+export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
   // 1) убрать лишние инфо-плашки из шаблона
   (() => {
     modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
@@ -1128,6 +1156,17 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
       });
       btnSubmit.style.display = picked.size ? '' : 'none';
       btnSubmit.disabled = picked.size === 0;
+
+      // Обновляем modalAmount: price × количество получателей
+      if (modalAmount && basePrice !== null) {
+        const price = Number(basePrice) || 0;
+        const totalRecipients = picked.size;
+        if (totalRecipients > 0) {
+          updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } }, { items: totalRecipients });
+        } else {
+          modalAmount.textContent = formatNumber(price);
+        }
+      }
     };
 
     const addChip = (user) => {
@@ -1244,7 +1283,7 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
   return counterWatcher;
 }
 
-export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data }) {
+export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
   // удалить инфо-элементы
   (() => {
     modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
@@ -1336,6 +1375,12 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
       }
       btnSubmit.style.display = pickedId ? '' : 'none';
       btnSubmit.disabled = !pickedId;
+
+      // Обновляем modalAmount: показываем price (для 1 получателя)
+      if (modalAmount && basePrice !== null) {
+        const price = Number(basePrice) || 0;
+        modalAmount.textContent = formatNumber(price);
+      }
     };
 
     const renderChip = (user) => {
@@ -2814,6 +2859,11 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
     let groupCounter = 0;
     const price = Number.parseInt(basePrice, 10) || 0;
 
+    // Показываем базовую цену сразу
+    if (modalAmount) {
+      modalAmount.textContent = formatNumber(price);
+    }
+
     const syncHiddenFields = () => {
       modalFields
         .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="from_"], input[type="hidden"][name^="wish_"], input[type="hidden"][name^="quantity_"]')
@@ -2854,7 +2904,8 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
         if (totalQuantity > 0) {
           updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } }, { items: totalQuantity });
         } else {
-          modalAmount.textContent = '';
+          // Показываем базовую цену даже когда нет получателей
+          modalAmount.textContent = formatNumber(price);
         }
       }
 
@@ -3281,7 +3332,7 @@ if (template.id === 'form-income-anketa') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: FORM_TIMEOUT_MS, data });
+    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: FORM_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3292,7 +3343,7 @@ if (template.id === 'form-income-akcion') {
     btnSubmit.style.display = 'none';
   } else {
     // админ — тот же выбор получателей, как у анкеты
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: PROMO_TIMEOUT_MS, data });
+    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: PROMO_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3301,7 +3352,7 @@ if (template.id === 'form-income-needchar') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: NEEDED_TIMEOUT_MS, data });
+    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: NEEDED_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3332,7 +3383,7 @@ const bonusMaskCleanForms = [
   'form-exp-mask', 'form-exp-clean'
 ];
 if (bonusMaskCleanForms.includes(template.id)) {
-  counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: amount });
+  counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 
 // === TRANSFER: «Перевод средств другому (комиссия)» — выбор пользователей + сумма с комиссией 10 галлеонов за каждого
@@ -3393,7 +3444,7 @@ if (template.id === 'form-income-episode-of') {
     btnSubmit.style.display = 'none';
   } else {
     // админ — тот же выбор получателей, как у анкеты
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_EPISODE_TIMEOUT_MS, data });
+    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_EPISODE_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3402,7 +3453,7 @@ if (template.id === 'form-income-post-of') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-окно для не-админов (data-info)
   } else {
-    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_POST_TIMEOUT_MS, data });
+    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_POST_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3411,7 +3462,7 @@ if (template.id === 'form-income-writer') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-окно
   } else {
-    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_WRITER_TIMEOUT_MS, data });
+    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_WRITER_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3420,7 +3471,7 @@ if (template.id === 'form-income-activist') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
-    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_ACTIVIST_TIMEOUT_MS, data });
+    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_ACTIVIST_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 

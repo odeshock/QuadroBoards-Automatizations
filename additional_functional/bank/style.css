@@ -1,5 +1,4 @@
 :root {
-      --bg: #f9fafc;
       --panel: #ffffff;
       --muted: #6b7280;
       --text: #1f2937;
@@ -14,11 +13,10 @@
     }
 
     * { box-sizing: border-box; }
-    .bank {
+    .bank_html {
       height: 100%;
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-      background: var(--bg);
       color: var(--text);
     }
 

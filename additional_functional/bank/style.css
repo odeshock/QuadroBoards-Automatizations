@@ -13,6 +13,11 @@
       --radius: 12px;
     }
 
+    body {
+      height: 1000px;
+      overflow-y: auto;
+    }
+
     * { box-sizing: border-box; }
     .bank {
       height: 100%;

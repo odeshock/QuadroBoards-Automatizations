@@ -58,7 +58,7 @@ function nodeToBBCode(node) {
       const text = node.textContent || '';
       // Если href и текст совпадают, оставляем просто URL жирным
       if (href === text) {
-        return `[b]${href}[/b]`;
+        return `${href}`;
       }
       // Иначе используем BB-код url
       return `[url=${href}]${text}[/url]`;

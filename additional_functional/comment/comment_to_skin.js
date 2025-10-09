@@ -1,10 +1,10 @@
 /**
  * Загружает карточки из текущего домена.
- * @param {string} topic_id  id темы (viewtopic.php?id=<topic_id>)
- * @param {string} comment_id  id поста (#p<comment_id>-content)
+ * @param {number} topic_id  id темы (viewtopic.php?id=<topic_id>)
+ * @param {Array<number>} comment_ids  id поста (#p<comment_id>-content)
  * @returns {Promise<Array<{id:string, html:string}>>}
  */
-async function fetchCardsWrappedClean(topic_id, comment_id) {
+async function fetchCardsWrappedClean(topic_id, comment_ids) {
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
 
   const normSpace = (typeof FMV?.normSpace === 'function')
@@ -37,27 +37,33 @@ async function fetchCardsWrappedClean(topic_id, comment_id) {
   const pageHtml = await smartFetchHtml(topicUrl);
   const doc = toDoc(pageHtml);
 
-  const post = doc.querySelector(`#p${String(comment_id)}-content`);
-  if (!post) {
-    console.warn(`Не найден #p${comment_id}-content на ${topicUrl}`);
-    return [];
+  const allResults = [];
+
+  for (const comment_id of comment_ids) {
+    const post = doc.querySelector(`#p${String(comment_id)}-content`);
+    if (!post) {
+      console.warn(`Не найден #p${comment_id}-content на ${topicUrl}`);
+      continue;
+    }
+
+    const scripts = [...post.querySelectorAll('script[type="text/html"]')];
+    if (!scripts.length) continue;
+
+    const combined = scripts.map(s => s.textContent || s.innerHTML || '').join('\n');
+    const decoded = decodeEntities(combined).replace(/\u00A0/g, ' ');
+    const innerDoc = toDoc(decoded);
+
+    const result = [...innerDoc.querySelectorAll('#grid .card')].map(card => {
+      const id        = normSpace(card.querySelector('.id')?.textContent || '');
+      const rawTitle  = normSpace(card.querySelector('.desc')?.textContent || '');
+      const content   = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
+      const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
+      const html      = `<div class="item" data-id="${id}"${titleAttr}>${content}</div>`;
+      return { id, html };
+    });
+
+    allResults.push(...result); // 🔸 добавляем карточки в общий массив
   }
 
-  const scripts = [...post.querySelectorAll('script[type="text/html"]')];
-  if (!scripts.length) return [];
-
-  const combined = scripts.map(s => s.textContent || s.innerHTML || '').join('\n');
-  const decoded = decodeEntities(combined).replace(/\u00A0/g, ' ');
-  const innerDoc = toDoc(decoded);
-
-  const result = [...innerDoc.querySelectorAll('#grid .card')].map(card => {
-    const id        = normSpace(card.querySelector('.id')?.textContent || '');
-    const rawTitle  = normSpace(card.querySelector('.desc')?.textContent || '');
-    const content   = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
-    const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
-    const html      = `<div class="item" data-id="${id}"${titleAttr}>${content}</div>`;
-    return { id, html };
-  });
-
-  return result;
+  return allResults;
 }

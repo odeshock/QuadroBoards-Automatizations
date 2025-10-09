@@ -4,6 +4,7 @@
 
 import {
   ALLOWED_PARENTS,
+  BASE_URL,
   COUNTER_POLL_INTERVAL_MS,
   FORM_TIMEOUT_MS,
   PROMO_TIMEOUT_MS,
@@ -895,7 +896,6 @@ export function renderLog(log) {
 
       // ===== Определяем тип формы для правильного рендеринга =====
       const tid = item.template_id;
-      const BASE_URL = 'http://followmyvoice.rusff.me/';
 
       // Группа 1: Формы с получателями (листом)
       const group1Templates = [
@@ -1478,14 +1478,16 @@ export function renderLog(log) {
       console.log('\n======================');
 
       // Отправляем сообщение родительскому окну с операциями
-      try {
-        window.parent.postMessage({
-          type: "PURCHASE",
-          operations: operations,
-          totalSum: totalSum
-        }, '*');
-      } catch {
-        console.log("ты пытался что-то купить");
+      for (const origin of ALLOWED_PARENTS) {
+        try {
+          window.parent.postMessage({
+            type: "PURCHASE",
+            operations: operations,
+            totalSum: totalSum
+          }, '*');
+        } catch {
+          console.log("ты пытался что-то купить");
+        }
       }
     });
 

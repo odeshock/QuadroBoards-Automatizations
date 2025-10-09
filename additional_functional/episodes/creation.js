@@ -2,7 +2,7 @@
   try{
     if (!/\/post\.php(\?|$)/.test(location.pathname)) return;
     var fid = +(new URLSearchParams(location.search).get('fid')||0);
-    var allowed = (window.CHRONO_CHECK.ForumID || []).map(Number);
+    var allowed = (window.CHRONO_CHECK?.ForumID || []).map(Number);
     if (allowed.indexOf(fid) === -1) return; // или allowed.includes(fid)
 
     var $form = $('#post form, form[action*="post.php"]').first();

@@ -107,12 +107,13 @@ async function fetchProfileInfo(userId = window.UserID) {
   };
 }
 
-function encodeWithAND(text) {
+function encodeWithSep(text, with_and = false) {
   // Разбиваем строку по пробелам
   const words = text.trim().split(/\s+/);
 
-  // Соединяем через AND
-  const combined = words.join(' AND ');
+  // Соединяем через 
+  const merger = with_and ? ' ' : ' AND ';
+  const combined = words.join(merger);
 
   // Кодируем в URL (UTF-8)
   return encodeURIComponent(combined);
@@ -121,7 +122,7 @@ function encodeWithAND(text) {
 /**
  * scrapePosts(author, forums, stopOnFirstNonEmpty?, last_src?, options?)
  *
- * @param {string} user_id — id автора (обязательно)
+ * @param {string} author — author автора (обязательно)
  * @param {Array<string>|string} forums — список ID форумов (обязательно)
  * @param {boolean} [stopOnFirstNonEmpty=false] — true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
  * @param {string}  [last_src=""] — пост-граница; сам пост не обрабатываем
@@ -130,8 +131,8 @@ function encodeWithAND(text) {
  * @param {number}  [options.delayMs=300]
  * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
  */
-async function scrapePosts(user_id, forums, stopOnFirstNonEmpty = false, last_src = "", { maxPages = 999, delayMs = 300 } = {}) {
-  if (!user_id) throw new Error("user_id обязателен");
+async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src = "", { maxPages = 999, delayMs = 300 } = {}) {
+  if (!author) throw new Error("author обязателен");
   if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
 
   const basePath    = "/search.php";
@@ -139,7 +140,7 @@ async function scrapePosts(user_id, forums, stopOnFirstNonEmpty = false, last_sr
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const buildUrl = (p) => {
     const u = new URL(basePath, location.origin);
-    u.search = new URLSearchParams({ action:"search", user_id, forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
+    u.search = new URLSearchParams({ action:"search", encodeWithSep(author), forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
     return u.toString();
   };
 
@@ -288,8 +289,8 @@ async function scrapePosts(user_id, forums, stopOnFirstNonEmpty = false, last_sr
 }
 
 
-async function scrapeTopicFirstPostLinks(user_id, forums, { maxPages = 999, delayMs = 300 } = {}) {
-  if (!user_id) throw new Error("user_id обязателен");
+async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300 } = {}) {
+  if (!author) throw new Error("author обязателен");
   if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
 
   const forumsParam = forums.join(",");
@@ -299,7 +300,7 @@ async function scrapeTopicFirstPostLinks(user_id, forums, { maxPages = 999, dela
   const buildSearchUrl = (p) => {
     const u = new URL(basePath, location.origin);
     u.search = new URLSearchParams({
-      action: "search", user_id, forums: forumsParam,
+      action: "search", encodeWithSep(author), forums: forumsParam,
       sort_dir: "DESC", show_as: "topics", p: String(p)
     }).toString();
     return u.toString();

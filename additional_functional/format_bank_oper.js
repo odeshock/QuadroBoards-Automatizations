@@ -34,3 +34,5 @@ function formatOperations(operations) {
 
   return result.trim();
 }
+
+window.formatOperations = formatOperations;

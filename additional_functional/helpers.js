@@ -187,6 +187,7 @@ window.resolveChronoData = async function(raw, opts = {}){
 function userLink(id, name = '', asBB = false) {
   const uid   = String(id);
   const label = name || `user${uid}`;
+  const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
 
   if (asBB) {
     // BB-код

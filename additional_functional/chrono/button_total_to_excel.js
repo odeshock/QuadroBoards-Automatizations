@@ -20,7 +20,7 @@
     : [];
 
   // базовый адрес сайта для ссылок на профиль
-  const SITE_URL = (window.FMV?.siteUrl || location.origin || '').replace(/\/+$/, '');
+  const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
 
   let lastBlobUrl = '';
 

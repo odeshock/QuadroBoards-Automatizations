@@ -91,11 +91,11 @@ function handleCloseModal() {
 // ADMIN ACCESS CONTROL
 // ============================================================================
 
-function isItemAllowedForAdmin(titleText) {
+function isItemAllowedForAdmin(formId) {
   if (typeof window.IS_ADMIN === 'undefined' || !window.IS_ADMIN) {
     return true; // Для обычных пользователей все доступно
   }
-  return ADMIN_ALLOWED_ITEMS.includes(titleText);
+  return ADMIN_ALLOWED_ITEMS.includes(formId);
 }
 
 // ============================================================================
@@ -121,8 +121,8 @@ document.addEventListener('click', (e) => {
   const titleText = overrideTitle || (row ? row.textContent.trim() : 'Пункт');
   const amountLabel = kind === 'expense' ? 'Стоимость' : 'Начисление';
 
-  // Дополнительная проверка доступа
-  if (!isItemAllowedForAdmin(titleText)) {
+  // Дополнительная проверка доступа (по ID формы)
+  if (!isItemAllowedForAdmin(selector)) {
     e.preventDefault();
     return;
   }
@@ -371,11 +371,9 @@ function initializeAccessControl() {
 
   // Для администраторов блокируем недоступные кнопки
   document.querySelectorAll('.btn-add').forEach((btn) => {
-    const row = btn.parentElement.querySelector('.title');
-    const overrideTitle = btn.getAttribute('data-title');
-    const titleText = overrideTitle || (row ? row.textContent.trim() : '');
+    const formId = btn.getAttribute('data-form');
 
-    if (!ADMIN_ALLOWED_ITEMS.includes(titleText)) {
+    if (!ADMIN_ALLOWED_ITEMS.includes(formId)) {
       btn.disabled = true;
       btn.classList.add('btn-disabled');
       btn.style.opacity = '0.3';

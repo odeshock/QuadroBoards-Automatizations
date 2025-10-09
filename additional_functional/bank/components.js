@@ -39,141 +39,131 @@ import {
 // ============================================================================
 
 /**
- * Конвертирует HTML-разметку в BB-коды
- * @param {string} html - HTML строка
+ * Конвертирует DOM узел в BB-код
+ * @param {Node} node - DOM узел
  * @returns {string} - строка с BB-кодами
  */
-function htmlToBBCode(html) {
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
-
-  // Рекурсивно обрабатываем элементы
-  function processNode(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent;
-    }
-
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const tagName = node.tagName.toLowerCase();
-
-      // Обрабатываем ссылки
-      if (tagName === 'a') {
-        const href = node.getAttribute('href') || '';
-        const text = node.textContent || '';
-        // Если href и текст совпадают, оставляем просто URL
-        if (href === text) {
-          return href;
-        }
-        // Иначе используем BB-код
-        return `[url=${href}]${text}[/url]`;
-      }
-
-      // Обрабатываем strong/b
-      if (tagName === 'strong' || tagName === 'b') {
-        const content = Array.from(node.childNodes).map(processNode).join('');
-        return `[b]${content}[/b]`;
-      }
-
-      // Обрабатываем br
-      if (tagName === 'br') {
-        return '\n';
-      }
-
-      // Для остальных элементов просто обрабатываем дочерние узлы
-      return Array.from(node.childNodes).map(processNode).join('');
-    }
-
-    return '';
+function nodeToBBCode(node) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent;
   }
 
-  return Array.from(tempDiv.childNodes).map(processNode).join('');
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const tagName = node.tagName.toLowerCase();
+
+    // Обрабатываем ссылки
+    if (tagName === 'a') {
+      const href = node.getAttribute('href') || '';
+      const text = node.textContent || '';
+      // Если href и текст совпадают, оставляем просто URL жирным
+      if (href === text) {
+        return `[b]${href}[/b]`;
+      }
+      // Иначе используем BB-код url
+      return `[url=${href}]${text}[/url]`;
+    }
+
+    // Обрабатываем strong/b
+    if (tagName === 'strong' || tagName === 'b') {
+      const content = Array.from(node.childNodes).map(nodeToBBCode).join('');
+      return `[b]${content}[/b]`;
+    }
+
+    // Обрабатываем br
+    if (tagName === 'br') {
+      return '\n';
+    }
+
+    // Для остальных элементов просто обрабатываем дочерние узлы
+    return Array.from(node.childNodes).map(nodeToBBCode).join('');
+  }
+
+  return '';
 }
 
 /**
- * Формирует массив операций для отправки (упрощенная версия)
- * @param {Array} groups - массив групп операций из submissionGroups
+ * Формирует массив операций из отрендеренного DOM
+ * @param {HTMLElement} logElement - элемент лога с отрендеренными операциями
  * @returns {Array} - массив операций с форматированными данными
  */
-function buildOperationsArray(groups) {
-  const BASE_URL = 'http://followmyvoice.rusff.me/';
+function buildOperationsArray(logElement) {
   const operations = [];
 
-  groups.forEach((group) => {
-    const info = [];
-    const isIncome = group.isDiscount || group.templateSelector?.includes('income');
+  // Находим все entry элементы в логе
+  const entries = logElement.querySelectorAll('.entry');
 
-    // Получаем сумму (используем простую логику)
-    let groupSum = 0;
-    if (group.price && group.entries.length > 0) {
-      groupSum = Number(group.price) * group.entries.length;
+  entries.forEach((entryEl) => {
+    // Получаем заголовок операции
+    const titleEl = entryEl.querySelector('.entry-title');
+    if (!titleEl) return;
+
+    const titleText = titleEl.textContent.trim();
+    // Убираем номер в начале (например "#1 · ")
+    const title = titleText.replace(/^#\d+\s*·\s*/, '');
+
+    // Получаем сумму из entry-meta
+    const metaEl = entryEl.querySelector('.entry-meta');
+    let sum = 0;
+    if (metaEl) {
+      const sumSpan = metaEl.querySelector('span[style*="color"]');
+      if (sumSpan) {
+        const sumText = sumSpan.textContent.trim();
+        // Убираем префикс "+ " или "− " и парсим число
+        const cleanSum = sumText.replace(/^[+−]\s*/, '').replace(/\s/g, '');
+        const numValue = parseNumericAmount(cleanSum);
+
+        // Определяем знак по цвету или префиксу
+        const isPositive = sumText.startsWith('+') || sumSpan.style.color.includes('22c55e');
+        sum = isPositive ? numValue : -numValue;
+      }
     }
-    const finalSum = isIncome ? groupSum : -groupSum;
 
-    // Собираем информацию из entries
-    group.entries.forEach((item) => {
-      const dataObj = item.data || {};
+    // Получаем информацию из entry-items
+    const info = [];
+    const itemsWrap = entryEl.querySelector('.entry-items');
 
-      // Проверяем, есть ли получатели (recipient_N)
-      const recipientKeys = Object.keys(dataObj).filter(k => k.match(/^recipient_(\d+)$/));
+    if (itemsWrap) {
+      // Проверяем, есть ли ol.entry-list (список)
+      const entryLists = itemsWrap.querySelectorAll('ol.entry-list');
 
-      if (recipientKeys.length > 0) {
-        // Форма с получателями
-        recipientKeys.forEach(key => {
-          const idx = key.match(/^recipient_(\d+)$/)[1];
-          const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
-          if (!rid) return;
-
-          const user = window.USERS_LIST?.find(u => String(u.id) === rid);
-          const userName = user ? user.name : '';
-          const userId = user ? user.id : rid;
-
-          const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
-          const quantity = dataObj[`quantity_${idx}`] || dataObj[`topup_${idx}`] || dataObj[`amount_${idx}`] || '';
-
-          let htmlContent = `<strong><a href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
-
-          if (quantity) {
-            const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
-            if (qtyNum !== null) {
-              htmlContent += ` — ${formatNumber(qtyNum)}`;
+      if (entryLists.length > 0) {
+        // Это список - собираем каждый li отдельно
+        const comments = [];
+        entryLists.forEach(list => {
+          const listItems = list.querySelectorAll('li');
+          listItems.forEach(li => {
+            const bbCode = nodeToBBCode(li);
+            if (bbCode.trim()) {
+              comments.push(bbCode);
             }
-          }
-
-          if (comment) {
-            htmlContent += `<br><br><strong>Комментарий: </strong>${comment}`;
-          }
-
-          info.push({
-            type: 'list',
-            comment: htmlToBBCode(htmlContent)
           });
         });
+
+        if (comments.length > 0) {
+          info.push({
+            comment: comments,
+            type: 'list'
+          });
+        }
       } else {
-        // Простые формы с URL или текстом
-        Object.entries(dataObj).forEach(([key, value]) => {
-          if (value === undefined || value === null || String(value).trim() === '') return;
+        // Это plain - собираем весь контент
+        const entryItems = itemsWrap.querySelectorAll('.entry-item');
 
-          const raw = typeof value === 'string' ? value.trim() : value;
-          const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
-
-          if (isUrl) {
+        entryItems.forEach(item => {
+          const bbCode = nodeToBBCode(item);
+          if (bbCode.trim()) {
             info.push({
-              type: 'list',
-              comment: raw
-            });
-          } else {
-            info.push({
-              type: 'plain',
-              comment: `[b]${formatEntryKey(key)}[/b] — ${raw}`
+              comment: [bbCode],
+              type: 'plain'
             });
           }
         });
       }
-    });
+    }
 
     operations.push({
-      title: group.title,
-      sum: finalSum,
+      title: title,
+      sum: sum,
       info: info
     });
   });
@@ -1477,8 +1467,8 @@ export function renderLog(log) {
     buyBtn.className = 'button primary';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
-      // Формируем массив операций
-      const operations = buildOperationsArray(sortedGroups);
+      // Формируем массив операций из отрендеренного DOM
+      const operations = buildOperationsArray(log);
 
       console.log('=== Итоги операций ===');
       console.log('Всего операций:', operations.length);
@@ -1488,16 +1478,14 @@ export function renderLog(log) {
       console.log('\n======================');
 
       // Отправляем сообщение родительскому окну с операциями
-      for (const origin of ALLOWED_PARENTS) {
-        try {
-          window.parent.postMessage({
-            type: "PURCHASE",
-            operations: operations,
-            totalSum: totalSum
-          }, origin);
-        } catch {
-          console.log("ты пытался что-то купить");
-        }
+      try {
+        window.parent.postMessage({
+          type: "PURCHASE",
+          operations: operations,
+          totalSum: totalSum
+        }, '*');
+      } catch {
+        console.log("ты пытался что-то купить");
       }
     });
 

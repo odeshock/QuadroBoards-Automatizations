@@ -6,9 +6,14 @@
 (function () {
   "use strict";
 
+  // Проверка наличия MoneyID
+  if (!window.PROFILE_FIELDS?.MoneyID) {
+    console.error("Ошибка: не найдено значение PROFILE_FIELDS.MoneyID");
+    return; // Останавливаем выполнение скрипта
+  }
+
   // ===== Настройки поля =====
-  const DEFAULT_FIELD_ID = "6";
-  const idNum = String(window.MoneyFieldUpdID ?? DEFAULT_FIELD_ID).trim().replace(/\D/g, "") || DEFAULT_FIELD_ID;
+  const idNum = String(window.PROFILE_FIELDS?.MoneyID);
   const fieldName = `pa-fld${idNum}`;
 
   // ===== Утилиты =====

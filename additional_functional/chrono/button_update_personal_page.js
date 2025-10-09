@@ -2,7 +2,22 @@
 // Делает точечный апдейт персональной страницы usr{ID}_chrono,
 // используя collectChronoByUser и общий билдер FMV.buildChronoHtml.
 // Плюс — массовое обновление поверх этого же вызова.
-(function () {
+
+// === КНОПКА: массовое обновление персоналок (обёртка над runBulkChronoUpdate) ===
+(() => {
+  'use strict';
+
+  // Проверяем наличие нужных полей
+  if (!checkChronoFields(['GroupID', 'AmsForumID', 'ForumInfo'])) {
+    console.warn('[button_update_personal_page] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ForumInfo');
+    return;
+  }
+
+  // Если всё ок — продолжаем
+  const GID        = (window.CHRONO_CHECK.GroupID).map(Number);
+  const FID        = (window.CHRONO_CHECK.AmsForumID).map(String);
+  const SECTIONS   = window.CHRONO_CHECK.ForumInfo;
+
   if (!window.FMV) window.FMV = {};
 
   /** ============================
@@ -23,33 +38,26 @@
    *  Точечный апдейт одного пользователя
    *  ============================ */
   /**
-   * @param {string|number} userId
-   * @param {Object} [opts]
-   * @param {Array}  [opts.sections]   список секций (если у вас есть CHRONO_CHECK.ForumInfo, можно оставить пустым)
-   * @param {boolean} [opts.verify=false]  верифицировать чтением страницы после сохранения
-   * @param {string} [opts.titlePrefix="Хронология"]  префикс заголовка в билдере
-   * @returns {Promise<{id:string,status:string, page?:string}>}
-   */
-  FMV.updateChronoForUser = async function updateChronoForUser(userId, opts = {}) {
+  * @param {string|number} userId
+  * @param {Object} [opts]
+  * @param {Array}  [opts.sections]   список секций (если у вас есть CHRONO_CHECK.ForumInfo, можно оставить пустым)
+  * @returns {Promise<{id:string,status:string, page?:string}>}
+  */
+  async function updateChronoForUser(userId, opts = {}) {
     const FMVeditPersonalPage = requireFn("FMVeditPersonalPage");
     const collectChronoByUser = requireFn("collectChronoByUser");
     const buildChronoHtml     = requireFn("FMV.buildChronoHtml");
 
-    const VERIFY = !!opts.verify;
     const id = String(userId);
     const pageName = `usr${id}_chrono`;
 
     // Источник секций (не обязательно)
-    const SECTIONS = Array.isArray(opts.sections) && opts.sections.length
-      ? opts.sections
-      : (Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-          ? window.CHRONO_CHECK.ForumInfo
-          : undefined);
+    const sectionsArg = opts.sections;
 
     // 1) Собираем хронологию по пользователям
     let byUser;
     try {
-      byUser = await collectChronoByUser({ sections: SECTIONS });
+      byUser = await collectChronoByUser({ sections: sectionsArg });
     } catch (e) {
       return { id, status: `ошибка collectChronoByUser: ${e?.message || e}` };
     }
@@ -63,7 +71,7 @@
     // 3) Строим HTML через общий билдер
     let html;
     try {
-      html = buildChronoHtml(data, { titlePrefix: opts.titlePrefix || "Хронология" });
+      html = buildChronoHtml(data, { titlePrefix: "Хронология" });
     } catch (e) {
       return { id, status: `ошибка buildChronoHtml: ${e?.message || e}` };
     }
@@ -76,32 +84,21 @@
       return { id, status: `ошибка сохранения: ${e?.message || e}` };
     }
 
-    // Нормализуем ответ
     const saved = normalizeSaveStatus(res);
-    if (!VERIFY) return { id, status: saved, page: pageName };
-
-    // 5) Верификация (опционально)
-    try {
-      const ok = await verifyPageContains(pageName, data?.name || "");
-      return { id, status: ok ? `${saved} (подтверждено)` : `${saved} (не подтвердилось чтением)` , page: pageName };
-    } catch (e) {
-      return { id, status: `${saved} (ошибка верификации: ${e?.message || e})`, page: pageName };
-    }
+    return { id, status: saved, page: pageName };
   };
 
   /** ============================
    *  Массовое обновление
    *  ============================ */
   /**
-   * @param {Object} [opts]
-   * @param {Array<string|number>} [opts.ids] — явный список id; если не задан, будет вызван FMV.fetchUsers()
-   * @param {number} [opts.delayMs=200] — пауза между сохранениями
-   * @param {boolean} [opts.verify=false]
-   * @param {Array} [opts.sections]
-   * @param {string} [opts.titlePrefix]
-   * @returns {Promise<Array<{id:string,status:string,page?:string}>>}
-   */
-  FMV.runBulkChronoUpdate = async function runBulkChronoUpdate(opts = {}) {
+  * @param {Object} [opts]
+  * @param {Array<string|number>} [opts.ids] — явный список id; если не задан, будет вызван FMV.fetchUsers()
+  * @param {number} [opts.delayMs=200] — пауза между сохранениями
+  * @param {Array} [opts.sections]
+  * @returns {Promise<Array<{id:string,status:string,page?:string}>>}
+  */
+  async function runBulkChronoUpdate(opts = {}) {
     const delayMs = Number.isFinite(opts.delayMs) ? opts.delayMs : 200;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -121,10 +118,8 @@
 
     const results = [];
     for (const u of users) {
-      const r = await FMV.updateChronoForUser(u.id, {
-        sections: opts.sections,
-        verify:   !!opts.verify,
-        titlePrefix: opts.titlePrefix
+      const r = await updateChronoForUser(u.id, {
+        sections: opts.sections
       });
       results.push(r);
       if (delayMs) await sleep(delayMs);
@@ -144,41 +139,6 @@
     if (s === "notfound") return "страница не найдена";
     return String(s);
   }
-
-  async function verifyPageContains(pageName, needle) {
-    if (!needle) return false;
-    const url = `/admin_pages.php?edit_page=${encodeURIComponent(pageName)}`;
-
-    // Если у вас есть кастомный загрузчик CP1251:
-    if (typeof window.fetchCP1251Doc === "function") {
-      const doc = await window.fetchCP1251Doc(url);
-      const ta = doc?.querySelector?.('#page-content,[name="content"]');
-      const val = (ta && (ta.value || ta.textContent)) || doc?.body?.innerText || "";
-      return String(val).includes(needle);
-    }
-
-    // Обычный fetch
-    const html = await fetch(url, { credentials: "include" }).then(r => r.text());
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const ta = doc.querySelector('#page-content,[name="content"]');
-    const val = (ta && (ta.value || ta.textContent)) || doc.body?.innerText || "";
-    return String(val).includes(needle);
-  }
-})();
-
-// === КНОПКА: массовое обновление персоналок (обёртка над runBulkChronoUpdate) ===
-(() => {
-  'use strict';
-
-  const GID        = (window.CHRONO_CHECK?.GroupID || []).map(Number);
-  const FID        = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
-  // если нужно ограничить показ — используйте forum/topic из CHRONO_CHECK по аналогии с другими кнопками
-  if (!GID.length || !FID.length) return;
-
-  // Пробуем прокинуть sections, если заранее подготовлены
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-    ? window.CHRONO_CHECK.ForumInfo
-    : undefined;
 
   // Хелперы ссылок/экрановки — совместимы с другими кнопками
   if (typeof window.userLinkHtml !== 'function') {
@@ -241,12 +201,9 @@
         // Этап 2: массовое обновление
         setStatus('Обновляю…');
 
-        const results = await FMV.runBulkChronoUpdate({
+        const results = await runBulkChronoUpdate({
           ids: explicitIds,
-          sections: SECTIONS,
-          // при необходимости можно прокинуть verify/titlePrefix:
-          // verify: false,
-          // titlePrefix: 'Хронология'
+          sections: SECTIONS
         }); // вернёт [{ id, status, page? }] — см. реализацию в update_personal
 
         // Пост-обработка результатов

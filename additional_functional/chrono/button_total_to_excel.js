@@ -2,25 +2,21 @@
 (() => {
   'use strict';
 
-  /* ===== входные ===== */
-  const GID = (window.CHRONO_CHECK?.GroupID || []).map(Number);
-  const FID = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
-  const TID = String(window.CHRONO_CHECK?.ChronoTopicID || '').trim();
-  const PID = String(window.CHRONO_CHECK?.TotalChronoPostID || '').trim();
-  const OPEN_URL = (new URL(`/viewtopic.php?id=${TID}#p${PID}`, location.href)).href;
-
-  if (!GID.length || !FID.length || !TID || !PID) {
-    console.warn('[button_total_to_excel] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID');
+  // Проверяем наличие нужных полей
+  if (!checkChronoFields(['GroupID', 'AmsForumID', 'ChronoTopicID', 'TotalChronoPostID', 'ForumInfo'])) {
+    console.warn('[button_total_to_excel] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, TotalChronoPostID, ForumInfo');
     return;
   }
 
-  // разделы (можно переопределить через CHRONO_CHECK.ForumInfo)
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-    ? window.CHRONO_CHECK.ForumInfo
-    : [];
-
-  // базовый адрес сайта для ссылок на профиль
+  // Если всё ок — продолжаем
+  const GID        = (window.CHRONO_CHECK.GroupID).map(Number);
+  const FID        = (window.CHRONO_CHECK.AmsForumID).map(String);
+  const TID        = String(window.CHRONO_CHECK.ChronoTopicID).trim();
+  const PID        = String(window.CHRONO_CHECK.TotalChronoPostID).trim();
+  const OPEN_URL   = new URL(`/viewtopic.php?id=${TID}#p${PID}`, location.href).href;
   const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
+  const SECTIONS   = window.CHRONO_CHECK.ForumInfo;
+
 
   let lastBlobUrl = '';
 

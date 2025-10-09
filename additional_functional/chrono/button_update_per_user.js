@@ -2,18 +2,19 @@
 (() => {
   'use strict';
 
-  const GID        = (window.CHRONO_CHECK?.GroupID || []).map(Number);
-  const FID        = (window.CHRONO_CHECK?.AmsForumID || []).map(String);
-  const TID        = String(window.CHRONO_CHECK?.ChronoTopicID || '').trim();
-  const TARGET_PID = String(window.CHRONO_CHECK?.PerPersonChronoPostID || '').trim();
+  // Проверяем наличие нужных полей
+  if (!checkChronoFields(['GroupID', 'AmsForumID', 'ChronoTopicID', 'PerPersonChronoPostID', 'ForumInfo'])) {
+    console.warn('[button_update_per_user] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, PerPersonChronoPostID, ForumInfo');
+    return;
+  }
+
+  // Если всё ок — продолжаем
+  const GID        = (window.CHRONO_CHECK.GroupID).map(Number);
+  const FID        = (window.CHRONO_CHECK.AmsForumID).map(String);
+  const TID        = String(window.CHRONO_CHECK.ChronoTopicID).trim();
+  const TARGET_PID = String(window.CHRONO_CHECK.PerPersonChronoPostID).trim();
   const SITE_URL   = (window.SITE_URL || location.origin).replace(/\/+$/, '');
-
-  if (!GID.length || !FID.length || !TID || !TARGET_PID) return;
-
-  // при наличии — явно прокинем sections
-  const SECTIONS = Array.isArray(window.CHRONO_CHECK?.ForumInfo) && window.CHRONO_CHECK.ForumInfo.length
-    ? window.CHRONO_CHECK.ForumInfo
-    : undefined;
+  const SECTIONS = window.CHRONO_CHECK.ForumInfo;
 
   // хелперы ссылок
   if (typeof window.userLink !== 'function') {

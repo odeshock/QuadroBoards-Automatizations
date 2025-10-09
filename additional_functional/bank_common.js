@@ -112,7 +112,7 @@ function encodeWithSep(text, with_and = false) {
   const words = text.trim().split(/\s+/);
 
   // Соединяем через 
-  const merger = with_and ? ' ' : ' AND ';
+  const merger = with_and ? '+' : '+AND+';
   const combined = words.join(merger);
 
   // Кодируем в URL (UTF-8)

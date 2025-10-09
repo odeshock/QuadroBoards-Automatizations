@@ -1344,6 +1344,17 @@ export function renderLog(log) {
         console.log('Данные:', group);
       });
       console.log('\n======================');
+
+      // Отправляем сообщение родительскому окну
+      try {
+        for (const origin of ALLOWED_PARENTS) {
+          try {
+            window.parent.postMessage({ type: "PURCHASE" }, origin);
+          } catch {}
+        }
+      } catch {
+        console.log("ты пытался что-то купить");
+      }
     });
 
     buttonsWrap.appendChild(resetBtn);

@@ -1,4 +1,4 @@
-function formatOperations(operations) {
+function formatBankOperations(operations) {
   let result = '';
 
   operations.forEach((op, i) => {
@@ -35,4 +35,4 @@ function formatOperations(operations) {
   return result.trim();
 }
 
-window.formatOperations = formatOperations;
+window.formatBankOperations = formatBankOperations;

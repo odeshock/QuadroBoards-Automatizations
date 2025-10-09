@@ -156,7 +156,7 @@ const FORM_STATE = new WeakMap();
 
 /* ================== ОСНОВНАЯ ФУНКЦИЯ ==================
    image_set: массив СТРОК (HTML или URL)
-   fieldSuffix: '5' → fld5 / form[fld5]
+   fieldSuffix (number): 5 → 'fld5' / 'form[fld5]' 
    opts: { btnWidth?: number, btnHeight?: number, gridColSize?: number, modalLinkMode?: boolean }
 */
 function applyImagePicker(image_set, fieldSuffix, opts = {}) {

@@ -165,28 +165,37 @@
   }
 
   // ----- кнопка-тумблер -----
-  createForumButton({
-    allowedGroups: CHRONO_CHECK?.GroupID || [],
-    allowedForums: CHRONO_CHECK?.ForumID || [],
-    label: BUTTON_LABEL,
-    order: BUTTON_ORDER,
-    showStatus: false,
-    showDetails: false,
-    showLink: false,
+  if (
+    window.CHRONO_CHECK &&
+    Array.isArray(window.CHRONO_CHECK.GroupID) &&
+    Array.isArray(window.CHRONO_CHECK.ForumID)
+  ) {
+    createForumButton({
+      allowedGroups: window.CHRONO_CHECK.GroupID,
+      allowedForums: window.CHRONO_CHECK.ForumID,
+      label: BUTTON_LABEL,
+      order: BUTTON_ORDER,
+      showStatus: false,
+      showDetails: false,
+      showLink: false,
 
-    async onClick({ wrap }) {
-      if (wrap.nextElementSibling?.classList.contains('fmv-meta')) {
-        wrap.nextElementSibling.remove();
-        localStorage.setItem('fmv:meta:enabled', '0');
-      } else {
-        const block = await buildMetaHtml();
-        if (block) {
-          wrap.parentNode.insertBefore(block, wrap.nextSibling);
-          localStorage.setItem('fmv:meta:enabled', '1');
+      async onClick({ wrap }) {
+        if (wrap.nextElementSibling?.classList.contains('fmv-meta')) {
+          wrap.nextElementSibling.remove();
+          localStorage.setItem('fmv:meta:enabled', '0');
+        } else {
+          const block = await buildMetaHtml();
+          if (block) {
+            wrap.parentNode.insertBefore(block, wrap.nextSibling);
+            localStorage.setItem('fmv:meta:enabled', '1');
+          }
         }
       }
-    }
-  });
+    });
+  } else {
+    console.warn('[tags_visibility] Требуются CHRONO_CHECK.GroupID, ForumID');
+  }
+
 
   // авто-восстановление состояния
   (async () => {

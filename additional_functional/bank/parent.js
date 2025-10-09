@@ -1,4 +1,4 @@
-function formatBankOperations(operations) {
+export function formatBankOperations(operations) {
   let result = '';
 
   operations.forEach((op, i) => {

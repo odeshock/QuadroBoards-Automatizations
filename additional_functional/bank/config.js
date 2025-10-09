@@ -2,6 +2,11 @@
 // config.js — Константы и конфигурации
 // ============================================================================
 
+export const ALLOWED_PARENTS = [
+    "https://testfmvoice.rusff.me",   // тест
+    "https://followmyvoice.rusff.me/"        // прод
+];
+
 // Базовые таймауты (3 минуты = 180000 мс)
 export const DEFAULT_TIMEOUT_MS = 180000;
 export const COUNTER_POLL_INTERVAL_MS = 500;

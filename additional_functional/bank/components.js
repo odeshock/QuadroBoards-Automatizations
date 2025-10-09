@@ -3,6 +3,7 @@
 // ============================================================================
 
 import {
+  ALLOWED_PARENTS,
   COUNTER_POLL_INTERVAL_MS,
   FORM_TIMEOUT_MS,
   PROMO_TIMEOUT_MS,
@@ -36,6 +37,149 @@ import {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * Конвертирует HTML-разметку в BB-коды
+ * @param {string} html - HTML строка
+ * @returns {string} - строка с BB-кодами
+ */
+function htmlToBBCode(html) {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  // Рекурсивно обрабатываем элементы
+  function processNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent;
+    }
+
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tagName = node.tagName.toLowerCase();
+
+      // Обрабатываем ссылки
+      if (tagName === 'a') {
+        const href = node.getAttribute('href') || '';
+        const text = node.textContent || '';
+        // Если href и текст совпадают, оставляем просто URL
+        if (href === text) {
+          return href;
+        }
+        // Иначе используем BB-код
+        return `[url=${href}]${text}[/url]`;
+      }
+
+      // Обрабатываем strong/b
+      if (tagName === 'strong' || tagName === 'b') {
+        const content = Array.from(node.childNodes).map(processNode).join('');
+        return `[b]${content}[/b]`;
+      }
+
+      // Обрабатываем br
+      if (tagName === 'br') {
+        return '\n';
+      }
+
+      // Для остальных элементов просто обрабатываем дочерние узлы
+      return Array.from(node.childNodes).map(processNode).join('');
+    }
+
+    return '';
+  }
+
+  return Array.from(tempDiv.childNodes).map(processNode).join('');
+}
+
+/**
+ * Формирует массив операций для отправки (упрощенная версия)
+ * @param {Array} groups - массив групп операций из submissionGroups
+ * @returns {Array} - массив операций с форматированными данными
+ */
+function buildOperationsArray(groups) {
+  const BASE_URL = 'http://followmyvoice.rusff.me/';
+  const operations = [];
+
+  groups.forEach((group) => {
+    const info = [];
+    const isIncome = group.isDiscount || group.templateSelector?.includes('income');
+
+    // Получаем сумму (используем простую логику)
+    let groupSum = 0;
+    if (group.price && group.entries.length > 0) {
+      groupSum = Number(group.price) * group.entries.length;
+    }
+    const finalSum = isIncome ? groupSum : -groupSum;
+
+    // Собираем информацию из entries
+    group.entries.forEach((item) => {
+      const dataObj = item.data || {};
+
+      // Проверяем, есть ли получатели (recipient_N)
+      const recipientKeys = Object.keys(dataObj).filter(k => k.match(/^recipient_(\d+)$/));
+
+      if (recipientKeys.length > 0) {
+        // Форма с получателями
+        recipientKeys.forEach(key => {
+          const idx = key.match(/^recipient_(\d+)$/)[1];
+          const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
+          if (!rid) return;
+
+          const user = window.USERS_LIST?.find(u => String(u.id) === rid);
+          const userName = user ? user.name : '';
+          const userId = user ? user.id : rid;
+
+          const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
+          const quantity = dataObj[`quantity_${idx}`] || dataObj[`topup_${idx}`] || dataObj[`amount_${idx}`] || '';
+
+          let htmlContent = `<strong><a href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
+
+          if (quantity) {
+            const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
+            if (qtyNum !== null) {
+              htmlContent += ` — ${formatNumber(qtyNum)}`;
+            }
+          }
+
+          if (comment) {
+            htmlContent += `<br><br><strong>Комментарий: </strong>${comment}`;
+          }
+
+          info.push({
+            type: 'list',
+            comment: htmlToBBCode(htmlContent)
+          });
+        });
+      } else {
+        // Простые формы с URL или текстом
+        Object.entries(dataObj).forEach(([key, value]) => {
+          if (value === undefined || value === null || String(value).trim() === '') return;
+
+          const raw = typeof value === 'string' ? value.trim() : value;
+          const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
+
+          if (isUrl) {
+            info.push({
+              type: 'list',
+              comment: raw
+            });
+          } else {
+            info.push({
+              type: 'plain',
+              comment: `[b]${formatEntryKey(key)}[/b] — ${raw}`
+            });
+          }
+        });
+      }
+    });
+
+    operations.push({
+      title: group.title,
+      sum: finalSum,
+      info: info
+    });
+  });
+
+  return operations;
+}
 
 /**
  * Создает модальное окно подтверждения действия
@@ -1333,25 +1477,23 @@ export function renderLog(log) {
     buyBtn.className = 'button primary';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
+      // Формируем массив операций
+      const operations = buildOperationsArray(sortedGroups);
+
       console.log('=== Итоги операций ===');
-      console.log('Всего операций:', submissionGroups.length);
+      console.log('Всего операций:', operations.length);
       console.log('Общая сумма:', totalSum);
       console.log('\nДетали операций:');
-      submissionGroups.forEach((group, idx) => {
-        console.log(`\n#${idx + 1} ${group.title}`);
-        console.log('Template:', group.templateSelector);
-        console.log('Записей:', group.entries.length);
-        console.log('Данные:', group);
-      });
+      console.log(operations);
       console.log('\n======================');
 
-      // Отправляем сообщение родительскому окну
+      // Отправляем сообщение родительскому окну с операциями
       try {
-        for (const origin of ALLOWED_PARENTS) {
-          try {
-            window.parent.postMessage({ type: "PURCHASE" }, origin);
-          } catch {}
-        }
+        window.parent.postMessage({
+          type: "PURCHASE",
+          operations: operations,
+          totalSum: totalSum
+        }, '*');
       } catch {
         console.log("ты пытался что-то купить");
       }

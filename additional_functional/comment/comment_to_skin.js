@@ -1,11 +1,11 @@
 /**
  * Загружает карточки из текущего домена.
- * @param {string} N  id темы (viewtopic.php?id=N)
- * @param {string} K  id поста (#pK-content)
+ * @param {string} topic_id  id темы (viewtopic.php?id=<topic_id>)
+ * @param {string} comment_id  id поста (#p<comment_id>-content)
  * @returns {Promise<Array<{id:string, html:string}>>}
  */
-async function fetchCardsWrappedClean(N, K) {
-  const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(N))}`;
+async function fetchCardsWrappedClean(topic_id, comment_id) {
+  const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
 
   const normSpace = (typeof FMV?.normSpace === 'function')
     ? FMV.normSpace
@@ -37,9 +37,9 @@ async function fetchCardsWrappedClean(N, K) {
   const pageHtml = await smartFetchHtml(topicUrl);
   const doc = toDoc(pageHtml);
 
-  const post = doc.querySelector(`#p${String(K)}-content`);
+  const post = doc.querySelector(`#p${String(comment_id)}-content`);
   if (!post) {
-    console.warn(`Не найден #p${K}-content на ${topicUrl}`);
+    console.warn(`Не найден #p${comment_id}-content на ${topicUrl}`);
     return [];
   }
 

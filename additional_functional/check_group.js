@@ -12,6 +12,6 @@ function getCurrentGroupId() {
 
 async function ensureAllowed() {
   const gid = getCurrentGroupId();
-  const allow = new Set((CHRONO_CHECK.GroupID || []).map(String)); // нормализуем к строкам
+  const allow = new Set((window?.CHRONO_CHECK.GroupID || []).map(String)); // нормализуем к строкам
   return gid !== null && allow.has(String(gid));
 }

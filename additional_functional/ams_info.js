@@ -27,11 +27,11 @@
       // объединяем списки для удобства
       const allowedGroups = [
         ...(PROFILE_CHECK.GroupID || []),
-        ...(CHRONO_CHECK.GroupID || [])
+        ...(window.CHRONO_CHECK?.GroupID || [])
       ];
       const allowedForums = [
         ...(PROFILE_CHECK.ForumIDs || []),
-        ...(CHRONO_CHECK.ForumID || []),
+        ...(window?.CHRONO_CHECK.ForumID || []),
         ...(CHRONO_CHECK.AmsForumID || []),
       ];
 
@@ -45,8 +45,9 @@
       const isAllowedForum = crumbs && Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {
           const u = new URL(a.getAttribute('href'), location.href);
-          return u.pathname.endsWith('/viewforum.php') &&
-                 allowedForums.includes(u.searchParams.get('id'));
+          const id = u.searchParams.get('id');
+          const check = id ? allowedForums.includes(Number(id)) : false;
+          return u.pathname.endsWith('/viewforum.php') && check;
         } catch { return false; }
       });
 

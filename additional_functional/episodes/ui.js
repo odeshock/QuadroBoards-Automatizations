@@ -3,11 +3,10 @@
   'use strict';
 
   // ───────────────────── helpers-конфиг ─────────────────────
-  window.CHRONO_CHECK = window.CHRONO_CHECK || {};
   // ожидаем, что check_group.js уже подключен и экспортирует getCurrentGroupId / getCurrentUserId
   function isAllowedAdmin(){
-    const groups = (CHRONO_CHECK.GroupID || []).map(String);
-    const users  = (CHRONO_CHECK.AllowedUser || []).map(String);
+    const groups = (window.CHRONO_CHECK?.GroupID || []).map(String);
+    const users  = (window.CHRONO_CHECK?.AllowedUser || []).map(String);
     const gid = (typeof window.getCurrentGroupId === 'function') ? String(window.getCurrentGroupId()) : '';
     const uid = (typeof window.getCurrentUserId === 'function') ? String(window.getCurrentUserId()) : '';
     return (gid && groups.includes(gid)) || (uid && users.includes(uid));
@@ -478,7 +477,7 @@
     // /post.php?fid=N без action (старое создание)
     if (/\/post\.php$/i.test(path) && !q.has('action')) {
       const fid = +(q.get('fid')||0);
-      const allowed = (CHRONO_CHECK.ForumID || []).map(Number);
+      const allowed = (window.CHRONO_CHECK?.ForumID || []).map(Number);
       if (allowed.includes(fid)) attachToPage({ strip:false, showOnlyIfCast:false });
     }
 
@@ -493,7 +492,7 @@
       if (q.has('tid')) return;
     
       const fid = Number(q.get('fid'));
-      const allowed = (CHRONO_CHECK.ForumID || []).map(Number);
+      const allowed = (window.CHRONO_CHECK?.ForumID || []).map(Number);
       if (!fid || allowed.includes(fid)) {
         attachToPage({ strip: true, showOnlyIfCast: false });
       }

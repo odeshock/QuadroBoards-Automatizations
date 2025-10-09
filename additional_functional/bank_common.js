@@ -108,18 +108,22 @@ async function fetchProfileInfo(userId = window.UserID) {
 }
 
 function encodeWithSep(text, with_and = false) {
-  // Разбиваем строку по пробелам
   const words = text.trim().split(/\s+/);
 
-  // Кодируем каждое слово отдельно
-  const encodedWords = words.map(w => encodeURIComponent(w));
+  // Кодируем каждый символ, кроме безопасных
+  const encodedWords = words.map(w =>
+    w.split('').map(ch => {
+      // оставляем только латиницу, цифры, апостроф, обратную кавычку, тильду и подчёркивание
+      // дефис НЕ включаем, чтобы он стал %2D
+      if (/[A-Za-z0-9'`~_]/.test(ch)) return ch;
+      return encodeURIComponent(ch);
+    }).join('')
+  );
 
-  // Выбираем разделитель
-  const merger = with_and ? ' AND ' : ' ';
-  
-  // Объединяем закодированные слова
+  const merger = with_and ? '+AND+' : '+';
   return encodedWords.join(merger);
 }
+
 
 /**
  * scrapePosts(author, forums, stopOnFirstNonEmpty?, last_src?, options?)

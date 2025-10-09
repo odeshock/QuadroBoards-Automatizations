@@ -1,9 +1,8 @@
-// episode_creation_boot.js — монтирует общий виджет на /post.php?fid=8|9
 (function(){
   try{
     if (!/\/post\.php(\?|$)/.test(location.pathname)) return;
     var fid = +(new URLSearchParams(location.search).get('fid')||0);
-    var allowed = (CHRONO_CHECK.ForumID || []).map(Number);
+    var allowed = (window.CHRONO_CHECK.ForumID || []).map(Number);
     if (allowed.indexOf(fid) === -1) return; // или allowed.includes(fid)
 
     var $form = $('#post form, form[action*="post.php"]').first();
@@ -21,5 +20,5 @@
       showOnlyIfFMVcast: false,
       className: 'fmv--compact'   // просто добавочный класс, если хочешь отличать темы
     });
-  }catch(e){ console.error('episode_creation_boot error:', e); }
+  }catch(e){ console.error('episode creation error:', e); }
 })();

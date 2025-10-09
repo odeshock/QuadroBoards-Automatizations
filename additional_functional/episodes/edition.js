@@ -1,4 +1,3 @@
-// episode_edit_boot.js — монтирует общий виджет на /edit.php?id=N&topicpost=1
 (function(){
   try{
     if (!/\/edit\.php$/i.test(location.pathname)) return;
@@ -21,5 +20,5 @@
       showOnlyIfFMVcast: true,    // показывать только если в тексте есть FMVcast
       className: 'fmv--compact'
     });
-  }catch(e){ console.error('episode_edit_boot error:', e); }
+  }catch(e){ console.error('episode edition error:', e); }
 })();

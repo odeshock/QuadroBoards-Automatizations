@@ -111,12 +111,14 @@ function encodeWithSep(text, with_and = false) {
   // Разбиваем строку по пробелам
   const words = text.trim().split(/\s+/);
 
-  // Соединяем через 
-  const merger = with_and ? '+' : '+AND+';
-  const combined = words.join(merger);
+  // Кодируем каждое слово отдельно
+  const encodedWords = words.map(w => encodeURIComponent(w));
 
-  // Кодируем в URL (UTF-8)
-  return encodeURIComponent(combined);
+  // Выбираем разделитель
+  const merger = with_and ? ' AND ' : ' ';
+  
+  // Объединяем закодированные слова
+  return encodedWords.join(merger);
 }
 
 /**
@@ -134,7 +136,6 @@ function encodeWithSep(text, with_and = false) {
 async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src = "", { maxPages = 999, delayMs = 300 } = {}) {
   if (!author) throw new Error("author обязателен");
   if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
-
   const basePath    = "/search.php";
   const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));

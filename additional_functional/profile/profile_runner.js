@@ -64,9 +64,6 @@
   
     // 2) Group-гейт: список разрешённых групп берём из SKIN.GroupID (массив строк)
     //    ensureAllowed() использует CHRONO_CHECK.GroupID и текущий gid
-    window.CHRONO_CHECK = {
-      GroupID: (window.SKIN && Array.isArray(window.SKIN.GroupID)) ? window.SKIN.GroupID : []
-    };
   
     if (typeof window.ensureAllowed === 'function') {
       const ok = await window.ensureAllowed();

@@ -2,10 +2,12 @@
 // config.js — Константы и конфигурации
 // ============================================================================
 
-export const ALLOWED_PARENTS = [
-    "https://testfmvoice.rusff.me",   // тест
-    "https://followmyvoice.rusff.me"        // прод
-];
+export const ALLOWED_PARENTS = Array.isArray(window.ALLOWED_PARENTS)
+  ? window.ALLOWED_PARENTS
+  : [
+      "https://testfmvoice.rusff.me",   // тест
+      "https://followmyvoice.rusff.me"  // прод
+    ];
 export const BASE_URL = 'http://followmyvoice.rusff.me';
 
 // Базовые таймауты (3 минуты = 180000 мс)

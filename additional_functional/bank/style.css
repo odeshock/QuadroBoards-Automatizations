@@ -670,3 +670,33 @@
     height: 114px;
     width: auto;
   }
+
+  /* ====== Итоговая плашка ====== */
+  .summary-panel {
+    margin-top: 32px;
+    padding: 24px;
+    background: var(--panel);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .summary-total {
+    font-size: 20px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .summary-total strong {
+    margin-right: 8px;
+  }
+
+  .summary-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .summary-buttons .button {
+    min-width: 120px;
+  }

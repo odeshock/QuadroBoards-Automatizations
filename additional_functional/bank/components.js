@@ -38,6 +38,83 @@ import {
 // ============================================================================
 
 /**
+ * Создает модальное окно подтверждения действия
+ * @param {string} message - текст сообщения для пользователя
+ * @returns {Promise<boolean>} - true если пользователь подтвердил, false если отменил
+ */
+export function showConfirmModal(message) {
+  return new Promise((resolve) => {
+    // Создаем backdrop для модального окна подтверждения
+    const confirmBackdrop = document.createElement('div');
+    confirmBackdrop.className = 'modal-backdrop';
+    confirmBackdrop.style.display = 'flex';
+    confirmBackdrop.setAttribute('aria-hidden', 'false');
+
+    // Создаем модальное окно
+    const confirmModal = document.createElement('div');
+    confirmModal.className = 'modal confirm-modal';
+    confirmModal.setAttribute('role', 'dialog');
+    confirmModal.setAttribute('aria-modal', 'true');
+
+    // Создаем содержимое
+    confirmModal.innerHTML = `
+      <header>
+        <h3>Подтверждение</h3>
+      </header>
+      <div class="body">
+        <p style="margin: 0; text-align: center;">${message}</p>
+      </div>
+      <div class="form-footer">
+        <div style="display:flex; gap:8px; justify-content: center; width: 100%;">
+          <button type="button" class="button" data-action="cancel">Отмена</button>
+          <button type="button" class="button primary" data-action="confirm">Подтвердить</button>
+        </div>
+      </div>
+    `;
+
+    confirmBackdrop.appendChild(confirmModal);
+    document.body.appendChild(confirmBackdrop);
+
+    // Функция закрытия модального окна
+    const closeModal = () => {
+      confirmBackdrop.remove();
+    };
+
+    // Обработчик кнопки "Отмена"
+    const cancelBtn = confirmModal.querySelector('[data-action="cancel"]');
+    cancelBtn.addEventListener('click', () => {
+      closeModal();
+      resolve(false);
+    });
+
+    // Обработчик кнопки "Подтвердить"
+    const confirmBtn = confirmModal.querySelector('[data-action="confirm"]');
+    confirmBtn.addEventListener('click', () => {
+      closeModal();
+      resolve(true);
+    });
+
+    // Закрытие по клику на backdrop
+    confirmBackdrop.addEventListener('click', (e) => {
+      if (e.target === confirmBackdrop) {
+        closeModal();
+        resolve(false);
+      }
+    });
+
+    // Закрытие по Escape
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        resolve(false);
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+  });
+}
+
+/**
  * Универсальная функция расчета стоимости на основе режима из data.js
  * @param {string} mode - режим расчета ('price_per_item', 'price_per_item_w_bonus', 'entered_amount', 'price_w_entered_amount')
  * @param {number} price - базовая цена за единицу
@@ -281,6 +358,11 @@ export function renderLog(log) {
       const meta = document.createElement('span');
       meta.className = 'entry-meta';
 
+      // Определяем тип операции: доход (+) или расход (-)
+      const isIncome = group.isDiscount || group.templateSelector?.includes('income');
+      const prefix = isIncome ? '+ ' : '− ';
+      const color = isIncome ? '#22c55e' : '#ef4444';
+
       // формат "фикс + xнадбавка" (например "5 + x10") или используем mode
       const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
       if (m || group.mode === 'price_per_item_w_bonus') {
@@ -325,7 +407,7 @@ export function renderLog(log) {
 
         // Используем calculateCost для получения только итоговой суммы
         const total = calculateCost('price_per_item_w_bonus', price, bonus, totalCount, totalThousands, 0);
-        meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+        meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
         header.appendChild(meta);
       } else if (group.templateSelector === '#form-exp-transfer' || /Перевод средств другому/i.test(group.title || '')) {
         // Специальная логика для переводов: сумма + комиссия
@@ -353,9 +435,9 @@ export function renderLog(log) {
         if (recipientCount > 0) {
           const price = group.price !== null && group.price !== undefined ? Number(group.price) : 10;
           const total = calculateCost('price_w_entered_amount', price, 0, recipientCount, 0, totalAmount);
-          meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
         } else {
-          meta.textContent = `${group.amountLabel}: ${group.amount}`;
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
       } else if (group.isDiscount) {
@@ -365,7 +447,7 @@ export function renderLog(log) {
           const amount = Number(item.data?.discount_amount) || 0;
           totalDiscount += amount;
         });
-        meta.textContent = `${group.amountLabel}: ${formatNumber(totalDiscount)}`;
+        meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(totalDiscount)}</span>`;
         header.appendChild(meta);
       } else if (
         group.templateSelector === '#form-gift-present' ||
@@ -389,9 +471,9 @@ export function renderLog(log) {
         // Используем calculateCost для получения только итоговой суммы
         if (totalGifts > 0) {
           const total = calculateCost('price_per_item', giftPrice1, 0, totalGifts, 0, 0);
-          meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
         } else {
-          meta.textContent = `${group.amountLabel}: ${group.amount}`;
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
       } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
@@ -417,9 +499,9 @@ export function renderLog(log) {
 
         if (totalQuantity > 0) {
           const total = calculateCost(mode, price, 0, totalQuantity, 0, 0);
-          meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
         } else {
-          meta.textContent = `${group.amountLabel}: ${group.amount}`;
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
       } else {
@@ -451,10 +533,10 @@ export function renderLog(log) {
             // Иначе используем multiplier
             const items = totalQuantity > 0 ? totalQuantity : (totalRecipients > 0 ? totalRecipients : (totalEntryMultiplier > 0 ? totalEntryMultiplier : 1));
             const total = calculateCost(mode, price, bonus || 0, items, 0, 0);
-            meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+            meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
           } else {
             // Для других режимов пока показываем просто amount
-            meta.textContent = `${group.amountLabel}: ${group.amount}`;
+            meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
           }
         } else {
           // Старая логика для форм без mode (обратная совместимость)
@@ -462,9 +544,9 @@ export function renderLog(log) {
           if (amountNumber !== null) {
             const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
             const total = amountNumber * multiplier;
-            meta.textContent = `${group.amountLabel}: ${formatNumber(total)}`;
+            meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
           } else {
-            meta.textContent = `${group.amountLabel}: ${group.amount}`;
+            meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
           }
         }
         header.appendChild(meta);
@@ -1055,6 +1137,221 @@ export function renderLog(log) {
     entryEl.appendChild(itemsWrap);
     log.appendChild(entryEl);
   });
+
+  // ====== Итоговая плашка с суммой и кнопками ======
+  if (sortedGroups.length > 0) {
+    const summaryPanel = document.createElement('div');
+    summaryPanel.className = 'summary-panel';
+
+    // Вычисляем общую сумму
+    let totalSum = 0;
+    sortedGroups.forEach((group) => {
+      if (!group.amount) return;
+
+      const isIncome = group.isDiscount || group.templateSelector?.includes('income');
+      const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
+
+      if (m || group.mode === 'price_per_item_w_bonus') {
+        const price = group.price !== null && group.price !== undefined ? Number(group.price) : (m ? Number(m[1]) : 0);
+        const bonus = group.bonus !== null && group.bonus !== undefined ? Number(group.bonus) : (m ? Number(m[2]) : 0);
+
+        let totalCount = 0;
+        let totalThousands = 0;
+        group.entries.forEach((item) => {
+          const rawPersonal = item?.data?.personal_posts_json;
+          if (rawPersonal) {
+            try {
+              const arr = JSON.parse(rawPersonal);
+              if (Array.isArray(arr) && arr.length) {
+                totalCount += arr.length;
+                totalThousands += arr.reduce((s, it) => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  return s + Math.floor(Math.max(0, n) / 1000);
+                }, 0);
+              }
+            } catch (_) {}
+          }
+          const rawPlot = item?.data?.plot_posts_json;
+          if (rawPlot) {
+            try {
+              const arr = JSON.parse(rawPlot);
+              if (Array.isArray(arr) && arr.length) {
+                totalCount += arr.length;
+                totalThousands += arr.reduce((s, it) => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  const k = Math.floor(Math.max(0, n) / 1000);
+                  return s + Math.min(k, 3);
+                }, 0);
+              }
+            } catch (_) {}
+          }
+        });
+
+        const total = calculateCost('price_per_item_w_bonus', price, bonus, totalCount, totalThousands, 0);
+        totalSum += isIncome ? total : -total;
+      } else if (group.templateSelector === '#form-exp-transfer' || /Перевод средств другому/i.test(group.title || '')) {
+        let totalAmount = 0;
+        let recipientCount = 0;
+        group.entries.forEach((item) => {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1]);
+          idxs.forEach((idx) => {
+            const rawAmount = String(dataObj[`amount_${idx}`] ?? '').trim();
+            const amountNum = parseNumericAmount(rawAmount);
+            if (amountNum !== null && amountNum > 0) {
+              totalAmount += amountNum;
+              recipientCount++;
+            }
+          });
+        });
+        if (recipientCount > 0) {
+          const price = group.price !== null && group.price !== undefined ? Number(group.price) : 10;
+          const total = calculateCost('price_w_entered_amount', price, 0, recipientCount, 0, totalAmount);
+          totalSum += isIncome ? total : -total;
+        }
+      } else if (group.isDiscount) {
+        let totalDiscount = 0;
+        group.entries.forEach((item) => {
+          const amount = Number(item.data?.discount_amount) || 0;
+          totalDiscount += amount;
+        });
+        totalSum += totalDiscount;
+      } else if (
+        group.templateSelector === '#form-gift-present' ||
+        group.templateSelector === '#form-gift-custom' ||
+        ['#form-icon-custom', '#form-icon-present', '#form-badge-custom', '#form-badge-present', '#form-bg-custom', '#form-bg-present'].includes(group.templateSelector) ||
+        /Подарить подарок|Индивидуальный подарок/i.test(group.title || '')
+      ) {
+        let totalGifts = 0;
+        const giftPrice1 = Number.parseInt(group.giftPrice1, 10) || 100;
+        group.entries.forEach((item) => {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1]);
+          totalGifts += idxs.filter(idx => String(dataObj[`recipient_${idx}`] || '').trim()).length;
+        });
+        if (totalGifts > 0) {
+          const total = calculateCost('price_per_item', giftPrice1, 0, totalGifts, 0, 0);
+          totalSum += isIncome ? total : -total;
+        }
+      } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
+        let totalQuantity = 0;
+        group.entries.forEach((item) => {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1]);
+          idxs.forEach((idx) => {
+            const qty = Number(dataObj[`quantity_${idx}`]) || 0;
+            totalQuantity += qty;
+          });
+        });
+        const mode = group.mode || 'price_per_item';
+        const price = group.price !== null && group.price !== undefined ? Number(group.price) : (parseNumericAmount(group.amount) || 0);
+        if (totalQuantity > 0) {
+          const total = calculateCost(mode, price, 0, totalQuantity, 0, 0);
+          totalSum += isIncome ? total : -total;
+        }
+      } else {
+        const mode = group.mode;
+        const price = group.price !== null && group.price !== undefined ? Number(group.price) : null;
+        const bonus = group.bonus !== null && group.bonus !== undefined ? Number(group.bonus) : null;
+
+        if (mode && price !== null) {
+          if (mode === 'price_per_item') {
+            let totalQuantity = 0;
+            let totalRecipients = 0;
+            const totalEntryMultiplier = group.entries.reduce((sum, item) => {
+              const raw = item && typeof item.multiplier !== 'undefined' ? item.multiplier : null;
+              const numeric = typeof raw === 'string' ? Number.parseFloat(raw) : raw;
+              const value = Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+              return sum + value;
+            }, 0);
+
+            group.entries.forEach((item) => {
+              const dataObj = item.data || {};
+              if (dataObj.quantity !== undefined) {
+                totalQuantity += Number(dataObj.quantity) || 0;
+              }
+              const recipientKeys = Object.keys(dataObj).filter(k => k.startsWith('recipient_'));
+              totalRecipients += recipientKeys.length;
+            });
+
+            const items = totalQuantity > 0 ? totalQuantity : (totalRecipients > 0 ? totalRecipients : (totalEntryMultiplier > 0 ? totalEntryMultiplier : 1));
+            const total = calculateCost(mode, price, bonus || 0, items, 0, 0);
+            totalSum += isIncome ? total : -total;
+          }
+        } else {
+          const amountNumber = parseNumericAmount(group.amount);
+          if (amountNumber !== null) {
+            const totalEntryMultiplier = group.entries.reduce((sum, item) => {
+              const raw = item && typeof item.multiplier !== 'undefined' ? item.multiplier : null;
+              const numeric = typeof raw === 'string' ? Number.parseFloat(raw) : raw;
+              const value = Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+              return sum + value;
+            }, 0);
+            const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+            const total = amountNumber * multiplier;
+            totalSum += isIncome ? total : -total;
+          }
+        }
+      }
+    });
+
+    // Создаем содержимое панели
+    const totalText = document.createElement('div');
+    totalText.className = 'summary-total';
+    const totalColor = totalSum >= 0 ? '#22c55e' : '#ef4444';
+    const totalPrefix = totalSum >= 0 ? '+ ' : '− ';
+    totalText.innerHTML = `<strong>ИТОГО:</strong> <span style="color: ${totalColor}">${totalPrefix}${formatNumber(Math.abs(totalSum))}</span>`;
+    summaryPanel.appendChild(totalText);
+
+    // Кнопки
+    const buttonsWrap = document.createElement('div');
+    buttonsWrap.className = 'summary-buttons';
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'button';
+    resetBtn.textContent = 'Сбросить';
+    resetBtn.addEventListener('click', async () => {
+      const confirmed = await showConfirmModal('Вы уверены, что хотите очистить все операции?');
+      if (confirmed) {
+        submissionGroups.length = 0;
+        renderLog(log);
+      }
+    });
+
+    const buyBtn = document.createElement('button');
+    buyBtn.type = 'button';
+    buyBtn.className = 'button primary';
+    buyBtn.textContent = 'Купить';
+    buyBtn.addEventListener('click', () => {
+      console.log('=== Итоги операций ===');
+      console.log('Всего операций:', submissionGroups.length);
+      console.log('Общая сумма:', totalSum);
+      console.log('\nДетали операций:');
+      submissionGroups.forEach((group, idx) => {
+        console.log(`\n#${idx + 1} ${group.title}`);
+        console.log('Template:', group.templateSelector);
+        console.log('Записей:', group.entries.length);
+        console.log('Данные:', group);
+      });
+      console.log('\n======================');
+    });
+
+    buttonsWrap.appendChild(resetBtn);
+    buttonsWrap.appendChild(buyBtn);
+    summaryPanel.appendChild(buttonsWrap);
+
+    log.appendChild(summaryPanel);
+  }
 }
 
 // ============================================================================

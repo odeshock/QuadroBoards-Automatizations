@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, updateGiftDiscountEntry } from './services.js';
-import { renderLog, openModal, closeModal } from './components.js';
+import { renderLog, openModal, closeModal, showConfirmModal } from './components.js';
 import { injectTemplates } from './templates.js';
 import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems } from './data.js';
 import {
@@ -183,7 +183,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Редактирование/удаление в логе
-log.addEventListener('click', (e) => {
+log.addEventListener('click', async (e) => {
   const actionBtn = e.target.closest('[data-action]');
   if (!actionBtn) return;
   const { action, groupId, entryId } = actionBtn.dataset;
@@ -229,7 +229,7 @@ log.addEventListener('click', (e) => {
     if (!entryId) return;
 
     // Подтверждение удаления
-    const confirmed = confirm(TEXT_MESSAGES.CONFIRM_DELETE);
+    const confirmed = await showConfirmModal(TEXT_MESSAGES.CONFIRM_DELETE);
     if (!confirmed) return;
 
     const entryIndex = group.entries.findIndex((item) => item.id === entryId);

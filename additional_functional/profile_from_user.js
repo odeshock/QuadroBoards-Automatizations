@@ -89,7 +89,7 @@
   const nameCache = new Map();
 
   // Конфигурация списка удалённых профилей (опционально)
-  // Ожидается, что верхний код проекта задаёт window.EX_PROFILES_URL при необходимости.
+  // Ожидается, что верхний код проекта задаёт window.EX_PROFILES = { topicID, commentID}.
   let exProfilesMap = null;
   let exProfilesPromise = null;
 
@@ -97,10 +97,27 @@
     if (exProfilesMap) return exProfilesMap;
     if (exProfilesPromise) return exProfilesPromise;
 
-    if (!window.EX_PROFILES_URL) { exProfilesMap = new Map(); return exProfilesMap; }
+    // Проверка наличия window.EX_PROFILES
+    if (!window.EX_PROFILES || typeof window.EX_PROFILES !== 'object') {
+      console.error('[loadExProfiles] Ошибка: window.EX_PROFILES не задан или имеет неверный формат');
+      exProfilesMap = new Map();
+      return exProfilesMap;
+    }
+
+    const { topicID, commentID } = window.EX_PROFILES;
+
+    // Проверка наличия обязательных полей
+    if (topicID == null || commentID == null) {
+      console.error('[loadExProfiles] Ошибка: отсутствует topicID или commentID в window.EX_PROFILES');
+      exProfilesMap = new Map();
+      return exProfilesMap;
+    }
+
+    // Формируем URL из topicID и commentID
+    const url = `/viewtopic.php?id=${encodeURIComponent(topicID)}#p${encodeURIComponent(commentID)}`;
 
     exProfilesPromise = (async () => {
-      const html = await fetchHtml(window.EX_PROFILES_URL);
+      const html = await fetchHtml(url);
       const doc  = new DOMParser().parseFromString(html, 'text/html');
       const map  = new Map();
       for (const a of doc.querySelectorAll('a[href*="profile.php?id="]')) {

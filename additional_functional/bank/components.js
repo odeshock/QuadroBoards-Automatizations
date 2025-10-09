@@ -1488,14 +1488,16 @@ export function renderLog(log) {
       console.log('\n======================');
 
       // Отправляем сообщение родительскому окну с операциями
-      try {
-        window.parent.postMessage({
-          type: "PURCHASE",
-          operations: operations,
-          totalSum: totalSum
-        }, '*');
-      } catch {
-        console.log("ты пытался что-то купить");
+      for (const origin of ALLOWED_PARENTS) {
+        try {
+          window.parent.postMessage({
+            type: "PURCHASE",
+            operations: operations,
+            totalSum: totalSum
+          }, origin);
+        } catch {
+          console.log("ты пытался что-то купить");
+        }
       }
     });
 

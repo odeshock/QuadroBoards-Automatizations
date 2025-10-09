@@ -140,7 +140,7 @@ async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const buildUrl = (p) => {
     const u = new URL(basePath, location.origin);
-    u.search = new URLSearchParams({ action:"search", encodeWithSep(author), forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
+    u.search = new URLSearchParams({ action:"search", author:encodeWithSep(author), forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
     return u.toString();
   };
 
@@ -300,7 +300,7 @@ async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delay
   const buildSearchUrl = (p) => {
     const u = new URL(basePath, location.origin);
     u.search = new URLSearchParams({
-      action: "search", encodeWithSep(author), forums: forumsParam,
+      action: "search", author:encodeWithSep(author), forums: forumsParam,
       sort_dir: "DESC", show_as: "topics", p: String(p)
     }).toString();
     return u.toString();

@@ -2,6 +2,7 @@
 // config.js — Константы и конфигурации
 // ============================================================================
 
+//Основные urlы для работы
 export const ALLOWED_PARENTS = [
     "https://testfmvoice.rusff.me",   // тест
     "https://followmyvoice.rusff.me"        // прод

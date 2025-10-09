@@ -29,6 +29,15 @@
     const startOpen   = opts.startOpen   ?? false;
 
     // --- тянем библиотеки через fetchCardsWrappedClean
+    const SKIN = window.SKIN;
+
+    // если SKIN не объявлен — выходим и логируем предупреждение
+    if (!SKIN) {
+      console.warn('[setupSkins] window.SKIN не найден — прекращаю выполнение.');
+      return;
+    }
+
+    // --- тянем библиотеки через fetchCardsWrappedClean
     let [libPlashka0, libIcon0, libBack0, libGift0] = await Promise.all([
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),

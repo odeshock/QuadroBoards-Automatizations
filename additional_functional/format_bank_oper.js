@@ -2,7 +2,7 @@ function formatOperations(operations) {
   let result = '';
 
   operations.forEach((op, i) => {
-    result += `[b]— ${op.title}[/b] // ${op.sum}\n`;
+    result += `[b]— ${op.title}[/b] — ${op.sum}\n`;
 
     // проверяем, есть ли info и comment
     const info = op.info?.[0];

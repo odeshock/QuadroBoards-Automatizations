@@ -355,8 +355,10 @@ function initializeAccessControl() {
   // Для администраторов блокируем недоступные кнопки
   document.querySelectorAll('.btn-add').forEach((btn) => {
     const formId = btn.getAttribute('data-form');
+    // Убираем # для сравнения с константами
+    const formIdWithoutHash = formId ? formId.replace('#', '') : '';
 
-    if (!ADMIN_ALLOWED_ITEMS.includes(formId)) {
+    if (!ADMIN_ALLOWED_ITEMS.includes(formIdWithoutHash)) {
       btn.disabled = true;
       btn.classList.add('btn-disabled');
       btn.style.opacity = '0.3';

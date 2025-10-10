@@ -23,7 +23,7 @@ async function FMVreplaceFieldData(user_id, field_id, new_value, overwriteIfExis
   const FIELD_SELECTOR = '#fld' + field_id;
 
   // helper: "есть ли что-то" — всё, кроме "", " ", "0"
-  const hasSomething = (v) => v !== '' && v !== ' ' && v !== '0' && v !== 0;
+  const hasSomething = (v) => v !== '' && v !== ' ';
 
   try {
     // A) загрузка формы редактирования

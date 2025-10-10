@@ -26,11 +26,11 @@
 
       // объединяем списки для удобства
       const allowedGroups = [
-        ...(PROFILE_CHECK.GroupID || []),
+        ...(window.PROFILE_CHECK?.GroupID || []),
         ...(window.CHRONO_CHECK?.GroupID || [])
       ];
       const allowedForums = [
-        ...(PROFILE_CHECK.ForumIDs || []),
+        ...(window.PROFILE_CHECK?.ForumIDs || []),
         ...(window.CHRONO_CHECK?.ForumID || []),
         ...(window.CHRONO_CHECK?.AmsForumID || []),
       ];

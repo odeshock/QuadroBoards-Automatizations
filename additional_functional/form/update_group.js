@@ -17,20 +17,20 @@
 
   createForumButton({
     // доступ ограничиваем извне заданными списками
-    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
-    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
+    allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
     label: 'Сменить группу',
     order: 5,
 
     async onClick({ setStatus, setDetails }) {
       // --- 0) Проверка конфигурации PROFILE_CHECK ---
-      const fromStr = (PROFILE_CHECK && PROFILE_CHECK.GroupUser) || '';
-      const toStr   = (PROFILE_CHECK && PROFILE_CHECK.GroupPlayer) || '';
+      const fromStr = (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupUserID) || '';
+      const toStr   = (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupPlayerID) || '';
 
       if (!fromStr || !toStr) {
         const missing = [
-          !fromStr ? 'PROFILE_CHECK.GroupUser' : null,
-          !toStr   ? 'PROFILE_CHECK.GroupPlayer' : null
+          !fromStr ? 'PROFILE_CHECK.GroupUserID' : null,
+          !toStr   ? 'PROFILE_CHECK.GroupPlayerID' : null
         ].filter(Boolean).join(', ');
         setStatus('✖ Замена не выполнена', 'red');
         setDetails(

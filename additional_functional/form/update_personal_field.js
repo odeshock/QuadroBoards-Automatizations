@@ -18,8 +18,8 @@
   // выносим всю механику в универсальную кнопку
   createForumButton({
     // передаём правила доступа параметрами (ничего не объединяем внутри)
-    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
-    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
+    allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
     label: 'Установить плашку',
     order: 2, // при необходимости расстановки — можно менять
 
@@ -42,8 +42,8 @@
       if (!userId) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
 
       // 2) Поле и значение: берём из PROFILE_CHECK и подставляем ID → arg2
-      const fieldId = PROFILE_CHECK.PPageFieldID;
-      const rawTemplate = PROFILE_CHECK.PPageFieldTemplate;
+      const fieldId = window.PROFILE_CHECK?.PPageFieldID;
+      const rawTemplate = window.PROFILE_CHECK?.PPageFieldTemplate;
       const fieldValue = String(rawTemplate).replace(/\bID\b/g, arg2);
 
       if (typeof window.FMVreplaceFieldData !== 'function') {

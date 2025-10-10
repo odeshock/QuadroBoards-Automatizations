@@ -16,8 +16,8 @@
     });
 
   createForumButton({
-    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
-    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
+    allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
     label: 'Создать страницу',
     order: 1, // чем меньше — тем выше среди других кнопок
 
@@ -40,9 +40,9 @@
       const arg2 = `usr${idMatch[1]}`;
 
       // --- остальные аргументы из PROFILE_CHECK
-      const arg3 = PROFILE_CHECK.PPageTemplate;
+      const arg3 = window.PROFILE_CHECK?.PPageTemplate;
       const arg4 = '';
-      const arg5 = PROFILE_CHECK.PPageGroupID;
+      const arg5 = window.PROFILE_CHECK?.PPageGroupID;
       const arg6 = '0';
 
       if (typeof window.FMVcreatePersonalPage !== 'function') {

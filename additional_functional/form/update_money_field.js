@@ -17,8 +17,8 @@
 
   createForumButton({
     // доступы передаём параметрами (ничего не объединяем внутри)
-    allowedGroups: (PROFILE_CHECK && PROFILE_CHECK.GroupID) || [],
-    allowedForums: (PROFILE_CHECK && PROFILE_CHECK.ForumIDs) || [],
+    allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
+    allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
     label: 'Выдать монетки',
     order: 3, // задайте нужное место среди других кнопок
 
@@ -36,8 +36,8 @@
       const userId = idMatch[1];
 
       // 2) Поле и значение (как в исходнике: берём шаблон «как есть»)
-      const fieldId = PROFILE_CHECK.MoneyFieldID;
-      const rawTemplate = PROFILE_CHECK.MoneyFieldTemplate;
+      const fieldId = window.PROFILE_CHECK?.MoneyFieldID;
+      const rawTemplate = window.PROFILE_CHECK?.MoneyFieldTemplate;
       const fieldValue = String(rawTemplate);
 
       if (typeof window.FMVreplaceFieldData !== 'function') {

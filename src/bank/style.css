@@ -382,8 +382,14 @@
       color: var(--text);
       word-break: break-word;
       margin: 0 0 4px;
-      list-style: decimal inside !important;  
-      display: list-item;    
+      list-style: decimal inside !important;
+      display: list-item;
+    }
+    .entry-list.separated li {
+      margin-bottom: 10px;
+    }
+    .entry-list.separated li:last-child {
+      margin-bottom: 0;
     }
     .entry-list .key { color: var(--muted);}
     .entry-list a {

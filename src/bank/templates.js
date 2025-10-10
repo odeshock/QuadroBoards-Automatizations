@@ -27,6 +27,19 @@ const urlFieldWithExtra = ({ id, name, label, buttonData, info = '' }) => {
   return `${infoBlock}<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${name}" type="url" required></div><div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
 };
 
+// Генератор шаблона для простого поля (input/textarea)
+const simpleField = ({ id, name, label, type = 'url', info = '', placeholder = '', required = true }) => {
+  const infoBlock = info ? infoTemplate(info) : '';
+  const requiredAttr = required ? 'required' : '';
+  const placeholderAttr = placeholder ? `placeholder="${placeholder}"` : '';
+
+  const inputElement = type === 'textarea'
+    ? `<textarea id="${id}" name="${name}" ${requiredAttr} ${placeholderAttr}></textarea>`
+    : `<input id="${id}" name="${name}" type="${type}" ${requiredAttr}>`;
+
+  return `${infoBlock}<div class="field"><label for="${id}">${label}</label>${inputElement}</div>`;
+};
+
 // Шаблоны модальных окон
 export const formTemplates = {
   // ДОХОДЫ (info)
@@ -41,8 +54,8 @@ export const formTemplates = {
   'form-income-100pos': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
   'form-income-month': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
   'form-income-flyer': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-topup': infoTemplate(TEXT_MESSAGES.TOPUP_INFO),
-  'form-income-ams': infoTemplate(TEXT_MESSAGES.AMS_INFO),
+  'form-income-topup': waitingTemplate(''),
+  'form-income-ams': waitingTemplate(''),
   'form-income-writer': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
   'form-income-post-of': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
   'form-income-episode-of': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
@@ -100,8 +113,18 @@ export const formTemplates = {
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 }
   }),
-  'form-income-banner-reno': '<div class="field"><label for="reno">Ссылка на скрин *</label><input id="reno" name="url" type="url" required></div>',
-  'form-income-banner-mayak': '<div class="field"><label for="mayak">Ссылка на скрин *</label><input id="mayak" name="url" type="url" required></div>',
+  'form-income-banner-reno': simpleField({
+    id: 'reno',
+    name: 'url',
+    label: 'Ссылка на скрин *',
+    type: 'url'
+  }),
+  'form-income-banner-mayak': simpleField({
+    id: 'mayak',
+    name: 'url',
+    label: 'Ссылка на скрин *',
+    type: 'url'
+  }),
   'form-income-rpgtop': urlFieldWithExtra({
     id: 'rpgtop-link',
     name: 'need',
@@ -141,27 +164,45 @@ export const formTemplates = {
   'form-exp-bonus1m3': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
   'form-exp-bonus2m3': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
-  'form-exp-thirdchar': `${infoTemplate(TEXT_MESSAGES.THIRDCHAR_INFO)}<div class="field"><label for="tc-link">Ссылка на комментарий *</label><input id="tc-link" name="url" type="url" required></div>`,
-  'form-exp-changechar': '<div class="field"><label for="new">Имя нового персонажа на английском *</label><input id="new" name="text" type="text" required></div>',
-  'form-exp-refuse': `${infoTemplate(TEXT_MESSAGES.REFUSE_INFO)}<div class="field"><label for="rf-r">Комментарий *</label><textarea id="rf-r" name="comment" required placeholder="Укажите, какой фантастической тварью Вы хотите стать и, если у вас несколько профилей, какой один оставить."></textarea></div>`,
+  'form-exp-thirdchar': simpleField({
+    id: 'tc-link',
+    name: 'url',
+    label: 'Ссылка на комментарий *',
+    type: 'url',
+    info: TEXT_MESSAGES.THIRDCHAR_INFO
+  }),
+  'form-exp-changechar': simpleField({
+    id: 'new',
+    name: 'text',
+    label: 'Имя нового персонажа на английском *',
+    type: 'text'
+  }),
+  'form-exp-refuse': simpleField({
+    id: 'rf-r',
+    name: 'comment',
+    label: 'Комментарий *',
+    type: 'textarea',
+    info: TEXT_MESSAGES.REFUSE_INFO,
+    placeholder: 'Укажите, какой фантастической тварью Вы хотите стать и, если у вас несколько профилей, какой один оставить.'
+  }),
   'form-exp-clean': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  'form-exp-transfer': '<div class="grid-2"><div class="field"><label for="tr-to">Кому перевод *</label><input id="tr-to" name="to" type="text" required></div><div class="field"><label for="tr-sum">Сумма перевода *</label><input id="tr-sum" name="amount" type="number" min="1" required></div></div>',
+  'form-exp-transfer': waitingTemplate(''),
 
   // ПОДАРКИ
   'form-gift-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-gift-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT),
+  'form-gift-present': waitingTemplate(''),
 
   // ОФОРМЛЕНИЕ - Иконки
   'form-icon-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-icon-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT),
+  'form-icon-present': waitingTemplate(''),
 
   // ОФОРМЛЕНИЕ - Плашки
   'form-badge-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-badge-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT),
+  'form-badge-present': waitingTemplate(''),
 
   // ОФОРМЛЕНИЕ - Фоны
   'form-bg-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-bg-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT)
+  'form-bg-present': waitingTemplate('')
 };
 
 // Список форм с data-info атрибутом

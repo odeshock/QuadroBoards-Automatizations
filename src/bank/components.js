@@ -787,7 +787,7 @@ export function renderLog(log) {
       itemEl.className = 'entry-item';
 
       const list = document.createElement('ol');
-      list.className = 'entry-list';
+      list.className = 'entry-list separated';
 
       group.entries.forEach((item) => {
         const dataObj = item.data || {};
@@ -1046,11 +1046,6 @@ export function renderLog(log) {
           if (giftData) {
             const formattedData = giftData.replace(/\n/g, '<br>');
             htmlContent += `<br><br><strong>Данные:</strong><br>${formattedData}`;
-          }
-
-          // Добавляем отступ в конце для форм с комментариями
-          if (hasFromField) {
-            htmlContent += '<br><br>';
           }
 
           li.innerHTML = htmlContent;

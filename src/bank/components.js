@@ -4454,12 +4454,6 @@ if (template.id === 'form-income-flyer') {
   const isRunContest  = template.id === 'form-income-run-contest';
   const isMastering   = template.id === 'form-income-mastering';
 
-  if (isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) {
-    const grid = modalFields.querySelector('.grid-2');
-    if (grid) grid.classList.remove('grid-2');
-  }
-
-
   const scrollContainer = modalFields.parentElement;
   const addExtraBtn = modalFields.querySelector('[data-add-extra]');
   const giftContainer = modalFields.querySelector('[data-gift-container]');

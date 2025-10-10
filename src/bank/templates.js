@@ -15,6 +15,18 @@ const quantityField = (idPrefix) => {
   return `<div class="field"><label for="${id}">Количество *</label><input id="${id}" name="quantity" type="number" min="1" value="1" required></div>`;
 };
 
+// Генератор шаблона для поля с URL и кнопкой "+ Еще"
+const urlFieldWithExtra = ({ id, name, label, buttonData, info = '' }) => {
+  const infoBlock = info ? infoTemplate(info) : '';
+  const isCountBase = buttonData.type === 'count-base';
+
+  const buttonAttrs = isCountBase
+    ? `data-add-extra data-count-base="${buttonData.value}"`
+    : `data-add-extra data-extra-label="${buttonData.label}" data-extra-start="${buttonData.start || 2}"`;
+
+  return `${infoBlock}<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${name}" type="url" required></div><div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
+};
+
 // Шаблоны модальных окон
 export const formTemplates = {
   // ДОХОДЫ (info)
@@ -37,17 +49,66 @@ export const formTemplates = {
   'form-income-activist': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
   
   // ДОХОДЫ (формы)
-  'form-income-needrequest': '<div class="grid-2"><div class="field"><label for="need-link">Ссылка на «нужного» *</label><input id="need-link" name="need" type="url" required></div></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="need">+ Еще</button></div>',
-  'form-income-ep-personal': '<div class="grid-2"><div class="field"><label for="ep-link">Ссылка на эпизод *</label><input id="ep-link" name="ep" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="ep">+ Еще</button></div></div>',
-  'form-income-ep-plot': '<div class="grid-2"><div class="field"><label for="plot-ep-link">Ссылка на эпизод *</label><input id="plot-ep-link" name="plot_ep" type="url" required></div></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="plot_ep">+ Еще</button></div>',
-  'form-income-contest': `${infoTemplate(TEXT_MESSAGES.CONTEST_INFO)}<div class="field"><label for="uc">Ссылка на конкурс *</label><input id="uc" name="contest" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на конкурс" data-extra-start="2">+ Еще</button></div>`,
-  'form-income-avatar': `${infoTemplate(TEXT_MESSAGES.GRAPHIC_WORK_INFO)}<div class="field"><label for="ava-link">Ссылка на граф.тему *</label><input id="ava-link" name="link" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на граф.тему" data-extra-start="2">+ Еще</button></div>`,
-  'form-income-design-other': `${infoTemplate(TEXT_MESSAGES.GRAPHIC_WORK_INFO)}<div class="field"><label for="do-link">Ссылка на граф.тему *</label><input id="do-link" name="link" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на граф.тему" data-extra-start="2">+ Еще</button></div>`,
-  'form-income-run-contest': '<div class="field"><label for="rc">Ссылка на конкурс *</label><input id="rc" name="contest" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на конкурс" data-extra-start="2">+ Еще</button></div>',
-  'form-income-mastering': '<div class="field"><label for="ms">Ссылка на эпизод *</label><input id="ms" name="ep" type="url" required></div><div class="field"><button type="button" class="btn" data-add-extra data-extra-label="Ссылка на эпизод" data-extra-start="2">+ Еще</button></div>',
+  'form-income-needrequest': urlFieldWithExtra({
+    id: 'need-link',
+    name: 'need',
+    label: 'Ссылка на «нужного» *',
+    buttonData: { type: 'count-base', value: 'need' }
+  }),
+  'form-income-ep-personal': urlFieldWithExtra({
+    id: 'ep-link',
+    name: 'ep',
+    label: 'Ссылка на эпизод *',
+    buttonData: { type: 'count-base', value: 'ep' }
+  }),
+  'form-income-ep-plot': urlFieldWithExtra({
+    id: 'plot-ep-link',
+    name: 'plot_ep',
+    label: 'Ссылка на эпизод *',
+    buttonData: { type: 'count-base', value: 'plot_ep' }
+  }),
+  'form-income-contest': urlFieldWithExtra({
+    id: 'uc',
+    name: 'contest',
+    label: 'Ссылка на конкурс *',
+    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 },
+    info: TEXT_MESSAGES.CONTEST_INFO
+  }),
+  'form-income-avatar': urlFieldWithExtra({
+    id: 'ava-link',
+    name: 'link',
+    label: 'Ссылка на граф.тему *',
+    buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
+    info: TEXT_MESSAGES.GRAPHIC_WORK_INFO
+  }),
+  'form-income-design-other': urlFieldWithExtra({
+    id: 'do-link',
+    name: 'link',
+    label: 'Ссылка на граф.тему *',
+    buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
+    info: TEXT_MESSAGES.GRAPHIC_WORK_INFO
+  }),
+  'form-income-run-contest': urlFieldWithExtra({
+    id: 'rc',
+    name: 'contest',
+    label: 'Ссылка на конкурс *',
+    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 }
+  }),
+  'form-income-mastering': urlFieldWithExtra({
+    id: 'ms',
+    name: 'ep',
+    label: 'Ссылка на эпизод *',
+    buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 }
+  }),
   'form-income-banner-reno': '<div class="field"><label for="reno">Ссылка на скрин *</label><input id="reno" name="url" type="url" required></div>',
   'form-income-banner-mayak': '<div class="field"><label for="mayak">Ссылка на скрин *</label><input id="mayak" name="url" type="url" required></div>',
-  'form-income-rpgtop': `${infoTemplate(TEXT_MESSAGES.SCREENSHOT_INFO)}<div class="grid-2"><div class="field"><label for="need-link">Ссылка на скрин *</label><input id="need-link" name="need" type="url" required></div></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="need">+ Еще</button></div>`,
+  'form-income-rpgtop': urlFieldWithExtra({
+    id: 'rpgtop-link',
+    name: 'need',
+    label: 'Ссылка на скрин *',
+    buttonData: { type: 'count-base', value: 'need' },
+    info: TEXT_MESSAGES.SCREENSHOT_INFO
+  }),
 
   // РАСХОДЫ
   'form-exp-face-1m': quantityField('face-1m'),

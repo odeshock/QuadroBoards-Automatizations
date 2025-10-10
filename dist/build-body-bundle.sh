@@ -34,7 +34,10 @@ cat src/chrono/parser.js src/chrono/button_*.js >> dist/body-bundle.js
 
 echo "" >> dist/body-bundle.js
 echo "/* Episodes */" >> dist/body-bundle.js
-cat src/episodes/*.js >> dist/body-bundle.js
+# Load ui.js (contains all bootstrap logic for creation/edition)
+cat src/episodes/ui.js >> dist/body-bundle.js
+# Load tags_visibility.js
+cat src/episodes/tags_visibility.js >> dist/body-bundle.js
 
 echo "✅ body-bundle.js created!"
 ls -lh dist/body-bundle.js

@@ -1018,8 +1018,8 @@ export function renderLog(log) {
           if (showPrice && group.price) {
             // Для админ-форм начислений показываем price рядом с именем
             htmlContent += ` — ${formatNumber(group.price)}`;
-          } else if (quantity && !isTopupOrAms) {
-            // Для topup/ams НЕ показываем индивидуальные суммы
+          } else if (quantity) {
+            // Для всех форм с quantity показываем количество
             const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
             if (qtyNum !== null) {
               htmlContent += ` — ${formatNumber(qtyNum)}`;

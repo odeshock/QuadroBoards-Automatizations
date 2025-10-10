@@ -347,10 +347,10 @@
 
         // загрузка участников и префилл
         if (typeof FMV.fetchUsers==='function'){
-          FMV.fetchUsers().done(function(list){
+          FMV.fetchUsers().then(function(list){
             knownUsers=(list||[]).slice();
             if (opts.prefill!==false) prefillFrom(initialRaw);
-          }).fail(function(msg){
+          }).catch(function(msg){
             $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show();
           });
         }

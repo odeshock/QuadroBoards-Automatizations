@@ -5908,10 +5908,10 @@ async function collectChronoByUser(opts = {}) {
 
         // загрузка участников и префилл
         if (typeof FMV.fetchUsers==='function'){
-          FMV.fetchUsers().done(function(list){
+          FMV.fetchUsers().then(function(list){
             knownUsers=(list||[]).slice();
             if (opts.prefill!==false) prefillFrom(initialRaw);
-          }).fail(function(msg){
+          }).catch(function(msg){
             $ac.html('<div class="ac-item"><span class="muted">'+(msg||'Ошибка загрузки')+'</span></div>').show();
           });
         }
@@ -6060,9 +6060,6 @@ async function collectChronoByUser(opts = {}) {
     }
 
     // /edit.php?id=N&action=edit — только если есть любые FMV-теги
-    console.log(/\/edit\.php$/i.test(path) );
-    console.log(q.has('id'));
-    console.log(document.querySelector('input[name="firstpost"]'));
     if (/\/edit\.php$/i.test(path) && q.has('id') && document.querySelector('input[name="firstpost"]')) {
       attachToPage({ strip:true, showOnlyIfCast:false });
     }

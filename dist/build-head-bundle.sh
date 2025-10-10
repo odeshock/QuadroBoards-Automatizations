@@ -13,27 +13,31 @@ echo "/* MODULE 1: common.js */" >> dist/head-bundle.js
 cat src/core/common.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 2: helpers.js */" >> dist/head-bundle.js
+echo "/* MODULE 2: common_users.js (FMV.fetchUsers) */" >> dist/head-bundle.js
+cat src/core/common_users.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 3: helpers.js */" >> dist/head-bundle.js
 cat src/core/helpers.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 3: profile_from_user.js */" >> dist/head-bundle.js
+echo "/* MODULE 4: profile_from_user.js */" >> dist/head-bundle.js
 cat src/core/profile_from_user.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 4: check_group.js */" >> dist/head-bundle.js
+echo "/* MODULE 5: check_group.js */" >> dist/head-bundle.js
 cat src/core/check_group.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 5: load_main_users_money.js */" >> dist/head-bundle.js
+echo "/* MODULE 6: load_main_users_money.js */" >> dist/head-bundle.js
 cat src/profile/loader/load_main_users_money.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 6: bank_common.js */" >> dist/head-bundle.js
+echo "/* MODULE 7: bank_common.js */" >> dist/head-bundle.js
 cat src/profile/fields/bank_common.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 7: bank/parent.js */" >> dist/head-bundle.js
+echo "/* MODULE 8: bank/parent.js */" >> dist/head-bundle.js
 cat src/bank/parent.js >> dist/head-bundle.js
 
 echo "✅ head-bundle.js created!"

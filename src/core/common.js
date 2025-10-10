@@ -187,121 +187,157 @@
     return err;
   };
 
-  /* ---------- users loader (moved to common) ---------- */
+  /* ---------- users loader (REMOVED - moved to common_users.js) ---------- */
+  // FMV.fetchUsers теперь определяется в common_users.js с новой реализацией
 
+  /* ---------- scrapeUsers - глобальная функция загрузки пользователей ---------- */
   /**
-   * FMV.fetchUsers({ force?:boolean, maxPages?:number, batchSize?:number })
-   * Возвращает $.Deferred().promise() с массивом:
-   *   [{ id:Number, code:'user<ID>', name:String }, ...] — 이미 отсортирован по name и без дублей
+   * Загружает список всех пользователей форума с кэшированием
+   * @param {Object} [opts] - Опции загрузки
+   * @param {boolean} [opts.force=false] - Игнорировать кэш
+   * @param {number} [opts.maxPages=1000] - Максимум страниц для загрузки
+   * @param {number} [opts.batchSize=5] - Количество страниц загружаемых параллельно
+   * @returns {Promise<Array<{id: number, code: string, name: string}>>}
    */
-  FMV.fetchUsers = FMV.fetchUsers || function (opts) {
-    opts = opts || {};
-    var force    = !!opts.force;
-    var maxPages = opts.maxPages || 50;   // защитный лимит
-    var batch    = opts.batchSize || 5;   // параллельная пачка
+  window.scrapeUsers = async function scrapeUsers(opts = {}) {
+    const force = opts.force || false;
+    const maxPages = opts.maxPages || 1000;
+    const batchSize = opts.batchSize || 5;
 
-    var CACHE_KEY = 'fmv_users_cache_v1';
-    var TTL_MS    = 30 * 60 * 1000;
+    const CACHE_KEY = 'fmv_users_cache_v2';
+    const TTL_MS = 30 * 60 * 1000; // 30 минут
+    const PATH = "/userlist.php";
+    const CELL_SELECTOR = "td.tcl.username span.usersname";
+    const LINK_SELECTOR = "a[href*='id=']";
 
-    function readCache(){
-      try{
-        var raw = sessionStorage.getItem(CACHE_KEY);
-        if(!raw) return null;
-        var obj = JSON.parse(raw);
-        if(!obj || !obj.time || !obj.data) return null;
-        if(Date.now() - obj.time > TTL_MS) return null;
+    // Нормализация пробелов (аналог FMV.normSpace)
+    const normSpace = str => String(str || '')
+      .replace(/\s+/g, ' ')
+      .replace(/\u00A0/g, ' ')
+      .trim();
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    const extractId = href => {
+      if (!href) return null;
+      const m = href.match(/(?:[?&/])id=(\d+)/i);
+      return m ? Number(m[1]) : null;
+    };
+
+    // Кэширование
+    const readCache = () => {
+      if (force) return null;
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !obj.time || !obj.data) return null;
+        if (Date.now() - obj.time > TTL_MS) return null;
         return obj.data;
-      }catch(_){ return null; }
+      } catch (_) { return null; }
+    };
+
+    const writeCache = list => {
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+          time: Date.now(),
+          data: list
+        }));
+      } catch (_) {}
+    };
+
+    // Проверка кэша
+    const cached = readCache();
+    if (cached) {
+      window.scrapedUsers = cached;
+      return cached;
     }
-    function writeCache(list){
-      try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({time:Date.now(), data:list})); }catch(_){}
-    }
-    function fetchHtmlCompat(url){
+
+    // Загрузка одной страницы с CP1251 поддержкой
+    async function fetchPage(page) {
+      const url = `${PATH}?p=${page}`;
+
+      // Используем fetchHtml если доступна (для CP1251)
+      let html;
       if (typeof window.fetchHtml === 'function') {
-        var d=$.Deferred();
-        Promise.resolve(window.fetchHtml(url)).then(function(txt){ d.resolve(txt); }, function(e){ d.reject(e||'fetchHtml failed'); });
-        return d.promise();
+        html = await window.fetchHtml(url);
+      } else {
+        const res = await fetch(url, { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`HTTP ${res.status} (${url})`);
+        html = await res.text();
       }
-      // fallback на jQuery
-      return $.get(url, undefined, undefined, 'html');
-    }
-    function parseUserList(html){
-      var doc = document.implementation.createHTMLDocument('');
-      doc.documentElement.innerHTML = html;
-      var anchors = doc.querySelectorAll('a[href*="profile.php?id="]');
-      var users = [];
-      anchors.forEach(function(a){
-        var name = FMV.normSpace(a.textContent || '');
-        var m = (a.getAttribute('href')||'').match(/profile\.php\?id=(\d+)/);
-        if (!m) return;
-        var id = +m[1];
-        users.push({ id: id, code: 'user'+id, name: name });
-      });
-      var pageLinks = doc.querySelectorAll('a[href*="userlist.php"]');
-      var pages = [1];
-      var baseHref = 'userlist.php';
-      pageLinks.forEach(function(a){
-        var href = a.getAttribute('href') || '';
-        if (href) baseHref = href;
-        var u = new URL(href, location.origin);
-        var p = +(u.searchParams.get('p') || 0);
-        if (p) pages.push(p);
-      });
-      var last = Math.max.apply(null, pages);
-      return { users: users, last: last, base: baseHref };
-    }
-    function urlForPage(baseHref, p){
-      var u = new URL(baseHref, location.origin);
-      if (p > 1) u.searchParams.set('p', String(p));
-      else u.searchParams.delete('p');
-      return u.pathname + (u.search || '');
-    }
-    function uniqSort(list){
-      var map = {};
-      (list||[]).forEach(function(u){ map[u.code] = u; });
-      var out = Object.keys(map).map(function(k){ return map[k]; });
-      out.sort(function(a,b){ return a.name.localeCompare(b.name,'ru',{sensitivity:'base'}) });
-      return out;
-    }
 
-    var cached = !force && readCache();
-    if (cached) return $.Deferred().resolve(cached).promise();
+      const doc = new DOMParser().parseFromString(html, "text/html");
 
-    var d=$.Deferred();
-    fetchHtmlCompat('/userlist.php').then(function(html1){
-      var first = parseUserList(html1);
-      var all   = first.users.slice();
-      var last  = Math.min(first.last || 1, maxPages);
-
-      var pages=[]; for (var p=2; p<=last; p++) pages.push(p);
-
-      function runBatch(start){
-        if (start >= pages.length) {
-          var list = uniqSort(all);
-          writeCache(list);
-          d.resolve(list);
-          return;
-        }
-        var chunk = pages.slice(start, start+batch);
-        $.when.apply($, chunk.map(function(p){
-          var url = urlForPage(first.base, p);
-          return fetchHtmlCompat(url).then(function(htmlN){
-            var part = parseUserList(htmlN);
-            all = all.concat(part.users);
+      const users = [];
+      doc.querySelectorAll(CELL_SELECTOR).forEach(cell => {
+        const a = cell.querySelector(LINK_SELECTOR);
+        const name = normSpace(a?.textContent || "");
+        const id = extractId(a?.getAttribute("href") || "");
+        if (name && Number.isFinite(id)) {
+          users.push({
+            id: id,
+            code: 'user' + id,
+            name: name
           });
-        })).always(function(){ runBatch(start+batch); });
-      }
+        }
+      });
+      return users;
+    }
 
-      runBatch(0);
-    }, function(err){
-      d.reject(err || 'Не удалось загрузить список участников');
+    // Параллельная загрузка
+    const seen = new Set();
+    const result = [];
+
+    // Загружаем первую страницу
+    const firstPage = await fetchPage(1);
+    firstPage.forEach(u => {
+      if (!seen.has(u.code)) {
+        seen.add(u.code);
+        result.push(u);
+      }
     });
 
-    return d.promise();
-  };
+    // Загружаем остальные страницы параллельно
+    for (let start = 2; start <= maxPages; start += batchSize) {
+      const pages = [];
+      for (let i = 0; i < batchSize && (start + i) <= maxPages; i++) {
+        pages.push(start + i);
+      }
 
-  FMV.invalidateUsersCache = FMV.invalidateUsersCache || function () {
-    try { sessionStorage.removeItem('fmv_users_cache_v1'); } catch (_) {}
+      const results = await Promise.all(
+        pages.map(page => fetchPage(page).catch(() => []))
+      );
+
+      let hasNew = false;
+      for (const users of results) {
+        const newUsers = users.filter(u => !seen.has(u.code));
+        if (newUsers.length > 0) {
+          hasNew = true;
+          newUsers.forEach(u => {
+            seen.add(u.code);
+            result.push(u);
+          });
+        }
+      }
+
+      // Если на всех страницах батча не было новых пользователей - выходим
+      if (!hasNew) break;
+
+      // Задержка между батчами
+      if (start + batchSize <= maxPages) {
+        await sleep(300);
+      }
+    }
+
+    // Сортировка по имени (locale-aware)
+    result.sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' }));
+
+    // Сохраняем в кэш
+    writeCache(result);
+    window.scrapedUsers = result;
+
+    return result;
   };
 
 })();

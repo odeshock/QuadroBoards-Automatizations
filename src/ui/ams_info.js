@@ -1,16 +1,4 @@
 (() => {
-  const waitFor = (selector, timeout = 8000) =>
-    new Promise((resolve, reject) => {
-      const node = document.querySelector(selector);
-      if (node) return resolve(node);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   const ready = new Promise(res => {
     if (document.readyState === 'complete' || document.readyState === 'interactive') res();
     else document.addEventListener('DOMContentLoaded', res, { once: true });
@@ -55,7 +43,7 @@
       let bodies = document.querySelectorAll('.topicpost .post-body .post-box .post-content');
       if (!bodies.length) {
         try {
-          await waitFor('.topicpost .post-body .post-box .post-content', 5000);
+          await FMV.waitForSelector('.topicpost .post-body .post-box .post-content', 5000);
           bodies = document.querySelectorAll('.topicpost .post-body .post-box .post-content');
         } catch { return; }
       }

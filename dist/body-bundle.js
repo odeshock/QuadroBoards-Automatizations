@@ -5,18 +5,6 @@
 
 /* UI Components */
 (() => {
-  const waitFor = (selector, timeout = 8000) =>
-    new Promise((resolve, reject) => {
-      const node = document.querySelector(selector);
-      if (node) return resolve(node);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   const ready = new Promise(res => {
     if (document.readyState === 'complete' || document.readyState === 'interactive') res();
     else document.addEventListener('DOMContentLoaded', res, { once: true });
@@ -61,7 +49,7 @@
       let bodies = document.querySelectorAll('.topicpost .post-body .post-box .post-content');
       if (!bodies.length) {
         try {
-          await waitFor('.topicpost .post-body .post-box .post-content', 5000);
+          await FMV.waitForSelector('.topicpost .post-body .post-box .post-content', 5000);
           bodies = document.querySelectorAll('.topicpost .post-body .post-box .post-content');
         } catch { return; }
       }
@@ -87,19 +75,6 @@
 // button.js
 (() => {
   'use strict';
-
-  // ждём DOM и нужный контейнер
-  const waitFor = (selector, timeout = 8000) =>
-    new Promise((resolve, reject) => {
-      const node = document.querySelector(selector);
-      if (node) return resolve(node);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
 
   const ready = new Promise(res => {
     if (document.readyState === 'complete' || document.readyState === 'interactive') res();
@@ -199,7 +174,7 @@
     // НОВОЕ: строгая проверка нужной темы
     if (!isOnTopicId(topicId)) return;
 
-    const container = await waitFor(containerSelector, 5000).catch(() => null);
+    const container = await FMV.waitForSelector(containerSelector, 5000).catch(() => null);
     if (!container) return;
 
     // ---------- UI ----------
@@ -1679,19 +1654,6 @@ async function collectSkinSets() {
 (() => {
   'use strict';
 
-  // локальная утилита ожидания (на случай, если ссылки на профиль ещё нет)
-  const waitFor = (selector, timeout = 5000) =>
-    new Promise((resolve, reject) => {
-      const n0 = document.querySelector(selector);
-      if (n0) return resolve(n0);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   createForumButton({
     allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
     allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
@@ -1710,7 +1672,7 @@ async function collectSkinSets() {
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       if (!idMatch) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
@@ -1765,19 +1727,6 @@ async function collectSkinSets() {
 (() => {
   'use strict';
 
-  // локальная утилита ожидания узла (как в кнопке поля)
-  const waitFor = (selector, timeout = 5000) =>
-    new Promise((resolve, reject) => {
-      const n0 = document.querySelector(selector);
-      if (n0) return resolve(n0);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   createForumButton({
     // доступ ограничиваем извне заданными списками
     allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
@@ -1811,7 +1760,7 @@ async function collectSkinSets() {
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       const userId = idMatch ? idMatch[1] : '';
@@ -1890,19 +1839,6 @@ async function collectSkinSets() {
 (() => {
   'use strict';
 
-  // локальная утилита ожидания (если ссылка профиля появляется не сразу)
-  const waitFor = (selector, timeout = 5000) =>
-    new Promise((resolve, reject) => {
-      const n0 = document.querySelector(selector);
-      if (n0) return resolve(n0);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   createForumButton({
     // доступы передаём параметрами (ничего не объединяем внутри)
     allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
@@ -1917,7 +1853,7 @@ async function collectSkinSets() {
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       if (!idMatch) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
@@ -1971,19 +1907,6 @@ async function collectSkinSets() {
 (() => {
   'use strict';
 
-  // небольшая локальная утилита для ожидания появления узла
-  const waitFor = (selector, timeout = 5000) =>
-    new Promise((resolve, reject) => {
-      const n0 = document.querySelector(selector);
-      if (n0) return resolve(n0);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   // выносим всю механику в универсальную кнопку
   createForumButton({
     // передаём правила доступа параметрами (ничего не объединяем внутри)
@@ -2003,7 +1926,7 @@ async function collectSkinSets() {
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       const userId = idMatch ? idMatch[1] : '';

@@ -2,19 +2,6 @@
 (() => {
   'use strict';
 
-  // небольшая локальная утилита для ожидания появления узла
-  const waitFor = (selector, timeout = 5000) =>
-    new Promise((resolve, reject) => {
-      const n0 = document.querySelector(selector);
-      if (n0) return resolve(n0);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   // выносим всю механику в универсальную кнопку
   createForumButton({
     // передаём правила доступа параметрами (ничего не объединяем внутри)
@@ -34,7 +21,7 @@
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       const userId = idMatch ? idMatch[1] : '';

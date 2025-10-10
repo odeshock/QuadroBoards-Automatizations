@@ -2,19 +2,6 @@
 (() => {
   'use strict';
 
-  // локальная утилита ожидания узла (как в кнопке поля)
-  const waitFor = (selector, timeout = 5000) =>
-    new Promise((resolve, reject) => {
-      const n0 = document.querySelector(selector);
-      if (n0) return resolve(n0);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   createForumButton({
     // доступ ограничиваем извне заданными списками
     allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
@@ -48,7 +35,7 @@
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await waitFor('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       const userId = idMatch ? idMatch[1] : '';

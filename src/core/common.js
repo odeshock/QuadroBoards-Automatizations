@@ -15,7 +15,26 @@
   };
 
   FMV.normSpace = FMV.normSpace || function (s) {
-    return String(s ?? '').replace(/\s+/g, ' ').trim();
+    return String(s ?? '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  /**
+   * Ждёт появления элемента в DOM
+   * @param {string} selector - CSS селектор
+   * @param {number} [timeout=8000] - Таймаут в миллисекундах
+   * @returns {Promise<Element>}
+   */
+  FMV.waitForSelector = FMV.waitForSelector || function (selector, timeout = 8000) {
+    return new Promise((resolve, reject) => {
+      const node = document.querySelector(selector);
+      if (node) return resolve(node);
+      const obs = new MutationObserver(() => {
+        const n = document.querySelector(selector);
+        if (n) { obs.disconnect(); resolve(n); }
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
+    });
   };
 
   /** Читает текст тега <tag> из узла (без дублирования пробелов) */

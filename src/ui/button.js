@@ -2,19 +2,6 @@
 (() => {
   'use strict';
 
-  // ждём DOM и нужный контейнер
-  const waitFor = (selector, timeout = 8000) =>
-    new Promise((resolve, reject) => {
-      const node = document.querySelector(selector);
-      if (node) return resolve(node);
-      const obs = new MutationObserver(() => {
-        const n = document.querySelector(selector);
-        if (n) { obs.disconnect(); resolve(n); }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
-    });
-
   const ready = new Promise(res => {
     if (document.readyState === 'complete' || document.readyState === 'interactive') res();
     else document.addEventListener('DOMContentLoaded', res, { once: true });
@@ -113,7 +100,7 @@
     // НОВОЕ: строгая проверка нужной темы
     if (!isOnTopicId(topicId)) return;
 
-    const container = await waitFor(containerSelector, 5000).catch(() => null);
+    const container = await FMV.waitForSelector(containerSelector, 5000).catch(() => null);
     if (!container) return;
 
     // ---------- UI ----------

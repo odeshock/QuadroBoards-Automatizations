@@ -10,16 +10,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- 1. HEAD BUNDLE - базовые утилиты -->
+    <!-- HEAD BUNDLE - базовые утилиты -->
     <script src="https://odeshock.github.io/QuadroBoards-Automatizations/dist/head-bundle.min.js"></script>
-
-    <!-- 2. Банковская система (если нужна) -->
-    <script src="https://odeshock.github.io/QuadroBoards-Automatizations/src/src/bank/parent.js"></script>
 </head>
 <body>
     <!-- Ваш контент -->
 
-    <!-- 3. BODY BUNDLE - UI и DOM-зависимые модули -->
+    <!-- BODY BUNDLE - UI и DOM-зависимые модули -->
     <script src="https://odeshock.github.io/QuadroBoards-Automatizations/dist/body-bundle.min.js"></script>
 </body>
 </html>

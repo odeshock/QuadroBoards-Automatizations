@@ -20,7 +20,7 @@
     allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
     allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
     label: 'Сменить группу',
-    order: 5,
+    order: 4,
 
     async onClick({ setStatus, setDetails }) {
       // --- 0) Проверка конфигурации PROFILE_CHECK ---

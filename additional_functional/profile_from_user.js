@@ -124,7 +124,7 @@
         const m = (a.getAttribute('href') || '').match(/profile\.php\?id=(\d+)/i);
         if (!m) continue;
         const id = String(Number(m[1]));
-        const nm = (a.textContent || '').trim();
+        const nm = (a.textContent || '').trim().toLowerCase();
         if (nm && !map.has(id)) map.set(id, nm);
       }
       exProfilesMap = map;

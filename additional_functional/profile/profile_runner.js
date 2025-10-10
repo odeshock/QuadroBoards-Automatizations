@@ -62,11 +62,10 @@
     const id = (sp.get('id') || '').trim();
     if (!id) return;
   
-    // 2) Group-гейт: список разрешённых групп берём из SKIN.GroupID (массив строк)
-    //    ensureAllowed() использует CHRONO_CHECK.GroupID и текущий gid
-  
+    const group_ids = window.SKIN?.GroupID || [];
+
     if (typeof window.ensureAllowed === 'function') {
-      const ok = await window.ensureAllowed();
+      const ok = await window.ensureAllowed(group_ids);
       if (!ok) return; // не в нужной группе — выходим тихо
     } else {
       return; // подстраховка: нет функции — никому не показываем

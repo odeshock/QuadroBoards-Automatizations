@@ -108,7 +108,9 @@
     , { timeout: 15000 });
     if (!first) return null;
 
-    if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed()) return null;
+    const group_ids = window.CHRONO_CHECK?.GroupID || [];
+
+    if (typeof window.ensureAllowed === 'function' && !window.ensureAllowed(group_ids)) return null;
 
     const rawChars = FMV.readTagText(first, 'characters');
     const rawLoc   = FMV.readTagText(first, 'location');

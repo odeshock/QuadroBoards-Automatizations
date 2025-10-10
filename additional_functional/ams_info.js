@@ -30,7 +30,7 @@
         ...(window.CHRONO_CHECK?.GroupID || [])
       ];
       const allowedForums = [
-        ...(window.PROFILE_CHECK?.ForumIDs || []),
+        ...(window.PROFILE_CHECK?.ForumID || []),
         ...(window.CHRONO_CHECK?.ForumID || []),
         ...(window.CHRONO_CHECK?.AmsForumID || []),
       ];

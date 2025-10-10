@@ -912,7 +912,8 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
     // Добавляем информационное сообщение
     const infoBlock = document.createElement('div');
     infoBlock.className = 'info';
-    infoBlock.innerHTML = '<strong>Система подсчета:</strong> ваша сумма + 10 галлеонов за каждого пользователя';
+    const commissionText = basePrice !== null ? formatNumber(basePrice) : '10';
+    infoBlock.innerHTML = `<strong>Система подсчета:</strong> ваша сумма + ${commissionText} галлеонов за каждого пользователя`;
     modalFields.appendChild(infoBlock);
 
     // Каркас

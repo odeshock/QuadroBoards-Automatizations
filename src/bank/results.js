@@ -844,7 +844,8 @@ export function renderLog(log) {
       const list = document.createElement('ol');
 
       // Добавляем класс separated для форм с комментариями/получателями
-      const needsSeparation = isBonusMaskClean || tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift');
+      const isTopupOrAms = tid === FORM_INCOME_TOPUP || tid === FORM_INCOME_AMS;
+      const needsSeparation = isBonusMaskClean || isTopupOrAms || tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift');
       list.className = needsSeparation ? 'entry-list separated' : 'entry-list';
 
       // ===== спец-рендеры =====

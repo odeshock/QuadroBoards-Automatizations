@@ -26,7 +26,11 @@ cat src/profile/*.js >> dist/body-bundle.js
 
 echo "" >> dist/body-bundle.js
 echo "/* Comments & Chrono */" >> dist/body-bundle.js
-cat src/comments/*.js src/chrono/*.js >> dist/body-bundle.js
+cat src/comments/*.js >> dist/body-bundle.js
+# Load helpers.js first to define checkChronoFields
+cat src/chrono/helpers.js >> dist/body-bundle.js
+# Then load parser and button files
+cat src/chrono/parser.js src/chrono/button_*.js >> dist/body-bundle.js
 
 echo "" >> dist/body-bundle.js
 echo "/* Episodes */" >> dist/body-bundle.js

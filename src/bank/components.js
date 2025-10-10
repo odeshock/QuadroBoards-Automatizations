@@ -58,6 +58,13 @@ import {
   FORM_INCOME_FLYER,
   FORM_INCOME_NEEDREQUEST,
   FORM_INCOME_RPGTOP,
+  FORM_INCOME_EP_PERSONAL,
+  FORM_INCOME_EP_PLOT,
+  FORM_INCOME_CONTEST,
+  FORM_INCOME_AVATAR,
+  FORM_INCOME_DESIGN_OTHER,
+  FORM_INCOME_RUN_CONTEST,
+  FORM_INCOME_MASTERING,
   DESIGN_FORMS,
   toSelector
 } from './constants.js';
@@ -2980,13 +2987,13 @@ if (template.id === FORM_INCOME_FLYER) {
 
   const isNeedRequest = template.id === FORM_INCOME_NEEDREQUEST;
   const isRpgTop      = template.id === FORM_INCOME_RPGTOP;
-  const isEpPersonal  = template.id === 'form-income-ep-personal';
-  const isEpPlot      = template.id === 'form-income-ep-plot';
-  const isContest     = template.id === 'form-income-contest';
-  const isAvatar      = template.id === 'form-income-avatar';
-  const isDesignOther = template.id === 'form-income-design-other';
-  const isRunContest  = template.id === 'form-income-run-contest';
-  const isMastering   = template.id === 'form-income-mastering';
+  const isEpPersonal  = template.id === FORM_INCOME_EP_PERSONAL;
+  const isEpPlot      = template.id === FORM_INCOME_EP_PLOT;
+  const isContest     = template.id === FORM_INCOME_CONTEST;
+  const isAvatar      = template.id === FORM_INCOME_AVATAR;
+  const isDesignOther = template.id === FORM_INCOME_DESIGN_OTHER;
+  const isRunContest  = template.id === FORM_INCOME_RUN_CONTEST;
+  const isMastering   = template.id === FORM_INCOME_MASTERING;
 
   const scrollContainer = modalFields.parentElement;
   const addExtraBtn = modalFields.querySelector('[data-add-extra]');
@@ -3093,7 +3100,7 @@ if (template.id === FORM_INCOME_FLYER) {
           computedLabel = `Ссылка на «нужного» ${suffix}`;
         } else if (template.id === FORM_INCOME_RPGTOP) {
           computedLabel = `Ссылка на скрин ${suffix}`;
-        } else if (template.id === 'form-income-ep-personal' || template.id === 'form-income-ep-plot') {
+        } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {
           computedLabel = `Ссылка на эпизод ${suffix}`;
         } else {
           computedLabel = `Доп. поле ${suffix}`;
@@ -3136,7 +3143,7 @@ if (template.id === FORM_INCOME_FLYER) {
         labelText = `Ссылка на «нужного» ${suffix}`;
       } else if (template.id === FORM_INCOME_RPGTOP) {
         labelText = `Ссылка на скрин ${suffix}`;
-      } else if (template.id === 'form-income-ep-personal' || template.id === 'form-income-ep-plot') {
+      } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {
         labelText = `Ссылка на эпизод ${suffix}`;
       } else {
         labelText = `Доп. поле ${suffix}`;

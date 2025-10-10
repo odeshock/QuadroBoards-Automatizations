@@ -2,7 +2,28 @@
 // templates.js — Шаблоны модальных окон
 // ============================================================================
 
-import { TEXT_MESSAGES } from './constants.js';
+import {
+  TEXT_MESSAGES,
+  FORM_INCOME_ANKETA, FORM_INCOME_AKCION, FORM_INCOME_NEEDCHAR, FORM_INCOME_NEEDREQUEST,
+  FORM_INCOME_FIRSTPOST, FORM_INCOME_PERSONALPOST, FORM_INCOME_PLOTPOST,
+  FORM_INCOME_EP_PERSONAL, FORM_INCOME_EP_PLOT, FORM_INCOME_100MSGS, FORM_INCOME_100REP,
+  FORM_INCOME_100POS, FORM_INCOME_MONTH, FORM_INCOME_FLYER, FORM_INCOME_CONTEST,
+  FORM_INCOME_AVATAR, FORM_INCOME_DESIGN_OTHER, FORM_INCOME_RUN_CONTEST, FORM_INCOME_MASTERING,
+  FORM_INCOME_RPGTOP, FORM_INCOME_BANNER_RENO, FORM_INCOME_BANNER_MAYAK,
+  FORM_INCOME_ACTIVIST, FORM_INCOME_WRITER, FORM_INCOME_EPISODE_OF, FORM_INCOME_POST_OF,
+  FORM_INCOME_TOPUP, FORM_INCOME_AMS,
+  FORM_EXP_FACE_1M, FORM_EXP_FACE_3M, FORM_EXP_FACE_6M,
+  FORM_EXP_CHAR_1M, FORM_EXP_CHAR_3M, FORM_EXP_CHAR_6M,
+  FORM_EXP_FACE_OWN_1M, FORM_EXP_FACE_OWN_3M, FORM_EXP_FACE_OWN_6M,
+  FORM_EXP_NEED_1W, FORM_EXP_NEED_2W, FORM_EXP_NEED_1M,
+  FORM_EXP_MASK, FORM_EXP_BONUS1D1, FORM_EXP_BONUS2D1, FORM_EXP_BONUS1W1, FORM_EXP_BONUS2W1,
+  FORM_EXP_BONUS1M1, FORM_EXP_BONUS2M1, FORM_EXP_BONUS1M3, FORM_EXP_BONUS2M3,
+  FORM_EXP_THIRDCHAR, FORM_EXP_CHANGECHAR, FORM_EXP_REFUSE, FORM_EXP_CLEAN, FORM_EXP_TRANSFER,
+  FORM_GIFT_CUSTOM, FORM_GIFT_PRESENT,
+  FORM_ICON_CUSTOM, FORM_ICON_PRESENT,
+  FORM_BADGE_CUSTOM, FORM_BADGE_PRESENT,
+  FORM_BG_CUSTOM, FORM_BG_PRESENT
+} from './constants.js';
 
 // Вспомогательные функции для создания шаблонов
 const infoTemplate = (text) => `<div class="info">${text}</div>`;
@@ -43,89 +64,89 @@ const simpleField = ({ id, name, label, type = 'url', info = '', placeholder = '
 // Шаблоны модальных окон
 export const formTemplates = {
   // ДОХОДЫ (info)
-  'form-income-anketa': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  'form-income-akcion': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  'form-income-needchar': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  'form-income-firstpost': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-personalpost': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-plotpost': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-100msgs': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-100rep': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-100pos': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-month': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-flyer': waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
-  'form-income-topup': waitingTemplate(''),
-  'form-income-ams': waitingTemplate(''),
-  'form-income-writer': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  'form-income-post-of': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  'form-income-episode-of': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  'form-income-activist': infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_ANKETA]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_AKCION]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_NEEDCHAR]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_FIRSTPOST]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_PERSONALPOST]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_PLOTPOST]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_100MSGS]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_100REP]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_100POS]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_MONTH]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_FLYER]: waitingTemplate(TEXT_MESSAGES.SCRIPT_INFO),
+  [FORM_INCOME_TOPUP]: waitingTemplate(''),
+  [FORM_INCOME_AMS]: waitingTemplate(''),
+  [FORM_INCOME_WRITER]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_POST_OF]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_EPISODE_OF]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
+  [FORM_INCOME_ACTIVIST]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
   
   // ДОХОДЫ (формы)
-  'form-income-needrequest': urlFieldWithExtra({
+  [FORM_INCOME_NEEDREQUEST]: urlFieldWithExtra({
     id: 'need-link',
     name: 'need',
     label: 'Ссылка на «нужного» *',
     buttonData: { type: 'count-base', value: 'need' }
   }),
-  'form-income-ep-personal': urlFieldWithExtra({
+  [FORM_INCOME_EP_PERSONAL]: urlFieldWithExtra({
     id: 'ep-link',
     name: 'ep',
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'count-base', value: 'ep' }
   }),
-  'form-income-ep-plot': urlFieldWithExtra({
+  [FORM_INCOME_EP_PLOT]: urlFieldWithExtra({
     id: 'plot-ep-link',
     name: 'plot_ep',
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'count-base', value: 'plot_ep' }
   }),
-  'form-income-contest': urlFieldWithExtra({
+  [FORM_INCOME_CONTEST]: urlFieldWithExtra({
     id: 'uc',
     name: 'contest',
     label: 'Ссылка на конкурс *',
     buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 },
     info: TEXT_MESSAGES.CONTEST_INFO
   }),
-  'form-income-avatar': urlFieldWithExtra({
+  [FORM_INCOME_AVATAR]: urlFieldWithExtra({
     id: 'ava-link',
     name: 'link',
     label: 'Ссылка на граф.тему *',
     buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
     info: TEXT_MESSAGES.GRAPHIC_WORK_INFO
   }),
-  'form-income-design-other': urlFieldWithExtra({
+  [FORM_INCOME_DESIGN_OTHER]: urlFieldWithExtra({
     id: 'do-link',
     name: 'link',
     label: 'Ссылка на граф.тему *',
     buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
     info: TEXT_MESSAGES.GRAPHIC_WORK_INFO
   }),
-  'form-income-run-contest': urlFieldWithExtra({
+  [FORM_INCOME_RUN_CONTEST]: urlFieldWithExtra({
     id: 'rc',
     name: 'contest',
     label: 'Ссылка на конкурс *',
     buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 }
   }),
-  'form-income-mastering': urlFieldWithExtra({
+  [FORM_INCOME_MASTERING]: urlFieldWithExtra({
     id: 'ms',
     name: 'ep',
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 }
   }),
-  'form-income-banner-reno': simpleField({
+  [FORM_INCOME_BANNER_RENO]: simpleField({
     id: 'reno',
     name: 'url',
     label: 'Ссылка на скрин *',
     type: 'url'
   }),
-  'form-income-banner-mayak': simpleField({
+  [FORM_INCOME_BANNER_MAYAK]: simpleField({
     id: 'mayak',
     name: 'url',
     label: 'Ссылка на скрин *',
     type: 'url'
   }),
-  'form-income-rpgtop': urlFieldWithExtra({
+  [FORM_INCOME_RPGTOP]: urlFieldWithExtra({
     id: 'rpgtop-link',
     name: 'need',
     label: 'Ссылка на скрин *',
@@ -134,50 +155,50 @@ export const formTemplates = {
   }),
 
   // РАСХОДЫ
-  'form-exp-face-1m': quantityField('face-1m'),
-  'form-exp-face-3m': quantityField('face-3m'),
-  'form-exp-face-6m': quantityField('face-6m'),
+  [FORM_EXP_FACE_1M]: quantityField('face-1m'),
+  [FORM_EXP_FACE_3M]: quantityField('face-3m'),
+  [FORM_EXP_FACE_6M]: quantityField('face-6m'),
 
-  'form-exp-char-1m': quantityField('char-1m'),
-  'form-exp-char-3m': quantityField('char-3m'),
-  'form-exp-char-6m': quantityField('char-6m'),
+  [FORM_EXP_CHAR_1M]: quantityField('char-1m'),
+  [FORM_EXP_CHAR_3M]: quantityField('char-3m'),
+  [FORM_EXP_CHAR_6M]: quantityField('char-6m'),
 
-  'form-exp-face-own-1m': quantityField('face-own-1m'),
-  'form-exp-face-own-3m': quantityField('face-own-3m'),
-  'form-exp-face-own-6m': quantityField('face-own-6m'),
+  [FORM_EXP_FACE_OWN_1M]: quantityField('face-own-1m'),
+  [FORM_EXP_FACE_OWN_3M]: quantityField('face-own-3m'),
+  [FORM_EXP_FACE_OWN_6M]: quantityField('face-own-6m'),
 
-  'form-exp-need-1w': quantityField('need-1w'),
-  'form-exp-need-2w': quantityField('need-2w'),
-  'form-exp-need-1m': quantityField('need-1m'),
+  [FORM_EXP_NEED_1W]: quantityField('need-1w'),
+  [FORM_EXP_NEED_2W]: quantityField('need-2w'),
+  [FORM_EXP_NEED_1M]: quantityField('need-1m'),
 
-  'form-exp-mask': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_MASK]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
-  'form-exp-bonus1d1': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  'form-exp-bonus2d1': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS1D1]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS2D1]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
-  'form-exp-bonus1w1': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  'form-exp-bonus2w1': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS1W1]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS2W1]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
-  'form-exp-bonus1m1': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  'form-exp-bonus2m1': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS1M1]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS2M1]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
-  'form-exp-bonus1m3': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  'form-exp-bonus2m3': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS1M3]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_BONUS2M3]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
-  'form-exp-thirdchar': simpleField({
+  [FORM_EXP_THIRDCHAR]: simpleField({
     id: 'tc-link',
     name: 'url',
     label: 'Ссылка на комментарий *',
     type: 'url',
     info: TEXT_MESSAGES.THIRDCHAR_INFO
   }),
-  'form-exp-changechar': simpleField({
+  [FORM_EXP_CHANGECHAR]: simpleField({
     id: 'new',
     name: 'text',
     label: 'Имя нового персонажа на английском *',
     type: 'text'
   }),
-  'form-exp-refuse': simpleField({
+  [FORM_EXP_REFUSE]: simpleField({
     id: 'rf-r',
     name: 'comment',
     label: 'Комментарий *',
@@ -185,34 +206,34 @@ export const formTemplates = {
     info: TEXT_MESSAGES.REFUSE_INFO,
     placeholder: 'Укажите, какой фантастической тварью Вы хотите стать и, если у вас несколько профилей, какой один оставить.'
   }),
-  'form-exp-clean': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  'form-exp-transfer': waitingTemplate(''),
+  [FORM_EXP_CLEAN]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
+  [FORM_EXP_TRANSFER]: waitingTemplate(''),
 
   // ПОДАРКИ
-  'form-gift-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-gift-present': waitingTemplate(''),
+  [FORM_GIFT_CUSTOM]: waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
+  [FORM_GIFT_PRESENT]: waitingTemplate(''),
 
   // ОФОРМЛЕНИЕ - Иконки
-  'form-icon-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-icon-present': waitingTemplate(''),
+  [FORM_ICON_CUSTOM]: waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
+  [FORM_ICON_PRESENT]: waitingTemplate(''),
 
   // ОФОРМЛЕНИЕ - Плашки
-  'form-badge-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-badge-present': waitingTemplate(''),
+  [FORM_BADGE_CUSTOM]: waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
+  [FORM_BADGE_PRESENT]: waitingTemplate(''),
 
   // ОФОРМЛЕНИЕ - Фоны
-  'form-bg-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-bg-present': waitingTemplate('')
+  [FORM_BG_CUSTOM]: waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
+  [FORM_BG_PRESENT]: waitingTemplate('')
 };
 
 // Список форм с data-info атрибутом
 const infoForms = [
-  'form-income-anketa', 'form-income-akcion', 'form-income-needchar',
-  'form-income-firstpost', 'form-income-personalpost', 'form-income-plotpost',
-  'form-income-100msgs', 'form-income-100rep', 'form-income-100pos',
-  'form-income-month', 'form-income-flyer', 'form-income-topup',
-  'form-income-ams', 'form-income-writer', 'form-income-post-of',
-  'form-income-episode-of', 'form-income-activist'
+  FORM_INCOME_ANKETA, FORM_INCOME_AKCION, FORM_INCOME_NEEDCHAR,
+  FORM_INCOME_FIRSTPOST, FORM_INCOME_PERSONALPOST, FORM_INCOME_PLOTPOST,
+  FORM_INCOME_100MSGS, FORM_INCOME_100REP, FORM_INCOME_100POS,
+  FORM_INCOME_MONTH, FORM_INCOME_FLYER, FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS, FORM_INCOME_WRITER, FORM_INCOME_POST_OF,
+  FORM_INCOME_EPISODE_OF, FORM_INCOME_ACTIVIST
 ];
 
 // Функция для инжекта шаблонов в DOM

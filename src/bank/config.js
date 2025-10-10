@@ -2,6 +2,13 @@
 // config.js — Константы и конфигурации
 // ============================================================================
 
+import {
+  FORM_INCOME_100MSGS,
+  FORM_INCOME_100REP,
+  FORM_INCOME_100POS,
+  FORM_INCOME_MONTH
+} from './constants.js';
+
 export const ALLOWED_PARENTS = Array.isArray(window.ALLOWED_PARENTS)
   ? window.ALLOWED_PARENTS
   : [
@@ -37,7 +44,7 @@ export const GIFT_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 
 // Конфигурация для счётчиков (сообщения, репутация, позитив, месяцы)
 export const counterConfigs = {
-  'form-income-100msgs': {
+  [FORM_INCOME_100MSGS]: {
     prefix: 'msg',
     oldVar: 'MSG100_OLD',
     newVar: 'MSG100_NEW',
@@ -47,7 +54,7 @@ export const counterConfigs = {
     timeout: MSG_TIMEOUT_MS,
     step: 100
   },
-  'form-income-100rep': {
+  [FORM_INCOME_100REP]: {
     prefix: 'rep',
     oldVar: 'REP100_OLD',
     newVar: 'REP100_NEW',
@@ -57,7 +64,7 @@ export const counterConfigs = {
     timeout: REP_TIMEOUT_MS,
     step: 100
   },
-  'form-income-100pos': {
+  [FORM_INCOME_100POS]: {
     prefix: 'pos',
     oldVar: 'POS100_OLD',
     newVar: 'POS100_NEW',
@@ -67,7 +74,7 @@ export const counterConfigs = {
     timeout: POS_TIMEOUT_MS,
     step: 100
   },
-  'form-income-month': {
+  [FORM_INCOME_MONTH]: {
     prefix: 'month',
     oldVar: 'MONTH_OLD',
     newVar: 'MONTH_NEW',
@@ -81,8 +88,8 @@ export const counterConfigs = {
 
 // Маппинг префиксов на конфигурации
 export const counterPrefixMap = {
-  msg: counterConfigs['form-income-100msgs'],
-  rep: counterConfigs['form-income-100rep'],
-  pos: counterConfigs['form-income-100pos'],
-  month: counterConfigs['form-income-month']
+  msg: counterConfigs[FORM_INCOME_100MSGS],
+  rep: counterConfigs[FORM_INCOME_100REP],
+  pos: counterConfigs[FORM_INCOME_100POS],
+  month: counterConfigs[FORM_INCOME_MONTH]
 };

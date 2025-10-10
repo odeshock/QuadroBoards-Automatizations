@@ -18,7 +18,9 @@ import {
   FORM_EXP_MASK, FORM_EXP_BONUS1D1, FORM_EXP_BONUS2D1, FORM_EXP_BONUS1W1, FORM_EXP_BONUS2W1,
   FORM_EXP_BONUS1M1, FORM_EXP_BONUS2M1, FORM_EXP_BONUS1M3, FORM_EXP_BONUS2M3,
   FORM_EXP_THIRDCHAR, FORM_EXP_CHANGECHAR, FORM_EXP_REFUSE, FORM_EXP_CLEAN, FORM_EXP_TRANSFER,
-  CALC_MODES
+  FORM_GIFT_PRESENT, FORM_GIFT_CUSTOM,
+  CALC_MODES,
+  toSelector
 } from './constants.js';
 
 // ============================================================================
@@ -188,7 +190,7 @@ export const backgroundItems = [
  * Структура:
  * - id: уникальный идентификатор скидки
  * - title: название скидки для отображения
- * - forms: массив form селекторов (например, ['#form-gift-present']) или 'all' для всех операций
+ * - forms: массив form селекторов (например, [toSelector(FORM_GIFT_PRESENT)]) или 'all' для всех операций
  * - type: тип скидки
  *   - 'percent': процентная скидка (discountValue = процент, например 20 для 20%)
  *   - 'fixed': фиксированная скидка (discountValue = фиксированная сумма)
@@ -211,7 +213,7 @@ export const autoDiscounts = [
   {
     id: 'gift-collection-bulk-discount',
     title: 'Скидка за каждые 5 подарков из коллекции',
-    forms: ['#form-gift-present'], // Только подарки из коллекции (не custom!)
+    forms: [toSelector(FORM_GIFT_PRESENT)], // Только подарки из коллекции (не custom!)
     type: 'per_batch',
     discountValue: itemPrices.gift.collection*5 - itemDiscountPrices.gift.collection.per5,
     batchSize: 5,      // за каждые 5 подарков
@@ -235,7 +237,7 @@ export const autoDiscounts = [
   {
     id: 'gift-custom-bulk-discount',
     title: 'Скидка за каждые 5 индивидуальных подарков',
-    forms: ['#form-gift-custom'], // Только подарки из коллекции (не custom!)
+    forms: [toSelector(FORM_GIFT_CUSTOM)], // Только индивидуальные подарки (custom!)
     type: 'per_batch',
     discountValue: itemPrices.gift.custom*5 - itemDiscountPrices.gift.custom.per5,
     batchSize: 5,      // за каждые 5 подарков

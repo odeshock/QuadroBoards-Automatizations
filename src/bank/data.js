@@ -98,11 +98,11 @@ export const expenseItems = [
 ];
 
 export const giftItems = [
-  { id: 'custom', icon: '✨', title: 'Индивидуальный подарок', price1: 100, price5: 400 },
-  { id: '1', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/999003.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
-  { id: '2', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/427793.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
-  { id: '3', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/899654.png">', title: 'Подарить подарок', price1: 60, price5: 140 },
-  { id: '4', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/772108.png">', title: 'Подарить подарок', price1: 60, price5: 140 }
+  { id: 'custom', icon: '✨', title: 'Индивидуальный подарок', price: 100 },
+  { id: '1', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/999003.png">', title: 'Подарить подарок', price: 60 },
+  { id: '2', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/427793.png">', title: 'Подарить подарок', price: 60 },
+  { id: '3', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/899654.png">', title: 'Подарить подарок', price: 60 },
+  { id: '4', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/772108.png">', title: 'Подарить подарок', price: 60 }
 ];
 
 export const iconItems = [
@@ -126,4 +126,46 @@ export const backgroundItems = [
   { id: '2', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/275271.png">', title: 'Фон 1', price: 40 },
   { id: '3', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/235283.png">', title: 'Фон 1', price: 40 },
   { id: '4', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/305050.png">', title: 'Фон 1', price: 40 }
+];
+
+// ============================================================================
+// АВТОМАТИЧЕСКИЕ СКИДКИ
+// ============================================================================
+
+/**
+ * Конфигурация автоматических скидок
+ *
+ * Структура:
+ * - id: уникальный идентификатор скидки
+ * - title: название скидки для отображения
+ * - forms: массив form селекторов (например, ['#form-gift-present']) или 'everything' для всех операций
+ * - type: тип скидки
+ *   - 'percent': процентная скидка (discountValue = процент, например 20 для 20%)
+ *   - 'fixed': фиксированная скидка (discountValue = фиксированная сумма)
+ *   - 'per_item': скидка за каждый элемент (discountValue = сумма за штуку)
+ * - discountValue: значение скидки (зависит от type)
+ * - roundResult: округлять ли результат (true/false), применяется для percent
+ * - condition: условие применения скидки
+ *   - type: 'none' | 'min_operation_total' | 'min_grand_total'
+ *   - value: пороговое значение (для min_operation_total или min_grand_total)
+ *
+ * Примеры:
+ * 1. Скидка 20% на подарки при сумме операции >= 300
+ * 2. Фиксированная скидка 50 галлеонов при итоговой сумме >= 1000
+ * 3. Скидка 4 галлеона за каждый подарок при количестве >= 5
+ */
+export const autoDiscounts = [
+  {
+    id: 'gift-bulk-discount',
+    title: 'Скидка за 5+ подарков',
+    forms: ['#form-gift-present', '#form-gift-custom'],
+    type: 'per_item',
+    discountValue: 4, // 4 галлеона за каждый подарок
+    roundResult: false,
+    condition: {
+      type: 'min_items', // минимальное количество элементов в операциях этого типа
+      value: 5
+    }
+  }
+  // Можно добавить больше правил скидок здесь
 ];

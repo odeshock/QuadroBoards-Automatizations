@@ -453,12 +453,11 @@ function renderGiftsList() {
     btn.className = 'gift-card btn-add';
     btn.setAttribute('data-form', item.id === 'custom' ? '#form-gift-custom' : '#form-gift-present');
     btn.setAttribute('data-kind', 'expense');
-    btn.setAttribute('data-amount', String(item.price1));
+    btn.setAttribute('data-amount', String(item.price));
     btn.setAttribute('data-title', item.title);
     btn.setAttribute('data-gift-id', item.id);
     btn.setAttribute('data-gift-icon', item.icon);
-    btn.setAttribute('data-gift-price-1', String(item.price1));
-    btn.setAttribute('data-gift-price-5', String(item.price5));
+    btn.setAttribute('data-gift-price-1', String(item.price));
     btn.innerHTML = item.icon;
     container.appendChild(btn);
   });

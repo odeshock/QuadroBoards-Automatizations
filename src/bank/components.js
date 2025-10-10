@@ -790,12 +790,7 @@ export function renderLog(log) {
         const li = document.createElement('li');
 
         const label = document.createElement('strong');
-
-        if (dataObj.discount_type === 'custom') {
-          label.textContent = 'Скидка за пять индивидуальных подарков: ';
-        } else {
-          label.textContent = 'Скидка за пять подарков: ';
-        }
+        label.textContent = `${dataObj.discount_title || 'Скидка'}: `;
 
         const calculation = document.createElement('span');
         calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.discount_amount || 0)}`;

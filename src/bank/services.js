@@ -18,6 +18,7 @@ import {
   fullMonthsDiffVirtualDOM,
   fmtYMD
 } from './utils.js';
+import { autoDiscounts } from './data.js';
 
 // Реэкспортируем для обратной совместимости
 export {
@@ -128,12 +129,9 @@ export function countTotalCustomGifts() {
   return total;
 }
 
-// Обновляет объект скидки: создаёт если >= 5 подарков, удаляет если < 5
-export function updateGiftDiscountEntry() {
-  const totalGifts = countTotalGifts();
-  const totalCustomGifts = countTotalCustomGifts();
-
-  // Находим существующую группу скидки
+// Универсальная функция для применения автоматических скидок
+export function updateAutoDiscounts() {
+  // Находим существующую группу скидок
   const discountKey = buildGroupKey({
     templateSelector: FORM_GIFT_DISCOUNT,
     title: TEXT_MESSAGES.AUTO_DISCOUNTS_TITLE,
@@ -143,88 +141,93 @@ export function updateGiftDiscountEntry() {
   });
 
   const discountGroupIndex = submissionGroups.findIndex(g => g.key === discountKey);
+  const entries = [];
+  let totalDiscount = 0;
 
-  const hasRegularDiscount = totalGifts >= 5;
-  const hasCustomDiscount = totalCustomGifts >= 5;
+  // Проходим по всем правилам скидок
+  autoDiscounts.forEach(rule => {
+    const { id, title, forms, type, discountValue, roundResult, condition } = rule;
 
-  if (hasRegularDiscount || hasCustomDiscount) {
-    const entries = [];
-    let totalDiscount = 0;
+    // Определяем, какие группы подходят под это правило
+    const matchingGroups = submissionGroups.filter(g => {
+      if (forms === 'everything') return true;
+      return forms.includes(g.templateSelector);
+    });
 
-    // Скидка на обычные подарки
-    if (hasRegularDiscount) {
-      const fivesCount = Math.floor(totalGifts / 5);
+    if (matchingGroups.length === 0) return;
 
-      let giftPrice1 = 60;
-      let giftPrice5 = 140;
+    // Подсчитываем общее количество элементов
+    let totalItems = 0;
+    matchingGroups.forEach(group => {
+      group.entries.forEach(entry => {
+        const dataObj = entry.data || {};
+        const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+        totalItems += recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+      });
+    });
 
-      const firstGiftGroup = submissionGroups.find(g =>
-        g.templateSelector === FORM_GIFT_PRESENT ||
-        REGEX.GIFT_TITLE.test(g.title || '')
-      );
+    // Проверяем условие
+    let conditionMet = false;
+    if (condition.type === 'none') {
+      conditionMet = true;
+    } else if (condition.type === 'min_items') {
+      conditionMet = totalItems >= condition.value;
+    }
 
-      if (firstGiftGroup) {
-        giftPrice1 = Number.parseInt(firstGiftGroup.giftPrice1, 10) || 60;
-        giftPrice5 = Number.parseInt(firstGiftGroup.giftPrice5, 10) || 140;
+    if (!conditionMet || totalItems === 0) return;
+
+    // Вычисляем скидку в зависимости от типа
+    let discount = 0;
+    let calculation = '';
+
+    if (type === 'per_item') {
+      // Скидка за каждый элемент
+      discount = discountValue * totalItems;
+      calculation = `${discountValue} × ${totalItems}`;
+    } else if (type === 'fixed') {
+      // Фиксированная скидка
+      discount = discountValue;
+      calculation = String(discountValue);
+    } else if (type === 'percent') {
+      // Процентная скидка - нужно вычислить общую стоимость
+      let operationTotal = 0;
+      matchingGroups.forEach(group => {
+        const price = Number.parseInt(group.giftPrice1, 10) || 0;
+        group.entries.forEach(entry => {
+          const dataObj = entry.data || {};
+          const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+          const count = recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+          operationTotal += price * count;
+        });
+      });
+      discount = operationTotal * (discountValue / 100);
+      if (roundResult) {
+        discount = Math.round(discount);
       }
+      calculation = `${formatNumber(operationTotal)} × ${discountValue}%`;
+    }
 
-      const discount = (giftPrice1 * fivesCount * 5) - (giftPrice5 * fivesCount);
+    if (discount > 0) {
       totalDiscount += discount;
-
       entries.push({
         id: incrementEntrySeq(),
-        template_id: 'gift-discount-regular',
+        template_id: `auto-discount-${id}`,
         data: {
-          discount_type: 'regular',
-          total_gifts: totalGifts,
-          fives_count: fivesCount,
+          discount_id: id,
+          discount_title: title,
+          discount_type: type,
+          total_items: totalItems,
           discount_amount: discount,
-          price_1: giftPrice1,
-          price_5: giftPrice5,
-          calculation: `(${giftPrice1} × ${fivesCount} × 5) - (${giftPrice5} × ${fivesCount})`
+          calculation
         },
         multiplier: 1
       });
     }
+  });
 
-    // Скидка на индивидуальные подарки
-    if (hasCustomDiscount) {
-      const fivesCount = Math.floor(totalCustomGifts / 5);
-
-      let customPrice1 = 100;
-      let customPrice5 = 400;
-
-      const firstCustomGiftGroup = submissionGroups.find(g =>
-        g.templateSelector === FORM_GIFT_CUSTOM ||
-        REGEX.CUSTOM_GIFT_TITLE.test(g.title || '')
-      );
-
-      if (firstCustomGiftGroup) {
-        customPrice1 = Number.parseInt(firstCustomGiftGroup.giftPrice1, 10) || 100;
-        customPrice5 = Number.parseInt(firstCustomGiftGroup.giftPrice5, 10) || 400;
-      }
-
-      const discount = (customPrice1 * fivesCount * 5) - (customPrice5 * fivesCount);
-      totalDiscount += discount;
-
-      entries.push({
-        id: incrementEntrySeq(),
-        template_id: 'gift-discount-custom',
-        data: {
-          discount_type: 'custom',
-          total_gifts: totalCustomGifts,
-          fives_count: fivesCount,
-          discount_amount: discount,
-          price_1: customPrice1,
-          price_5: customPrice5,
-          calculation: `(${customPrice1} × ${fivesCount} × 5) - (${customPrice5} × ${fivesCount})`
-        },
-        multiplier: 1
-      });
-    }
-
+  // Обновляем или удаляем группу скидок
+  if (entries.length > 0) {
     if (discountGroupIndex === -1) {
-      // Создаём новую группу
       const newGroup = {
         id: incrementGroupSeq(),
         key: discountKey,
@@ -238,13 +241,16 @@ export function updateGiftDiscountEntry() {
       };
       submissionGroups.push(newGroup);
     } else {
-      // Обновляем существующую
       const group = submissionGroups[discountGroupIndex];
       group.amount = totalDiscount;
       group.entries = entries;
     }
   } else if (discountGroupIndex !== -1) {
-    // Удаляем группу скидки, если нет подарков >= 5
     submissionGroups.splice(discountGroupIndex, 1);
   }
+}
+
+// Оставляем старую функцию для обратной совместимости (будет удалена позже)
+export function updateGiftDiscountEntry() {
+  updateAutoDiscounts();
 }

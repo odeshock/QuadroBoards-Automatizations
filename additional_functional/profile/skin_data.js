@@ -22,7 +22,7 @@
   const { icons, plashki, backs } = await collectSkinSets();
 
   // Плашка
-  if (SKIN?.PlashkaFieldID) {
+  if (window.SKIN?.PlashkaFieldID) {
     applyImagePicker(plashki, SKIN.PlashkaFieldID, {
       btnWidth: 229,
       btnHeight: 42,
@@ -31,7 +31,7 @@
   }
 
   // Фон
-  if (SKIN?.BackFieldID) {
+  if (window.SKIN?.BackFieldID) {
     applyImagePicker(backs, SKIN.BackFieldID, {
       btnWidth: 229,
       btnHeight: 42,
@@ -40,7 +40,7 @@
   }
 
   // Иконка
-  if (SKIN?.IconFieldID) {
+  if (window.SKIN?.IconFieldID) {
     applyImagePicker(icons, SKIN.IconFieldID, {
       btnWidth: 44,
     });

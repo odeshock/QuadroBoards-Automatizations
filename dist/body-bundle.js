@@ -3501,10 +3501,6 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
 async function fetchCardsWrappedClean(topic_id, comment_ids) {
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
 
-  const normSpace = (typeof FMV?.normSpace === 'function')
-    ? FMV.normSpace
-    : s => String(s ?? '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
-
   const decodeEntities = s => {
     const d = document.createElement('div');
     d.innerHTML = String(s ?? '');
@@ -3548,8 +3544,8 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
     const innerDoc = toDoc(decoded);
 
     const result = [...innerDoc.querySelectorAll('#grid .card')].map(card => {
-      const id        = normSpace(card.querySelector('.id')?.textContent || '');
-      const rawTitle  = normSpace(card.querySelector('.desc')?.textContent || '');
+      const id        = FMV.normSpace(card.querySelector('.id')?.textContent || '');
+      const rawTitle  = FMV.normSpace(card.querySelector('.desc')?.textContent || '');
       const content   = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
       const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
       const html      = `<div class="item" data-id="${id}"${titleAttr}>${content}</div>`;
@@ -5189,7 +5185,6 @@ async function collectChronoByUser(opts = {}) {
   */
   async function runBulkChronoUpdate(opts = {}) {
     const delayMs = Number.isFinite(opts.delayMs) ? opts.delayMs : 200;
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     // Источник пользователей
     let users;
@@ -5211,7 +5206,7 @@ async function collectChronoByUser(opts = {}) {
         sections: opts.sections
       });
       results.push(r);
-      if (delayMs) await sleep(delayMs);
+      if (delayMs) await FMV.sleep(delayMs);
     }
     try { console.table(results.map(x => ({ id: x.id, status: x.status }))); } catch {}
     return results;
@@ -5998,12 +5993,11 @@ async function collectChronoByUser(opts = {}) {
   const BUTTON_ORDER = 1;
 
   // ----- утилиты -----
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   async function waitFor(fn, { timeout = 10000, interval = 100 } = {}) {
     const t0 = performance.now();
     while (performance.now() - t0 < timeout) {
       try { const v = fn(); if (v) return v; } catch {}
-      await sleep(interval);
+      await FMV.sleep(interval);
     }
     return null;
   }

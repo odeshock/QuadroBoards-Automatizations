@@ -100,7 +100,6 @@
   */
   async function runBulkChronoUpdate(opts = {}) {
     const delayMs = Number.isFinite(opts.delayMs) ? opts.delayMs : 200;
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     // Источник пользователей
     let users;
@@ -122,7 +121,7 @@
         sections: opts.sections
       });
       results.push(r);
-      if (delayMs) await sleep(delayMs);
+      if (delayMs) await FMV.sleep(delayMs);
     }
     try { console.table(results.map(x => ({ id: x.id, status: x.status }))); } catch {}
     return results;

@@ -8,16 +8,6 @@
   // ───────────────────────────────────────────────────────────────────────────
   // УТИЛИТЫ
   // ───────────────────────────────────────────────────────────────────────────
-  const escapeHtml = (str) =>
-    (window.FMV && typeof FMV.escapeHtml === 'function')
-      ? FMV.escapeHtml(String(str))
-      : String(str)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-
   function extractUserIdsFromString(s) {
     const ids = new Set();
     (s || '').replace(/user(\d+)/gi, (_, d) => { ids.add(String(Number(d))); return _; });
@@ -49,10 +39,10 @@
 
     if (!hasName) {
       const label = `user${uid}`;
-      return `<span class="fmv-missing" data-user-id="${uid}" data-found="0">${escapeHtml(label)}</span>`;
+      return `<span class="fmv-missing" data-user-id="${uid}" data-found="0">${FMV.escapeHtml(label)}</span>`;
     }
 
-    const safeName = escapeHtml(name.trim());
+    const safeName = FMV.escapeHtml(name.trim());
     if (!MAKE_NAMES_LINKS) return safeName;
 
     const a = document.createElement('a');

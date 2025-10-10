@@ -7,10 +7,6 @@
 async function fetchCardsWrappedClean(topic_id, comment_ids) {
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
 
-  const normSpace = (typeof FMV?.normSpace === 'function')
-    ? FMV.normSpace
-    : s => String(s ?? '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
-
   const decodeEntities = s => {
     const d = document.createElement('div');
     d.innerHTML = String(s ?? '');
@@ -54,8 +50,8 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
     const innerDoc = toDoc(decoded);
 
     const result = [...innerDoc.querySelectorAll('#grid .card')].map(card => {
-      const id        = normSpace(card.querySelector('.id')?.textContent || '');
-      const rawTitle  = normSpace(card.querySelector('.desc')?.textContent || '');
+      const id        = FMV.normSpace(card.querySelector('.id')?.textContent || '');
+      const rawTitle  = FMV.normSpace(card.querySelector('.desc')?.textContent || '');
       const content   = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
       const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
       const html      = `<div class="item" data-id="${id}"${titleAttr}>${content}</div>`;

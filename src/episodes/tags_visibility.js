@@ -7,12 +7,11 @@
   const BUTTON_ORDER = 1;
 
   // ----- утилиты -----
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   async function waitFor(fn, { timeout = 10000, interval = 100 } = {}) {
     const t0 = performance.now();
     while (performance.now() - t0 < timeout) {
       try { const v = fn(); if (v) return v; } catch {}
-      await sleep(interval);
+      await FMV.sleep(interval);
     }
     return null;
   }

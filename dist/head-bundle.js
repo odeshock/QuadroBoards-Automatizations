@@ -11,13 +11,18 @@
   const FMV = (window.FMV = window.FMV || {});
 
   /* ---------- tiny utils ---------- */
+  /**
+   * Экранирование HTML-символов
+   * @param {string} s - Строка для экранирования
+   * @returns {string}
+   */
   FMV.escapeHtml = FMV.escapeHtml || function (s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+      .replace(/'/g, '&#39;');
   };
 
   FMV.normSpace = FMV.normSpace || function (s) {
@@ -41,6 +46,15 @@
       obs.observe(document.documentElement, { childList: true, subtree: true });
       setTimeout(() => { obs.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
     });
+  };
+
+  /**
+   * Задержка выполнения
+   * @param {number} ms - Миллисекунды
+   * @returns {Promise<void>}
+   */
+  FMV.sleep = FMV.sleep || function (ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   };
 
   /** Читает текст тега <tag> из узла (без дублирования пробелов) */
@@ -235,14 +249,6 @@
     const CELL_SELECTOR = "td.tcl.username span.usersname";
     const LINK_SELECTOR = "a[href*='id=']";
 
-    // Нормализация пробелов (аналог FMV.normSpace)
-    const normSpace = str => String(str || '')
-      .replace(/\s+/g, ' ')
-      .replace(/\u00A0/g, ' ')
-      .trim();
-
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-
     const extractId = href => {
       if (!href) return null;
       const m = href.match(/(?:[?&/])id=(\d+)/i);
@@ -297,7 +303,7 @@
       const users = [];
       doc.querySelectorAll(CELL_SELECTOR).forEach(cell => {
         const a = cell.querySelector(LINK_SELECTOR);
-        const name = normSpace(a?.textContent || "");
+        const name = FMV.normSpace(a?.textContent || "");
         const id = extractId(a?.getAttribute("href") || "");
         if (name && Number.isFinite(id)) {
           users.push({
@@ -351,7 +357,7 @@
 
       // Задержка между батчами
       if (start + batchSize <= maxPages) {
-        await sleep(300);
+        await FMV.sleep(300);
       }
     }
 
@@ -476,7 +482,6 @@
     if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
     const basePath    = "/search.php";
     const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const buildUrl = (p) => {
       const u = new URL(basePath, location.origin);
       u.search = new URLSearchParams({ action:"search", author:window.encodeWithSep(author), forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
@@ -560,7 +565,7 @@
         if (last_src && post.src === last_src) return finalize([]);
         if (post.symbols_num > 0) return finalize([post]);
       }
-      await sleep(delayMs);
+      await FMV.sleep(delayMs);
 
       for (let p=2; p<=maxPages; p++) {
         const doc = await getDoc(buildUrl(p)); const posts = extractPosts(doc);
@@ -570,7 +575,7 @@
           if (last_src && post.src === last_src) return finalize([]);
           if (post.symbols_num > 0) return finalize([post]);
         }
-        await sleep(delayMs);
+        await FMV.sleep(delayMs);
       }
       return finalize([]);
     }
@@ -592,14 +597,14 @@
       };
 
       if (pushUntilBorder(posts1)) return finalize(acc);
-      await sleep(delayMs);
+      await FMV.sleep(delayMs);
 
       for (let p=2; p<=maxPages; p++) {
         const doc = await getDoc(buildUrl(p)); const posts = extractPosts(doc);
         if (!posts.length) break;
         if (pageSignature(posts) === baseSig) break;
         if (pushUntilBorder(posts)) return finalize(acc);
-        await sleep(delayMs);
+        await FMV.sleep(delayMs);
       }
       return finalize(acc);
     }
@@ -643,7 +648,6 @@
 
     const forumsParam = forums.join(",");
     const basePath = "/search.php";
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     const buildSearchUrl = (p) => {
       const u = new URL(basePath, location.origin);
@@ -738,7 +742,7 @@
     const links1 = extractTopicPageLinks(doc1);
     const sig1 = hash(links1.join("\n"));
     const topics = [...links1];
-    await sleep(delayMs);
+    await FMV.sleep(delayMs);
 
     for (let p = 2; p <= maxPages; p++) {
       const doc = await getDoc(buildSearchUrl(p));
@@ -746,7 +750,7 @@
       const sig = hash(links.join("\n"));
       if (sig === sig1) break;
       topics.push(...links);
-      await sleep(delayMs);
+      await FMV.sleep(delayMs);
     }
 
     const uniqTopics = [...new Set(topics)];
@@ -771,7 +775,7 @@
           }
         }
       } catch {}
-      await sleep(delayMs);
+      await FMV.sleep(delayMs);
     }
 
     window.__scrapedTopicFirstPosts = firstPostLinks;
@@ -1236,16 +1240,6 @@ function textFromNodes(nodes) {
   // ───────────────────────────────────────────────────────────────────────────
   // УТИЛИТЫ
   // ───────────────────────────────────────────────────────────────────────────
-  const escapeHtml = (str) =>
-    (window.FMV && typeof FMV.escapeHtml === 'function')
-      ? FMV.escapeHtml(String(str))
-      : String(str)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-
   function extractUserIdsFromString(s) {
     const ids = new Set();
     (s || '').replace(/user(\d+)/gi, (_, d) => { ids.add(String(Number(d))); return _; });
@@ -1277,10 +1271,10 @@ function textFromNodes(nodes) {
 
     if (!hasName) {
       const label = `user${uid}`;
-      return `<span class="fmv-missing" data-user-id="${uid}" data-found="0">${escapeHtml(label)}</span>`;
+      return `<span class="fmv-missing" data-user-id="${uid}" data-found="0">${FMV.escapeHtml(label)}</span>`;
     }
 
-    const safeName = escapeHtml(name.trim());
+    const safeName = FMV.escapeHtml(name.trim());
     if (!MAKE_NAMES_LINKS) return safeName;
 
     const a = document.createElement('a');

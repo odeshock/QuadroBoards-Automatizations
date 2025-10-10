@@ -694,7 +694,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
       amount.min = '1';
       amount.step = '1';
       amount.placeholder = 'сколько';
-      amount.value = prefillAmount || '0';
+      amount.value = prefillAmount || '';
       amount.required = true;
       amount.style.width = '90px';
       amount.addEventListener('input', syncHiddenFields);
@@ -1014,7 +1014,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
       amount.min = '1';
       amount.step = '1';
       amount.placeholder = 'сколько';
-      amount.value = prefillAmount || '0';
+      amount.value = prefillAmount || '';
       amount.required = true;
       amount.style.width = '90px';
       amount.addEventListener('input', syncHiddenFields);

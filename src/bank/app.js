@@ -128,7 +128,9 @@ document.addEventListener('click', (e) => {
   const amountLabel = kind === 'expense' ? 'Стоимость' : 'Начисление';
 
   // Дополнительная проверка доступа (по ID формы)
-  if (!isItemAllowedForAdmin(selector)) {
+  // Убираем # для сравнения с константами
+  const selectorWithoutHash = selector ? selector.replace('#', '') : '';
+  if (!isItemAllowedForAdmin(selectorWithoutHash)) {
     e.preventDefault();
     return;
   }

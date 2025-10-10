@@ -1374,6 +1374,25 @@ export function renderLog(log) {
           const total = calculateCost('price_w_entered_amount', price, 0, recipientCount, 0, totalAmount);
           totalSum += isIncome ? total : -total;
         }
+      } else if (group.templateSelector === '#form-income-topup' || group.templateSelector === '#form-income-ams') {
+        // Докупить кредиты / Выдать денежку дополнительно
+        let totalTopup = 0;
+        group.entries.forEach((item) => {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1]);
+          idxs.forEach((idx) => {
+            const topupAmount = Number(dataObj[`topup_${idx}`]) || 0;
+            totalTopup += topupAmount;
+          });
+        });
+        if (totalTopup > 0) {
+          const price = group.price !== null && group.price !== undefined ? Number(group.price) : 0;
+          const total = calculateCost('price_per_item', price, 0, totalTopup, 0, 0);
+          totalSum += isIncome ? total : -total;
+        }
       } else if (group.isDiscount) {
         let totalDiscount = 0;
         group.entries.forEach((item) => {

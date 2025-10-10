@@ -386,7 +386,7 @@
       display: list-item;
     }
     .entry-list.separated li {
-      margin-bottom: 10px;
+      margin-bottom: 15px;
     }
     .entry-list.separated li:last-child {
       margin-bottom: 0;

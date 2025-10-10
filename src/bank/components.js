@@ -787,7 +787,7 @@ export function renderLog(log) {
       itemEl.className = 'entry-item';
 
       const list = document.createElement('ol');
-      list.className = 'entry-list separated';
+      list.className = 'entry-list';
 
       group.entries.forEach((item) => {
         const dataObj = item.data || {};
@@ -816,6 +816,19 @@ export function renderLog(log) {
       itemEl.dataset.entryId = item.id;
       itemEl.dataset.groupId = group.id;
 
+      // ID шаблона формы
+      const tid = item.template_id;
+
+      // Определяем формы, требующие визуального разделения
+      const bonusMaskCleanIds = [
+        'form-exp-bonus1d1', 'form-exp-bonus2d1',
+        'form-exp-bonus1w1', 'form-exp-bonus2w1',
+        'form-exp-bonus1m1', 'form-exp-bonus2m1',
+        'form-exp-bonus1m3', 'form-exp-bonus2m3',
+        'form-exp-mask', 'form-exp-clean'
+      ];
+      const isBonusMaskClean = bonusMaskCleanIds.includes(tid);
+
       // header у записи (если нужен заголовок для нескольких записей)
       // Для скидок не показываем "Запись X"
       const itemTitle = document.createElement('div');
@@ -835,7 +848,10 @@ export function renderLog(log) {
 
       // список данных
       const list = document.createElement('ol');
-      list.className = 'entry-list';
+
+      // Добавляем класс separated для форм с комментариями/получателями
+      const needsSeparation = isBonusMaskClean || tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift');
+      list.className = needsSeparation ? 'entry-list separated' : 'entry-list';
 
       // ===== спец-рендеры =====
       // листовка
@@ -920,8 +936,6 @@ export function renderLog(log) {
       }
 
       // ===== Определяем тип формы для правильного рендеринга =====
-      const tid = item.template_id;
-
       // Группа 1: Формы с получателями (листом)
       const group1Templates = [
         'form-income-anketa', 'form-income-akcion', 'form-income-needchar',
@@ -968,15 +982,6 @@ export function renderLog(log) {
 
       // Группа 8: Ключ-значение без li (100 сообщений, репутации, позитива, месяц)
       const group8Templates = ['form-income-100msgs', 'form-income-100rep', 'form-income-100pos', 'form-income-month'];
-
-      const bonusMaskCleanIds = [
-        'form-exp-bonus1d1', 'form-exp-bonus2d1',
-        'form-exp-bonus1w1', 'form-exp-bonus2w1',
-        'form-exp-bonus1m1', 'form-exp-bonus2m1',
-        'form-exp-bonus1m3', 'form-exp-bonus2m3',
-        'form-exp-mask', 'form-exp-clean'
-      ];
-      const isBonusMaskClean = bonusMaskCleanIds.includes(item.template_id);
 
       // ===== ГРУППА 1: Формы с получателями в списке =====
       if (group1Templates.includes(tid)) {

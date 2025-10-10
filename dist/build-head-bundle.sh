@@ -30,7 +30,7 @@ cat src/core/check_group.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
 echo "/* MODULE 6: load_main_users_money.js */" >> dist/head-bundle.js
-cat src/profile/loader/load_main_users_money.js >> dist/head-bundle.js
+cat src/profile/load_main_users_money.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
 echo "/* MODULE 7: bank/parent.js */" >> dist/head-bundle.js

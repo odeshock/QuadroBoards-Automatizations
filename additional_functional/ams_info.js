@@ -37,10 +37,7 @@
 
       const isAllowedGroup = allowedGroups.includes(groupId);
 
-      const crumbs = document.querySelector('.crumbs') ||
-                     document.querySelector('#pun-crumbs') ||
-                     document.querySelector('.pun_crumbs') ||
-                     document.querySelector('.container .crumbs');
+      const crumbs = document.querySelector('.container.crumbs');
 
       const isAllowedForum = crumbs && Array.from(crumbs.querySelectorAll('a[href]')).some(a => {
         try {

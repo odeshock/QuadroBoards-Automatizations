@@ -31,6 +31,10 @@ echo "" >> dist/head-bundle.js
 
 echo "/* MODULE 6: bank_common.js */" >> dist/head-bundle.js
 cat src/profile/fields/bank_common.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 7: bank/parent.js */" >> dist/head-bundle.js
+cat src/bank/parent.js >> dist/head-bundle.js
 
 echo "✅ head-bundle.js created!"
 ls -lh dist/head-bundle.js

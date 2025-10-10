@@ -1,5 +1,22 @@
-// === helpers: cp1251 + сериализация формы «как браузер» (как в твоём файле) ===
+/**
+ * @fileoverview Базовые утилиты для работы с кодировкой CP1251 и сериализацией форм
+ * @module helpers
+ */
+
+// === helpers: cp1251 + сериализация формы «как браузер» ===
+
+/**
+ * Карта соответствия Unicode кодов кириллицы в CP1251
+ * @type {Object<number, number>}
+ * @private
+ */
 const __cp1251Map = (()=>{const m={};for(let u=1040;u<=1103;u++)m[u]=u-848;m[1025]=168;m[1105]=184;return m;})();
+
+/**
+ * Кодирует строку в формат URL с использованием кодировки CP1251
+ * @param {string} str - Строка для кодирования
+ * @returns {string} URL-кодированная строка в CP1251
+ */
 function encodeURIcp1251(str){
   const out=[]; for(const ch of String(str)){ let code=ch.charCodeAt(0);
     if(__cp1251Map[code]!==undefined) code=__cp1251Map[code];
@@ -18,6 +35,14 @@ function encodeURIcp1251(str){
   }
   return out.join('').replace(/\+/g,'%2B');
 }
+
+/**
+ * Сериализует форму в формат application/x-www-form-urlencoded с кодировкой CP1251
+ * Позволяет выбрать конкретную submit-кнопку для отправки
+ * @param {HTMLFormElement} form - HTML форма для сериализации
+ * @param {string} [chosenName='save'] - Имя submit-кнопки для включения в данные
+ * @returns {string} Сериализованная строка формы
+ */
 function serializeFormCP1251_SelectSubmit(form, chosenName='save'){
   const pairs=[];
   for(const el of Array.from(form.elements||[])){
@@ -41,6 +66,13 @@ function serializeFormCP1251_SelectSubmit(form, chosenName='save'){
   }
   return pairs.join('&');
 }
+
+/**
+ * Загружает HTML документ с URL и декодирует его из CP1251
+ * @param {string} url - URL для загрузки
+ * @returns {Promise<Document>} Promise с распарсенным HTML документом
+ * @throws {Error} При ошибке HTTP
+ */
 async function fetchCP1251Doc(url){
   const res = await fetch(url, { credentials:'include' });
   if(!res.ok) throw new Error(`GET ${url} → HTTP ${res.status}`);
@@ -48,11 +80,25 @@ async function fetchCP1251Doc(url){
   const html = new TextDecoder('windows-1251').decode(buf);
   return new DOMParser().parseFromString(html, 'text/html');
 }
+
+/**
+ * Загружает текст с URL и декодирует его из CP1251
+ * @param {string} url - URL для загрузки
+ * @param {RequestInit} [init] - Параметры fetch запроса
+ * @returns {Promise<{res: Response, text: string}>} Promise с ответом и декодированным текстом
+ */
 async function fetchCP1251Text(url, init){
   const res = await fetch(url, init);
   const buf = await res.arrayBuffer();
   return { res, text: new TextDecoder('windows-1251').decode(buf) };
 }
+
+/**
+ * Сериализует форму в формат application/x-www-form-urlencoded с кодировкой CP1251
+ * Базовая версия без выбора конкретной submit-кнопки
+ * @param {HTMLFormElement} form - HTML форма для сериализации
+ * @returns {string} Сериализованная строка формы
+ */
 function serializeFormCP1251(form){
   const pairs = [];
   for (const el of Array.from(form.elements||[])) {
@@ -68,8 +114,16 @@ function serializeFormCP1251(form){
   return pairs.join('&');
 }
 
-// --- helpers.js ---
-// Универсальный загрузчик HTML с корректной детекцией кодировки
+/**
+ * Универсальный загрузчик HTML с автоматической детекцией кодировки
+ * Определяет кодировку в следующем порядке приоритета:
+ * 1. HTTP заголовок Content-Type
+ * 2. Meta тег в HTML
+ * 3. Эвристический анализ (UTF-8 vs CP1251)
+ * @param {string} url - URL для загрузки
+ * @returns {Promise<string>} Promise с декодированным HTML текстом
+ * @throws {Error} При ошибке HTTP
+ */
 async function fetchHtml(url) {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -117,13 +171,12 @@ async function fetchHtml(url) {
   return utf8;
 }
 
-function escapeHtml(s){
-  return (s||'').replace(/[&<>\"']/g, ch => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]
-  ));
-}
-
-// helpers.js
+/**
+ * Парсит хронологические теги из DOM узла
+ * Извлекает информацию об участниках, масках, локации и порядке
+ * @param {Element} firstNode - DOM элемент содержащий теги хронологии
+ * @returns {{participantsLower: string[], masks: Object<string, string>, location: string, order: string}}
+ */
 window.parseChronoTagsRaw = function(firstNode){
   const pick = sel => firstNode.querySelector(sel)?.textContent.trim() || '';
 
@@ -150,7 +203,13 @@ window.parseChronoTagsRaw = function(firstNode){
   };
 };
 
-// Резолвер имён и готового HTML (использует profileLink / getProfileNameById)
+/**
+ * Резолвит имена пользователей и создает готовый HTML для хронологических данных
+ * Использует глобальные функции profileLink и getProfileNameById
+ * @param {Object} raw - Сырые данные из parseChronoTagsRaw
+ * @param {Object} [opts={}] - Дополнительные опции
+ * @returns {Promise<Object>} Резолвенные данные с HTML разметкой
+ */
 window.resolveChronoData = async function(raw, opts = {}){
   const out = { ...raw, idToName: new Map(), participantsHtml: '', masksHtml: '' };
 
@@ -165,24 +224,25 @@ window.resolveChronoData = async function(raw, opts = {}){
 
   const renderLeft = (token) => {
     const m = /^user(\d+)$/i.exec(token);
-    if (!m) return escapeHtml(token);
+    if (!m) return (window.FMV && window.FMV.escapeHtml) ? window.FMV.escapeHtml(token) : token;
     const id = String(+m[1]);
     const name = out.idToName.get(id) || null;
     return profileLink(id, name); // ← тут появится <a> или (не найден)
   };
 
+  const escHtml = (window.FMV && window.FMV.escapeHtml) ? window.FMV.escapeHtml : (s => s);
   out.participantsHtml = raw.participantsLower.map(renderLeft).join('; ');
-  out.masksHtml = Object.entries(raw.masks||{}).map(([k,v]) => `${renderLeft(k)}=${escapeHtml(v)}`).join('; ');
+  out.masksHtml = Object.entries(raw.masks||{}).map(([k,v]) => `${renderLeft(k)}=${escHtml(v)}`).join('; ');
 
   return out;
 };
 
 /**
- * userLink – вывод ссылки на профиль в HTML или BB-коде
- * @param {string|number} id   – числовой ID пользователя
- * @param {string}        name – отображаемое имя (если есть)
- * @param {boolean}       asBB – true → вернуть BB-код, false → HTML
- * @returns {string}
+ * Генерирует ссылку на профиль пользователя в HTML или BB-коде формате
+ * @param {string|number} id - Числовой ID пользователя
+ * @param {string} [name=''] - Отображаемое имя (если не указано, будет userN)
+ * @param {boolean} [asBB=false] - true → BB-код, false → HTML
+ * @returns {string} Ссылка на профиль
  */
 function userLink(id, name = '', asBB = false) {
   const uid   = String(id);
@@ -204,9 +264,10 @@ function userLink(id, name = '', asBB = false) {
 }
 
 /**
- * missingUser – оформление «не найденного» пользователя
- * @param {string} token – исходное имя/токен (например user11)
- * @param {boolean} asBB – true → BB-код, false → HTML
+ * Форматирует "не найденного" пользователя с визуальным выделением
+ * @param {string} token - Исходное имя/токен (например user11)
+ * @param {boolean} [asBB=false] - true → BB-код с [mark], false → HTML с span
+ * @returns {string} Форматированная строка
  */
 function missingUser(token, asBB = false) {
   const raw = String(token);
@@ -215,6 +276,11 @@ function missingUser(token, asBB = false) {
     : `<span class="fmv-missing" data-found="0">${raw}</span>`;
 }
 
+/**
+ * Извлекает заголовок темы из хлебных крошек (breadcrumbs) документа
+ * @param {Document} doc - HTML документ для парсинга
+ * @returns {string} Заголовок темы или пустая строка
+ */
 function topicTitleFromCrumbs(doc) {
   // обычно: <p class="container crumbs"> … <a>FMV</a> <em>»</em> <a>АУ</a> <em>»</em> Тест заголовка</p>
   const p =
@@ -240,6 +306,12 @@ function topicTitleFromCrumbs(doc) {
 }
 
 /* ===================== парсинг ===================== */
+
+/**
+ * Парсит HTML строку (из script тега) и извлекает параграфы
+ * @param {string} htmlText - HTML текст для парсинга
+ * @returns {Array} Массив распарсенных параграфов
+ */
 function parseFromScriptHTML(htmlText) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${htmlText}</div>`, 'text/html');
@@ -248,6 +320,12 @@ function parseFromScriptHTML(htmlText) {
   wrap.querySelectorAll('p').forEach(p => { const row = parseParagraph(p); if (row) out.push(row); });
   return out;
 }
+
+/**
+ * Парсит уже отрендеренный DOM контейнер и извлекает параграфы
+ * @param {Element} container - DOM элемент контейнер
+ * @returns {Array} Массив распарсенных параграфов
+ */
 function parseFromRendered(container) {
   const ps = container.querySelectorAll('p');
   if (ps.length) return Array.from(ps).map(parseParagraph).filter(Boolean);
@@ -258,6 +336,13 @@ function parseFromRendered(container) {
     return parseParagraph(div.firstElementChild);
   }).filter(Boolean);
 }
+
+/**
+ * Находит DOM узел поста по его ID
+ * @param {Document} doc - HTML документ
+ * @param {string|number} pid - ID поста
+ * @returns {Element|null} Найденный узел поста
+ */
 function findPostNode(doc, pid) {
   const id = `p${pid}`;
   let node = doc.getElementById(id);
@@ -267,31 +352,53 @@ function findPostNode(doc, pid) {
   node = doc.querySelector(`[id^="p${pid}"]`);
   return node;
 }
+
+/**
+ * Извлекает текст из массива DOM узлов
+ * @param {Array<Node>} nodes - Массив DOM узлов
+ * @returns {string} Объединенный текст с нормализованными пробелами
+ */
 function textFromNodes(nodes) {
   return nodes.map(n => n.nodeType===3 ? (n.nodeValue||'') : (n.nodeType===1 ? (n.textContent||'') : ''))
     .join('').replace(/\s+/g,' ').trim();
 }
 
-/* === helpers: общие утилиты для всех скриптов (НОВОЕ) === */
+/**
+ * @fileoverview Дополнительные утилиты для FMV namespace
+ * @requires common.js - использует FMV.escapeHtml
+ */
 (function () {
   'use strict';
   window.FMV = window.FMV || {};
 
-  // короткий escaper для сообщений/логов
+  /**
+   * Экранирует HTML и обрезает строку до заданного лимита
+   * @param {string} s - Строка для экранирования
+   * @param {number} [limit=500] - Максимальная длина строки
+   * @returns {string} Экранированная и обрезанная строка
+   */
   FMV.escapeHtmlShort = FMV.escapeHtmlShort || function (s = '', limit = 500) {
     const t = String(s);
     const cut = t.length > limit ? t.slice(0, limit) + '…' : t;
     return (typeof FMV.escapeHtml === 'function') ? FMV.escapeHtml(cut) : cut;
   };
 
-  // загрузчик документа через fetchHtml (+ DOMParser fallback)
+  /**
+   * Загружает HTML документ с автоопределением кодировки
+   * @param {string} url - URL для загрузки
+   * @returns {Promise<Document>} Promise с распарсенным документом
+   */
   FMV.fetchDoc = FMV.fetchDoc || async function (url) {
     const html = await fetchHtml(url);
     if (typeof window.parseHTML === 'function') return window.parseHTML(html);
     return new DOMParser().parseFromString(html, 'text/html');
   };
 
-  // cp1251-safe: заменяет все символы вне ASCII/кириллицы на &#NNNN;
+  /**
+   * Преобразует строку в CP1251-safe формат, заменяя несовместимые символы на HTML entities
+   * @param {string} s - Строка для преобразования
+   * @returns {string} CP1251-безопасная строка с HTML entities
+   */
   FMV.toCp1251Entities = FMV.toCp1251Entities || function (s) {
     const keep = /[\u0000-\u007F\u0400-\u045F\u0401\u0451]/; // ASCII + кириллица + Ё/ё
     let out = '';

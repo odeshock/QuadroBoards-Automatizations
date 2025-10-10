@@ -1,0 +1,36 @@
+#!/bin/bash
+cd "$(dirname "$0")/.."
+
+cat > dist/body-bundle.js << 'HEADER'
+/*!
+ * QuadroBoards Automatizations - BODY BUNDLE
+ * @version 1.0.0
+ */
+HEADER
+
+echo "" >> dist/body-bundle.js
+echo "/* UI Components */" >> dist/body-bundle.js
+cat src/ui/*.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
+echo "/* Private Pages */" >> dist/body-bundle.js
+cat src/private_pages/*.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
+echo "/* Forms */" >> dist/body-bundle.js
+cat src/form/*.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
+echo "/* Profile */" >> dist/body-bundle.js
+cat src/profile/*.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
+echo "/* Comments & Chrono */" >> dist/body-bundle.js
+cat src/comments/*.js src/chrono/*.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
+echo "/* Episodes */" >> dist/body-bundle.js
+cat src/episodes/*.js >> dist/body-bundle.js
+
+echo "✅ body-bundle.js created!"
+ls -lh dist/body-bundle.js

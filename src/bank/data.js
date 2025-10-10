@@ -103,7 +103,7 @@ export const expenseItems = [
 
 export const itemPrices = {
   gift: {
-    collection: 60,   // Подарки из коллекции
+    collection: 40,   // Подарки из коллекции
     custom: 100       // Индивидуальный подарок
   },
   icon: {
@@ -117,6 +117,17 @@ export const itemPrices = {
   background: {
     collection: 40,   // Фоны из коллекции
     custom: 155       // Индивидуальный фон
+  }
+};
+
+export const itemDiscountPrices = {
+  gift: {
+    collection: {
+      per5: 180,  // Цена за 5 подарков из коллекции (40×5=200, скидка 20₲)
+    },
+    custom: {
+      per5: 480,  // Цена за 5 индивидуальных подарков (100×5=500, скидка 20₲)
+    }
   }
 };
 
@@ -182,24 +193,41 @@ export const backgroundItems = [
  *   - 'percent': процентная скидка (discountValue = процент, например 20 для 20%)
  *   - 'fixed': фиксированная скидка (discountValue = фиксированная сумма)
  *   - 'per_item': скидка за каждый элемент (discountValue = сумма за штуку)
+ *   - 'per_batch': скидка за каждые N элементов (discountValue = сумма за партию, batchSize = размер партии)
  * - discountValue: значение скидки (зависит от type)
+ * - batchSize: размер партии (только для type='per_batch', например 5 = за каждые 5 штук)
  * - roundResult: округлять ли результат (true/false), применяется для percent
  * - condition: условие применения скидки
- *   - type: 'none' | 'min_operation_total' | 'min_grand_total'
- *   - value: пороговое значение (для min_operation_total или min_grand_total)
+ *   - type: 'none' | 'min_items' | 'min_operation_total' | 'min_grand_total'
+ *   - value: пороговое значение
  *
  * Примеры:
  * 1. Скидка 20% на подарки при сумме операции >= 300
  * 2. Фиксированная скидка 50 галлеонов при итоговой сумме >= 1000
  * 3. Скидка 4 галлеона за каждый подарок при количестве >= 5
+ * 4. Скидка 20 галлеонов за каждые 5 подарков (per_batch)
  */
 export const autoDiscounts = [
   {
+    id: 'gift-custom-bulk-discount',
+    title: 'Скидка за каждые 5 индивидуальных подарков',
+    forms: ['#form-gift-custom'], // Только подарки из коллекции (не custom!)
+    type: 'per_batch',
+    discountValue: itemPrices.gift.custom*5 - itemDiscountPrices.gift.custom.per5,
+    batchSize: 5,      // за каждые 5 подарков
+    roundResult: false,
+    condition: {
+      type: 'min_items', // минимальное количество элементов в операциях этого типа
+      value: 5
+    }
+  },
+  {
     id: 'gift-collection-bulk-discount',
-    title: 'Скидка за 5+ подарков из коллекции',
+    title: 'Скидка за каждые 5 подарков из коллекции',
     forms: ['#form-gift-present'], // Только подарки из коллекции (не custom!)
-    type: 'per_item',
-    discountValue: 4, // 4 галлеона за каждый подарок
+    type: 'per_batch',
+    discountValue: itemPrices.gift.collection*5 - itemDiscountPrices.gift.collection.per5,
+    batchSize: 5,      // за каждые 5 подарков
     roundResult: false,
     condition: {
       type: 'min_items', // минимальное количество элементов в операциях этого типа

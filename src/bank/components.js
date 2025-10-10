@@ -691,10 +691,11 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 
       const amount = document.createElement('input');
       amount.type = 'number';
-      amount.min = '0';
+      amount.min = '1';
       amount.step = '1';
       amount.placeholder = 'сколько';
-      amount.value = prefillAmount || '';
+      amount.value = prefillAmount || '0';
+      amount.required = true;
       amount.style.width = '90px';
       amount.addEventListener('input', syncHiddenFields);
 
@@ -1009,10 +1010,11 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
 
       const amount = document.createElement('input');
       amount.type = 'number';
-      amount.min = '0';
+      amount.min = '1';
       amount.step = '1';
       amount.placeholder = 'сколько';
-      amount.value = prefillAmount || '';
+      amount.value = prefillAmount || '0';
+      amount.required = true;
       amount.style.width = '90px';
       amount.addEventListener('input', syncHiddenFields);
 
@@ -2402,12 +2404,12 @@ if (template.id === FORM_INCOME_AMS) {
 }
 
 // === BONUSES, MASK, CLEAN: выбор получателя + количество + от кого + комментарий
-if (SPECIAL_EXPENSE_FORMS.includes('#' + template.id)) {
+if (SPECIAL_EXPENSE_FORMS.includes(toSelector(template.id))) {
   counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 
 // === TRANSFER: «Перевод средств другому (комиссия)» — выбор пользователей + сумма с комиссией 10 галлеонов за каждого
-if ('#' + template.id === FORM_EXP_TRANSFER) {
+if (template.id === FORM_EXP_TRANSFER) {
   counterWatcher = setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TRANSFER_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 

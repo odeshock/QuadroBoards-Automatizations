@@ -22,7 +22,7 @@
 
       // === Переменные для настроек и проверок ===
       const bodyGroup  = Number(document.body?.dataset?.groupId || NaN);
-      const groupId    = Number(window.GroupID ?? window?.PUNBB?.group_id ?? window?.PUNBB?.user?.g_id ?? bodyGroup);
+      const groupId    = window.GroupID ? Number(window.GroupID) : null;
 
       // объединяем списки для удобства
       const allowedGroups = [

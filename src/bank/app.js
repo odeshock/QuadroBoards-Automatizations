@@ -5,7 +5,7 @@
 import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, updateGiftDiscountEntry } from './services.js';
 import { renderLog, openModal, closeModal, showConfirmModal } from './components.js';
 import { injectTemplates } from './templates.js';
-import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems } from './data.js';
+import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems, itemPrices } from './data.js';
 import {
   ADMIN_ALLOWED_ITEMS,
   TEXT_MESSAGES,
@@ -448,16 +448,19 @@ function renderGiftsList() {
   if (!container) return;
 
   giftItems.forEach(item => {
+    const isCustom = item.id === 'custom';
+    const price = isCustom ? itemPrices.gift.custom : itemPrices.gift.collection;
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'gift-card btn-add';
-    btn.setAttribute('data-form', item.id === 'custom' ? '#form-gift-custom' : '#form-gift-present');
+    btn.setAttribute('data-form', isCustom ? '#form-gift-custom' : '#form-gift-present');
     btn.setAttribute('data-kind', 'expense');
-    btn.setAttribute('data-amount', String(item.price));
+    btn.setAttribute('data-amount', String(price));
     btn.setAttribute('data-title', item.title);
     btn.setAttribute('data-gift-id', item.id);
     btn.setAttribute('data-gift-icon', item.icon);
-    btn.setAttribute('data-gift-price-1', String(item.price));
+    btn.setAttribute('data-gift-price-1', String(price));
     btn.innerHTML = item.icon;
     container.appendChild(btn);
   });
@@ -469,15 +472,18 @@ function renderDesignLists() {
   const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {
     iconItems.forEach(item => {
+      const isCustom = item.id === 'icon-custom';
+      const price = isCustom ? itemPrices.icon.custom : itemPrices.icon.collection;
+
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'icon btn-add';
-      btn.setAttribute('data-form', item.id === 'icon-custom' ? '#form-icon-custom' : '#form-icon-present');
+      btn.setAttribute('data-form', isCustom ? '#form-icon-custom' : '#form-icon-present');
       btn.setAttribute('data-kind', 'expense');
-      btn.setAttribute('data-amount', String(item.price));
+      btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
       btn.setAttribute('data-gift-icon', item.icon);
-      btn.setAttribute('data-gift-price-1', String(item.price));
+      btn.setAttribute('data-gift-price-1', String(price));
       btn.innerHTML = item.icon;
       iconContainer.appendChild(btn);
     });
@@ -487,15 +493,18 @@ function renderDesignLists() {
   const badgeContainer = document.querySelector('#tab-design .badge-grid');
   if (badgeContainer) {
     badgeItems.forEach(item => {
+      const isCustom = item.id === 'badge-custom';
+      const price = isCustom ? itemPrices.badge.custom : itemPrices.badge.collection;
+
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'badge btn-add';
-      btn.setAttribute('data-form', item.id === 'badge-custom' ? '#form-badge-custom' : '#form-badge-present');
+      btn.setAttribute('data-form', isCustom ? '#form-badge-custom' : '#form-badge-present');
       btn.setAttribute('data-kind', 'expense');
-      btn.setAttribute('data-amount', String(item.price));
+      btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
       btn.setAttribute('data-gift-icon', item.icon);
-      btn.setAttribute('data-gift-price-1', String(item.price));
+      btn.setAttribute('data-gift-price-1', String(price));
       btn.innerHTML = item.icon;
       badgeContainer.appendChild(btn);
     });
@@ -505,15 +514,18 @@ function renderDesignLists() {
   const bgContainer = document.querySelector('#tab-design .bg-grid');
   if (bgContainer) {
     backgroundItems.forEach(item => {
+      const isCustom = item.id === 'bg-custom';
+      const price = isCustom ? itemPrices.background.custom : itemPrices.background.collection;
+
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'bg btn-add';
-      btn.setAttribute('data-form', item.id === 'bg-custom' ? '#form-bg-custom' : '#form-bg-present');
+      btn.setAttribute('data-form', isCustom ? '#form-bg-custom' : '#form-bg-present');
       btn.setAttribute('data-kind', 'expense');
-      btn.setAttribute('data-amount', String(item.price));
+      btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
       btn.setAttribute('data-gift-icon', item.icon);
-      btn.setAttribute('data-gift-price-1', String(item.price));
+      btn.setAttribute('data-gift-price-1', String(price));
       btn.innerHTML = item.icon;
       bgContainer.appendChild(btn);
     });

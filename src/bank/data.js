@@ -97,35 +97,74 @@ export const expenseItems = [
   { title: 'Перевод средств другому (комиссия)', amount: 'ч', price: 26, mode: CALC_MODES.PRICE_W_ENTERED_AMOUNT, form: FORM_EXP_TRANSFER }
 ];
 
+// ============================================================================
+// ЦЕНЫ
+// ============================================================================
+
+export const itemPrices = {
+  gift: {
+    collection: 60,   // Подарки из коллекции
+    custom: 100       // Индивидуальный подарок
+  },
+  icon: {
+    collection: 30,   // Иконки из коллекции
+    custom: 120       // Индивидуальная иконка
+  },
+  badge: {
+    collection: 45,   // Плашки из коллекции
+    custom: 190       // Индивидуальная плашка
+  },
+  background: {
+    collection: 40,   // Фоны из коллекции
+    custom: 155       // Индивидуальный фон
+  }
+};
+
+// ============================================================================
+// ПОДАРКИ
+// ============================================================================
+
 export const giftItems = [
-  { id: 'custom', icon: '✨', title: 'Индивидуальный подарок', price: 100 },
-  { id: '1', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/999003.png">', title: 'Подарить подарок', price: 60 },
-  { id: '2', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/427793.png">', title: 'Подарить подарок', price: 60 },
-  { id: '3', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/899654.png">', title: 'Подарить подарок', price: 60 },
-  { id: '4', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/772108.png">', title: 'Подарить подарок', price: 60 }
+  { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' },
+  { id: '1', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/999003.png">', title: 'Подарить подарок' },
+  { id: '2', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/427793.png">', title: 'Подарить подарок' },
+  { id: '3', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/899654.png">', title: 'Подарить подарок' },
+  { id: '4', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/772108.png">', title: 'Подарить подарок' }
 ];
+
+// ============================================================================
+// ИКОНКИ
+// ============================================================================
 
 export const iconItems = [
-  { id: 'icon-custom', icon: '✨', title: 'Индивидуальная иконка', price: 120 },
-  { id: '1', icon: '<img class="icon" src="https://static.thenounproject.com/png/2185221-200.png">', title: 'Иконка 1', price: 30 },
-  { id: '2', icon: '<img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png">', title: 'Иконка 1', price: 30 },
-  { id: '3', icon: '<img class="icon" src="https://upforme.ru/uploads/001c/8a/af/3/35168.png">', title: 'Иконка 1', price: 30 },
+  { id: 'icon-custom', icon: '✨', title: 'Индивидуальная иконка' },
+  { id: '1', icon: '<img class="icon" src="https://static.thenounproject.com/png/2185221-200.png">', title: 'Иконка 1' },
+  { id: '2', icon: '<img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png">', title: 'Иконка 2' },
+  { id: '3', icon: '<img class="icon" src="https://upforme.ru/uploads/001c/8a/af/3/35168.png">', title: 'Иконка 3' }
 ];
+
+// ============================================================================
+// ПЛАШКИ
+// ============================================================================
 
 export const badgeItems = [
-  { id: 'badge-custom', icon: '✨', title: 'Индивидуальная плашка', price: 190 },
-  { id: '1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1', price: 45 },
-  { id: '2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 1', price: 45 },
-  { id: '3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 1', price: 45 },
-  { id: '4', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 1', price: 45 }
+  { id: 'badge-custom', icon: '✨', title: 'Индивидуальная плашка' },
+  { id: '1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1' },
+  { id: '2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 2' },
+  { id: '3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 3' },
+  { id: '4', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 4' }
 ];
 
+// ============================================================================
+// ФОНЫ
+// ============================================================================
+
 export const backgroundItems = [
-  { id: 'bg-custom', icon: '✨', title: 'Индивидуальный фон', price: 155 },
-  { id: '1', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/123607.png">', title: 'Фон 1', price: 40 },
-  { id: '2', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/275271.png">', title: 'Фон 1', price: 40 },
-  { id: '3', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/235283.png">', title: 'Фон 1', price: 40 },
-  { id: '4', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/305050.png">', title: 'Фон 1', price: 40 }
+  { id: 'bg-custom', icon: '✨', title: 'Индивидуальный фон' },
+  { id: '1', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/123607.png">', title: 'Фон 1' },
+  { id: '2', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/275271.png">', title: 'Фон 2' },
+  { id: '3', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/235283.png">', title: 'Фон 3' },
+  { id: '4', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/305050.png">', title: 'Фон 4' }
 ];
 
 // ============================================================================
@@ -156,9 +195,9 @@ export const backgroundItems = [
  */
 export const autoDiscounts = [
   {
-    id: 'gift-bulk-discount',
-    title: 'Скидка за 5+ подарков',
-    forms: ['#form-gift-present', '#form-gift-custom'],
+    id: 'gift-collection-bulk-discount',
+    title: 'Скидка за 5+ подарков из коллекции',
+    forms: ['#form-gift-present'], // Только подарки из коллекции (не custom!)
     type: 'per_item',
     discountValue: 4, // 4 галлеона за каждый подарок
     roundResult: false,

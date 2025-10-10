@@ -31,7 +31,7 @@
       ];
       const allowedForums = [
         ...(PROFILE_CHECK.ForumIDs || []),
-        ...(window?.CHRONO_CHECK.ForumID || []),
+        ...(window.CHRONO_CHECK?.ForumID || []),
         ...(CHRONO_CHECK.AmsForumID || []),
       ];
 

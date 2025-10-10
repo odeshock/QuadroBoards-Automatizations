@@ -32,7 +32,7 @@
       const allowedForums = [
         ...(PROFILE_CHECK.ForumIDs || []),
         ...(window.CHRONO_CHECK?.ForumID || []),
-        ...(CHRONO_CHECK.AmsForumID || []),
+        ...(window.CHRONO_CHECK?.AmsForumID || []),
       ];
 
       const isAllowedGroup = allowedGroups.includes(groupId);

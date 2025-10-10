@@ -2,7 +2,7 @@
 // app.js — Основная точка входа
 // ============================================================================
 
-import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, updateGiftDiscountEntry } from './services.js';
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq } from './services.js';
 import { renderLog, openModal, closeModal, showConfirmModal } from './components.js';
 import { injectTemplates } from './templates.js';
 import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems, itemPrices } from './data.js';
@@ -10,8 +10,7 @@ import {
   ADMIN_ALLOWED_ITEMS,
   TEXT_MESSAGES,
   FORM_GIFT_PRESENT,
-  FORM_GIFT_CUSTOM,
-  REGEX
+  FORM_GIFT_CUSTOM
 } from './constants.js';
 import { parseNumericAmount } from './utils.js';
 
@@ -130,8 +129,6 @@ document.addEventListener('click', (e) => {
   // Дополнительные данные для подарков
   const giftId = btn.getAttribute('data-gift-id');
   const giftIcon = btn.getAttribute('data-gift-icon');
-  const giftPrice1 = btn.getAttribute('data-gift-price-1');
-  const giftPrice5 = btn.getAttribute('data-gift-price-5');
 
   // Данные из data.js (price, bonus, mode)
   const price = btn.getAttribute('data-price');
@@ -146,8 +143,6 @@ document.addEventListener('click', (e) => {
     amountLabel,
     giftId,
     giftIcon,
-    giftPrice1,
-    giftPrice5,
     price: price !== null ? Number(price) : null,
     bonus: bonus !== null ? Number(bonus) : null,
     mode
@@ -211,8 +206,6 @@ log.addEventListener('click', async (e) => {
       amount: group.amount, // только для отображения
       kind: group.kind,
       amountLabel: group.amountLabel,
-      giftPrice1: group.giftPrice1,
-      giftPrice5: group.giftPrice5,
       giftId: editGiftId,
       giftIcon: editGiftIcon,
       data: entry.data,
@@ -234,18 +227,10 @@ log.addEventListener('click', async (e) => {
 
     const entryIndex = group.entries.findIndex((item) => item.id === entryId);
     if (entryIndex !== -1) {
-      const isGift = group.templateSelector === FORM_GIFT_PRESENT ||
-                     REGEX.GIFT_TITLE.test(group.title || '');
-
       group.entries.splice(entryIndex, 1);
       if (!group.entries.length) {
         const groupIndex = submissionGroups.findIndex((item) => item.id === group.id);
         if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
-      }
-
-      // Обновляем скидку на подарки если удалили подарок
-      if (isGift) {
-        updateGiftDiscountEntry();
       }
 
       renderLog(log);
@@ -276,8 +261,6 @@ form.addEventListener('submit', (e) => {
     amount: displayAmount, // только для отображения
     amountLabel: form.dataset.amountLabel || modalAmountLabel.textContent,
     kind: form.dataset.kind || '',
-    giftPrice1: form.dataset.giftPrice1 || '',
-    giftPrice5: form.dataset.giftPrice5 || '',
     giftId: form.dataset.giftId || '',
     price: form.dataset.price ? Number(form.dataset.price) : null,
     bonus: form.dataset.bonus ? Number(form.dataset.bonus) : null,
@@ -316,8 +299,6 @@ form.addEventListener('submit', (e) => {
     group.amount = meta.amount; // только для отображения
     group.amountLabel = meta.amountLabel;
     group.kind = meta.kind;
-    group.giftPrice1 = meta.giftPrice1;
-    group.giftPrice5 = meta.giftPrice5;
     group.giftId = meta.giftId;
     group.price = meta.price;
     group.bonus = meta.bonus;
@@ -350,11 +331,6 @@ form.addEventListener('submit', (e) => {
   entryRecord.multiplier = normalizedMultiplier;
   entryRecord.template_id = meta.templateSelector?.replace('#', '') || '';
   group.entries.push(entryRecord);
-
-  // Обновляем скидку на подарки если это была операция с подарками
-  if (isGift) {
-    updateGiftDiscountEntry();
-  }
 
   renderLog(log);
   handleCloseModal();
@@ -457,10 +433,10 @@ function renderGiftsList() {
     btn.setAttribute('data-form', isCustom ? '#form-gift-custom' : '#form-gift-present');
     btn.setAttribute('data-kind', 'expense');
     btn.setAttribute('data-amount', String(price));
+    btn.setAttribute('data-price', String(price));
     btn.setAttribute('data-title', item.title);
     btn.setAttribute('data-gift-id', item.id);
     btn.setAttribute('data-gift-icon', item.icon);
-    btn.setAttribute('data-gift-price-1', String(price));
     btn.innerHTML = item.icon;
     container.appendChild(btn);
   });
@@ -483,7 +459,7 @@ function renderDesignLists() {
       btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
       btn.setAttribute('data-gift-icon', item.icon);
-      btn.setAttribute('data-gift-price-1', String(price));
+      btn.setAttribute('data-price', String(price));
       btn.innerHTML = item.icon;
       iconContainer.appendChild(btn);
     });
@@ -504,7 +480,7 @@ function renderDesignLists() {
       btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
       btn.setAttribute('data-gift-icon', item.icon);
-      btn.setAttribute('data-gift-price-1', String(price));
+      btn.setAttribute('data-price', String(price));
       btn.innerHTML = item.icon;
       badgeContainer.appendChild(btn);
     });
@@ -525,7 +501,7 @@ function renderDesignLists() {
       btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
       btn.setAttribute('data-gift-icon', item.icon);
-      btn.setAttribute('data-gift-price-1', String(price));
+      btn.setAttribute('data-price', String(price));
       btn.innerHTML = item.icon;
       bgContainer.appendChild(btn);
     });

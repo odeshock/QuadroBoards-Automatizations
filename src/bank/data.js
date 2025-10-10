@@ -104,19 +104,19 @@ export const expenseItems = [
 export const itemPrices = {
   gift: {
     collection: 40,   // Подарки из коллекции
-    custom: 100       // Индивидуальный подарок
+    custom: 101       // Индивидуальный подарок
   },
   icon: {
-    collection: 30,   // Иконки из коллекции
-    custom: 120       // Индивидуальная иконка
+    collection: 31,   // Иконки из коллекции
+    custom: 111       // Индивидуальная иконка
   },
   badge: {
-    collection: 45,   // Плашки из коллекции
-    custom: 190       // Индивидуальная плашка
+    collection: 41,   // Плашки из коллекции
+    custom: 191       // Индивидуальная плашка
   },
   background: {
-    collection: 40,   // Фоны из коллекции
-    custom: 155       // Индивидуальный фон
+    collection: 51,   // Фоны из коллекции
+    custom: 151       // Индивидуальный фон
   }
 };
 
@@ -209,6 +209,30 @@ export const backgroundItems = [
  */
 export const autoDiscounts = [
   {
+    id: 'gift-collection-bulk-discount',
+    title: 'Скидка за каждые 5 подарков из коллекции',
+    forms: ['#form-gift-present'], // Только подарки из коллекции (не custom!)
+    type: 'per_batch',
+    discountValue: itemPrices.gift.collection*5 - itemDiscountPrices.gift.collection.per5,
+    batchSize: 5,      // за каждые 5 подарков
+    roundResult: false,
+    condition: {
+      type: 'min_items', // минимальное количество элементов в операциях этого типа
+      value: 5
+    }
+  },
+  {
+    id: 'global-75-percent-discount',
+    title: 'Скидка 75% на все расходы',
+    forms: 'all', // Применяется ко всем расходам (kind === 'expense')
+    type: 'percent',
+    discountValue: 75, // 75% скидка
+    roundResult: true,
+    condition: {
+      type: 'none' // Всегда работает
+    }
+  },
+  {
     id: 'gift-custom-bulk-discount',
     title: 'Скидка за каждые 5 индивидуальных подарков',
     forms: ['#form-gift-custom'], // Только подарки из коллекции (не custom!)
@@ -221,18 +245,5 @@ export const autoDiscounts = [
       value: 5
     }
   },
-  {
-    id: 'gift-collection-bulk-discount',
-    title: 'Скидка за каждые 5 подарков из коллекции',
-    forms: ['#form-gift-present'], // Только подарки из коллекции (не custom!)
-    type: 'per_batch',
-    discountValue: itemPrices.gift.collection*5 - itemDiscountPrices.gift.collection.per5,
-    batchSize: 5,      // за каждые 5 подарков
-    roundResult: false,
-    condition: {
-      type: 'min_items', // минимальное количество элементов в операциях этого типа
-      value: 5
-    }
-  }
   // Можно добавить больше правил скидок здесь
 ];

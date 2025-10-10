@@ -6,8 +6,6 @@ import { counterPrefixMap } from './config.js';
 import {
   REGEX,
   TEXT_MESSAGES,
-  FORM_GIFT_PRESENT,
-  FORM_GIFT_CUSTOM,
   FORM_GIFT_DISCOUNT
 } from './constants.js';
 import {
@@ -86,51 +84,132 @@ export function formatEntryKey(key) {
 }
 
 // ============================================================================
-// СКИДКИ НА ПОДАРКИ
+// АВТОМАТИЧЕСКИЕ СКИДКИ
 // ============================================================================
 
-// Подсчитывает общее количество подарков (получателей) во всех группах подарков
-export function countTotalGifts() {
+// Вычисляет реальную стоимость группы на основе её записей
+function calculateGroupCost(group) {
   let total = 0;
-  submissionGroups.forEach((group) => {
-    const isGift = group.templateSelector === FORM_GIFT_PRESENT ||
-                   REGEX.GIFT_TITLE.test(group.title || '');
-    if (!isGift) return;
 
-    group.entries.forEach((item) => {
-      const dataObj = item.data || {};
-      const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
-      recipientKeys.forEach((key) => {
-        const rid = String(dataObj[key] ?? '').trim();
-        if (rid) total++;
-      });
-    });
+  const mode = group.mode || 'price_per_item';
+  const price = Number(group.price) || 0;
+  const bonus = Number(group.bonus) || 0;
+
+  console.log('[DEBUG calculateGroupCost]', {
+    selector: group.templateSelector,
+    mode,
+    price,
+    bonus,
+    entriesCount: group.entries.length
   });
-  return total;
-}
 
-// Подсчитывает общее количество индивидуальных подарков
-export function countTotalCustomGifts() {
-  let total = 0;
-  submissionGroups.forEach((group) => {
-    const isCustomGift = group.templateSelector === FORM_GIFT_CUSTOM ||
-                         REGEX.CUSTOM_GIFT_TITLE.test(group.title || '');
-    if (!isCustomGift) return;
+  group.entries.forEach(entry => {
+    const dataObj = entry.data || {};
+    const multiplier = Number(entry.multiplier) || 1;
 
-    group.entries.forEach((item) => {
-      const dataObj = item.data || {};
-      const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
-      recipientKeys.forEach((key) => {
-        const rid = String(dataObj[key] ?? '').trim();
-        if (rid) total++;
-      });
+    console.log('[DEBUG calculateGroupCost dataObj]', JSON.stringify(dataObj, null, 2));
+
+    // Подсчёт элементов (получателей)
+    const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+    const recipientCount = recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+
+    // Подсчёт количества через quantity_N (для форм типа спасительный жилет)
+    const quantityKeys = Object.keys(dataObj).filter(k => /^quantity_\d+$/.test(k));
+    let totalQuantity = 0;
+    quantityKeys.forEach(key => {
+      const idx = key.match(/^quantity_(\d+)$/)[1];
+      const recipientKey = `recipient_${idx}`;
+      // Учитываем quantity только если есть получатель
+      if (String(dataObj[recipientKey] || '').trim()) {
+        totalQuantity += Number(dataObj[key]) || 0;
+      }
     });
+
+    // Проверяем простое поле quantity (без индекса)
+    if (totalQuantity === 0 && dataObj.quantity) {
+      totalQuantity = Number(dataObj.quantity) || 0;
+    }
+
+    // Если есть quantity - используем его, иначе - количество получателей
+    const items = totalQuantity > 0 ? totalQuantity : recipientCount;
+
+    // Подсчёт дополнительных элементов (тысячи)
+    const thousandKeys = Object.keys(dataObj).filter(k => /^thousand_\d+$/.test(k));
+    const additional_items = thousandKeys.reduce((sum, key) => {
+      return sum + (Number(dataObj[key]) || 0);
+    }, 0);
+
+    // Введённая сумма
+    let entered_amount = 0;
+    if (dataObj.amount) {
+      entered_amount = parseNumericAmount(String(dataObj.amount));
+    }
+
+    // Для topup/ams - суммируем все topup_N значения
+    const topupKeys = Object.keys(dataObj).filter(k => /^topup_\d+$/.test(k));
+    if (topupKeys.length > 0) {
+      entered_amount = topupKeys.reduce((sum, key) => {
+        return sum + (Number(dataObj[key]) || 0);
+      }, 0);
+    }
+
+    // Для переводов - суммируем все amount_N значения
+    const amountKeys = Object.keys(dataObj).filter(k => /^amount_\d+$/.test(k));
+    if (amountKeys.length > 0) {
+      entered_amount = amountKeys.reduce((sum, key) => {
+        const idx = key.match(/^amount_(\d+)$/)[1];
+        const recipientKey = `recipient_${idx}`;
+        // Учитываем amount только если есть получатель
+        if (String(dataObj[recipientKey] || '').trim()) {
+          return sum + (parseNumericAmount(String(dataObj[key] || '0')));
+        }
+        return sum;
+      }, 0);
+    }
+
+    console.log('[DEBUG calculateGroupCost entry]', {
+      items,
+      additional_items,
+      entered_amount,
+      multiplier,
+      mode,
+      price,
+      bonus
+    });
+
+    // Расчёт стоимости в зависимости от режима
+    let entryCost = 0;
+    switch (mode) {
+      case 'price_per_item':
+        // Если нет получателей, считаем 1 единицу (для фиксированных операций)
+        entryCost = price * (items > 0 ? items : 1);
+        break;
+      case 'price_per_item_w_bonus':
+        entryCost = price * (items > 0 ? items : 1) + bonus * additional_items;
+        break;
+      case 'entered_amount':
+        entryCost = entered_amount;
+        break;
+      case 'price_w_entered_amount':
+        entryCost = entered_amount + price * (items > 0 ? items : 1);
+        break;
+      default:
+        entryCost = 0;
+    }
+
+    console.log('[DEBUG calculateGroupCost entryCost]', { entryCost, formula: `${mode}: ${entryCost}`, calculatedItems: items > 0 ? items : 1 });
+
+    total += entryCost * multiplier;
   });
+
   return total;
 }
 
 // Универсальная функция для применения автоматических скидок
 export function updateAutoDiscounts() {
+  console.log('[DEBUG] updateAutoDiscounts called! submissionGroups:', submissionGroups.length, submissionGroups.map(g => ({ selector: g.templateSelector, amount: g.amount })));
+  console.log('[DEBUG] autoDiscounts rules:', autoDiscounts.length);
+
   // Находим существующую группу скидок
   const discountKey = buildGroupKey({
     templateSelector: FORM_GIFT_DISCOUNT,
@@ -148,11 +227,16 @@ export function updateAutoDiscounts() {
   autoDiscounts.forEach(rule => {
     const { id, title, forms, type, discountValue, roundResult, condition } = rule;
 
+    console.log('[DEBUG] Processing rule:', { id, forms, type, discountValue });
+
     // Определяем, какие группы подходят под это правило
     const matchingGroups = submissionGroups.filter(g => {
-      if (forms === 'all') return true;
+      // Для 'all' берём только расходы (kind === 'expense')
+      if (forms === 'all') return g.kind === 'expense';
       return forms.includes(g.templateSelector);
     });
+
+    console.log('[DEBUG] Matching groups:', matchingGroups.length, matchingGroups.map(g => ({ selector: g.templateSelector, amount: g.amount })));
 
     if (matchingGroups.length === 0) return;
 
@@ -174,7 +258,9 @@ export function updateAutoDiscounts() {
       conditionMet = totalItems >= condition.value;
     }
 
-    if (!conditionMet || totalItems === 0) return;
+    // Для процентной скидки не требуем totalItems > 0, т.к. считаем по суммам
+    if (!conditionMet) return;
+    if (totalItems === 0 && type !== 'percent') return;
 
     // Вычисляем скидку в зависимости от типа
     let discount = 0;
@@ -195,21 +281,20 @@ export function updateAutoDiscounts() {
       discount = discountValue;
       calculation = String(discountValue);
     } else if (type === 'percent') {
-      // Процентная скидка - нужно вычислить общую стоимость
+      // Процентная скидка - вычисляем общую стоимость операций
       let operationTotal = 0;
       matchingGroups.forEach(group => {
-        const price = Number.parseInt(group.giftPrice1, 10) || 0;
-        group.entries.forEach(entry => {
-          const dataObj = entry.data || {};
-          const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
-          const count = recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
-          operationTotal += price * count;
-        });
+        // Вычисляем реальную стоимость группы на основе записей
+        const groupCost = calculateGroupCost(group);
+        console.log('[DEBUG] Group cost:', { selector: group.templateSelector, groupCost, kind: group.kind, entriesCount: group.entries.length });
+        operationTotal += Math.abs(groupCost); // Используем abs, т.к. расходы могут быть отрицательными
       });
+      console.log('[DEBUG] Percent calculation:', { operationTotal, discountValue, roundResult, matchingGroupsCount: matchingGroups.length });
       discount = operationTotal * (discountValue / 100);
       if (roundResult) {
         discount = Math.round(discount);
       }
+      console.log('[DEBUG] Final discount:', discount);
       calculation = `${formatNumber(operationTotal)} × ${discountValue}%`;
     }
 
@@ -254,9 +339,4 @@ export function updateAutoDiscounts() {
   } else if (discountGroupIndex !== -1) {
     submissionGroups.splice(discountGroupIndex, 1);
   }
-}
-
-// Оставляем старую функцию для обратной совместимости (будет удалена позже)
-export function updateGiftDiscountEntry() {
-  updateAutoDiscounts();
 }

@@ -32,7 +32,8 @@ import {
   fullMonthsDiffVirtualDOM,
   fmtYMD,
   submissionGroups,
-  formatEntryKey
+  formatEntryKey,
+  updateAutoDiscounts
 } from './services.js';
 
 // ============================================================================
@@ -401,6 +402,9 @@ export function setHiddenField(modalFields, name, value) {
 // ============================================================================
 
 export function renderLog(log) {
+  // Пересчитываем автоматические скидки перед рендерингом
+  updateAutoDiscounts();
+
   log.innerHTML = '';
   if (!submissionGroups.length) {
     const empty = document.createElement('div');
@@ -618,7 +622,7 @@ export function renderLog(log) {
       ) {
         // Подарки и Оформление: цена_1 × количество получателей
         let totalGifts = 0;
-        const giftPrice1 = Number.parseInt(group.giftPrice1, 10) || 100;
+        const price = Number.parseInt(group.price, 10) || 100;
 
         group.entries.forEach((item) => {
           const dataObj = item.data || {};
@@ -631,7 +635,7 @@ export function renderLog(log) {
 
         // Используем calculateCost для получения только итоговой суммы
         if (totalGifts > 0) {
-          const total = calculateCost('price_per_item', giftPrice1, 0, totalGifts, 0, 0);
+          const total = calculateCost('price_per_item', price, 0, totalGifts, 0, 0);
           meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
         } else {
           meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
@@ -1402,7 +1406,7 @@ export function renderLog(log) {
         /Подарить подарок|Индивидуальный подарок/i.test(group.title || '')
       ) {
         let totalGifts = 0;
-        const giftPrice1 = Number.parseInt(group.giftPrice1, 10) || 100;
+        const price = Number.parseInt(group.price, 10) || 100;
         group.entries.forEach((item) => {
           const dataObj = item.data || {};
           const idxs = Object.keys(dataObj)
@@ -1412,7 +1416,7 @@ export function renderLog(log) {
           totalGifts += idxs.filter(idx => String(dataObj[`recipient_${idx}`] || '').trim()).length;
         });
         if (totalGifts > 0) {
-          const total = calculateCost('price_per_item', giftPrice1, 0, totalGifts, 0, 0);
+          const total = calculateCost('price_per_item', price, 0, totalGifts, 0, 0);
           totalSum += isIncome ? total : -total;
         }
       } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
@@ -2557,7 +2561,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
 // SETUP CUSTOM GIFT FLOW - Индивидуальные подарки
 // ============================================================================
 
-export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, giftPrice1, giftPrice5 }) {
+export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
   // Удаляем всё кроме дисклеймера
   modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
     .forEach(el => el.remove());
@@ -2609,17 +2613,17 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
   
   const updateTotalCost = (giftGroups) => {
     const totalCount = giftGroups.length;
-    const price1 = Number.parseInt(giftPrice1, 10) || 100;
+    const itemPrice = Number.parseInt(price, 10) || 100;
 
     if (modalAmount) {
       if (totalCount > 0) {
-        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price1), bonus: '0' } }, { items: totalCount });
+        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(itemPrice), bonus: '0' } }, { items: totalCount });
       } else {
         modalAmount.textContent = '';
       }
     }
 
-    const totalCost = price1 * totalCount;
+    const totalCost = itemPrice * totalCount;
     return { totalCount, totalCost };
   };
 
@@ -2916,7 +2920,9 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 // SETUP GIFT FLOW - Подарки
 // ============================================================================
 
-export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, giftPrice1, giftPrice5 }) {
+export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
+  console.log('[DEBUG setupGiftFlow] price:', price, 'giftId:', giftId);
+
   // === 1) Удаляем существующие поля формы ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
     .forEach(el => el.remove());
@@ -2956,20 +2962,20 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
     cancel();
   };
 
-  // === 3) Функция подсчета стоимости подарков (простое умножение цена_1 × количество) ===
+  // === 3) Функция подсчета стоимости подарков (простое умножение цена × количество) ===
   const updateTotalCost = (giftGroups) => {
     const totalCount = giftGroups.length;
-    const price1 = Number.parseInt(giftPrice1, 10) || 60;
+    const itemPrice = Number.parseInt(price, 10) || 60;
 
     if (modalAmount) {
       if (totalCount > 0) {
-        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price1), bonus: '0' } }, { items: totalCount });
+        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(itemPrice), bonus: '0' } }, { items: totalCount });
       } else {
         modalAmount.textContent = '';
       }
     }
 
-    const totalCost = price1 * totalCount;
+    const totalCost = itemPrice * totalCount;
     return { totalCount, totalCost };
   };
 
@@ -3675,8 +3681,6 @@ export function openModal({
     amount,
     kind,
     amountLabel,
-    giftPrice1,
-    giftPrice5,
     giftId,
     giftIcon,
     data = null,
@@ -3717,8 +3721,6 @@ export function openModal({
   form.dataset.amount = amount || ''; // только для отображения в modalAmount при открытии
   form.dataset.amountLabel = resolvedAmountLabel;
   form.dataset.title = resolvedTitle;
-  form.dataset.giftPrice1 = giftPrice1 || '';
-  form.dataset.giftPrice5 = giftPrice5 || '';
   form.dataset.giftId = giftId || '';
   form.dataset.giftIcon = giftIcon || '';
   form.dataset.price = price !== null ? String(price) : '';
@@ -3875,8 +3877,7 @@ if (template.id === 'form-gift-custom') {
     timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
     giftId: config.giftId,
     giftIcon: config.giftIcon,
-    giftPrice1: config.giftPrice1,
-    giftPrice5: config.giftPrice5
+    price: config.price
   });
 }
 
@@ -3886,8 +3887,7 @@ if (template.id === 'form-gift-present') {
     timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
     giftId: config.giftId,
     giftIcon: config.giftIcon,
-    giftPrice1: config.giftPrice1,
-    giftPrice5: config.giftPrice5
+    price: config.price
   });
 }
 
@@ -3901,16 +3901,14 @@ if (designForms.includes(template.id)) {
         timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
         giftId: config.giftId,
         giftIcon: config.giftIcon,
-        giftPrice1: config.giftPrice1,
-        giftPrice5: config.giftPrice5
+        price: config.price
       })
     : setupGiftFlow({
         modalFields, btnSubmit, counterWatcher,
         timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
         giftId: config.giftId,
         giftIcon: config.giftIcon,
-        giftPrice1: config.giftPrice1,
-        giftPrice5: config.giftPrice5
+        price: config.price
       });
 }
 

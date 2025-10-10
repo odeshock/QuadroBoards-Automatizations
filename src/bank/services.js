@@ -154,13 +154,6 @@ export function updateAutoDiscounts() {
       return forms.includes(g.templateSelector);
     });
 
-    console.log('[updateAutoDiscounts]', {
-      ruleId: id,
-      forms,
-      matchingGroups: matchingGroups.map(g => ({ selector: g.templateSelector, entries: g.entries.length })),
-      submissionGroups: submissionGroups.map(g => g.templateSelector)
-    });
-
     if (matchingGroups.length === 0) return;
 
     // Подсчитываем общее количество элементов
@@ -181,27 +174,11 @@ export function updateAutoDiscounts() {
       conditionMet = totalItems >= condition.value;
     }
 
-    console.log('[updateAutoDiscounts] Condition check:', {
-      ruleId: id,
-      totalItems,
-      conditionType: condition.type,
-      conditionValue: condition.value,
-      conditionMet
-    });
-
     if (!conditionMet || totalItems === 0) return;
 
     // Вычисляем скидку в зависимости от типа
     let discount = 0;
     let calculation = '';
-
-    console.log('[updateAutoDiscounts] Before calculation:', {
-      ruleId: id,
-      type,
-      discountValue,
-      totalItems,
-      rule
-    });
 
     if (type === 'per_item') {
       // Скидка за каждый элемент
@@ -211,15 +188,8 @@ export function updateAutoDiscounts() {
       // Скидка за каждые N элементов
       const { batchSize = 1 } = rule;
       const batches = Math.floor(totalItems / batchSize);
-      console.log('[updateAutoDiscounts] per_batch calculation:', {
-        batchSize,
-        totalItems,
-        batches,
-        discountValue,
-        discount: discountValue * batches
-      });
       discount = discountValue * batches;
-      calculation = `${discountValue} × ${batches} (по ${batchSize} шт.)`;
+      calculation = `${discountValue} × ${batches}`;
     } else if (type === 'fixed') {
       // Фиксированная скидка
       discount = discountValue;
@@ -242,13 +212,6 @@ export function updateAutoDiscounts() {
       }
       calculation = `${formatNumber(operationTotal)} × ${discountValue}%`;
     }
-
-    console.log('[updateAutoDiscounts] Discount calculated:', {
-      ruleId: id,
-      type,
-      discount,
-      calculation
-    });
 
     if (discount > 0) {
       totalDiscount += discount;

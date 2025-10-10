@@ -137,7 +137,7 @@ export const giftItems = [
 // ============================================================================
 
 export const iconItems = [
-  { id: 'icon-custom', icon: '✨', title: 'Индивидуальная иконка' },
+  { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' },
   { id: '1', icon: '<img class="icon" src="https://static.thenounproject.com/png/2185221-200.png">', title: 'Иконка 1' },
   { id: '2', icon: '<img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png">', title: 'Иконка 2' },
   { id: '3', icon: '<img class="icon" src="https://upforme.ru/uploads/001c/8a/af/3/35168.png">', title: 'Иконка 3' }
@@ -148,7 +148,7 @@ export const iconItems = [
 // ============================================================================
 
 export const badgeItems = [
-  { id: 'badge-custom', icon: '✨', title: 'Индивидуальная плашка' },
+  { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' },
   { id: '1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1' },
   { id: '2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 2' },
   { id: '3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 3' },
@@ -160,7 +160,7 @@ export const badgeItems = [
 // ============================================================================
 
 export const backgroundItems = [
-  { id: 'bg-custom', icon: '✨', title: 'Индивидуальный фон' },
+  { id: 'custom', icon: '✨', title: 'Индивидуальный фон' },
   { id: '1', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/123607.png">', title: 'Фон 1' },
   { id: '2', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/275271.png">', title: 'Фон 2' },
   { id: '3', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/235283.png">', title: 'Фон 3' },
@@ -177,7 +177,7 @@ export const backgroundItems = [
  * Структура:
  * - id: уникальный идентификатор скидки
  * - title: название скидки для отображения
- * - forms: массив form селекторов (например, ['#form-gift-present']) или 'everything' для всех операций
+ * - forms: массив form селекторов (например, ['#form-gift-present']) или 'all' для всех операций
  * - type: тип скидки
  *   - 'percent': процентная скидка (discountValue = процент, например 20 для 20%)
  *   - 'fixed': фиксированная скидка (discountValue = фиксированная сумма)

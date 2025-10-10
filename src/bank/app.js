@@ -472,7 +472,7 @@ function renderDesignLists() {
   const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {
     iconItems.forEach(item => {
-      const isCustom = item.id === 'icon-custom';
+      const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.icon.custom : itemPrices.icon.collection;
 
       const btn = document.createElement('button');
@@ -493,7 +493,7 @@ function renderDesignLists() {
   const badgeContainer = document.querySelector('#tab-design .badge-grid');
   if (badgeContainer) {
     badgeItems.forEach(item => {
-      const isCustom = item.id === 'badge-custom';
+      const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.badge.custom : itemPrices.badge.collection;
 
       const btn = document.createElement('button');
@@ -514,7 +514,7 @@ function renderDesignLists() {
   const bgContainer = document.querySelector('#tab-design .bg-grid');
   if (bgContainer) {
     backgroundItems.forEach(item => {
-      const isCustom = item.id === 'bg-custom';
+      const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.background.custom : itemPrices.background.collection;
 
       const btn = document.createElement('button');

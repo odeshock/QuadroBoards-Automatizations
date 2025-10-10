@@ -150,7 +150,7 @@ export function updateAutoDiscounts() {
 
     // Определяем, какие группы подходят под это правило
     const matchingGroups = submissionGroups.filter(g => {
-      if (forms === 'everything') return true;
+      if (forms === 'all') return true;
       return forms.includes(g.templateSelector);
     });
 

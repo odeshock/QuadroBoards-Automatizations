@@ -77,6 +77,34 @@ const ADMIN_RECIPIENT_FLOW_TIMEOUTS = {
   [FORM_INCOME_EPISODE_OF]: BEST_EPISODE_TIMEOUT_MS
 };
 
+const BANNER_ALREADY_PROCESSED_CONFIG = {
+  [FORM_INCOME_BANNER_RENO]: {
+    flagKey: 'BANNER_RENO_FLAG',
+    message: 'Начисление за баннер на Рено уже производилось.'
+  },
+  [FORM_INCOME_BANNER_MAYAK]: {
+    flagKey: 'BANNER_MAYAK_FLAG',
+    message: 'Начисление за баннер на Маяке уже производилось.'
+  }
+};
+
+function handleBannerAlreadyProcessed({ template, modalTitle, modalFields, btnSubmit, backdrop }) {
+  const config = BANNER_ALREADY_PROCESSED_CONFIG[template.id];
+  if (!config) return { handled: false, shouldReturn: false };
+
+  const flagValue = typeof window !== 'undefined' ? window[config.flagKey] : undefined;
+  if (typeof flagValue === 'undefined' || flagValue !== false) {
+    return { handled: false, shouldReturn: false };
+  }
+
+  modalFields.innerHTML = `<p><strong>${config.message}</strong></p>`;
+  btnSubmit.style.display = 'none';
+
+  backdrop.setAttribute('open', '');
+
+  return { handled: true, shouldReturn: true };
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -2223,6 +2251,157 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
   return counterWatcher;
 }
 
+function normalizePostItem(raw) {
+  const candidate = (raw && (raw.link || raw.a || raw)) || raw || null;
+  const src = candidate && typeof candidate.src === 'string' ? candidate.src : null;
+  if (!src) return null;
+  const text = candidate.text || src;
+  const symbolsRaw = candidate.symbols_num;
+  const numericSymbols = Number.isFinite(symbolsRaw)
+    ? symbolsRaw
+    : Number.parseInt(typeof symbolsRaw === 'string' ? symbolsRaw : '', 10) || 0;
+  return { src, text, symbols_num: Math.max(0, numericSymbols) };
+}
+
+function setupPostsModalFlow({
+  modalFields,
+  btnSubmit,
+  counterWatcher,
+  form,
+  modalAmount,
+  modalAmountLabel,
+  hiddenFieldName,
+  postsKey,
+  timeoutMs,
+  previewId,
+  infoBuilder,
+  additionalItemsAggregator
+}) {
+  const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
+
+  const price = Number(form.dataset.price) || 0;
+  const bonus = Number(form.dataset.bonus) || 0;
+
+  const info = document.createElement('div');
+  info.className = 'calc-info';
+  info.innerHTML = infoBuilder({ price, bonus });
+
+  if (waitEl && waitEl.parentNode) {
+    waitEl.parentNode.insertBefore(info, waitEl);
+  } else {
+    modalFields.appendChild(info);
+  }
+
+  let canceled = false;
+  let poll = null;
+  let timeoutHandle = null;
+
+  const cancel = () => {
+    canceled = true;
+    if (poll) clearInterval(poll);
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  };
+
+  counterWatcher = { cancel };
+
+  const setSummary = (count, additionalItems) => {
+    modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
+    updateModalAmount(modalAmount, form, {
+      items: count,
+      additional_items: additionalItems
+    });
+  };
+
+  const fail = () => {
+    if (canceled) return;
+    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    btnSubmit.style.display = 'none';
+    setHiddenField(modalFields, hiddenFieldName, '');
+    cancel();
+  };
+
+  const renderList = (items) => {
+    const caption = document.createElement('p');
+    caption.className = 'list-caption';
+    caption.innerHTML = '<strong>Список постов:</strong>';
+    modalFields.appendChild(caption);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.innerHTML = `
+      <div style="max-height:320px; overflow:auto">
+        <ol class="entry-list" id="${previewId}"></ol>
+      </div>`;
+    modalFields.appendChild(wrap);
+
+    const listEl = wrap.querySelector(`#${previewId}`);
+    items.forEach(({ src, text, symbols_num }) => {
+      const li = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = src;
+      link.textContent = text || src;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      li.appendChild(link);
+      li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
+      listEl.appendChild(li);
+    });
+  };
+
+  const succeed = (posts) => {
+    if (canceled) return;
+
+    const items = Array.isArray(posts) ? posts.map(normalizePostItem).filter(Boolean) : [];
+    if (!items.length) {
+      updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
+      btnSubmit.style.display = 'none';
+      setHiddenField(modalFields, hiddenFieldName, '');
+      setSummary(0, 0);
+      cancel();
+      return;
+    }
+
+    setHiddenField(modalFields, hiddenFieldName, JSON.stringify(items));
+
+    const note = updateNote(modalFields, '');
+    if (note) note.remove();
+
+    renderList(items);
+
+    const additionalItems = additionalItemsAggregator(items);
+    setSummary(items.length, additionalItems);
+
+    form.dataset.currentMultiplier = String(items.length);
+    btnSubmit.style.display = '';
+    btnSubmit.disabled = false;
+    cancel();
+  };
+
+  const globalObj = typeof window !== 'undefined' ? window : undefined;
+
+  timeoutHandle = setTimeout(fail, timeoutMs);
+
+  poll = setInterval(() => {
+    if (!globalObj) return;
+    const value = globalObj[postsKey];
+    if (typeof value !== 'undefined' && !Array.isArray(value)) {
+      fail();
+      return;
+    }
+    if (Array.isArray(value)) {
+      clearInterval(poll);
+      poll = null;
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      succeed(value);
+    }
+  }, COUNTER_POLL_INTERVAL_MS);
+
+  return counterWatcher;
+}
+
 export function openModal({
   backdrop,
   modalTitle,
@@ -2337,30 +2516,8 @@ export function openModal({
   counterWatcher = cleanupCounterWatcher(counterWatcher, modalFields, form);
   modalFields.innerHTML = template.innerHTML;
 
-// === Баннер FMV в подписи на Рено ===
-if (
-  template.id === FORM_INCOME_BANNER_RENO &&
-  typeof window.BANNER_RENO_FLAG !== 'undefined' &&
-  window.BANNER_RENO_FLAG === false
-) {
-  // заменяем содержимое формы на текст
-  modalFields.innerHTML = '<p><strong>Начисление за баннер на Рено уже производилось.</strong></p>';
-
-  // скрываем кнопку "Сохранить", как у info-модалок
-  btnSubmit.style.display = 'none';
-}
-
-// === Баннер FMV в подписи на Маяке ===
-if (
-  template.id === FORM_INCOME_BANNER_MAYAK &&
-  typeof window.BANNER_MAYAK_FLAG !== 'undefined' &&
-  window.BANNER_MAYAK_FLAG === false
-) {
-  modalTitle.textContent = 'Баннер FMV в подписи на Маяке';
-  modalFields.innerHTML = '<p><strong>Начисление за баннер на Маяке уже производилось.</strong></p>';
-  btnSubmit.style.display = 'none';
-
-  backdrop.setAttribute('open', '');
+const bannerState = handleBannerAlreadyProcessed({ template, modalTitle, modalFields, btnSubmit, backdrop });
+if (bannerState.shouldReturn) {
   return { counterWatcher };
 }
 
@@ -2572,266 +2729,55 @@ if (template.id === FORM_INCOME_FIRSTPOST) {
 
 // === PERSONAL POST: ждём PERSONAL_POSTS и рендерим список ===
 if (template.id === FORM_INCOME_PERSONALPOST) {
-  // 1) Сначала создаём "Пожалуйста, подождите..." и держим ссылку на элемент
-  const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
-
-  // 2) Теперь формируем блок "Система подсчета" и вставляем его ПЕРЕД waitEl
-  (() => {
-    const price = Number(form.dataset.price) || 5;
-    const bonus = Number(form.dataset.bonus) || 10;
-
-    const info = document.createElement('div');
-    info.className = 'calc-info';
-    info.innerHTML =
+  counterWatcher = setupPostsModalFlow({
+    modalFields,
+    btnSubmit,
+    counterWatcher,
+    form,
+    modalAmount,
+    modalAmountLabel,
+    hiddenFieldName: 'personal_posts_json',
+    postsKey: 'PERSONAL_POSTS',
+    timeoutMs: PERSONAL_TIMEOUT_MS,
+    previewId: 'personal-preview',
+    infoBuilder: ({ price, bonus }) => (
       `<strong>Система подсчета:</strong><br>
       — фиксированная выплата за пост — ${price},<br>
-      — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`;
-
-    if (waitEl && waitEl.parentNode) {
-      waitEl.parentNode.insertBefore(info, waitEl); // ← вставляем строго над "подождите"
-    } else {
-      modalFields.appendChild(info); // запасной вариант
-    }
-  })();
-
-  // вытаскиваем {src, text, symbols_num} (поддерживаем вложенные словари link/a)
-  const pickItem = (it) => {
-    const d = (it && (it.link || it.a || it)) || it || null;
-    const src = d && typeof d.src === 'string' ? d.src : null;
-    const text = d && (d.text || src);
-    const symbols = Number.isFinite(d?.symbols_num) ? d.symbols_num : (parseInt(d?.symbols_num, 10) || 0);
-    return src ? { src, text, symbols_num: Math.max(0, symbols) } : null;
-  };
-
-  // таймеры ожидания
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const setSummary = (count, thousandsSum) => {
-    modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
-    updateModalAmount(modalAmount, form, {
-      items: count,
-      additional_items: thousandsSum
-    });
-  };
-
-  const fail = () => {
-    if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
-    // прячем кнопку — это info-форма
-    btnSubmit.style.display = 'none';
-    setHiddenField(modalFields, 'personal_posts_json', '');
-    cancel();
-  };
-
-  const succeed = (posts) => {
-    if (canceled) return;
-
-    // пустой массив → сообщение и НЕТ кнопки «Сохранить»
-    if (!Array.isArray(posts) || posts.length === 0) {
-      updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
-      btnSubmit.style.display = 'none';
-      setHiddenField(modalFields, 'personal_posts_json', '');
-      setSummary(0, 0);
-      cancel();
-      return;
-    }
-
-    // нормальный случай
-    const items = posts.map(pickItem).filter(Boolean);
-    setHiddenField(modalFields, 'personal_posts_json', JSON.stringify(items));
-
-    // предпросмотр списка (вертикальный скролл)
-    const note = updateNote(modalFields, '');
-    if (note) note.remove();
-
-    // Заголовок над списком
-    const caption = document.createElement('p');
-    caption.className = 'list-caption';
-    caption.innerHTML = '<strong>Список постов:</strong>';
-    modalFields.appendChild(caption);
-
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-    wrap.innerHTML = `
-      <div style="max-height:320px; overflow:auto">
-        <ol class="entry-list" id="personal-preview"></ol>
-      </div>`;
-    modalFields.appendChild(wrap);
-
-    const ol = wrap.querySelector('#personal-preview');
-    items.forEach(({ src, text, symbols_num }) => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = src;
-      a.textContent = text || src;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      li.appendChild(a);
-      const note = document.createTextNode(` [${symbols_num} символов]`);
-      li.appendChild(note);
-      ol.appendChild(li);
-    });
-
-    // сумма «тысяч» = Σ floor(symbols_num / 1000)
-    const thousandsSum = items.reduce((s, it) => s + Math.floor(it.symbols_num / 1000), 0);
-
-    // показываем формулу «фикс x count + надбавка x Σтысяч»
-    setSummary(items.length, thousandsSum);
-
-    // для единообразия сохраним множитель (может пригодиться дальше)
-    form.dataset.currentMultiplier = String(items.length);
-
-    // если всё успешно — показываем кнопку "Сохранить"
-    btnSubmit.style.display = '';
-    btnSubmit.disabled = false;
-
-    // завершаем наблюдатель
-    cancel();
-
-  };
-
-  // ждём PERSONAL_POSTS не дольше 3 минут
-  const to = setTimeout(fail, PERSONAL_TIMEOUT_MS);
-  const poll = setInterval(() => {
-    if (typeof window.PERSONAL_POSTS !== 'undefined' && !Array.isArray(window.PERSONAL_POSTS)) {
-      fail(); return;
-    }
-    if (Array.isArray(window.PERSONAL_POSTS)) {
-      clearTimeout(to); clearInterval(poll);
-      succeed(window.PERSONAL_POSTS);
-    }
-  }, 500);
+      — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`
+    ),
+    additionalItemsAggregator: (items) => items.reduce(
+      (sum, item) => sum + Math.floor(item.symbols_num / 1000),
+      0
+    )
+  });
 }
 
 // === PLOT POST: ждём PLOT_POSTS и рендерим список (кап 3к на пост) ===
 if (template.id === FORM_INCOME_PLOTPOST) {
-  // якорь "подождите..."
-  const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
-
-  // Пояснение «Система подсчёта»
-  (() => {
-    const price = Number(form.dataset.price) || 20;
-    const bonus = Number(form.dataset.bonus) || 5;
-
-    const info = document.createElement('div');
-    info.className = 'calc-info';
-    info.innerHTML =
+  counterWatcher = setupPostsModalFlow({
+    modalFields,
+    btnSubmit,
+    counterWatcher,
+    form,
+    modalAmount,
+    modalAmountLabel,
+    hiddenFieldName: 'plot_posts_json',
+    postsKey: 'PLOT_POSTS',
+    timeoutMs: PLOT_TIMEOUT_MS,
+    previewId: 'plot-preview',
+    infoBuilder: ({ price, bonus }) => (
       `<strong>Система подсчета:</strong><br>
       — фиксированная выплата за пост — ${price},<br>
-      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`;
-
-    if (waitEl && waitEl.parentNode) {
-      waitEl.parentNode.insertBefore(info, waitEl);
-    } else {
-      modalFields.appendChild(info);
-    }
-  })();
-
-  // извлекаем {src, text, symbols_num}
-  const pickItem = (it) => {
-    const d = (it && (it.link || it.a || it)) || it || null;
-    const src = d && typeof d.src === 'string' ? d.src : null;
-    const text = d && (d.text || src);
-    const symbols = Number.isFinite(d?.symbols_num) ? d.symbols_num : (parseInt(d?.symbols_num, 10) || 0);
-    return src ? { src, text, symbols_num: Math.max(0, symbols) } : null;
-  };
-
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const setSummary = (count, thousandsSumCapped) => {
-    modalAmountLabel.textContent = form.dataset.amountLabel || 'Начисление';
-    updateModalAmount(modalAmount, form, {
-      items: count,
-      additional_items: thousandsSumCapped
-    });
-  };
-
-  const fail = () => {
-    if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
-    btnSubmit.style.display = 'none';
-    setHiddenField(modalFields, 'plot_posts_json', '');
-    cancel();
-  };
-
-  const succeed = (posts) => {
-    if (canceled) return;
-
-    // пустой массив → сообщение и НЕТ кнопки «Сохранить»
-    if (!Array.isArray(posts) || posts.length === 0) {
-      updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
-      btnSubmit.style.display = 'none';
-      setHiddenField(modalFields, 'plot_posts_json', '');
-      setSummary(0, 0);
-      cancel();
-      return;
-    }
-
-    // нормальный случай
-    const items = posts.map(pickItem).filter(Boolean);
-    setHiddenField(modalFields, 'plot_posts_json', JSON.stringify(items));
-
-    // убираем «подождите…»
-    const n = updateNote(modalFields, '');
-    if (n) n.remove();
-
-    // Заголовок «Список постов:»
-    const caption = document.createElement('p');
-    caption.className = 'list-caption';
-    caption.innerHTML = '<strong>Список постов:</strong>';
-    modalFields.appendChild(caption);
-
-    // список со скроллом
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-    wrap.innerHTML = `
-      <div style="max-height:320px; overflow:auto">
-        <ol class="entry-list" id="plot-preview"></ol>
-      </div>`;
-    modalFields.appendChild(wrap);
-
-    const ol = wrap.querySelector('#plot-preview');
-    items.forEach(({ src, text, symbols_num }) => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = src; a.textContent = text || src;
-      a.target = '_blank'; a.rel = 'noopener noreferrer';
-      li.appendChild(a);
-      li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
-      ol.appendChild(li);
-    });
-
-    // Σ min(floor(symbols/1000), 3) по постам
-    const thousandsSumCapped = items.reduce((s, it) => {
-      const k = Math.floor(it.symbols_num / 1000);
-      return s + Math.min(Math.max(0, k), 3);
-    }, 0);
-
-    // формула
-    setSummary(items.length, thousandsSumCapped);
-
-    form.dataset.currentMultiplier = String(items.length);
-    btnSubmit.style.display = '';
-    btnSubmit.disabled = false;
-    cancel();
-  };
-
-  // ждём PLOT_POSTS не дольше 3 минут (используем уже заданный таймаут)
-  const to = setTimeout(fail, PLOT_TIMEOUT_MS);
-  const poll = setInterval(() => {
-    if (typeof window.PLOT_POSTS !== 'undefined' && !Array.isArray(window.PLOT_POSTS)) { fail(); return; }
-    if (Array.isArray(window.PLOT_POSTS)) {
-      clearTimeout(to); clearInterval(poll);
-      succeed(window.PLOT_POSTS);
-    }
-  }, 500);
+      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`
+    ),
+    additionalItemsAggregator: (items) => items.reduce((sum, item) => {
+      const thousands = Math.floor(item.symbols_num / 1000);
+      return sum + Math.min(Math.max(0, thousands), 3);
+    }, 0)
+  });
 }
 
-  // === FLYER: ждём ADS_POSTS и рисуем список ===
+// === FLYER: ждём ADS_POSTS и рисуем список ===
 if (template.id === FORM_INCOME_FLYER) {
   // показываем «ждём…» (у вас уже есть <p class="muted-note">Пожалуйста, подождите...</p>)
   updateNote(modalFields, 'Пожалуйста, подождите...');

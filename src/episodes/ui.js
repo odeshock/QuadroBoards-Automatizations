@@ -499,8 +499,8 @@
     }
 
     // /edit.php?id=N&action=edit — только если есть любые FMV-теги
-    if (/\/edit\.php$/i.test(path) && q.get('action') === 'edit' && q.has('id')) {
-      attachToPage({ strip:true, showOnlyIfCast:true });
+    if (/\/edit\.php$/i.test(path) && q.has('id') && document.querySelector('input[name="firstpost"]')) {
+      attachToPage({ strip:true, showOnlyIfCast:false });
     }
   });
 

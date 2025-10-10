@@ -9,6 +9,12 @@ const infoTemplate = (text) => `<div class="info">${text}</div>`;
 const infoWithNote = (text, note = '') => `<div class="info">${text}</div><p class="muted-note">${note}</p>`;
 const waitingTemplate = (text) => infoWithNote(text, TEXT_MESSAGES.PLEASE_WAIT);
 
+// Генератор шаблона для поля с количеством
+const quantityField = (idPrefix) => {
+  const id = `${idPrefix}-qty`;
+  return `<div class="field"><label for="${id}">Количество *</label><input id="${id}" name="quantity" type="number" min="1" value="1" required></div>`;
+};
+
 // Шаблоны модальных окон
 export const formTemplates = {
   // ДОХОДЫ (info)
@@ -44,21 +50,21 @@ export const formTemplates = {
   'form-income-rpgtop': `${infoTemplate(TEXT_MESSAGES.SCREENSHOT_INFO)}<div class="grid-2"><div class="field"><label for="need-link">Ссылка на скрин *</label><input id="need-link" name="need" type="url" required></div></div><div class="field"><button type="button" class="btn" data-add-extra data-count-base="need">+ Еще</button></div>`,
 
   // РАСХОДЫ
-  'form-exp-face-1m': '<div class="field"><label for="f1q">Количество *</label><input id="f1q" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-face-3m': '<div class="field"><label for="f3q">Количество *</label><input id="f3q" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-face-6m': '<div class="field"><label for="f6q">Количество *</label><input id="f6q" name="quantity" type="number" min="1" value="1" required></div>',
+  'form-exp-face-1m': quantityField('face-1m'),
+  'form-exp-face-3m': quantityField('face-3m'),
+  'form-exp-face-6m': quantityField('face-6m'),
 
-  'form-exp-char-1m': '<div class="field"><label for="c1q">Количество *</label><input id="c1q" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-char-3m': '<div class="field"><label for="c3q">Количество *</label><input id="c3q" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-char-6m': '<div class="field"><label for="c6q">Количество *</label><input id="c6q" name="quantity" type="number" min="1" value="1" required></div>',
+  'form-exp-char-1m': quantityField('char-1m'),
+  'form-exp-char-3m': quantityField('char-3m'),
+  'form-exp-char-6m': quantityField('char-6m'),
 
-  'form-exp-face-own-1m': '<div class="field"><label for="fo1q">Количество *</label><input id="fo1q" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-face-own-3m': '<div class="field"><label for="fo3q">Количество *</label><input id="fo3q" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-face-own-6m': '<div class="field"><label for="fo6q">Количество *</label><input id="fo6q" name="quantity" type="number" min="1" value="1" required></div>',
+  'form-exp-face-own-1m': quantityField('face-own-1m'),
+  'form-exp-face-own-3m': quantityField('face-own-3m'),
+  'form-exp-face-own-6m': quantityField('face-own-6m'),
 
-  'form-exp-need-1w': '<div class="field"><label for="n1wq">Количество *</label><input id="n1wq" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-need-2w': '<div class="field"><label for="n2wq">Количество *</label><input id="n2wq" name="quantity" type="number" min="1" value="1" required></div>',
-  'form-exp-need-1m': '<div class="field"><label for="n1mq">Количество *</label><input id="n1mq" name="quantity" type="number" min="1" value="1" required></div>',
+  'form-exp-need-1w': quantityField('need-1w'),
+  'form-exp-need-2w': quantityField('need-2w'),
+  'form-exp-need-1m': quantityField('need-1m'),
 
   'form-exp-mask': waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
 
@@ -82,28 +88,19 @@ export const formTemplates = {
 
   // ПОДАРКИ
   'form-gift-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-gift-present': `<p class="muted-note">Пожалуйста, подождите...</p>
-<div class="gift-groups" data-gift-container>
-  <div class="gift-group" data-gift-group>
-    <button type="button" class="btn-remove-extra gift-remove" data-gift-remove aria-label="Удалить получателя" disabled>×</button>
-    <div class="field gift-field" data-gift-label="recipient"><label for="gift-recipient-1">Получатель *</label><input id="gift-recipient-1" data-gift-recipient name="recipient_1" type="text" required placeholder="Начните вводить имя..."></div>
-    <div class="field gift-field" data-gift-label="from"><label for="gift-from-1">От кого</label><input id="gift-from-1" data-gift-from name="from_1" type="text" placeholder="От ..."></div>
-    <div class="field gift-field" data-gift-label="wish"><label for="gift-wish-1">Комментарий</label><input id="gift-wish-1" data-gift-wish name="wish_1" type="text" placeholder="Например, с праздником!"></div>
-  </div>
-</div>
-<div class="field"><button type="button" class="btn" data-add-gift-group>+ Еще</button></div>`,
+  'form-gift-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT),
 
   // ОФОРМЛЕНИЕ - Иконки
   'form-icon-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-icon-present': `<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
+  'form-icon-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT),
 
   // ОФОРМЛЕНИЕ - Плашки
   'form-badge-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-badge-present': `<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
+  'form-badge-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT),
 
   // ОФОРМЛЕНИЕ - Фоны
   'form-bg-custom': waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  'form-bg-present': `<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`
+  'form-bg-present': waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT)
 };
 
 // Список форм с data-info атрибутом

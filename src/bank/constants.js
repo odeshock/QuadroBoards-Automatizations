@@ -114,6 +114,27 @@ export const GIFT_FORMS = [
   FORM_GIFT_PRESENT
 ];
 
+// Формы с получателями (для рендеринга списком)
+export const RECIPIENT_LIST_FORMS = [
+  FORM_INCOME_ANKETA,
+  FORM_INCOME_AKCION,
+  FORM_INCOME_NEEDCHAR,
+  FORM_INCOME_EPISODE_OF,
+  FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS,
+  FORM_EXP_TRANSFER,
+  ...SPECIAL_EXPENSE_FORMS,
+  ...DESIGN_FORMS,
+  ...GIFT_FORMS
+];
+
+// Формы без списка получателей (прямой рендеринг)
+export const DIRECT_RENDER_FORMS = [
+  FORM_INCOME_ACTIVIST,
+  FORM_INCOME_WRITER,
+  FORM_INCOME_POST_OF
+];
+
 // ============================================================================
 // ТЕКСТОВЫЕ КОНСТАНТЫ
 // ============================================================================

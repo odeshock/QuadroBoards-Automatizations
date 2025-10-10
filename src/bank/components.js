@@ -36,6 +36,11 @@ import {
   updateAutoDiscounts
 } from './services.js';
 
+import {
+  SPECIAL_EXPENSE_FORMS,
+  FORM_EXP_TRANSFER
+} from './constants.js';
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -2369,19 +2374,12 @@ if (template.id === 'form-income-ams') {
 }
 
 // === BONUSES, MASK, CLEAN: выбор получателя + количество + от кого + комментарий
-const bonusMaskCleanForms = [
-  'form-exp-bonus1d1', 'form-exp-bonus2d1',
-  'form-exp-bonus1w1', 'form-exp-bonus2w1',
-  'form-exp-bonus1m1', 'form-exp-bonus2m1',
-  'form-exp-bonus1m3', 'form-exp-bonus2m3',
-  'form-exp-mask', 'form-exp-clean'
-];
-if (bonusMaskCleanForms.includes(template.id)) {
+if (SPECIAL_EXPENSE_FORMS.includes('#' + template.id)) {
   counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 
 // === TRANSFER: «Перевод средств другому (комиссия)» — выбор пользователей + сумма с комиссией 10 галлеонов за каждого
-if (template.id === 'form-exp-transfer') {
+if ('#' + template.id === FORM_EXP_TRANSFER) {
   counterWatcher = setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TRANSFER_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 

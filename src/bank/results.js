@@ -15,6 +15,13 @@ import {
   updateAutoDiscounts
 } from './services.js';
 
+import {
+  SPECIAL_EXPENSE_FORMS,
+  RECIPIENT_LIST_FORMS,
+  DIRECT_RENDER_FORMS,
+  FORM_GIFT_DISCOUNT
+} from './constants.js';
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -620,7 +627,7 @@ export function renderLog(log) {
           meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
-      } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
+      } else if (SPECIAL_EXPENSE_FORMS.includes(group.templateSelector)) {
         // Бонусы/Маска/Жилет: базовая цена × сумма всех quantity
         let totalQuantity = 0;
 
@@ -799,14 +806,7 @@ export function renderLog(log) {
       const tid = item.template_id;
 
       // Определяем формы, требующие визуального разделения
-      const bonusMaskCleanIds = [
-        'form-exp-bonus1d1', 'form-exp-bonus2d1',
-        'form-exp-bonus1w1', 'form-exp-bonus2w1',
-        'form-exp-bonus1m1', 'form-exp-bonus2m1',
-        'form-exp-bonus1m3', 'form-exp-bonus2m3',
-        'form-exp-mask', 'form-exp-clean'
-      ];
-      const isBonusMaskClean = bonusMaskCleanIds.includes(tid);
+      const isBonusMaskClean = SPECIAL_EXPENSE_FORMS.includes('#' + tid);
 
       // header у записи (если нужен заголовок для нескольких записей)
       // Для скидок не показываем "Запись X"
@@ -915,25 +915,8 @@ export function renderLog(log) {
       }
 
       // ===== Определяем тип формы для правильного рендеринга =====
-      // Группа 1: Формы с получателями (листом)
-      const group1Templates = [
-        'form-income-anketa', 'form-income-akcion', 'form-income-needchar',
-        'form-income-episode-of', 'form-income-topup', 'form-income-ams',
-        'form-exp-mask',
-        'form-exp-bonus1d1', 'form-exp-bonus2d1',
-        'form-exp-bonus1w1', 'form-exp-bonus2w1',
-        'form-exp-bonus1m1', 'form-exp-bonus2m1',
-        'form-exp-bonus1m3', 'form-exp-bonus2m3',
-        'form-exp-clean',
-        'form-icon-custom', 'form-icon-present',
-        'form-badge-custom', 'form-badge-present',
-        'form-bg-custom', 'form-bg-present',
-        'form-gift-custom', 'form-gift-present',
-        'form-exp-transfer'
-      ];
-
-      // Группа 2: Активист/Постописец/Пост полумесяца (без li)
-      const group2Templates = ['form-income-activist', 'form-income-writer', 'form-income-post-of'];
+      // Формы с получателями используют RECIPIENT_LIST_FORMS (с #), а tid без #
+      // Формы без li используют DIRECT_RENDER_FORMS
 
       // Группа 3: Выкупы (только количество)
       const group3Templates = [
@@ -963,7 +946,7 @@ export function renderLog(log) {
       const group8Templates = ['form-income-100msgs', 'form-income-100rep', 'form-income-100pos', 'form-income-month'];
 
       // ===== ГРУППА 1: Формы с получателями в списке =====
-      if (group1Templates.includes(tid)) {
+      if (RECIPIENT_LIST_FORMS.includes('#' + tid)) {
         const dataObj = item.data || {};
         const idxs = Object.keys(dataObj)
           .map(k => k.match(/^recipient_(\d+)$/))
@@ -1038,7 +1021,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 2: Активист/Постописец/Пост полумесяца (без li) =====
-      if (group2Templates.includes(tid)) {
+      if (DIRECT_RENDER_FORMS.includes('#' + tid)) {
         const dataObj = item.data || {};
         const idxs = Object.keys(dataObj)
           .map(k => k.match(/^recipient_(\d+)$/))
@@ -1191,10 +1174,10 @@ export function renderLog(log) {
       if (!isDiscount) {
         Object.entries(item.data || {}).forEach(([key, value]) => {
           // Группа 1: все поля уже отрисованы
-          if (group1Templates.includes(tid) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+          if (RECIPIENT_LIST_FORMS.includes('#' + tid) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // Группа 2: все поля уже отрисованы
-          if (group2Templates.includes(tid) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+          if (DIRECT_RENDER_FORMS.includes('#' + tid) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // Группа 3: quantity уже отрисован
           if (group3Templates.includes(tid) && key === 'quantity') return;
@@ -1398,7 +1381,7 @@ export function renderLog(log) {
           const total = calculateCost('price_per_item', price, 0, totalGifts, 0, 0);
           totalSum += isIncome ? total : -total;
         }
-      } else if (['#form-exp-bonus1d1', '#form-exp-bonus2d1', '#form-exp-bonus1w1', '#form-exp-bonus2w1', '#form-exp-bonus1m1', '#form-exp-bonus2m1', '#form-exp-bonus1m3', '#form-exp-bonus2m3', '#form-exp-mask', '#form-exp-clean'].includes(group.templateSelector)) {
+      } else if (SPECIAL_EXPENSE_FORMS.includes(group.templateSelector)) {
         let totalQuantity = 0;
         group.entries.forEach((item) => {
           const dataObj = item.data || {};

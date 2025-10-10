@@ -575,6 +575,32 @@ export function renderLog(log) {
           meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
+      } else if (group.templateSelector === '#form-income-topup' || group.templateSelector === '#form-income-ams') {
+        // Докупить кредиты / Выдать денежку дополнительно: price × сумма всех topup
+        let totalTopup = 0;
+
+        group.entries.forEach((item) => {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1]);
+
+          idxs.forEach((idx) => {
+            const topupAmount = Number(dataObj[`topup_${idx}`]) || 0;
+            totalTopup += topupAmount;
+          });
+        });
+
+        // Используем calculateCost для получения только итоговой суммы
+        if (totalTopup > 0) {
+          const price = group.price !== null && group.price !== undefined ? Number(group.price) : 0;
+          const total = calculateCost('price_per_item', price, 0, totalTopup, 0, 0);
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
+        } else {
+          meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
+        }
+        header.appendChild(meta);
       } else if (group.isDiscount) {
         // Скидки: сумма всех discount_amount
         let totalDiscount = 0;
@@ -987,11 +1013,13 @@ export function renderLog(log) {
           // NUM_INFO: показываем либо quantity, либо price (для админ-форм начислений)
           const adminRecipientForms = ['form-income-anketa', 'form-income-akcion', 'form-income-needchar', 'form-income-episode-of'];
           const showPrice = adminRecipientForms.includes(tid) && !quantity;
+          const isTopupOrAms = tid === 'form-income-topup' || tid === 'form-income-ams';
 
           if (showPrice && group.price) {
             // Для админ-форм начислений показываем price рядом с именем
             htmlContent += ` — ${formatNumber(group.price)}`;
-          } else if (quantity) {
+          } else if (quantity && !isTopupOrAms) {
+            // Для topup/ams НЕ показываем индивидуальные суммы
             const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
             if (qtyNum !== null) {
               htmlContent += ` — ${formatNumber(qtyNum)}`;
@@ -1930,7 +1958,7 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
   return counterWatcher;
 }
 
-export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false }) {
+export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null }) {
   // === 1) Удаляем дисклеймер и прочие инфо-элементы — у админа их быть НЕ должно ===
   modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info]')
     .forEach(el => el.remove());
@@ -2026,6 +2054,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 
       // пересобираем пары recipient_i + topup_i (+ comment_i для AMS) только для валидных сумм
       let i = 1;
+      let totalAmount = 0;
       for (const { id, amountInput, commentInput } of picked.values()) {
         const val = amountInput?.value ?? '';
         if (!isValidAmount(val)) continue;
@@ -2057,12 +2086,21 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
           modalFields.append(hidC);
         }
 
+        // Суммируем количество получателей для расчета итого
+        totalAmount += parseNumericAmount(val) || 0;
         i++;
       }
 
       const hasAny = i > 1;
       btnSubmit.style.display = hasAny ? '' : 'none';
       btnSubmit.disabled = !hasAny;
+
+      // Обновляем modal-amount: price × total = итого
+      if (modalAmount && basePrice !== null) {
+        const price = Number(basePrice);
+        const total = price * totalAmount;
+        modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
+      }
     };
 
     const removeChip = (id) => {
@@ -3786,7 +3824,7 @@ if (template.id === 'form-income-topup') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-режим (data-info)
   } else {
-    counterWatcher = setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TOPUP_TIMEOUT_MS, data });
+    counterWatcher = setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TOPUP_TIMEOUT_MS, data, modalAmount, basePrice: price });
   }
 }
 
@@ -3795,7 +3833,7 @@ if (template.id === 'form-income-ams') {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-режим (data-info)
   } else {
-    counterWatcher = setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, requireComment: true });
+    counterWatcher = setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, requireComment: true, modalAmount, basePrice: price });
   }
 }
 

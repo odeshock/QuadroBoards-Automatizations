@@ -285,3 +285,10 @@ export const ADMIN_ALLOWED_ITEMS = [
   FORM_INCOME_ACTIVIST,    // 'Активист полумесяца'
   FORM_INCOME_AMS          // 'Выдать денежку дополнительно'
 ];
+
+export const ADMIN_RECIPIENT_MULTI_FORMS = [
+  FORM_INCOME_ANKETA,
+  FORM_INCOME_AKCION,
+  FORM_INCOME_NEEDCHAR,
+  FORM_INCOME_EPISODE_OF
+];

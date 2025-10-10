@@ -66,8 +66,16 @@ import {
   FORM_INCOME_RUN_CONTEST,
   FORM_INCOME_MASTERING,
   DESIGN_FORMS,
+  ADMIN_RECIPIENT_MULTI_FORMS,
   toSelector
 } from './constants.js';
+
+const ADMIN_RECIPIENT_FLOW_TIMEOUTS = {
+  [FORM_INCOME_ANKETA]: FORM_TIMEOUT_MS,
+  [FORM_INCOME_AKCION]: PROMO_TIMEOUT_MS,
+  [FORM_INCOME_NEEDCHAR]: NEEDED_TIMEOUT_MS,
+  [FORM_INCOME_EPISODE_OF]: BEST_EPISODE_TIMEOUT_MS
+};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -209,14 +217,28 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
     const addChip = (user) => {
       const chip = document.createElement('span');
       chip.className = 'chip';
-      chip.textContent = `${user.name} (id: ${user.id})`;
-      chip.title = 'Нажмите, чтобы удалить';
-      chip.style.cursor = 'pointer';
-      chip.addEventListener('click', () => {
+      chip.style.display = 'inline-flex';
+      chip.style.alignItems = 'center';
+      chip.style.gap = '8px';
+
+      const text = document.createElement('span');
+      text.textContent = `${user.name} (id: ${user.id})`;
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = '×';
+      del.title = 'Удалить';
+      del.style.border = 'none';
+      del.style.background = 'transparent';
+      del.style.cursor = 'pointer';
+      del.style.fontSize = '16px';
+      del.addEventListener('click', () => {
         picked.delete(String(user.id));
         chip.remove();
         syncHiddenFields();
       });
+
+      chip.append(text, del);
       chosen.appendChild(chip);
     };
 
@@ -366,18 +388,12 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
     if (!Array.isArray(users)) return fail();
 
     hideWait();
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-
-    const chosen = document.createElement('div');
-    chosen.className = 'chips';
-    wrap.appendChild(chosen);
 
     const block = document.createElement('div');
     block.className = 'field anketa-combobox';
 
     const label = document.createElement('label');
-    label.textContent = 'Кому начислить*';
+    label.textContent = 'Получатель *';
     block.appendChild(label);
 
     const box = document.createElement('div');
@@ -387,6 +403,7 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
     input.type = 'text';
     input.placeholder = 'Начните вводить имя или id...';
     input.setAttribute('autocomplete', 'off');
+    input.required = true;
 
     const list = document.createElement('div');
     list.className = 'suggest';
@@ -395,11 +412,11 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
     box.appendChild(input);
     box.appendChild(list);
     block.appendChild(box);
-    wrap.appendChild(block);
-    modalFields.appendChild(wrap);
+    modalFields.appendChild(block);
 
     // единственный выбранный id (строка)
     let pickedId = '';
+    let pickedName = '';
 
     const syncHiddenFields = () => {
       modalFields.querySelectorAll('input[type="hidden"][name^="recipient_"]').forEach(n => n.remove());
@@ -418,21 +435,6 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
         const price = Number(basePrice) || 0;
         modalAmount.textContent = formatNumber(price);
       }
-    };
-
-    const renderChip = (user) => {
-      chosen.innerHTML = '';
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.textContent = `${user.name} (id: ${user.id})`;
-      chip.title = 'Нажмите, чтобы удалить';
-      chip.style.cursor = 'pointer';
-      chip.addEventListener('click', () => {
-        pickedId = '';
-        chosen.innerHTML = '';
-        syncHiddenFields();
-      });
-      chosen.appendChild(chip);
     };
 
     const portalList = list;
@@ -458,11 +460,10 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
       item.textContent = `${u.name} (id: ${u.id})`;
       item.addEventListener('click', () => {
         pickedId = String(u.id);
-        renderChip(u);
+        pickedName = u.name;
+        input.value = `${u.name} (id: ${u.id})`;
         syncHiddenFields();
-        input.value = '';
         closeSuggest();
-        input.focus();
       });
       return item;
     };
@@ -498,8 +499,15 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
       const first = ids[0];
       if (first) {
         const u = users.find(x => String(x.id) === first);
-        if (u) { pickedId = String(u.id); renderChip(u); }
-        else   { pickedId = first; renderChip({ name: 'Неизвестный', id: first }); }
+        if (u) {
+          pickedId = String(u.id);
+          pickedName = u.name;
+          input.value = `${u.name} (id: ${u.id})`;
+        } else {
+          pickedId = first;
+          pickedName = 'Неизвестный';
+          input.value = `Неизвестный (id: ${first})`;
+        }
       }
       syncHiddenFields();
     }
@@ -2357,32 +2365,21 @@ if (
 }
 
 
-// === ANKETA (за приём анкеты): режимы для админа/не админа ===
-if (template.id === FORM_INCOME_ANKETA) {
+// === ADMIN multi-recipient начисления (анкета, акция, нужный, эпизод) ===
+if (ADMIN_RECIPIENT_MULTI_FORMS.includes(template.id)) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: FORM_TIMEOUT_MS, data, modalAmount, basePrice: price });
-  }
-}
-
-// === AKCION: «Взятие акционного персонажа» — поведение как у анкеты ===
-if (template.id === FORM_INCOME_AKCION) {
-  if (!window.IS_ADMIN) {
-    // не админ — просто инфо-окно (кнопка скрыта уже через data-info)
-    btnSubmit.style.display = 'none';
-  } else {
-    // админ — тот же выбор получателей, как у анкеты
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: PROMO_TIMEOUT_MS, data, modalAmount, basePrice: price });
-  }
-}
-
-// === NEEDCHAR: «Взятие нужного персонажа» — поведение как у анкеты ===
-if (template.id === FORM_INCOME_NEEDCHAR) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none';
-  } else {
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: NEEDED_TIMEOUT_MS, data, modalAmount, basePrice: price });
+    const timeoutMs = ADMIN_RECIPIENT_FLOW_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;
+    counterWatcher = setupAdminRecipientsFlow({
+      modalFields,
+      btnSubmit,
+      counterWatcher,
+      timeoutMs,
+      data,
+      modalAmount,
+      basePrice: price
+    });
   }
 }
 
@@ -2454,17 +2451,6 @@ if (DESIGN_FORMS.map(f => f.replace("#", "")).includes(template.id)) {
         giftIcon: config.giftIcon,
         price: config.price
       });
-}
-
-// === BEST-EPISODE: «Эпизод полумесяца» — поведение как у анкеты ===
-if (template.id === FORM_INCOME_EPISODE_OF) {
-  if (!window.IS_ADMIN) {
-    // не админ — просто инфо-окно (submit скрыт за счёт data-info)
-    btnSubmit.style.display = 'none';
-  } else {
-    // админ — тот же выбор получателей, как у анкеты
-    counterWatcher = setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_EPISODE_TIMEOUT_MS, data, modalAmount, basePrice: price });
-  }
 }
 
 // === BEST-POST: «Пост полумесяца» — как «Эпизод полумесяца», но один получатель ===

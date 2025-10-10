@@ -29,10 +29,7 @@
   // проверка форума по ссылкам на viewforum.php
   function isAllowedForum(forumIds) {
     const allow = (forumIds || []).map(String);
-    const crumbs = document.querySelector('.crumbs') ||
-                   document.querySelector('#pun-crumbs') ||
-                   document.querySelector('.pun_crumbs') ||
-                   document.querySelector('.container .crumbs');
+    const crumbs = document.querySelector('.container.crumbs');
 
     const matchIn = (root) => Array.from(root.querySelectorAll('a[href]')).some(a => {
       try {

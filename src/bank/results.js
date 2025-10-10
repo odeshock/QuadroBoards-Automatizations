@@ -19,7 +19,23 @@ import {
   SPECIAL_EXPENSE_FORMS,
   RECIPIENT_LIST_FORMS,
   DIRECT_RENDER_FORMS,
-  FORM_GIFT_DISCOUNT
+  BUYOUT_FORMS,
+  URL_FIELD_FORMS,
+  BANNER_FORMS,
+  CHARACTER_CHANGE_FORMS,
+  REFUSE_FORMS,
+  COUNTER_FORMS,
+  ADMIN_RECIPIENT_FORMS,
+  DESIGN_FORMS,
+  GIFT_FORMS,
+  FORM_GIFT_DISCOUNT,
+  FORM_GIFT_PRESENT,
+  FORM_GIFT_CUSTOM,
+  FORM_EXP_TRANSFER,
+  FORM_EXP_THIRDCHAR,
+  FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS,
+  toSelector
 } from './constants.js';
 
 // ============================================================================
@@ -435,9 +451,8 @@ export function renderLog(log) {
     title.style.gap = '8px';
 
     // Для подарков и оформления добавляем иконку и ID в заголовок
-    const designSelectors = ['#form-icon-custom', '#form-icon-present', '#form-badge-custom', '#form-badge-present', '#form-bg-custom', '#form-bg-present'];
-    const isGiftGroup = group.templateSelector === '#form-gift-present' || /Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(group.title || '');
-    const isDesignGroup = designSelectors.includes(group.templateSelector);
+    const isGiftGroup = group.templateSelector === toSelector(FORM_GIFT_PRESENT) || /Подарить подарок|Праздничный подарок|Подарок-сюрприз|Воздушный подарок/i.test(group.title || '');
+    const isDesignGroup = DESIGN_FORMS.includes(group.templateSelector);
 
     if ((isGiftGroup || isDesignGroup) && group.entries.length > 0) {
       const firstEntry = group.entries[0];
@@ -534,7 +549,7 @@ export function renderLog(log) {
         const total = calculateCost('price_per_item_w_bonus', price, bonus, totalCount, totalThousands, 0);
         meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(total)}</span>`;
         header.appendChild(meta);
-      } else if (group.templateSelector === '#form-exp-transfer' || /Перевод средств другому/i.test(group.title || '')) {
+      } else if (group.templateSelector === toSelector(FORM_EXP_TRANSFER) || /Перевод средств другому/i.test(group.title || '')) {
         // Специальная логика для переводов: сумма + комиссия
         let totalAmount = 0;
         let recipientCount = 0;
@@ -565,7 +580,7 @@ export function renderLog(log) {
           meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
-      } else if (group.templateSelector === '#form-income-topup' || group.templateSelector === '#form-income-ams') {
+      } else if (group.templateSelector === toSelector(FORM_INCOME_TOPUP) || group.templateSelector === toSelector(FORM_INCOME_AMS)) {
         // Докупить кредиты / Выдать денежку дополнительно: price × сумма всех topup
         let totalTopup = 0;
 
@@ -601,9 +616,9 @@ export function renderLog(log) {
         meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(totalDiscount)}</span>`;
         header.appendChild(meta);
       } else if (
-        group.templateSelector === '#form-gift-present' ||
-        group.templateSelector === '#form-gift-custom' ||
-        ['#form-icon-custom', '#form-icon-present', '#form-badge-custom', '#form-badge-present', '#form-bg-custom', '#form-bg-present'].includes(group.templateSelector) ||
+        group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||
+        group.templateSelector === toSelector(FORM_GIFT_CUSTOM) ||
+        DESIGN_FORMS.includes(group.templateSelector) ||
         /Подарить подарок|Индивидуальный подарок/i.test(group.title || '')
       ) {
         // Подарки и Оформление: цена_1 × количество получателей
@@ -806,7 +821,7 @@ export function renderLog(log) {
       const tid = item.template_id;
 
       // Определяем формы, требующие визуального разделения
-      const isBonusMaskClean = SPECIAL_EXPENSE_FORMS.includes('#' + tid);
+      const isBonusMaskClean = SPECIAL_EXPENSE_FORMS.includes(toSelector(tid));
 
       // header у записи (если нужен заголовок для нескольких записей)
       // Для скидок не показываем "Запись X"
@@ -915,38 +930,10 @@ export function renderLog(log) {
       }
 
       // ===== Определяем тип формы для правильного рендеринга =====
-      // Формы с получателями используют RECIPIENT_LIST_FORMS (с #), а tid без #
-      // Формы без li используют DIRECT_RENDER_FORMS
-
-      // Группа 3: Выкупы (только количество)
-      const group3Templates = [
-        'form-exp-face-1m', 'form-exp-face-3m', 'form-exp-face-6m',
-        'form-exp-char-1m', 'form-exp-char-3m', 'form-exp-char-6m',
-        'form-exp-face-own-1m', 'form-exp-face-own-3m', 'form-exp-face-own-6m',
-        'form-exp-need-1w', 'form-exp-need-2w', 'form-exp-need-1m'
-      ];
-
-      // Группа 4: Ссылки в li
-      const group4Templates = [
-        'form-income-needrequest', 'form-income-ep-personal', 'form-income-ep-plot',
-        'form-income-contest', 'form-income-avatar', 'form-income-design-other',
-        'form-income-run-contest', 'form-income-mastering', 'form-income-rpgtop'
-      ];
-
-      // Группа 5: Ссылки без li
-      const group5Templates = ['form-income-banner-reno', 'form-income-banner-mayak', 'form-exp-thirdchar'];
-
-      // Группа 6: Текстовые поля
-      const group6Templates = ['form-exp-changechar', 'form-income-firstpost'];
-
-      // Группа 7: Отказ от персонажа
-      const group7Templates = ['form-exp-refuse'];
-
-      // Группа 8: Ключ-значение без li (100 сообщений, репутации, позитива, месяц)
-      const group8Templates = ['form-income-100msgs', 'form-income-100rep', 'form-income-100pos', 'form-income-month'];
+      // Используем импортированные константы вместо локальных массивов
 
       // ===== ГРУППА 1: Формы с получателями в списке =====
-      if (RECIPIENT_LIST_FORMS.includes('#' + tid)) {
+      if (RECIPIENT_LIST_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const idxs = Object.keys(dataObj)
           .map(k => k.match(/^recipient_(\d+)$/))
@@ -977,9 +964,9 @@ export function renderLog(log) {
           let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
 
           // NUM_INFO: показываем либо quantity, либо price (для админ-форм начислений)
-          const adminRecipientForms = ['form-income-anketa', 'form-income-akcion', 'form-income-needchar', 'form-income-episode-of'];
-          const showPrice = adminRecipientForms.includes(tid) && !quantity;
-          const isTopupOrAms = tid === 'form-income-topup' || tid === 'form-income-ams';
+          // adminRecipientForms заменены на ADMIN_RECIPIENT_FORMS
+          const showPrice = ADMIN_RECIPIENT_FORMS.includes(toSelector(tid)) && !quantity;
+          const isTopupOrAms = toSelector(tid) === FORM_INCOME_TOPUP || toSelector(tid) === FORM_INCOME_AMS;
 
           if (showPrice && group.price) {
             // Для админ-форм начислений показываем price рядом с именем
@@ -1021,7 +1008,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 2: Активист/Постописец/Пост полумесяца (без li) =====
-      if (DIRECT_RENDER_FORMS.includes('#' + tid)) {
+      if (DIRECT_RENDER_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const idxs = Object.keys(dataObj)
           .map(k => k.match(/^recipient_(\d+)$/))
@@ -1080,7 +1067,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 3: Выкупы (только количество) =====
-      if (group3Templates.includes(tid)) {
+      if (BUYOUT_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const quantity = dataObj.quantity || '';
 
@@ -1094,7 +1081,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 4: Ссылки в li =====
-      if (group4Templates.includes(tid)) {
+      if (URL_FIELD_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const url = dataObj.url || '';
 
@@ -1106,7 +1093,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 5: Ссылки без li =====
-      if (group5Templates.includes(tid)) {
+      if (BANNER_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const url = dataObj.url || '';
 
@@ -1119,7 +1106,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 6: Текстовые поля =====
-      if (group6Templates.includes(tid)) {
+      if (CHARACTER_CHANGE_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const text = dataObj.text || dataObj.name || dataObj.reason || '';
 
@@ -1132,7 +1119,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 7: Отказ от персонажа =====
-      if (group7Templates.includes(tid)) {
+      if (REFUSE_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const comment = (dataObj.comment || '').replace(/\n/g, '<br>');
 
@@ -1145,7 +1132,7 @@ export function renderLog(log) {
       }
 
       // ===== ГРУППА 8: Ключ-значение без li =====
-      if (group8Templates.includes(tid)) {
+      if (COUNTER_FORMS.includes(toSelector(tid))) {
         const dataObj = item.data || {};
         const itemEl = document.createElement('div');
         itemEl.className = 'entry-item';
@@ -1174,28 +1161,28 @@ export function renderLog(log) {
       if (!isDiscount) {
         Object.entries(item.data || {}).forEach(([key, value]) => {
           // Группа 1: все поля уже отрисованы
-          if (RECIPIENT_LIST_FORMS.includes('#' + tid) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+          if (RECIPIENT_LIST_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // Группа 2: все поля уже отрисованы
-          if (DIRECT_RENDER_FORMS.includes('#' + tid) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+          if (DIRECT_RENDER_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // Группа 3: quantity уже отрисован
-          if (group3Templates.includes(tid) && key === 'quantity') return;
+          if (BUYOUT_FORMS.includes(toSelector(tid)) && key === 'quantity') return;
 
           // Группа 4: url уже отрисован
-          if (group4Templates.includes(tid) && key === 'url') return;
+          if (URL_FIELD_FORMS.includes(toSelector(tid)) && key === 'url') return;
 
           // Группа 5: url уже отрисован
-          if (group5Templates.includes(tid) && key === 'url') return;
+          if (BANNER_FORMS.includes(toSelector(tid)) && key === 'url') return;
 
           // Группа 6: text/name/reason уже отрисованы
-          if (group6Templates.includes(tid) && (key === 'text' || key === 'name' || key === 'reason')) return;
+          if (CHARACTER_CHANGE_FORMS.includes(toSelector(tid)) && (key === 'text' || key === 'name' || key === 'reason')) return;
 
           // Группа 7: comment уже отрисован
-          if (group7Templates.includes(tid) && key === 'comment') return;
+          if (REFUSE_FORMS.includes(toSelector(tid)) && key === 'comment') return;
 
           // Группа 8: все поля уже отрисованы
-          if (group8Templates.includes(tid)) return;
+          if (COUNTER_FORMS.includes(toSelector(tid))) return;
 
           // пустые значения не выводим (чтобы не было "— —")
           if (value === undefined || value === null || String(value).trim() === '') return;
@@ -1212,7 +1199,7 @@ export function renderLog(log) {
           }
 
           // Для link в "Третий персонаж" - выводим ссылку напрямую, без <li>
-          const isThirdChar = item.template_id === 'form-exp-thirdchar';
+          const isThirdChar = toSelector(item.template_id) === FORM_EXP_THIRDCHAR;
           if (isThirdChar && key === 'link') {
             const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
             if (isUrl) {
@@ -1312,7 +1299,7 @@ export function renderLog(log) {
 
         const total = calculateCost('price_per_item_w_bonus', price, bonus, totalCount, totalThousands, 0);
         totalSum += isIncome ? total : -total;
-      } else if (group.templateSelector === '#form-exp-transfer' || /Перевод средств другому/i.test(group.title || '')) {
+      } else if (group.templateSelector === toSelector(FORM_EXP_TRANSFER) || /Перевод средств другому/i.test(group.title || '')) {
         let totalAmount = 0;
         let recipientCount = 0;
         group.entries.forEach((item) => {
@@ -1335,7 +1322,7 @@ export function renderLog(log) {
           const total = calculateCost('price_w_entered_amount', price, 0, recipientCount, 0, totalAmount);
           totalSum += isIncome ? total : -total;
         }
-      } else if (group.templateSelector === '#form-income-topup' || group.templateSelector === '#form-income-ams') {
+      } else if (group.templateSelector === toSelector(FORM_INCOME_TOPUP) || group.templateSelector === toSelector(FORM_INCOME_AMS)) {
         // Докупить кредиты / Выдать денежку дополнительно
         let totalTopup = 0;
         group.entries.forEach((item) => {
@@ -1362,9 +1349,9 @@ export function renderLog(log) {
         });
         totalSum += totalDiscount;
       } else if (
-        group.templateSelector === '#form-gift-present' ||
-        group.templateSelector === '#form-gift-custom' ||
-        ['#form-icon-custom', '#form-icon-present', '#form-badge-custom', '#form-badge-present', '#form-bg-custom', '#form-bg-present'].includes(group.templateSelector) ||
+        group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||
+        group.templateSelector === toSelector(FORM_GIFT_CUSTOM) ||
+        DESIGN_FORMS.includes(group.templateSelector) ||
         /Подарить подарок|Индивидуальный подарок/i.test(group.title || '')
       ) {
         let totalGifts = 0;

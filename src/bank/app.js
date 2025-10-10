@@ -10,7 +10,14 @@ import {
   ADMIN_ALLOWED_ITEMS,
   TEXT_MESSAGES,
   FORM_GIFT_PRESENT,
-  FORM_GIFT_CUSTOM
+  FORM_GIFT_CUSTOM,
+  FORM_ICON_PRESENT,
+  FORM_ICON_CUSTOM,
+  FORM_BADGE_PRESENT,
+  FORM_BADGE_CUSTOM,
+  FORM_BG_PRESENT,
+  FORM_BG_CUSTOM,
+  toSelector
 } from './constants.js';
 import { parseNumericAmount } from './utils.js';
 
@@ -374,7 +381,7 @@ function renderIncomeList() {
 
     const btn = document.createElement('button');
     btn.className = 'btn-add';
-    btn.setAttribute('data-form', item.form);
+    btn.setAttribute('data-form', toSelector(item.form));
     btn.setAttribute('data-kind', 'income');
     btn.setAttribute('data-amount', String(item.amount));
     if (item.price !== undefined) btn.setAttribute('data-price', String(item.price));
@@ -402,7 +409,7 @@ function renderExpenseList() {
 
     const btn = document.createElement('button');
     btn.className = 'btn-add';
-    btn.setAttribute('data-form', item.form);
+    btn.setAttribute('data-form', toSelector(item.form));
     btn.setAttribute('data-kind', 'expense');
     btn.setAttribute('data-amount', String(item.amount));
     if (item.price !== undefined) btn.setAttribute('data-price', String(item.price));
@@ -430,7 +437,7 @@ function renderGiftsList() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'gift-card btn-add';
-    btn.setAttribute('data-form', isCustom ? '#form-gift-custom' : '#form-gift-present');
+    btn.setAttribute('data-form', toSelector(isCustom ? FORM_GIFT_CUSTOM : FORM_GIFT_PRESENT));
     btn.setAttribute('data-kind', 'expense');
     btn.setAttribute('data-amount', String(price));
     btn.setAttribute('data-price', String(price));
@@ -454,7 +461,7 @@ function renderDesignLists() {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'icon btn-add';
-      btn.setAttribute('data-form', isCustom ? '#form-icon-custom' : '#form-icon-present');
+      btn.setAttribute('data-form', toSelector(isCustom ? FORM_ICON_CUSTOM : FORM_ICON_PRESENT));
       btn.setAttribute('data-kind', 'expense');
       btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
@@ -475,7 +482,7 @@ function renderDesignLists() {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'badge btn-add';
-      btn.setAttribute('data-form', isCustom ? '#form-badge-custom' : '#form-badge-present');
+      btn.setAttribute('data-form', toSelector(isCustom ? FORM_BADGE_CUSTOM : FORM_BADGE_PRESENT));
       btn.setAttribute('data-kind', 'expense');
       btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);
@@ -496,7 +503,7 @@ function renderDesignLists() {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'bg btn-add';
-      btn.setAttribute('data-form', isCustom ? '#form-bg-custom' : '#form-bg-present');
+      btn.setAttribute('data-form', toSelector(isCustom ? FORM_BG_CUSTOM : FORM_BG_PRESENT));
       btn.setAttribute('data-kind', 'expense');
       btn.setAttribute('data-amount', String(price));
       btn.setAttribute('data-gift-id', item.id);

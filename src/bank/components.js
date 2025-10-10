@@ -38,7 +38,28 @@ import {
 
 import {
   SPECIAL_EXPENSE_FORMS,
-  FORM_EXP_TRANSFER
+  FORM_EXP_TRANSFER,
+  FORM_INCOME_BANNER_RENO,
+  FORM_INCOME_BANNER_MAYAK,
+  FORM_INCOME_ANKETA,
+  FORM_INCOME_AKCION,
+  FORM_INCOME_NEEDCHAR,
+  FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS,
+  FORM_GIFT_CUSTOM,
+  FORM_GIFT_PRESENT,
+  FORM_INCOME_EPISODE_OF,
+  FORM_INCOME_POST_OF,
+  FORM_INCOME_WRITER,
+  FORM_INCOME_ACTIVIST,
+  FORM_INCOME_FIRSTPOST,
+  FORM_INCOME_PERSONALPOST,
+  FORM_INCOME_PLOTPOST,
+  FORM_INCOME_FLYER,
+  FORM_INCOME_NEEDREQUEST,
+  FORM_INCOME_RPGTOP,
+  DESIGN_FORMS,
+  toSelector
 } from './constants.js';
 
 // ============================================================================
@@ -2300,7 +2321,7 @@ export function openModal({
 
 // === Баннер FMV в подписи на Рено ===
 if (
-  template.id === 'form-income-banner-reno' &&
+  template.id === FORM_INCOME_BANNER_RENO &&
   typeof window.BANNER_RENO_FLAG !== 'undefined' &&
   window.BANNER_RENO_FLAG === false
 ) {
@@ -2313,7 +2334,7 @@ if (
 
 // === Баннер FMV в подписи на Маяке ===
 if (
-  template.id === 'form-income-banner-mayak' &&
+  template.id === FORM_INCOME_BANNER_MAYAK &&
   typeof window.BANNER_MAYAK_FLAG !== 'undefined' &&
   window.BANNER_MAYAK_FLAG === false
 ) {
@@ -2327,7 +2348,7 @@ if (
 
 
 // === ANKETA (за приём анкеты): режимы для админа/не админа ===
-if (template.id === 'form-income-anketa') {
+if (template.id === FORM_INCOME_ANKETA) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
@@ -2336,7 +2357,7 @@ if (template.id === 'form-income-anketa') {
 }
 
 // === AKCION: «Взятие акционного персонажа» — поведение как у анкеты ===
-if (template.id === 'form-income-akcion') {
+if (template.id === FORM_INCOME_AKCION) {
   if (!window.IS_ADMIN) {
     // не админ — просто инфо-окно (кнопка скрыта уже через data-info)
     btnSubmit.style.display = 'none';
@@ -2347,7 +2368,7 @@ if (template.id === 'form-income-akcion') {
 }
 
 // === NEEDCHAR: «Взятие нужного персонажа» — поведение как у анкеты ===
-if (template.id === 'form-income-needchar') {
+if (template.id === FORM_INCOME_NEEDCHAR) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
@@ -2356,7 +2377,7 @@ if (template.id === 'form-income-needchar') {
 }
 
 // === TOPUP: «Докупить кредиты» — как анкета, но на каждого указываем сумму
-if (template.id === 'form-income-topup') {
+if (template.id === FORM_INCOME_TOPUP) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-режим (data-info)
   } else {
@@ -2365,7 +2386,7 @@ if (template.id === 'form-income-topup') {
 }
 
 // === AMS: «Выдать денежку дополнительно» — как докупка, но на каждого указываем сумму и комментарий
-if (template.id === 'form-income-ams') {
+if (template.id === FORM_INCOME_AMS) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-режим (data-info)
   } else {
@@ -2384,7 +2405,7 @@ if ('#' + template.id === FORM_EXP_TRANSFER) {
 }
 
 // === GIFT: «Подарить подарок» — выбор пользователей с опциональными полями "от кого" и "комментарий"
-if (template.id === 'form-gift-custom') {
+if (template.id === FORM_GIFT_CUSTOM) {
   counterWatcher = setupCustomGiftFlow({
     modalFields, btnSubmit, counterWatcher,
     timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
@@ -2394,7 +2415,7 @@ if (template.id === 'form-gift-custom') {
   });
 }
 
-if (template.id === 'form-gift-present') {
+if (template.id === FORM_GIFT_PRESENT) {
   counterWatcher = setupGiftFlow({
     modalFields, btnSubmit, counterWatcher,
     timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
@@ -2405,8 +2426,8 @@ if (template.id === 'form-gift-present') {
 }
 
 // === DESIGN: Оформление (иконки, плашки, фоны) — как подарки ===
-const designForms = ['form-icon-custom', 'form-icon-present', 'form-badge-custom', 'form-badge-present', 'form-bg-custom', 'form-bg-present'];
-if (designForms.includes(template.id)) {
+// designForms заменены на DESIGN_FORMS
+if (DESIGN_FORMS.map(f => f.replace("#", "")).includes(template.id)) {
   const isCustom = template.id.includes('custom');
   counterWatcher = isCustom
     ? setupCustomGiftFlow({
@@ -2426,7 +2447,7 @@ if (designForms.includes(template.id)) {
 }
 
 // === BEST-EPISODE: «Эпизод полумесяца» — поведение как у анкеты ===
-if (template.id === 'form-income-episode-of') {
+if (template.id === FORM_INCOME_EPISODE_OF) {
   if (!window.IS_ADMIN) {
     // не админ — просто инфо-окно (submit скрыт за счёт data-info)
     btnSubmit.style.display = 'none';
@@ -2437,7 +2458,7 @@ if (template.id === 'form-income-episode-of') {
 }
 
 // === BEST-POST: «Пост полумесяца» — как «Эпизод полумесяца», но один получатель ===
-if (template.id === 'form-income-post-of') {
+if (template.id === FORM_INCOME_POST_OF) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-окно для не-админов (data-info)
   } else {
@@ -2446,7 +2467,7 @@ if (template.id === 'form-income-post-of') {
 }
 
 // === BEST-WRITER: «Постописец полумесяца» — как «Пост полумесяца», 1 получатель
-if (template.id === 'form-income-writer') {
+if (template.id === FORM_INCOME_WRITER) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-окно
   } else {
@@ -2455,7 +2476,7 @@ if (template.id === 'form-income-writer') {
 }
 
 // === BEST-ACTIVIST: «Активист полумесяца» — как «Пост полумесяца», 1 получатель
-if (template.id === 'form-income-activist') {
+if (template.id === FORM_INCOME_ACTIVIST) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
@@ -2465,7 +2486,7 @@ if (template.id === 'form-income-activist') {
 
 
 // === FIRST POST: ждём FIRST_POST_FLAG, PLOT_POSTS и PERSONAL_POSTS ===
-if (template.id === 'form-income-firstpost') {
+if (template.id === FORM_INCOME_FIRSTPOST) {
   // якорь "подождите..."
   const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
 
@@ -2554,7 +2575,7 @@ if (template.id === 'form-income-firstpost') {
 
 
 // === PERSONAL POST: ждём PERSONAL_POSTS и рендерим список ===
-if (template.id === 'form-income-personalpost') {
+if (template.id === FORM_INCOME_PERSONALPOST) {
   // 1) Сначала создаём "Пожалуйста, подождите..." и держим ссылку на элемент
   const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
 
@@ -2689,7 +2710,7 @@ if (template.id === 'form-income-personalpost') {
 }
 
 // === PLOT POST: ждём PLOT_POSTS и рендерим список (кап 3к на пост) ===
-if (template.id === 'form-income-plotpost') {
+if (template.id === FORM_INCOME_PLOTPOST) {
   // якорь "подождите..."
   const waitEl = updateNote(modalFields, 'Пожалуйста, подождите...');
 
@@ -2815,7 +2836,7 @@ if (template.id === 'form-income-plotpost') {
 }
 
   // === FLYER: ждём ADS_POSTS и рисуем список ===
-if (template.id === 'form-income-flyer') {
+if (template.id === FORM_INCOME_FLYER) {
   // показываем «ждём…» (у вас уже есть <p class="muted-note">Пожалуйста, подождите...</p>)
   updateNote(modalFields, 'Пожалуйста, подождите...');
 
@@ -2957,8 +2978,8 @@ if (template.id === 'form-income-flyer') {
   }, COUNTER_POLL_INTERVAL_MS);
 }
 
-  const isNeedRequest = template.id === 'form-income-needrequest';
-  const isRpgTop      = template.id === 'form-income-rpgtop';
+  const isNeedRequest = template.id === FORM_INCOME_NEEDREQUEST;
+  const isRpgTop      = template.id === FORM_INCOME_RPGTOP;
   const isEpPersonal  = template.id === 'form-income-ep-personal';
   const isEpPlot      = template.id === 'form-income-ep-plot';
   const isContest     = template.id === 'form-income-contest';
@@ -3068,9 +3089,9 @@ if (template.id === 'form-income-flyer') {
         let computedLabel;
         if (extraLabelBase) {
           computedLabel = `${extraLabelBase} ${suffix}`;
-        } else if (template.id === 'form-income-needrequest') {
+        } else if (template.id === FORM_INCOME_NEEDREQUEST) {
           computedLabel = `Ссылка на «нужного» ${suffix}`;
-        } else if (template.id === 'form-income-rpgtop') {
+        } else if (template.id === FORM_INCOME_RPGTOP) {
           computedLabel = `Ссылка на скрин ${suffix}`;
         } else if (template.id === 'form-income-ep-personal' || template.id === 'form-income-ep-plot') {
           computedLabel = `Ссылка на эпизод ${suffix}`;
@@ -3111,9 +3132,9 @@ if (template.id === 'form-income-flyer') {
       const label = document.createElement('label');
 
       let labelText = '';
-      if (template.id === 'form-income-needrequest') {
+      if (template.id === FORM_INCOME_NEEDREQUEST) {
         labelText = `Ссылка на «нужного» ${suffix}`;
-      } else if (template.id === 'form-income-rpgtop') {
+      } else if (template.id === FORM_INCOME_RPGTOP) {
         labelText = `Ссылка на скрин ${suffix}`;
       } else if (template.id === 'form-income-ep-personal' || template.id === 'form-income-ep-plot') {
         labelText = `Ссылка на эпизод ${suffix}`;

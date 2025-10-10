@@ -184,6 +184,32 @@ function calculateGroupCost(group) {
 }
 
 // Универсальная функция для применения автоматических скидок
+/**
+ * Проверяет, истекла ли скидка на основе времени по Москве (UTC+3)
+ * @param {string} expiresAt - Дата окончания в формате 'YYYY-MM-DD' (скидка действует до конца этого дня)
+ * @returns {boolean} - true, если скидка истекла
+ */
+function isDiscountExpired(expiresAt) {
+  if (!expiresAt) return false;
+
+  // Получаем текущее время
+  const now = new Date();
+
+  // Добавляем время конца дня (23:59:59) к дате
+  const expiryDateString = `${expiresAt}T23:59:59`;
+
+  // Парсим дату окончания (предполагаем, что она указана в московском времени)
+  const expiryDate = new Date(expiryDateString);
+
+  // Московское время = UTC+3
+  // Конвертируем текущее время в московское
+  const moscowOffset = 3 * 60; // 3 часа в минутах
+  const localOffset = now.getTimezoneOffset(); // смещение локального времени от UTC в минутах (отрицательное для восточных часовых поясов)
+  const moscowTime = new Date(now.getTime() + (moscowOffset + localOffset) * 60 * 1000);
+
+  return moscowTime >= expiryDate;
+}
+
 export function updateAutoDiscounts() {
   // Находим существующую группу скидок
   const discountKey = buildGroupKey({
@@ -200,7 +226,12 @@ export function updateAutoDiscounts() {
 
   // Проходим по всем правилам скидок
   autoDiscounts.forEach(rule => {
-    const { id, title, forms, type, discountValue, roundResult, condition } = rule;
+    const { id, title, forms, type, discountValue, roundResult, condition, expiresAt } = rule;
+
+    // Проверяем, не истекла ли скидка
+    if (isDiscountExpired(expiresAt)) {
+      return; // Пропускаем истекшую скидку
+    }
 
     // Определяем, какие группы подходят под это правило
     const matchingGroups = submissionGroups.filter(g => {

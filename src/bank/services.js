@@ -95,19 +95,9 @@ function calculateGroupCost(group) {
   const price = Number(group.price) || 0;
   const bonus = Number(group.bonus) || 0;
 
-  console.log('[DEBUG calculateGroupCost]', {
-    selector: group.templateSelector,
-    mode,
-    price,
-    bonus,
-    entriesCount: group.entries.length
-  });
-
   group.entries.forEach(entry => {
     const dataObj = entry.data || {};
     const multiplier = Number(entry.multiplier) || 1;
-
-    console.log('[DEBUG calculateGroupCost dataObj]', JSON.stringify(dataObj, null, 2));
 
     // Подсчёт элементов (получателей)
     const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
@@ -167,16 +157,6 @@ function calculateGroupCost(group) {
       }, 0);
     }
 
-    console.log('[DEBUG calculateGroupCost entry]', {
-      items,
-      additional_items,
-      entered_amount,
-      multiplier,
-      mode,
-      price,
-      bonus
-    });
-
     // Расчёт стоимости в зависимости от режима
     let entryCost = 0;
     switch (mode) {
@@ -196,9 +176,7 @@ function calculateGroupCost(group) {
       default:
         entryCost = 0;
     }
-
-    console.log('[DEBUG calculateGroupCost entryCost]', { entryCost, formula: `${mode}: ${entryCost}`, calculatedItems: items > 0 ? items : 1 });
-
+    
     total += entryCost * multiplier;
   });
 
@@ -207,9 +185,6 @@ function calculateGroupCost(group) {
 
 // Универсальная функция для применения автоматических скидок
 export function updateAutoDiscounts() {
-  console.log('[DEBUG] updateAutoDiscounts called! submissionGroups:', submissionGroups.length, submissionGroups.map(g => ({ selector: g.templateSelector, amount: g.amount })));
-  console.log('[DEBUG] autoDiscounts rules:', autoDiscounts.length);
-
   // Находим существующую группу скидок
   const discountKey = buildGroupKey({
     templateSelector: FORM_GIFT_DISCOUNT,
@@ -227,16 +202,12 @@ export function updateAutoDiscounts() {
   autoDiscounts.forEach(rule => {
     const { id, title, forms, type, discountValue, roundResult, condition } = rule;
 
-    console.log('[DEBUG] Processing rule:', { id, forms, type, discountValue });
-
     // Определяем, какие группы подходят под это правило
     const matchingGroups = submissionGroups.filter(g => {
       // Для 'all' берём только расходы (kind === 'expense')
       if (forms === 'all') return g.kind === 'expense';
       return forms.includes(g.templateSelector);
     });
-
-    console.log('[DEBUG] Matching groups:', matchingGroups.length, matchingGroups.map(g => ({ selector: g.templateSelector, amount: g.amount })));
 
     if (matchingGroups.length === 0) return;
 
@@ -286,15 +257,12 @@ export function updateAutoDiscounts() {
       matchingGroups.forEach(group => {
         // Вычисляем реальную стоимость группы на основе записей
         const groupCost = calculateGroupCost(group);
-        console.log('[DEBUG] Group cost:', { selector: group.templateSelector, groupCost, kind: group.kind, entriesCount: group.entries.length });
         operationTotal += Math.abs(groupCost); // Используем abs, т.к. расходы могут быть отрицательными
       });
-      console.log('[DEBUG] Percent calculation:', { operationTotal, discountValue, roundResult, matchingGroupsCount: matchingGroups.length });
       discount = operationTotal * (discountValue / 100);
       if (roundResult) {
         discount = Math.round(discount);
       }
-      console.log('[DEBUG] Final discount:', discount);
       calculation = `${formatNumber(operationTotal)} × ${discountValue}%`;
     }
 

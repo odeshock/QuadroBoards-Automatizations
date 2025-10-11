@@ -134,6 +134,24 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
+  // 3) Вставляем превью В НАЧАЛО (перед сообщением ожидания)
+  if (giftIcon && title) {
+    const preview = document.createElement('div');
+    preview.className = 'preview';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'icon-prw';
+    iconSpan.innerHTML = giftIcon;
+
+    const titleSpan = document.createElement('span');
+    titleSpan.style.fontWeight = '600';
+    titleSpan.textContent = title;
+
+    preview.append(iconSpan, titleSpan);
+    // Вставляем в самое начало
+    modalFields.insertBefore(preview, modalFields.firstChild);
+  }
+
   // 3) Функция для отображения ошибки
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
@@ -171,7 +189,7 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
       giftIcon,
       price,
       updateTotalCost,
-      showPreview: true,
+      showPreview: false, // Превью уже показано выше
       includeGiftDataField: false,
       title
     });

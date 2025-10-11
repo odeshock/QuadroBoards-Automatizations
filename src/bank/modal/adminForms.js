@@ -38,6 +38,7 @@ import {
   showWaitMessage,
   hideWaitMessage,
   showErrorMessage,
+  disableSubmitButton,
   waitForGlobalArray
 } from './helpers.js';
 
@@ -54,8 +55,7 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
   // 3) Функция для отображения ошибки
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   // 4) Ожидаем USERS_LIST и создаём user picker
@@ -91,8 +91,7 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
   // 3) Функция для отображения ошибки
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   // 4) Ожидаем USERS_LIST и создаём single user picker
@@ -127,8 +126,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   // 3) Когда USERS_LIST готов — рисуем пикер с суммой на каждого
@@ -364,8 +362,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
     }
 
     // изначально submit скрыт, пока нет валидных пар
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   // 4) Ждём USERS_LIST с таймаутом
@@ -392,8 +389,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
 
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   // === 3) Функция обновления стоимости ===

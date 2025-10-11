@@ -4,7 +4,7 @@
 
 import { formatNumber } from '../services.js';
 import { updateModalAmount } from '../results.js';
-import { clearRecipientFields } from './helpers.js';
+import { clearRecipientFields, disableSubmitButton } from './helpers.js';
 
 /**
  * Создаёт интерактивный компонент выбора пользователей
@@ -260,8 +260,7 @@ export function createUserPicker(options) {
 
   // Начальное состояние кнопки
   if (!picked.size) {
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   }
 
   // Возвращаем API
@@ -434,8 +433,7 @@ export function createSingleUserPicker(options) {
   }
 
   if (!pickedId) {
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   }
 
   return {

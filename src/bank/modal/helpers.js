@@ -70,6 +70,21 @@ export function clearErrorMessage(modalFields) {
 }
 
 /**
+ * Отключает кнопку отправки формы
+ * @param {HTMLElement} btnSubmit - Кнопка отправки
+ * @param {Object} options - Опции отключения
+ * @param {boolean} options.hide - Скрывать кнопку (по умолчанию true)
+ */
+export function disableSubmitButton(btnSubmit, options = {}) {
+  const { hide = true } = options;
+
+  if (hide) {
+    btnSubmit.style.display = 'none';
+  }
+  btnSubmit.disabled = true;
+}
+
+/**
  * Очищает поля модального окна
  * @param {HTMLElement} modalFields - Контейнер полей модального окна
  * @param {Object} options - Опции очистки
@@ -172,8 +187,7 @@ export function createCancellableOperation(modalFields, btnSubmit) {
   const fail = (message = TEXT_MESSAGES.ERROR_REFRESH) => {
     if (canceled) return;
     showErrorMessage(modalFields, message);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
     cancel();
   };
 

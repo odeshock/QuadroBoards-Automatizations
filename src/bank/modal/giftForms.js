@@ -25,6 +25,7 @@ import {
   showWaitMessage,
   hideWaitMessage,
   showErrorMessage,
+  disableSubmitButton,
   clearModalFields,
   waitForGlobalArray
 } from './helpers.js';
@@ -39,8 +40,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
   // 3) Функция для отображения ошибки
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   
@@ -357,8 +357,7 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
   // 3) Функция для отображения ошибки
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   // === 3) Функция подсчета стоимости подарков (простое умножение цена × количество) ===

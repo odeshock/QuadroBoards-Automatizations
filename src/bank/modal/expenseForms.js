@@ -25,6 +25,7 @@ import {
   showWaitMessage,
   hideWaitMessage,
   showErrorMessage,
+  disableSubmitButton,
   clearModalFields,
   waitForGlobalArray
 } from './helpers.js';
@@ -45,8 +46,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
   // 4) Функция для отображения ошибки
   const fail = () => {
     showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   };
 
   const renderPicker = (users) => {

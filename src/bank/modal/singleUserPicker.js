@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { formatNumber } from '../services.js';
-import { clearRecipientFields } from './helpers.js';
+import { clearRecipientFields, disableSubmitButton } from './helpers.js';
 
 /**
  * Создаёт интерактивный компонент выбора ОДНОГО пользователя
@@ -140,8 +140,7 @@ export function createSingleUserPicker(options) {
   }
 
   if (!pickedId) {
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
+    disableSubmitButton(btnSubmit);
   }
 
   return {

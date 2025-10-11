@@ -13,15 +13,10 @@ import {
 } from '../results.js';
 
 import {
-  TEXT_MESSAGES,
   FORM_INCOME_TOPUP,
   FORM_INCOME_AMS,
   toSelector
 } from '../constants.js';
-
-import {
-  BANNER_ALREADY_PROCESSED_CONFIG
-} from './config.js';
 
 
 import {
@@ -56,26 +51,9 @@ import {
   setupUrlFieldLogic
 } from './urlFieldForms.js';
 
-// ============================================================================
-// BANNER ALREADY PROCESSED CHECK
-// ============================================================================
-
-function handleBannerAlreadyProcessed({ template, modalFields, btnSubmit }) {
-  const config = BANNER_ALREADY_PROCESSED_CONFIG[template.id];
-  if (!config) return { shouldReturn: false };
-
-  const { flagKey, message } = config;
-  // Проверяем, что флаг определён и равен false (уже обработан)
-  if (typeof window[flagKey] === 'undefined' || window[flagKey] !== false) {
-    return { shouldReturn: false };
-  }
-
-  // Баннер уже обработан - показываем сообщение
-  modalFields.innerHTML = `<p><strong>${message}</strong></p>`;
-  btnSubmit.style.display = 'none';
-
-  return { shouldReturn: true };
-}
+import {
+  handleBannerAlreadyProcessed
+} from './bannerForms.js';
 
 export function openModal({
   backdrop,
@@ -338,7 +316,7 @@ if (buyoutResult.handled) {
   };
 
   // === URL FIELDS: вызываем логику для форм с дополнительными URL полями ===
-  setupUrlFieldLogic({ template, modalFields, updateAmountSummary, data });
+  setupUrlFieldLogic({ template, modalFields, getExtraFields, updateAmountSummary, data });
 
   let addGiftGroup = null;
   let refreshGiftGroups = () => {};

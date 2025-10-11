@@ -11,7 +11,7 @@ import {
   toSelector
 } from '../constants.js';
 
-export function setupUrlFieldLogic({ template, modalFields, updateAmountSummary, data }) {
+export function setupUrlFieldLogic({ template, modalFields, getExtraFields, updateAmountSummary, data }) {
   const isUrlFieldForm = URL_FIELD_FORMS.includes(toSelector(template.id));
   if (!isUrlFieldForm) return { handled: false };
 
@@ -34,8 +34,6 @@ export function setupUrlFieldLogic({ template, modalFields, updateAmountSummary,
   const baseIndex = Number.isFinite(extraStartAttr)
     ? extraStartAttr
     : ((isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) ? 2 : 1);
-
-  const getExtraFields = () => Array.from(modalFields.querySelectorAll('.extra-field'));
 
   const parseSuffix = (key) => {
     if (!key || !key.startsWith(extraPrefix)) return NaN;
@@ -178,5 +176,5 @@ export function setupUrlFieldLogic({ template, modalFields, updateAmountSummary,
     refreshExtraFields();
   }
 
-  return { handled: true, getExtraFields };
+  return { handled: true };
 }

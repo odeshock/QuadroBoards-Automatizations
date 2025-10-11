@@ -482,7 +482,23 @@
     line-height: 1;
   }
 
+  .chip--flex {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .chip input[type="number"] { width: 90px; }
+  .chip input[type="text"] { width: 150px; }
+
+  .chip__delete-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    line-height: 1;
+  }
 
   /* Preloader - Harry Potter Theme */
   .preloader {

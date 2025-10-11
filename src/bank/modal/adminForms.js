@@ -234,10 +234,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     if (picked.has(sid)) return;
 
     const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.style.display = 'inline-flex';
-    chip.style.alignItems = 'center';
-    chip.style.gap = '8px';
+    chip.className = 'chip chip--flex';
 
     const text = document.createElement('span');
     text.textContent = `${user.name} (id: ${user.id})`;
@@ -249,7 +246,6 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     amount.placeholder = 'сколько';
     amount.value = prefillAmount || '';
     amount.required = true;
-    amount.style.width = '90px';
     amount.addEventListener('input', syncHiddenFields);
 
     let commentInput = null;
@@ -258,19 +254,15 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
       commentInput.type = 'text';
       commentInput.placeholder = 'за что *';
       commentInput.value = prefillComment || '';
-      commentInput.style.width = '150px';
       commentInput.required = true;
       commentInput.addEventListener('input', syncHiddenFields);
     }
 
     const del = document.createElement('button');
     del.type = 'button';
+    del.className = 'chip__delete-btn';
     del.textContent = '×';
     del.title = 'Удалить';
-    del.style.border = 'none';
-    del.style.background = 'transparent';
-    del.style.cursor = 'pointer';
-    del.style.fontSize = '16px';
     del.addEventListener('click', () => removeChip(sid));
 
     if (requireComment) {
@@ -532,10 +524,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
       if (picked.has(sid)) return;
 
       const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.style.display = 'inline-flex';
-      chip.style.alignItems = 'center';
-      chip.style.gap = '8px';
+      chip.className = 'chip chip--flex';
 
       const text = document.createElement('span');
       text.textContent = `${user.name} (id: ${user.id})`;
@@ -547,17 +536,13 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
       amount.placeholder = 'сколько';
       amount.value = prefillAmount || '';
       amount.required = true;
-      amount.style.width = '90px';
       amount.addEventListener('input', syncHiddenFields);
 
       const del = document.createElement('button');
       del.type = 'button';
+      del.className = 'chip__delete-btn';
       del.textContent = '×';
       del.title = 'Удалить';
-      del.style.border = 'none';
-      del.style.background = 'transparent';
-      del.style.cursor = 'pointer';
-      del.style.fontSize = '16px';
       del.addEventListener('click', () => removeChip(sid));
 
       chip.append(text, amount, del);

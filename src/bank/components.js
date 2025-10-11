@@ -39,6 +39,7 @@ import {
 import {
   SPECIAL_EXPENSE_FORMS,
   COUNTER_FORMS,
+  BUYOUT_FORMS,
   TEXT_MESSAGES,
   FORM_EXP_TRANSFER,
   FORM_INCOME_BANNER_RENO,
@@ -69,6 +70,7 @@ import {
   FORM_INCOME_MASTERING,
   DESIGN_FORMS,
   ADMIN_RECIPIENT_MULTI_FORMS,
+  ADMIN_SINGLE_RECIPIENT_FORMS,
   toSelector
 } from './constants.js';
 
@@ -77,6 +79,12 @@ const ADMIN_RECIPIENT_FLOW_TIMEOUTS = {
   [FORM_INCOME_AKCION]: PROMO_TIMEOUT_MS,
   [FORM_INCOME_NEEDCHAR]: NEEDED_TIMEOUT_MS,
   [FORM_INCOME_EPISODE_OF]: BEST_EPISODE_TIMEOUT_MS
+};
+
+const ADMIN_SINGLE_RECIPIENT_TIMEOUTS = {
+  [FORM_INCOME_POST_OF]: BEST_POST_TIMEOUT_MS,
+  [FORM_INCOME_WRITER]: BEST_WRITER_TIMEOUT_MS,
+  [FORM_INCOME_ACTIVIST]: BEST_ACTIVIST_TIMEOUT_MS
 };
 
 const BANNER_ALREADY_PROCESSED_CONFIG = {
@@ -2612,30 +2620,21 @@ if (DESIGN_FORMS.map(f => f.replace("#", "")).includes(template.id)) {
       });
 }
 
-// === BEST-POST: «Пост полумесяца» — как «Эпизод полумесяца», но один получатель ===
-if (template.id === FORM_INCOME_POST_OF) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none'; // инфо-окно для не-админов (data-info)
-  } else {
-    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_POST_TIMEOUT_MS, data, modalAmount, basePrice: price });
-  }
-}
-
-// === BEST-WRITER: «Постописец полумесяца» — как «Пост полумесяца», 1 получатель
-if (template.id === FORM_INCOME_WRITER) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none'; // инфо-окно
-  } else {
-    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_WRITER_TIMEOUT_MS, data, modalAmount, basePrice: price });
-  }
-}
-
-// === BEST-ACTIVIST: «Активист полумесяца» — как «Пост полумесяца», 1 получатель
-if (template.id === FORM_INCOME_ACTIVIST) {
+// === ADMIN single-recipient начисления (активист, постописец, пост полумесяца) ===
+if (ADMIN_SINGLE_RECIPIENT_FORMS.includes(template.id)) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none';
   } else {
-    counterWatcher = setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: BEST_ACTIVIST_TIMEOUT_MS, data, modalAmount, basePrice: price });
+    const timeoutMs = ADMIN_SINGLE_RECIPIENT_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;
+    counterWatcher = setupAdminSingleRecipientFlow({
+      modalFields,
+      btnSubmit,
+      counterWatcher,
+      timeoutMs,
+      data,
+      modalAmount,
+      basePrice: price
+    });
   }
 }
 
@@ -3183,6 +3182,33 @@ if (template.id === FORM_INCOME_FLYER) {
     }
   }
 
+  // === BUYOUT: формы выкупа ===
+  if (BUYOUT_FORMS.includes(toSelector(template.id))) {
+    const quantityInput = modalFields.querySelector('input[name="quantity"]');
+    if (quantityInput) {
+      const mode = form.dataset.mode;
+
+      // Для форм с mode используем универсальную функцию
+      if (mode === 'price_per_item') {
+        const updateQuantityAmount = () => {
+          const qty = Number(quantityInput.value) || 1;
+          updateModalAmount(modalAmount, form, { items: qty });
+        };
+        quantityInput.addEventListener('input', updateQuantityAmount);
+        updateQuantityAmount();
+      } else if (amountNumber !== null) {
+        // Старая логика для форм без mode (для обратной совместимости)
+        const updateQuantityAmount = () => {
+          const qty = Number(quantityInput.value) || 1;
+          const total = amountNumber * qty;
+          modalAmount.textContent = `${formatNumber(amountNumber)} × ${qty} = ${formatNumber(total)}`;
+        };
+        quantityInput.addEventListener('input', updateQuantityAmount);
+        updateQuantityAmount();
+      }
+    }
+  }
+
   const parseSuffix = (key) => {
     if (!key || !key.startsWith(extraPrefix)) return NaN;
     const trimmed = key.slice(extraPrefix.length);
@@ -3455,31 +3481,6 @@ if (template.id === FORM_INCOME_FLYER) {
     refreshExtraFields();
     refreshGiftGroups();
     updateAmountSummary();
-  }
-
-  // Пересчет для форм с quantity (после восстановления data)
-  const quantityInput = modalFields.querySelector('input[name="quantity"]');
-  if (quantityInput) {
-    const mode = form.dataset.mode;
-
-    // Для форм с mode используем универсальную функцию
-    if (mode === 'price_per_item') {
-      const updateQuantityAmount = () => {
-        const qty = Number(quantityInput.value) || 1;
-        updateModalAmount(modalAmount, form, { items: qty });
-      };
-      quantityInput.addEventListener('input', updateQuantityAmount);
-      updateQuantityAmount();
-    } else if (amountNumber !== null) {
-      // Старая логика для форм без mode (для обратной совместимости)
-      const updateQuantityAmount = () => {
-        const qty = Number(quantityInput.value) || 1;
-        const total = amountNumber * qty;
-        modalAmount.textContent = `${formatNumber(amountNumber)} × ${qty} = ${formatNumber(total)}`;
-      };
-      quantityInput.addEventListener('input', updateQuantityAmount);
-      updateQuantityAmount();
-    }
   }
 
   backdrop.setAttribute('open', '');

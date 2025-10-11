@@ -292,3 +292,10 @@ export const ADMIN_RECIPIENT_MULTI_FORMS = [
   FORM_INCOME_NEEDCHAR,
   FORM_INCOME_EPISODE_OF
 ];
+
+// Формы админских начислений с одним получателем (активист, постописец, пост полумесяца)
+export const ADMIN_SINGLE_RECIPIENT_FORMS = [
+  FORM_INCOME_ACTIVIST,
+  FORM_INCOME_WRITER,
+  FORM_INCOME_POST_OF
+];

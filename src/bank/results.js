@@ -133,7 +133,14 @@ function buildOperationsArray(logElement) {
       if (entryLists.length > 0) {
         // Это список - собираем каждый li отдельно
         const comments = [];
+        let listType = 'list';
+
         entryLists.forEach(list => {
+          // Если список помечен классом separated, меняем тип
+          if (list.classList.contains('separated')) {
+            listType = 'list separated';
+          }
+
           const listItems = list.querySelectorAll('li');
           listItems.forEach(li => {
             const bbCode = nodeToBBCode(li);
@@ -146,8 +153,7 @@ function buildOperationsArray(logElement) {
         if (comments.length > 0) {
           info.push({
             comment: comments,
-            type: (entryLists.classList.contains('separated')) ? 'list separated' : 'list'
-
+            type: listType
           });
         }
       } else {

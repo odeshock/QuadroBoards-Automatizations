@@ -40,6 +40,7 @@ import {
   SPECIAL_EXPENSE_FORMS,
   COUNTER_FORMS,
   BUYOUT_FORMS,
+  URL_FIELD_FORMS,
   TEXT_MESSAGES,
   FORM_EXP_TRANSFER,
   FORM_INCOME_BANNER_RENO,
@@ -63,11 +64,6 @@ import {
   FORM_INCOME_RPGTOP,
   FORM_INCOME_EP_PERSONAL,
   FORM_INCOME_EP_PLOT,
-  FORM_INCOME_CONTEST,
-  FORM_INCOME_AVATAR,
-  FORM_INCOME_DESIGN_OTHER,
-  FORM_INCOME_RUN_CONTEST,
-  FORM_INCOME_MASTERING,
   DESIGN_FORMS,
   ADMIN_RECIPIENT_MULTI_FORMS,
   ADMIN_SINGLE_RECIPIENT_FORMS,
@@ -2921,15 +2917,12 @@ if (template.id === FORM_INCOME_FLYER) {
   }, COUNTER_POLL_INTERVAL_MS);
 }
 
+  // === URL FIELDS: формы с дополнительными URL полями ===
+  const isUrlFieldForm = URL_FIELD_FORMS.includes(toSelector(template.id));
   const isNeedRequest = template.id === FORM_INCOME_NEEDREQUEST;
-  const isRpgTop      = template.id === FORM_INCOME_RPGTOP;
-  const isEpPersonal  = template.id === FORM_INCOME_EP_PERSONAL;
-  const isEpPlot      = template.id === FORM_INCOME_EP_PLOT;
-  const isContest     = template.id === FORM_INCOME_CONTEST;
-  const isAvatar      = template.id === FORM_INCOME_AVATAR;
-  const isDesignOther = template.id === FORM_INCOME_DESIGN_OTHER;
-  const isRunContest  = template.id === FORM_INCOME_RUN_CONTEST;
-  const isMastering   = template.id === FORM_INCOME_MASTERING;
+  const isRpgTop = template.id === FORM_INCOME_RPGTOP;
+  const isEpPersonal = template.id === FORM_INCOME_EP_PERSONAL;
+  const isEpPlot = template.id === FORM_INCOME_EP_PLOT;
 
   const scrollContainer = modalFields.parentElement;
   const addExtraBtn = modalFields.querySelector('[data-add-extra]');
@@ -2940,7 +2933,7 @@ if (template.id === FORM_INCOME_FLYER) {
   const extraLabelBase = addExtraBtn ? addExtraBtn.getAttribute('data-extra-label') : null;
   const extraPlaceholderCustom = addExtraBtn ? addExtraBtn.getAttribute('data-extra-placeholder') : null;
   const extraStartAttr = addExtraBtn ? Number.parseInt(addExtraBtn.getAttribute('data-extra-start'), 10) : NaN;
-  const requiresUrlType = isRpgTop || isEpPersonal || isEpPlot || isContest || isAvatar || isDesignOther || isRunContest || isMastering;
+  const requiresUrlType = isUrlFieldForm;
   const typeOverride = requiresUrlType ? 'url' : null;
   const extraPrefix = extraPrefixAttr || (isNeedRequest ? 'need_extra_' : 'extra_');
   const baseIndex = Number.isFinite(extraStartAttr)

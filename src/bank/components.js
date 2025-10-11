@@ -68,6 +68,7 @@ import {
   ADMIN_RECIPIENT_MULTI_FORMS,
   ADMIN_SINGLE_RECIPIENT_FORMS,
   ADMIN_AMOUNT_FORMS,
+  POST_FORMS,
   toSelector
 } from './constants.js';
 
@@ -99,6 +100,39 @@ const ADMIN_AMOUNT_CONFIG = {
     timeoutMs: TRANSFER_TIMEOUT_MS,
     setupFn: 'setupTransferFlow',
     requireComment: false
+  }
+};
+
+const POST_CONFIG = {
+  [FORM_INCOME_PERSONALPOST]: {
+    hiddenFieldName: 'personal_posts_json',
+    postsKey: 'PERSONAL_POSTS',
+    timeoutMs: PERSONAL_TIMEOUT_MS,
+    previewId: 'personal-preview',
+    infoBuilder: ({ price, bonus }) => (
+      `<strong>Система подсчета:</strong><br>
+      — фиксированная выплата за пост — ${price},<br>
+      — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`
+    ),
+    additionalItemsAggregator: (items) => items.reduce(
+      (sum, item) => sum + Math.floor(item.symbols_num / 1000),
+      0
+    )
+  },
+  [FORM_INCOME_PLOTPOST]: {
+    hiddenFieldName: 'plot_posts_json',
+    postsKey: 'PLOT_POSTS',
+    timeoutMs: PLOT_TIMEOUT_MS,
+    previewId: 'plot-preview',
+    infoBuilder: ({ price, bonus }) => (
+      `<strong>Система подсчета:</strong><br>
+      — фиксированная выплата за пост — ${price},<br>
+      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`
+    ),
+    additionalItemsAggregator: (items) => items.reduce((sum, item) => {
+      const thousands = Math.floor(item.symbols_num / 1000);
+      return sum + Math.min(Math.max(0, thousands), 3);
+    }, 0)
   }
 };
 
@@ -2751,8 +2785,9 @@ if (template.id === FORM_INCOME_FIRSTPOST) {
 }
 
 
-// === PERSONAL POST: ждём PERSONAL_POSTS и рендерим список ===
-if (template.id === FORM_INCOME_PERSONALPOST) {
+// === POST: личные и сюжетные посты ===
+if (POST_FORMS.includes(template.id)) {
+  const config = POST_CONFIG[template.id];
   counterWatcher = setupPostsModalFlow({
     modalFields,
     btnSubmit,
@@ -2760,44 +2795,7 @@ if (template.id === FORM_INCOME_PERSONALPOST) {
     form,
     modalAmount,
     modalAmountLabel,
-    hiddenFieldName: 'personal_posts_json',
-    postsKey: 'PERSONAL_POSTS',
-    timeoutMs: PERSONAL_TIMEOUT_MS,
-    previewId: 'personal-preview',
-    infoBuilder: ({ price, bonus }) => (
-      `<strong>Система подсчета:</strong><br>
-      — фиксированная выплата за пост — ${price},<br>
-      — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`
-    ),
-    additionalItemsAggregator: (items) => items.reduce(
-      (sum, item) => sum + Math.floor(item.symbols_num / 1000),
-      0
-    )
-  });
-}
-
-// === PLOT POST: ждём PLOT_POSTS и рендерим список (кап 3к на пост) ===
-if (template.id === FORM_INCOME_PLOTPOST) {
-  counterWatcher = setupPostsModalFlow({
-    modalFields,
-    btnSubmit,
-    counterWatcher,
-    form,
-    modalAmount,
-    modalAmountLabel,
-    hiddenFieldName: 'plot_posts_json',
-    postsKey: 'PLOT_POSTS',
-    timeoutMs: PLOT_TIMEOUT_MS,
-    previewId: 'plot-preview',
-    infoBuilder: ({ price, bonus }) => (
-      `<strong>Система подсчета:</strong><br>
-      — фиксированная выплата за пост — ${price},<br>
-      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`
-    ),
-    additionalItemsAggregator: (items) => items.reduce((sum, item) => {
-      const thousands = Math.floor(item.symbols_num / 1000);
-      return sum + Math.min(Math.max(0, thousands), 3);
-    }, 0)
+    ...config
   });
 }
 

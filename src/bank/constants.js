@@ -306,3 +306,9 @@ export const ADMIN_AMOUNT_FORMS = [
   FORM_INCOME_AMS,
   FORM_EXP_TRANSFER
 ];
+
+// Формы начисления за посты (личные и сюжетные)
+export const POST_FORMS = [
+  FORM_INCOME_PERSONALPOST,
+  FORM_INCOME_PLOTPOST
+];

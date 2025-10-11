@@ -134,22 +134,50 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  // 3) Вставляем превью В НАЧАЛО (перед сообщением ожидания)
+  // 3) Предзагружаем иконку и показываем превью только когда она загрузится
   if (giftIcon && title) {
-    const preview = document.createElement('div');
-    preview.className = 'preview';
+    // Создаём временный контейнер для парсинга HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = giftIcon;
+    const imgElement = tempDiv.querySelector('img');
 
-    const iconSpan = document.createElement('span');
-    iconSpan.className = 'icon-prw';
-    iconSpan.innerHTML = giftIcon;
+    const showPreview = (preloadedImg = null) => {
+      const preview = document.createElement('div');
+      preview.className = 'preview';
 
-    const titleSpan = document.createElement('span');
-    titleSpan.style.fontWeight = '600';
-    titleSpan.textContent = title;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'icon-prw';
 
-    preview.append(iconSpan, titleSpan);
-    // Вставляем в самое начало
-    modalFields.insertBefore(preview, modalFields.firstChild);
+      // Если есть предзагруженное изображение, используем его
+      if (preloadedImg) {
+        iconSpan.appendChild(preloadedImg);
+      } else {
+        iconSpan.innerHTML = giftIcon;
+      }
+
+      const titleSpan = document.createElement('span');
+      titleSpan.style.fontWeight = '600';
+      titleSpan.textContent = title;
+
+      preview.append(iconSpan, titleSpan);
+      // Вставляем в самое начало
+      modalFields.insertBefore(preview, modalFields.firstChild);
+    };
+
+    if (imgElement && imgElement.src) {
+      // Есть img - предзагружаем
+      const preloadImg = new Image();
+      // Копируем все атрибуты из оригинального img
+      Array.from(imgElement.attributes).forEach(attr => {
+        preloadImg.setAttribute(attr.name, attr.value);
+      });
+      preloadImg.onload = () => showPreview(preloadImg);
+      preloadImg.onerror = () => showPreview(); // Показываем без картинки если загрузка не удалась
+      preloadImg.src = imgElement.src;
+    } else {
+      // Нет img (например, эмодзи) - показываем сразу
+      showPreview();
+    }
   }
 
   // 3) Функция для отображения ошибки

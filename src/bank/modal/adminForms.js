@@ -58,7 +58,7 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
 
   // 3) Функция для отображения ошибки
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };
@@ -100,7 +100,7 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
 
   // 3) Функция для отображения ошибки
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };
@@ -140,7 +140,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };
@@ -405,7 +405,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };

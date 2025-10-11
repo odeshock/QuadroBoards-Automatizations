@@ -36,7 +36,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
   // 2) Добавляем disclaimer
   const disclaimer = document.createElement('div');
   disclaimer.className = 'info';
-  disclaimer.textContent = 'Можете выбрать себя или другого игрока';
+  disclaimer.textContent = TEXT_MESSAGES.PLAYER_CHOICE_INFO;
   modalFields.insertBefore(disclaimer, modalFields.firstChild);
 
   // 3) Показываем сообщение ожидания
@@ -44,7 +44,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
 
   // 4) Функция для отображения ошибки
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };
@@ -157,7 +157,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
 
       const recipientLabel = document.createElement('label');
       recipientLabel.setAttribute('for', `bonus-recipient-${idx}`);
-      recipientLabel.textContent = 'Получатель *';
+      recipientLabel.textContent = `${TEXT_MESSAGES.RECIPIENT_LABEL} *`;
 
       const comboDiv = document.createElement('div');
       comboDiv.className = 'combo';
@@ -186,7 +186,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
       quantityField.className = 'field gift-field';
       const qtyLabel = document.createElement('label');
       qtyLabel.setAttribute('for', `bonus-quantity-${idx}`);
-      qtyLabel.textContent = 'Количество *';
+      qtyLabel.textContent = `${TEXT_MESSAGES.QUANTITY_LABEL} *`;
       const qtyInput = document.createElement('input');
       qtyInput.id = `bonus-quantity-${idx}`;
       qtyInput.type = 'number';
@@ -201,7 +201,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
       fromField.setAttribute('data-gift-label', 'from');
       const fromLabel = document.createElement('label');
       fromLabel.setAttribute('for', `bonus-from-${idx}`);
-      fromLabel.textContent = 'От кого';
+      fromLabel.textContent = TEXT_MESSAGES.FROM_LABEL;
       const fromInput = document.createElement('input');
       fromInput.id = `bonus-from-${idx}`;
       fromInput.setAttribute('data-gift-from', '');
@@ -216,7 +216,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
       wishField.setAttribute('data-gift-label', 'wish');
       const wishLabel = document.createElement('label');
       wishLabel.setAttribute('for', `bonus-wish-${idx}`);
-      wishLabel.textContent = 'Комментарий';
+      wishLabel.textContent = TEXT_MESSAGES.COMMENT_LABEL;
       const wishInput = document.createElement('input');
       wishInput.id = `bonus-wish-${idx}`;
       wishInput.setAttribute('data-gift-wish', '');

@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { COUNTER_POLL_INTERVAL_MS } from '../config.js';
+import { TEXT_MESSAGES } from '../constants.js';
 
 // ============================================================================
 // UI HELPERS - Работа с сообщениями и очисткой
@@ -11,7 +12,7 @@ import { COUNTER_POLL_INTERVAL_MS } from '../config.js';
 /**
  * Показывает сообщение ожидания в модальном окне
  */
-export function showWaitMessage(modalFields, message = 'Пожалуйста, подождите...') {
+export function showWaitMessage(modalFields, message = TEXT_MESSAGES.PLEASE_WAIT) {
   let waitNote = modalFields.querySelector('.admin-wait-note');
   if (!waitNote) {
     waitNote = document.createElement('p');
@@ -40,7 +41,7 @@ export function hideWaitMessage(modalFields) {
 /**
  * Показывает сообщение об ошибке
  */
-export function showErrorMessage(modalFields, message = 'Произошла ошибка. Попробуйте обновить страницу.') {
+export function showErrorMessage(modalFields, message = TEXT_MESSAGES.ERROR_REFRESH) {
   hideWaitMessage(modalFields);
 
   let err = modalFields.querySelector('.note-error.admin-error');
@@ -168,7 +169,7 @@ export function createCancellableOperation(modalFields, btnSubmit) {
     timers.length = 0;
   };
 
-  const fail = (message = 'Произошла ошибка. Попробуйте обновить страницу.') => {
+  const fail = (message = TEXT_MESSAGES.ERROR_REFRESH) => {
     if (canceled) return;
     showErrorMessage(modalFields, message);
     btnSubmit.style.display = 'none';

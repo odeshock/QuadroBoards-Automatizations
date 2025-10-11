@@ -401,7 +401,7 @@ if (flyerResult.handled) {
 
       const concludeError = () => {
         if (controller.cancelled) return;
-        updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+        updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
         btnSubmit.style.display = 'none';
         btnSubmit.disabled = true;
         setHiddenField(modalFields, `${cfg.prefix}_old`);

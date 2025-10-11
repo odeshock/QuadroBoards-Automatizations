@@ -93,7 +93,7 @@ export function setupPostsModalFlow({
 
   const fail = () => {
     if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
     btnSubmit.style.display = 'none';
     setHiddenField(modalFields, hiddenFieldName, '');
     cancel();
@@ -198,7 +198,7 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
 
   const fail = () => {
     if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
     btnSubmit.style.display = 'none';
     cancel();
   };
@@ -323,7 +323,7 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
   // если что-то пошло не так
   const fail = () => {
     if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
     btnSubmit.style.display = '';      // кнопку всё же покажем
     btnSubmit.disabled = true;         // ...но заблокируем
     cancel();

@@ -38,7 +38,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 
   // 3) Функция для отображения ошибки
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };
@@ -356,7 +356,7 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
 
   // 3) Функция для отображения ошибки
   const fail = () => {
-    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };

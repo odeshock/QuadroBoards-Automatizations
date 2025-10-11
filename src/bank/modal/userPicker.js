@@ -4,7 +4,7 @@
 
 import { formatNumber } from '../services.js';
 import { updateModalAmount } from '../results.js';
-import { clearRecipientFields, disableSubmitButton } from './helpers.js';
+import { clearRecipientFields, disableSubmitButton, normalizeString } from './helpers.js';
 
 /**
  * Создаёт интерактивный компонент выбора пользователей
@@ -70,7 +70,7 @@ export function createUserPicker(options) {
   modalFields.appendChild(wrap);
 
   // Хелперы
-  const norm = (s) => String(s ?? '').trim().toLowerCase();
+  const norm = normalizeString;
   const picked = new Set();
 
   // Синхронизация скрытых полей

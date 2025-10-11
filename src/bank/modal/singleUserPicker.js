@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { formatNumber } from '../services.js';
-import { clearRecipientFields, disableSubmitButton } from './helpers.js';
+import { clearRecipientFields, disableSubmitButton, normalizeString } from './helpers.js';
 
 /**
  * Создаёт интерактивный компонент выбора ОДНОГО пользователя
@@ -50,7 +50,7 @@ export function createSingleUserPicker(options) {
 
   let pickedId = '';
   let pickedName = '';
-  const norm = (s) => String(s ?? '').trim().toLowerCase();
+  const norm = normalizeString;
 
   const syncHiddenFields = () => {
     clearRecipientFields(modalFields);

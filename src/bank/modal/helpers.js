@@ -39,6 +39,40 @@ export function hideWaitMessage(modalFields) {
 }
 
 /**
+ * Универсальная функция для обновления заметки с поддержкой markdown-подобного форматирования
+ */
+export function updateNote(parent, lines, { error = false } = {}) {
+  const linesArray = Array.isArray(lines) ? lines : [lines];
+  const textContent = linesArray.join('\n');
+
+  let note = parent.querySelector('.muted-note');
+  if (!note) {
+    note = document.createElement('p');
+    note.className = 'muted-note';
+    parent.appendChild(note);
+  }
+
+  note.innerHTML = textContent
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim();
+      const boldRegex = /\*\*(.*?)\*\*/g;
+      return trimmed.replace(boldRegex, '<strong>$1</strong>');
+    })
+    .join('<br>');
+
+  note.style.color = error ? 'var(--error)' : '';
+  return note;
+}
+
+/**
+ * Нормализует строку для поиска (trim + lowercase)
+ */
+export function normalizeString(s) {
+  return String(s ?? '').trim().toLowerCase();
+}
+
+/**
  * Показывает сообщение об ошибке
  */
 export function showErrorMessage(modalFields, message = TEXT_MESSAGES.ERROR_REFRESH) {

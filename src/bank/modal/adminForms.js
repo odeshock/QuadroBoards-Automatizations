@@ -42,7 +42,8 @@ import {
   hideWaitMessage,
   showErrorMessage,
   disableSubmitButton,
-  waitForGlobalArray
+  waitForGlobalArray,
+  normalizeString
 } from './helpers.js';
 
 import { createUserPicker } from './userPicker.js';
@@ -312,7 +313,7 @@ function renderUserAmountPicker({
   };
 
   // Подсказки
-  const norm = (s) => String(s ?? '').trim().toLowerCase();
+  const norm = normalizeString;
   const buildItem = (u) => {
     const item = document.createElement('button');
     item.type = 'button';

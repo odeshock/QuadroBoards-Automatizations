@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { TEXT_MESSAGES } from '../constants.js';
-import { hideWaitMessage } from './helpers.js';
+import { hideWaitMessage, normalizeString } from './helpers.js';
 
 /**
  * Универсальная функция для создания picker'а с группами получателей
@@ -372,7 +372,7 @@ export function renderRecipientPickerUniversal({
       return item;
     };
 
-    const norm = (s) => String(s ?? '').trim().toLowerCase();
+    const norm = normalizeString;
     const doSearch = () => {
       const q = norm(recipientInput.value);
       portalList.innerHTML = '';

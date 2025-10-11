@@ -23,42 +23,10 @@ import {
   updateModalAmount
 } from '../results.js';
 
-// Вспомогательная функция для создания скрытых полей
-function setHiddenField(parent, name, value = '') {
-  let existing = parent.querySelector(`input[name="${name}"]`);
-  if (!existing) {
-    existing = document.createElement('input');
-    existing.type = 'hidden';
-    existing.name = name;
-    parent.appendChild(existing);
-  }
-  existing.value = value;
-}
-
-// Вспомогательная функция для обновления заметки
-function updateNote(parent, lines, { error = false } = {}) {
-  const linesArray = Array.isArray(lines) ? lines : [lines];
-  const textContent = linesArray.join('\n');
-
-  let note = parent.querySelector('.muted-note');
-  if (!note) {
-    note = document.createElement('p');
-    note.className = 'muted-note';
-    parent.appendChild(note);
-  }
-
-  note.innerHTML = textContent
-    .split('\n')
-    .map((line) => {
-      const trimmed = line.trim();
-      const boldRegex = /\*\*(.*?)\*\*/g;
-      return trimmed.replace(boldRegex, '<strong>$1</strong>');
-    })
-    .join('<br>');
-
-  note.style.color = error ? 'var(--error)' : '';
-  return note;
-}
+import {
+  setHiddenField,
+  updateNote
+} from './helpers.js';
 
 export function handleCounterForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel, data }) {
   if (!COUNTER_FORMS.includes(toSelector(template.id))) return { handled: false, counterWatcher };

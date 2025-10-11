@@ -67,6 +67,7 @@ import {
   DESIGN_FORMS,
   ADMIN_RECIPIENT_MULTI_FORMS,
   ADMIN_SINGLE_RECIPIENT_FORMS,
+  ADMIN_AMOUNT_FORMS,
   toSelector
 } from './constants.js';
 
@@ -81,6 +82,24 @@ const ADMIN_SINGLE_RECIPIENT_TIMEOUTS = {
   [FORM_INCOME_POST_OF]: BEST_POST_TIMEOUT_MS,
   [FORM_INCOME_WRITER]: BEST_WRITER_TIMEOUT_MS,
   [FORM_INCOME_ACTIVIST]: BEST_ACTIVIST_TIMEOUT_MS
+};
+
+const ADMIN_AMOUNT_CONFIG = {
+  [FORM_INCOME_TOPUP]: {
+    timeoutMs: TOPUP_TIMEOUT_MS,
+    setupFn: 'setupAdminTopupFlow',
+    requireComment: false
+  },
+  [FORM_INCOME_AMS]: {
+    timeoutMs: AMS_TIMEOUT_MS,
+    setupFn: 'setupAdminTopupFlow',
+    requireComment: true
+  },
+  [FORM_EXP_TRANSFER]: {
+    timeoutMs: TRANSFER_TIMEOUT_MS,
+    setupFn: 'setupTransferFlow',
+    requireComment: false
+  }
 };
 
 const BANNER_ALREADY_PROCESSED_CONFIG = {
@@ -2546,32 +2565,40 @@ if (ADMIN_RECIPIENT_MULTI_FORMS.includes(template.id)) {
   }
 }
 
-// === TOPUP: «Докупить кредиты» — как анкета, но на каждого указываем сумму
-if (template.id === FORM_INCOME_TOPUP) {
+// === ADMIN AMOUNT: докупка кредитов, доп.деньги, переводы
+if (ADMIN_AMOUNT_FORMS.includes(template.id)) {
   if (!window.IS_ADMIN) {
     btnSubmit.style.display = 'none'; // инфо-режим (data-info)
   } else {
-    counterWatcher = setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TOPUP_TIMEOUT_MS, data, modalAmount, basePrice: price });
-  }
-}
-
-// === AMS: «Выдать денежку дополнительно» — как докупка, но на каждого указываем сумму и комментарий
-if (template.id === FORM_INCOME_AMS) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none'; // инфо-режим (data-info)
-  } else {
-    counterWatcher = setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, requireComment: true, modalAmount, basePrice: price });
+    const config = ADMIN_AMOUNT_CONFIG[template.id];
+    if (config.setupFn === 'setupAdminTopupFlow') {
+      counterWatcher = setupAdminTopupFlow({
+        modalFields,
+        btnSubmit,
+        counterWatcher,
+        timeoutMs: config.timeoutMs,
+        data,
+        requireComment: config.requireComment,
+        modalAmount,
+        basePrice: price
+      });
+    } else if (config.setupFn === 'setupTransferFlow') {
+      counterWatcher = setupTransferFlow({
+        modalFields,
+        btnSubmit,
+        counterWatcher,
+        timeoutMs: config.timeoutMs,
+        data,
+        modalAmount,
+        basePrice: price
+      });
+    }
   }
 }
 
 // === BONUSES, MASK, CLEAN: выбор получателя + количество + от кого + комментарий
 if (SPECIAL_EXPENSE_FORMS.includes(toSelector(template.id))) {
   counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: price });
-}
-
-// === TRANSFER: «Перевод средств другому (комиссия)» — выбор пользователей + сумма с комиссией 10 галлеонов за каждого
-if (template.id === FORM_EXP_TRANSFER) {
-  counterWatcher = setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: TRANSFER_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 
 // === GIFT: «Подарить подарок» — выбор пользователей с опциональными полями "от кого" и "комментарий"

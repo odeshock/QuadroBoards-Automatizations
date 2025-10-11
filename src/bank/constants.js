@@ -299,3 +299,10 @@ export const ADMIN_SINGLE_RECIPIENT_FORMS = [
   FORM_INCOME_WRITER,
   FORM_INCOME_POST_OF
 ];
+
+// Формы админских начислений с указанием суммы (докупка кредитов, доп.деньги, переводы)
+export const ADMIN_AMOUNT_FORMS = [
+  FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS,
+  FORM_EXP_TRANSFER
+];

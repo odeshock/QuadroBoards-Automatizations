@@ -11,6 +11,7 @@ const HIDDEN_OPERATIONS = [
 
 
 function formatBankOperations(operations) {
+  console.log("hahaha");
   let result = '';
 
   operations.forEach((op, i) => {

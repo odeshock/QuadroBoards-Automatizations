@@ -22,7 +22,7 @@ import {
 
 import {
   POST_CONFIG
-} from './modalConfig.js';
+} from './config.js';
 
 import {
   updateModalAmount,
@@ -183,15 +183,103 @@ export function setupPostsModalFlow({
 
 
 // ============================================================================
-// HANDLERS
+// HANDLER: FIRST POST FORM
 // ============================================================================
 
 export function handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher }) {
   if (template.id !== FORM_INCOME_FIRSTPOST) return { handled: false, counterWatcher };
 
+  // якорь "подождите..."
+  const waitEl = updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
+
+  let canceled = false;
+  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  counterWatcher = { cancel };
+
+  const fail = () => {
+    if (canceled) return;
+    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
+    btnSubmit.style.display = 'none';
+    cancel();
+  };
+
+  const show = (html, { ok = false, hideBtn = true } = {}) => {
+    const el = updateNote(modalFields, html);
+    if (ok && el) el.style.color = 'var(--ok)'; // зелёный для «Поздравляем…»
+    btnSubmit.style.display = hideBtn ? 'none' : '';
+    btnSubmit.disabled = hideBtn ? true : false;
+  };
+
+  const succeed = () => {
+    if (canceled) return;
+
+    const flag = window.FIRST_POST_FLAG;
+    const personal = window.PERSONAL_POSTS;
+    const plot = window.PLOT_POSTS;
+
+    // строгая проверка типов
+    if (typeof flag !== 'boolean' || !Array.isArray(personal) || !Array.isArray(plot)) {
+      fail(); return;
+    }
+
+    // 1) уже начисляли
+    if (flag === false) {
+      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
+      cancel(); return;
+    }
+
+    // 2) флаг true, но оба массива пустые
+    if (flag === true && personal.length === 0 && plot.length === 0) {
+      show('**Для начисления не хватает поста.**', { hideBtn: true });
+      cancel(); return;
+    }
+
+    // 3) флаг true и хотя бы один массив непустой — успех
+    show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
+    cancel();
+  };
+
+  const to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
+  const poll = setInterval(() => {
+    // Сначала проверяем флаг
+    if (typeof window.FIRST_POST_FLAG === 'undefined') return;
+
+    // Если флаг есть, но не boolean — ошибка
+    if (typeof window.FIRST_POST_FLAG !== 'boolean') {
+      fail(); return;
+    }
+
+    // Если флаг false — сразу показываем сообщение, не ждём массивы
+    if (window.FIRST_POST_FLAG === false) {
+      clearTimeout(to);
+      clearInterval(poll);
+      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
+      cancel();
+      return;
+    }
+
+    // Если флаг true — ждём появления обоих массивов
+    if (typeof window.PERSONAL_POSTS === 'undefined' || typeof window.PLOT_POSTS === 'undefined') {
+      return;
+    }
+
+    clearTimeout(to);
+    clearInterval(poll);
+
+    // Проверяем типы массивов
+    if (!Array.isArray(window.PERSONAL_POSTS) || !Array.isArray(window.PLOT_POSTS)) {
+      fail(); return;
+    }
+
+    succeed();
+  }, COUNTER_POLL_INTERVAL_MS);
 
   return { handled: true, counterWatcher };
 }
+
+// ============================================================================
+// HANDLER: POST FORMS
+// ============================================================================
 
 export function handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel }) {
   if (!POST_FORMS.includes(template.id)) return { handled: false, counterWatcher };
@@ -208,6 +296,10 @@ export function handlePostForms({ template, modalFields, btnSubmit, counterWatch
   });
   return { handled: true, counterWatcher };
 }
+
+// ============================================================================
+// HANDLER: FLYER FORM
+// ============================================================================
 
 export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount }) {
   if (template.id !== FORM_INCOME_FLYER) return { handled: false, counterWatcher };
@@ -352,121 +444,6 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
     }
   }, COUNTER_POLL_INTERVAL_MS);
 
-  return { handled: true, counterWatcher };
-}
-
-// ============================================================================
-// HANDLER: FIRST POST FORM
-// ============================================================================
-
-export function handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher }) {
-  if (template.id !== FORM_INCOME_FIRSTPOST) return { handled: false, counterWatcher };
-
-  // якорь "подождите..."
-  const waitEl = updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
-
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const fail = () => {
-    if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
-    btnSubmit.style.display = 'none';
-    cancel();
-  };
-
-  const show = (html, { ok = false, hideBtn = true } = {}) => {
-    const el = updateNote(modalFields, html);
-    if (ok && el) el.style.color = 'var(--ok)'; // зелёный для «Поздравляем…»
-    btnSubmit.style.display = hideBtn ? 'none' : '';
-    btnSubmit.disabled = hideBtn ? true : false;
-  };
-
-  const succeed = () => {
-    if (canceled) return;
-
-    const flag = window.FIRST_POST_FLAG;
-    const personal = window.PERSONAL_POSTS;
-    const plot = window.PLOT_POSTS;
-
-    // строгая проверка типов
-    if (typeof flag !== 'boolean' || !Array.isArray(personal) || !Array.isArray(plot)) {
-      fail(); return;
-    }
-
-    // 1) уже начисляли
-    if (flag === false) {
-      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
-      cancel(); return;
-    }
-
-    // 2) флаг true, но оба массива пустые
-    if (flag === true && personal.length === 0 && plot.length === 0) {
-      show('**Для начисления не хватает поста.**', { hideBtn: true });
-      cancel(); return;
-    }
-
-    // 3) флаг true и хотя бы один массив непустой — успех
-    show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
-    cancel();
-  };
-
-  const to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
-  const poll = setInterval(() => {
-    // Сначала проверяем флаг
-    if (typeof window.FIRST_POST_FLAG === 'undefined') return;
-
-    // Если флаг есть, но не boolean — ошибка
-    if (typeof window.FIRST_POST_FLAG !== 'boolean') {
-      fail(); return;
-    }
-
-    // Если флаг false — сразу показываем сообщение, не ждём массивы
-    if (window.FIRST_POST_FLAG === false) {
-      clearTimeout(to);
-      clearInterval(poll);
-      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
-      cancel();
-      return;
-    }
-
-    // Если флаг true — ждём появления обоих массивов
-    if (typeof window.PERSONAL_POSTS === 'undefined' || typeof window.PLOT_POSTS === 'undefined') {
-      return;
-    }
-
-    clearTimeout(to);
-    clearInterval(poll);
-
-    // Проверяем типы массивов
-    if (!Array.isArray(window.PERSONAL_POSTS) || !Array.isArray(window.PLOT_POSTS)) {
-      fail(); return;
-    }
-
-    succeed();
-  }, COUNTER_POLL_INTERVAL_MS);
-
-  return { handled: true, counterWatcher };
-}
-
-// ============================================================================
-// HANDLER: POST FORMS
-// ============================================================================
-
-export function handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel }) {
-  if (!POST_FORMS.includes(template.id)) return { handled: false, counterWatcher };
-
-  const config = POST_CONFIG[template.id];
-  counterWatcher = setupPostsModalFlow({
-    modalFields,
-    btnSubmit,
-    counterWatcher,
-    form,
-    modalAmount,
-    modalAmountLabel,
-    ...config
-  });
   return { handled: true, counterWatcher };
 }
 

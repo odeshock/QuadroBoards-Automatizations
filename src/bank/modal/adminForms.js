@@ -28,7 +28,7 @@ import {
   ADMIN_RECIPIENT_FLOW_TIMEOUTS,
   ADMIN_SINGLE_RECIPIENT_TIMEOUTS,
   ADMIN_AMOUNT_CONFIG
-} from './modalConfig.js';
+} from './config.js';
 
 import {
   updateModalAmount

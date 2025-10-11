@@ -1,5 +1,5 @@
 // ============================================================================
-// components.js — UI и модальные функции
+// index.js — Главный модуль модальных окон
 // ============================================================================
 
 import {
@@ -9,7 +9,7 @@ import {
   ADS_TIMEOUT_MS,
   counterConfigs,
   counterPrefixMap
-} from './config.js';
+} from '../config.js';
 
 import {
   formatNumber,
@@ -20,12 +20,12 @@ import {
   submissionGroups,
   formatEntryKey,
   updateAutoDiscounts
-} from './services.js';
+} from '../services.js';
 
 import {
   updateModalAmount,
   cleanupCounterWatcher
-} from './results.js';
+} from '../results.js';
 
 import {
   COUNTER_FORMS,
@@ -37,32 +37,32 @@ import {
   FORM_INCOME_EP_PERSONAL,
   FORM_INCOME_EP_PLOT,
   toSelector
-} from './constants.js';
+} from '../constants.js';
 
 import {
   BANNER_ALREADY_PROCESSED_CONFIG
-} from './components/modalConfig.js';
+} from './config.js';
 
 
 import {
   handleAdminRecipientMultiForms,
   handleAdminSingleRecipientForms,
   handleAdminAmountForms
-} from './components/adminForms.js';
+} from './adminForms.js';
 
 import {
   handleGiftsAndDesignForms
-} from './components/giftForms.js';
+} from './giftForms.js';
 
 import {
   handleBonusMaskCleanForms
-} from './components/expenseForms.js';
+} from './expenseForms.js';
 
 import {
   handleFirstPostForm,
   handlePostForms,
   handleFlyerForm
-} from './components/postForms.js';
+} from './postForms.js';
 
 // ============================================================================
 // BANNER ALREADY PROCESSED CHECK

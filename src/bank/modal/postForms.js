@@ -30,6 +30,10 @@ import {
   setHiddenField
 } from '../results.js';
 
+import {
+  showErrorMessage
+} from './helpers.js';
+
 export function normalizePostItem(raw) {
   const candidate = (raw && (raw.link || raw.a || raw)) || raw || null;
   const src = candidate && typeof candidate.src === 'string' ? candidate.src : null;
@@ -93,7 +97,7 @@ export function setupPostsModalFlow({
 
   const fail = () => {
     if (canceled) return;
-    updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     setHiddenField(modalFields, hiddenFieldName, '');
     cancel();
@@ -209,7 +213,7 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
 
   const fail = () => {
     if (canceled) return;
-    updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = 'none';
     cancel();
   };
@@ -334,7 +338,7 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
   // если что-то пошло не так
   const fail = () => {
     if (canceled) return;
-    updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
+    showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
     btnSubmit.style.display = '';      // кнопку всё же покажем
     btnSubmit.disabled = true;         // ...но заблокируем
     cancel();

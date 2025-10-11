@@ -25,7 +25,8 @@ import {
 
 import {
   setHiddenField,
-  updateNote
+  updateNote,
+  showErrorMessage
 } from './helpers.js';
 
 export function handleCounterForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel, data }) {
@@ -138,7 +139,7 @@ export function handleCounterForms({ template, modalFields, btnSubmit, counterWa
 
     const concludeError = () => {
       if (controller.cancelled) return;
-      updateNote(modalFields, TEXT_MESSAGES.ERROR_REFRESH, { error: true });
+      showErrorMessage(modalFields, TEXT_MESSAGES.ERROR_REFRESH);
       btnSubmit.style.display = 'none';
       btnSubmit.disabled = true;
       setHiddenField(modalFields, `${cfg.prefix}_old`);

@@ -38,6 +38,10 @@ import {
   FORM_INCOME_ANKETA,
   FORM_INCOME_AKCION,
   FORM_INCOME_NEEDCHAR,
+  FORM_INCOME_ACTIVIST,
+  FORM_INCOME_WRITER,
+  FORM_INCOME_EPISODE_OF,
+  FORM_INCOME_POST_OF,
   toSelector
 } from './constants.js';
 
@@ -697,9 +701,13 @@ export function renderLog(log) {
       } else if (
         group.templateSelector === toSelector(FORM_INCOME_ANKETA) ||
         group.templateSelector === toSelector(FORM_INCOME_AKCION) ||
-        group.templateSelector === toSelector(FORM_INCOME_NEEDCHAR)
+        group.templateSelector === toSelector(FORM_INCOME_NEEDCHAR) ||
+        group.templateSelector === toSelector(FORM_INCOME_ACTIVIST) ||
+        group.templateSelector === toSelector(FORM_INCOME_WRITER) ||
+        group.templateSelector === toSelector(FORM_INCOME_EPISODE_OF) ||
+        group.templateSelector === toSelector(FORM_INCOME_POST_OF)
       ) {
-        // Приём анкеты, Взятие акционного персонажа, Взятие нужного персонажа: всегда показываем 0
+        // Приём анкеты, Взятие акционного/нужного персонажа, Активист/Постописец/Эпизод/Пост полумесяца: всегда показываем 0
         meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}0</span>`;
         header.appendChild(meta);
       } else {
@@ -1294,7 +1302,11 @@ export function renderLog(log) {
       if (
         group.templateSelector === toSelector(FORM_INCOME_ANKETA) ||
         group.templateSelector === toSelector(FORM_INCOME_AKCION) ||
-        group.templateSelector === toSelector(FORM_INCOME_NEEDCHAR)
+        group.templateSelector === toSelector(FORM_INCOME_NEEDCHAR) ||
+        group.templateSelector === toSelector(FORM_INCOME_ACTIVIST) ||
+        group.templateSelector === toSelector(FORM_INCOME_WRITER) ||
+        group.templateSelector === toSelector(FORM_INCOME_EPISODE_OF) ||
+        group.templateSelector === toSelector(FORM_INCOME_POST_OF)
       ) {
         return;
       }

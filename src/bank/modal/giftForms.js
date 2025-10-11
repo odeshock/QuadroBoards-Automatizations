@@ -21,53 +21,26 @@ import {
   updateModalAmount
 } from '../results.js';
 
+import {
+  showWaitMessage,
+  hideWaitMessage,
+  showErrorMessage,
+  clearModalFields,
+  waitForGlobalArray
+} from './helpers.js';
+
 export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
-  // Удаляем всё кроме дисклеймера
-  modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
-    .forEach(el => el.remove());
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields, { includeInfo: false });
 
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  // Вставляем после дисклеймера
-  const disclaimer = modalFields.querySelector('.info');
-  if (disclaimer) {
-    disclaimer.insertAdjacentElement('afterend', waitNote);
-  } else {
-    modalFields.prepend(waitNote);
-  }
+  // 2) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  const hideWait = () => {
-    const el = modalFields.querySelector('.admin-wait-note');
-    if (el) el.remove();
-  };
-
-  const showError = (msg) => {
-    hideWait();
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      err.style.color = 'var(--danger)';
-      if (disclaimer) {
-        disclaimer.insertAdjacentElement('afterend', err);
-      } else {
-        modalFields.prepend(err);
-      }
-    }
-    err.textContent = msg || 'Произошла ошибка. Пожалуйста, обновите страницу.';
+  // 3) Функция для отображения ошибки
+  const fail = () => {
+    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
-  };
-
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const fail = () => {
-    if (canceled) return;
-    showError('Произошла ошибка. Пожалуйста, обновите страницу.');
-    cancel();
   };
 
   
@@ -90,7 +63,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
   const renderCustomGiftPicker = (users) => {
     if (!Array.isArray(users)) return fail();
 
-    hideWait();
+    hideWaitMessage(modalFields);
 
     const groupsContainer = document.createElement('div');
     groupsContainer.className = 'gift-groups';
@@ -363,16 +336,8 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
     }
   };
 
-  const to = setTimeout(fail, timeoutMs);
-  const poll = setInterval(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
-    if (Array.isArray(window.USERS_LIST)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      renderCustomGiftPicker(window.USERS_LIST);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
-
+  // 4) Ожидаем USERS_LIST и создаём gift picker
+  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs, renderCustomGiftPicker, fail);
   return counterWatcher;
 }
 
@@ -383,43 +348,17 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
   console.log('[DEBUG setupGiftFlow] price:', price, 'giftId:', giftId);
 
-  // === 1) Удаляем существующие поля формы ===
-  modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
-    .forEach(el => el.remove());
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields);
 
-  // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  modalFields.prepend(waitNote);
+  // 2) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  const hideWait = () => {
-    const el = modalFields.querySelector('.admin-wait-note');
-    if (el) el.remove();
-  };
-
-  const showError = (msg) => {
-    hideWait();
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      err.style.color = 'var(--danger)';
-      modalFields.prepend(err);
-    }
-    err.textContent = msg || 'Произошла ошибка. Пожалуйста, обновите страницу.';
+  // 3) Функция для отображения ошибки
+  const fail = () => {
+    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
-  };
-
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const fail = () => {
-    if (canceled) return;
-    showError('Произошла ошибка. Пожалуйста, обновите страницу.');
-    cancel();
   };
 
   // === 3) Функция подсчета стоимости подарков (простое умножение цена × количество) ===
@@ -443,7 +382,7 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
   const renderGiftPicker = (users) => {
     if (!Array.isArray(users)) return fail();
 
-    hideWait();
+    hideWaitMessage(modalFields);
 
     // Превью подарка (иконка + ID)
     const preview = document.createElement('div');
@@ -722,16 +661,7 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
   };
 
   // === 5) Ждём USERS_LIST с таймаутом ===
-  const to = setTimeout(fail, timeoutMs);
-  const poll = setInterval(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
-    if (Array.isArray(window.USERS_LIST)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      renderGiftPicker(window.USERS_LIST);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
-
+  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs, renderGiftPicker, fail);
   return counterWatcher;
 }
 

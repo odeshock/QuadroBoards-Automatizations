@@ -21,55 +21,38 @@ import {
   updateModalAmount
 } from '../results.js';
 
-export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice }) {
-  // === 1) Удаляем существующие поля формы ===
-  modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field, .gift-groups')
-    .forEach(el => el.remove());
+import {
+  showWaitMessage,
+  hideWaitMessage,
+  showErrorMessage,
+  clearModalFields,
+  waitForGlobalArray
+} from './helpers.js';
 
+export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice }) {
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields);
+
+  // 2) Добавляем disclaimer
   const disclaimer = document.createElement('div');
   disclaimer.className = 'info';
   disclaimer.textContent = 'Можете выбрать себя или другого игрока';
   modalFields.insertBefore(disclaimer, modalFields.firstChild);
 
-  // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  modalFields.appendChild(waitNote);
+  // 3) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  const hideWait = () => {
-    const el = modalFields.querySelector('.admin-wait-note');
-    if (el) el.remove();
-  };
-
-  const showError = (msg) => {
-    hideWait();
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      err.style.color = 'var(--danger)';
-      disclaimer.insertAdjacentElement('afterend', err);
-    }
-    err.textContent = msg || 'Произошла ошибка. Пожалуйста, обновите страницу.';
+  // 4) Функция для отображения ошибки
+  const fail = () => {
+    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
-  };
-
-  let canceled = false;
-  const cancel = () => { canceled = true; };
-  counterWatcher = { cancel };
-
-  const fail = () => {
-    if (canceled) return;
-    showError('Произошла ошибка. Пожалуйста, обновите страницу.');
-    cancel();
   };
 
   const renderPicker = (users) => {
     if (!Array.isArray(users)) return fail();
 
-    hideWait();
+    hideWaitMessage(modalFields);
 
     const groupsContainer = document.createElement('div');
     groupsContainer.className = 'gift-groups';
@@ -380,25 +363,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
   };
 
   // === 3) Ждём USERS_LIST ===
-  let counter = 0;
-  const poll = setInterval(() => {
-    if (canceled) return;
-    if (window.USERS_LIST && Array.isArray(window.USERS_LIST)) {
-      clearInterval(poll);
-      clearTimeout(to);
-      renderPicker(window.USERS_LIST);
-    } else {
-      counter++;
-    }
-  }, 100);
-
-  const to = setTimeout(() => {
-    if (!canceled) {
-      clearInterval(poll);
-      fail();
-    }
-  }, timeoutMs);
-
+  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs, renderPicker, fail);
   return counterWatcher;
 }
 

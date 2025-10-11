@@ -96,47 +96,49 @@ export const formTemplates = {
     name: 'ep',
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'count-base', value: 'ep' },
-    systemInfo: 'Каждый завершённый эпизод учитывается <strong>лишь раз</strong>. При переоткрытии <strong>не начисляется</strong> заново.'
+    systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br>При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_EP_PLOT]: urlFieldWithExtra({
     id: 'plot-ep-link',
     name: 'plot_ep',
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'count-base', value: 'plot_ep' },
-    systemInfo: 'Каждый завершённый эпизод учитывается <strong>лишь раз</strong>. При переоткрытии <strong>не начисляется</strong> заново.'
+    systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br>При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_CONTEST]: urlFieldWithExtra({
     id: 'uc',
     name: 'contest',
     label: 'Ссылка на конкурс *',
     buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 },
-    info: TEXT_MESSAGES.CONTEST_INFO
+    systemInfo: TEXT_MESSAGES.CONTEST_INFO
   }),
   [FORM_INCOME_AVATAR]: urlFieldWithExtra({
     id: 'ava-link',
     name: 'link',
     label: 'Ссылка на граф.тему *',
     buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
-    info: TEXT_MESSAGES.GRAPHIC_WORK_INFO
+    systemInfo: TEXT_MESSAGES.GRAPHIC_WORK_INFO
   }),
   [FORM_INCOME_DESIGN_OTHER]: urlFieldWithExtra({
     id: 'do-link',
     name: 'link',
     label: 'Ссылка на граф.тему *',
     buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
-    info: TEXT_MESSAGES.GRAPHIC_WORK_INFO
+    systemInfo: TEXT_MESSAGES.GRAPHIC_WORK_INFO
   }),
   [FORM_INCOME_RUN_CONTEST]: urlFieldWithExtra({
     id: 'rc',
     name: 'contest',
     label: 'Ссылка на конкурс *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 }
+    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 },
+    systemInfo: 'Каждый конкурс учитывается только один раз.'
   }),
   [FORM_INCOME_MASTERING]: urlFieldWithExtra({
     id: 'ms',
     name: 'ep',
     label: 'Ссылка на эпизод *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 }
+    buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 },
+    systemInfo: 'Каждый сюжетный эпизод учитывается <strong>только один раз</strong>.'
   }),
   [FORM_INCOME_BANNER_RENO]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
   [FORM_INCOME_BANNER_MAYAK]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,

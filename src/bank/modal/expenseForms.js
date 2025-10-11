@@ -170,7 +170,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
       recipientInput.required = true;
       recipientInput.setAttribute('autocomplete', 'off');
       if (prefillUser) {
-        recipientInput.value = `${prefillUser.name} (id: ${prefillUser.id})`;
+        recipientInput.value = prefillUser.name;
       }
 
       const suggestDiv = document.createElement('div');
@@ -261,9 +261,9 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
         item.type = 'button';
         item.className = 'suggest-item';
         item.setAttribute('role', 'option');
-        item.textContent = `${u.name} (id: ${u.id})`;
+        item.textContent = u.name;
         item.addEventListener('click', () => {
-          recipientInput.value = `${u.name} (id: ${u.id})`;
+          recipientInput.value = u.name;
           group.recipientId = u.id;
           recipientInput.setCustomValidity('');
           closeSuggest();

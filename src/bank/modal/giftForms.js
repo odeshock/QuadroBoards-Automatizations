@@ -246,9 +246,9 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
         item.type = 'button';
         item.className = 'suggest-item';
         item.setAttribute('role', 'option');
-        item.textContent = `${u.name} (id: ${u.id})`;
+        item.textContent = u.name;
         item.addEventListener('click', () => {
-          recipientInput.value = `${u.name} (id: ${u.id})`;
+          recipientInput.value = u.name;
           group.recipientId = u.id;
           recipientInput.setCustomValidity('');
           closeSuggest();
@@ -289,7 +289,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
       if (prefillRecipientId) {
         const user = users.find(u => String(u.id) === String(prefillRecipientId));
         if (user) {
-          recipientInput.value = `${user.name} (id: ${user.id})`;
+          recipientInput.value = user.name;
           group.recipientId = user.id;
           recipientInput.setCustomValidity('');
         }
@@ -564,9 +564,9 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
         item.type = 'button';
         item.className = 'suggest-item';
         item.setAttribute('role', 'option');
-        item.textContent = `${u.name} (id: ${u.id})`;
+        item.textContent = u.name;
         item.addEventListener('click', () => {
-          recipientInput.value = `${u.name} (id: ${u.id})`;
+          recipientInput.value = u.name;
           group.recipientId = u.id;
           recipientInput.setCustomValidity('');
           closeSuggest();
@@ -609,7 +609,7 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
       if (prefillRecipientId) {
         const user = users.find(u => String(u.id) === String(prefillRecipientId));
         if (user) {
-          recipientInput.value = `${user.name} (id: ${user.id})`;
+          recipientInput.value = user.name;
           group.recipientId = user.id;
           recipientInput.setCustomValidity('');
         }

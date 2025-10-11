@@ -272,7 +272,7 @@ function renderUserAmountPicker({
     chip.className = 'chip chip--flex';
 
     const text = document.createElement('span');
-    text.textContent = `${user.name} (id: ${user.id})`;
+    text.textContent = user.name;
 
     const amount = document.createElement('input');
     amount.type = 'number';
@@ -318,7 +318,7 @@ function renderUserAmountPicker({
     item.type = 'button';
     item.className = 'suggest-item';
     item.setAttribute('role', 'option');
-    item.textContent = `${u.name} (id: ${u.id})`;
+    item.textContent = u.name;
     item.addEventListener('click', () => {
       addChip(u);
       input.value = '';

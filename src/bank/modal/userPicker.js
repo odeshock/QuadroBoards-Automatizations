@@ -119,7 +119,7 @@ export function createUserPicker(options) {
     chip.style.gap = '8px';
 
     const text = document.createElement('span');
-    text.textContent = `${user.name} (id: ${user.id})`;
+    text.textContent = user.name;
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -145,7 +145,7 @@ export function createUserPicker(options) {
     item.type = 'button';
     item.className = 'suggest-item';
     item.setAttribute('role', 'option');
-    item.textContent = `${u.name} (id: ${u.id})`;
+    item.textContent = u.name;
     item.addEventListener('click', () => {
       const sid = String(u.id);
       if (picked.has(sid)) {
@@ -326,11 +326,11 @@ export function createSingleUserPicker(options) {
     item.type = 'button';
     item.className = 'suggest-item';
     item.setAttribute('role', 'option');
-    item.textContent = `${u.name} (id: ${u.id})`;
+    item.textContent = u.name;
     item.addEventListener('click', () => {
       pickedId = String(u.id);
       pickedName = u.name;
-      input.value = `${u.name} (id: ${u.id})`;
+      input.value = u.name;
       syncHiddenFields();
       list.style.display = 'none';
       input.focus();
@@ -370,7 +370,7 @@ export function createSingleUserPicker(options) {
       if (u) {
         pickedId = String(u.id);
         pickedName = u.name;
-        input.value = `${u.name} (id: ${u.id})`;
+        input.value = u.name;
       } else {
         pickedId = first;
         pickedName = 'Неизвестный';
@@ -390,7 +390,7 @@ export function createSingleUserPicker(options) {
     setUser: (user) => {
       pickedId = String(user.id);
       pickedName = user.name;
-      input.value = `${user.name} (id: ${user.id})`;
+      input.value = user.name;
       syncHiddenFields();
     },
     clear: () => { pickedId = ''; pickedName = ''; input.value = ''; syncHiddenFields(); },

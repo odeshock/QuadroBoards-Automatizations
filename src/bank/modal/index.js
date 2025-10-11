@@ -287,6 +287,12 @@ if (buyoutResult.handled) {
       return;
     }
 
+    // Для форм с mode='price_per_item_w_bonus' используем универсальную функцию
+    if (mode === 'price_per_item_w_bonus' && form.dataset.price) {
+      updateModalAmount(modalAmount, form, { items: multiplier });
+      return;
+    }
+
     // Для topup/ams (mode='entered_amount') показываем просто price (только для админов)
     if (mode === 'entered_amount' && form.dataset.price && window.IS_ADMIN) {
       const priceNum = Number(form.dataset.price);
@@ -482,5 +488,6 @@ export function closeModal({ backdrop, form, modalFields, counterWatcher }) {
   delete form.dataset.price;
   delete form.dataset.bonus;
   delete form.dataset.mode;
+
   return counterWatcher;
 }

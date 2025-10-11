@@ -124,7 +124,7 @@ export function openModal({
     } else if (templateSelector?.includes('bg')) {
       resolvedTitle = isCustom ? 'Индивидуальный фон' : `Фон из коллекции (#${giftId})`;
     } else if (templateSelector?.includes('gift')) {
-      resolvedTitle = `Подарок из коллекции (#${giftId})`;
+      resolvedTitle = isCustom ? 'Индивидуальный подарок' : `Подарок из коллекции (#${giftId})`;
     }
   }
 

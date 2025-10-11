@@ -4,7 +4,7 @@
 
 import { formatNumber } from '../services.js';
 import { updateModalAmount } from '../results.js';
-import { clearRecipientFields, disableSubmitButton, createPortal } from './helpers.js';
+import { clearRecipientFields, disableSubmitButton } from './helpers.js';
 
 /**
  * Создаёт интерактивный компонент выбора пользователей
@@ -139,9 +139,6 @@ export function createUserPicker(options) {
     chosen.appendChild(chip);
   };
 
-  // Portal для suggest (выносим за пределы modal)
-  const portal = createPortal(list, input, block);
-
   // Создание элемента списка
   const buildItem = (u) => {
     const item = document.createElement('button');
@@ -152,7 +149,7 @@ export function createUserPicker(options) {
     item.addEventListener('click', () => {
       const sid = String(u.id);
       if (picked.has(sid)) {
-        portal.close();
+        list.style.display = 'none';
         input.value = '';
         return;
       }
@@ -160,7 +157,7 @@ export function createUserPicker(options) {
       addChip(u);
       syncHiddenFields();
       input.value = '';
-      portal.close();
+      list.style.display = 'none';
       input.focus();
     });
     return item;
@@ -171,23 +168,26 @@ export function createUserPicker(options) {
     const q = norm(input.value);
     list.innerHTML = '';
     if (!q) {
-      portal.close();
+      list.style.display = 'none';
       return;
     }
     const res = users
       .filter(u => norm(u.name).includes(q) || String(u.id).includes(q))
       .slice(0, 20);
     if (!res.length) {
-      portal.close();
+      list.style.display = 'none';
       return;
     }
     res.forEach(u => list.appendChild(buildItem(u)));
-    portal.open();
+    list.style.display = 'block';
   };
 
   // События
   input.addEventListener('input', doSearch);
   input.addEventListener('focus', doSearch);
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) list.style.display = 'none';
+  });
 
   // Prefill из data
   if (data) {
@@ -246,7 +246,6 @@ export function createUserPicker(options) {
       syncHiddenFields();
     },
     destroy: () => {
-      portal.destroy();
       wrap.remove();
     }
   };
@@ -316,8 +315,6 @@ export function createSingleUserPicker(options) {
     if (onUpdate) onUpdate(pickedId ? { id: pickedId, name: pickedName } : null);
   };
 
-  const portal = createPortal(list, input, block);
-
   const buildItem = (u) => {
     const item = document.createElement('button');
     item.type = 'button';
@@ -329,7 +326,8 @@ export function createSingleUserPicker(options) {
       pickedName = u.name;
       input.value = `${u.name} (id: ${u.id})`;
       syncHiddenFields();
-      portal.close();
+      list.style.display = 'none';
+      input.focus();
     });
     return item;
   };
@@ -337,15 +335,18 @@ export function createSingleUserPicker(options) {
   const doSearch = () => {
     const q = norm(input.value);
     list.innerHTML = '';
-    if (!q) { portal.close(); return; }
+    if (!q) { list.style.display = 'none'; return; }
     const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
-    if (!res.length) { portal.close(); return; }
+    if (!res.length) { list.style.display = 'none'; return; }
     res.forEach(u => list.appendChild(buildItem(u)));
-    portal.open();
+    list.style.display = 'block';
   };
 
   input.addEventListener('input', doSearch);
   input.addEventListener('focus', doSearch);
+  document.addEventListener('click', (e) => {
+    if (!block.contains(e.target)) list.style.display = 'none';
+  });
 
   if (data) {
     const ids = Object.keys(data).filter(k => /^recipient_\d+$/.test(k))
@@ -381,6 +382,6 @@ export function createSingleUserPicker(options) {
       syncHiddenFields();
     },
     clear: () => { pickedId = ''; pickedName = ''; input.value = ''; syncHiddenFields(); },
-    destroy: () => { portal.destroy(); block.remove(); }
+    destroy: () => { block.remove(); }
   };
 }

@@ -41,8 +41,7 @@ import {
   hideWaitMessage,
   showErrorMessage,
   disableSubmitButton,
-  waitForGlobalArray,
-  createPortal
+  waitForGlobalArray
 } from './helpers.js';
 
 import { createUserPicker } from './userPicker.js';
@@ -279,9 +278,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     syncHiddenFields();
   };
 
-  // Подсказки (портал)
-  const portal = createPortal(list, input, block);
-
+  // Подсказки
   const norm = (s) => String(s ?? '').trim().toLowerCase();
   const buildItem = (u) => {
     const item = document.createElement('button');
@@ -292,7 +289,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     item.addEventListener('click', () => {
       addChip(u);
       input.value = '';
-      portal.close();
+      list.style.display = 'none';
       input.focus();
     });
     return item;
@@ -300,14 +297,17 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
   const doSearch = () => {
     const q = norm(input.value);
     list.innerHTML = '';
-    if (!q) { portal.close(); return; }
+    if (!q) { list.style.display = 'none'; return; }
     const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
-    if (!res.length) { portal.close(); return; }
+    if (!res.length) { list.style.display = 'none'; return; }
     res.forEach(u => list.appendChild(buildItem(u)));
-    portal.open();
+    list.style.display = 'block';
   };
   input.addEventListener('input', doSearch);
   input.addEventListener('focus', doSearch);
+  document.addEventListener('click', (e) => {
+    if (!block.contains(e.target)) list.style.display = 'none';
+  });
 
   // Prefill из data: recipient_i + topup_i (+ comment_i для AMS)
   if (data) {
@@ -543,18 +543,18 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
       syncHiddenFields();
     };
 
-    // Подсказки (портал)
-    const portal = createPortal(list, input, block);
-
+    // Подсказки
     const buildItem = (u) => {
-      const item = document.createElement('div');
+      const item = document.createElement('button');
+      item.type = 'button';
       item.className = 'suggest-item';
       item.textContent = `${u.name} (id: ${u.id})`;
       item.setAttribute('role', 'option');
       item.addEventListener('click', () => {
         addChip(u);
         input.value = '';
-        portal.close();
+        list.style.display = 'none';
+        input.focus();
       });
       return item;
     };
@@ -562,17 +562,20 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
     const doSearch = () => {
       const q = input.value.trim().toLowerCase();
       list.innerHTML = '';
-      if (!q) { portal.close(); return; }
+      if (!q) { list.style.display = 'none'; return; }
       const matches = users
         .filter(u => u.name.toLowerCase().includes(q) || String(u.id).includes(q))
         .slice(0, 10);
-      if (!matches.length) { portal.close(); return; }
+      if (!matches.length) { list.style.display = 'none'; return; }
       matches.forEach(u => list.appendChild(buildItem(u)));
-      portal.open();
+      list.style.display = 'block';
     };
 
     input.addEventListener('input', doSearch);
-    input.addEventListener('blur', () => setTimeout(() => portal.close(), 200));
+    input.addEventListener('focus', doSearch);
+    document.addEventListener('click', (e) => {
+      if (!block.contains(e.target)) list.style.display = 'none';
+    });
 
     // Восстановление данных при редактировании
     if (data) {

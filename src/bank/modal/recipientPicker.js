@@ -413,6 +413,24 @@ export function renderRecipientPickerUniversal({
     });
     recipientInput.addEventListener('focus', doSearch);
 
+    // При потере фокуса проверяем точное совпадение с именем
+    recipientInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (!group.recipientId && recipientInput.value.trim()) {
+          // Ищем точное совпадение по имени
+          const exactMatch = users.find(u =>
+            norm(u.name) === norm(recipientInput.value)
+          );
+          if (exactMatch) {
+            recipientInput.value = exactMatch.name;
+            group.recipientId = exactMatch.id;
+            recipientInput.setCustomValidity('');
+            syncHiddenFields();
+          }
+        }
+      }, 200);
+    });
+
     document.addEventListener('click', (e) => {
       if (!recipientField.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
     });

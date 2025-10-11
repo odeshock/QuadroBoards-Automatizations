@@ -104,6 +104,23 @@ export function createSingleUserPicker(options) {
 
   input.addEventListener('input', doSearch);
   input.addEventListener('focus', doSearch);
+
+  // При потере фокуса проверяем точное совпадение с именем
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      const val = input.value.trim();
+      if (val && !pickedId) {
+        const exactMatch = users.find(u => norm(u.name) === norm(val));
+        if (exactMatch) {
+          pickedId = String(exactMatch.id);
+          pickedName = exactMatch.name;
+          input.value = exactMatch.name;
+          syncHiddenFields();
+        }
+      }
+    }, 200);
+  });
+
   document.addEventListener('click', (e) => {
     if (!block.contains(e.target)) list.style.display = 'none';
   });

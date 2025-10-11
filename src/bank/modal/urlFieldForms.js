@@ -174,6 +174,8 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
         .forEach((key) => addExtraField({ silent: true, presetKey: key }));
     }
     refreshExtraFields();
+    // Обновляем modalAmount после загрузки всех полей
+    updateAmountSummary();
   }
 
   return { handled: true };

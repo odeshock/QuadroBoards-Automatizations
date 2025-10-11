@@ -15,6 +15,7 @@ import {
 import {
   FORM_INCOME_TOPUP,
   FORM_INCOME_AMS,
+  URL_FIELD_FORMS,
   toSelector
 } from '../constants.js';
 
@@ -277,11 +278,32 @@ if (buyoutResult.handled) {
 
   const updateAmountSummary = (multiplierOverride = null) => {
     modalAmountLabel.textContent = resolvedAmountLabel;
+
+    // Для urlFieldForms НЕ используем сохраненный currentMultiplier, всегда пересчитываем
+    const isUrlFieldForm = URL_FIELD_FORMS.includes(templateSelector);
+    if (isUrlFieldForm && multiplierOverride === null) {
+      // Временно удаляем currentMultiplier, чтобы computeMultiplier() пересчитал
+      delete form.dataset.currentMultiplier;
+      const multiplier = computeMultiplier();
+      form.dataset.currentMultiplier = String(multiplier);
+
+      const mode = form.dataset.mode;
+      if (mode === 'price_per_item' && form.dataset.price) {
+        updateModalAmount(modalAmount, form, { items: multiplier });
+        return;
+      }
+      if (mode === 'price_per_item_w_bonus' && form.dataset.price) {
+        updateModalAmount(modalAmount, form, { items: multiplier });
+        return;
+      }
+    }
+
     const multiplier = multiplierOverride !== null ? multiplierOverride : computeMultiplier();
     form.dataset.currentMultiplier = String(multiplier);
 
-    // Для форм с mode используем новую универсальную функцию
     const mode = form.dataset.mode;
+
+    // Для форм с mode используем новую универсальную функцию
     if (mode === 'price_per_item' && form.dataset.price) {
       updateModalAmount(modalAmount, form, { items: multiplier });
       return;

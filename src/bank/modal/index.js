@@ -13,8 +13,6 @@ import {
 } from '../results.js';
 
 import {
-  COUNTER_FORMS,
-  BUYOUT_FORMS,
   URL_FIELD_FORMS,
   TEXT_MESSAGES,
   FORM_INCOME_NEEDREQUEST,
@@ -54,6 +52,10 @@ import {
 import {
   handleCounterForms
 } from './counterForms.js';
+
+import {
+  handleBuyoutForms
+} from './buyoutForms.js';
 
 // ============================================================================
 // BANNER ALREADY PROCESSED CHECK
@@ -258,6 +260,12 @@ if (counterResult.handled) {
   counterWatcher = counterResult.counterWatcher;
 }
 
+// === BUYOUT: формы выкупа ===
+const buyoutResult = handleBuyoutForms({ template, modalFields, modalAmount, form, amount });
+if (buyoutResult.handled) {
+  // Buyout forms не требуют counterWatcher
+}
+
   // === URL FIELDS: формы с дополнительными URL полями ===
   const isUrlFieldForm = URL_FIELD_FORMS.includes(toSelector(template.id));
   const isNeedRequest = template.id === FORM_INCOME_NEEDREQUEST;
@@ -350,33 +358,6 @@ if (counterResult.handled) {
     const total = amountNumber * multiplier;
     modalAmount.textContent = `${formatNumber(amountNumber)} x ${multiplier} = ${formatNumber(total)}`;
   };
-
-  // === BUYOUT: формы выкупа ===
-  if (BUYOUT_FORMS.includes(toSelector(template.id))) {
-    const quantityInput = modalFields.querySelector('input[name="quantity"]');
-    if (quantityInput) {
-      const mode = form.dataset.mode;
-
-      // Для форм с mode используем универсальную функцию
-      if (mode === 'price_per_item') {
-        const updateQuantityAmount = () => {
-          const qty = Number(quantityInput.value) || 1;
-          updateModalAmount(modalAmount, form, { items: qty });
-        };
-        quantityInput.addEventListener('input', updateQuantityAmount);
-        updateQuantityAmount();
-      } else if (amountNumber !== null) {
-        // Старая логика для форм без mode (для обратной совместимости)
-        const updateQuantityAmount = () => {
-          const qty = Number(quantityInput.value) || 1;
-          const total = amountNumber * qty;
-          modalAmount.textContent = `${formatNumber(amountNumber)} × ${qty} = ${formatNumber(total)}`;
-        };
-        quantityInput.addEventListener('input', updateQuantityAmount);
-        updateQuantityAmount();
-      }
-    }
-  }
 
   const parseSuffix = (key) => {
     if (!key || !key.startsWith(extraPrefix)) return NaN;

@@ -370,7 +370,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     modalAmount,
     basePrice,
     labelText: 'Кому начислить и сколько *',
-    amountFieldName: 'topup'
+    amountFieldName: 'amount'
   });
 }
 

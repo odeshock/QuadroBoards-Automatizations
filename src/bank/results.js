@@ -607,7 +607,7 @@ export function renderLog(log) {
             .map(m => m[1]);
 
           idxs.forEach((idx) => {
-            const topupAmount = Number(dataObj[`topup_${idx}`]) || 0;
+            const topupAmount = Number(dataObj[`amount_${idx}`]) || 0;
             totalTopup += topupAmount;
           });
         });
@@ -971,7 +971,7 @@ export function renderLog(log) {
           const from = String(dataObj[`from_${idx}`] ?? '').trim();
           const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
           const giftData = String(dataObj[`gift_data_${idx}`] ?? '').trim();
-          const quantity = dataObj[`quantity_${idx}`] || dataObj[`topup_${idx}`] || dataObj[`amount_${idx}`] || '';
+          const quantity = dataObj[`quantity_${idx}`] || dataObj[`amount_${idx}`] || '';
 
           const li = document.createElement('li');
 
@@ -1044,7 +1044,7 @@ export function renderLog(log) {
           const from = String(dataObj[`from_${idx}`] ?? '').trim();
           const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
           const giftData = String(dataObj[`gift_data_${idx}`] ?? '').trim();
-          const quantity = dataObj[`quantity_${idx}`] || dataObj[`topup_${idx}`] || dataObj[`amount_${idx}`] || '';
+          const quantity = dataObj[`quantity_${idx}`] || dataObj[`amount_${idx}`] || '';
 
           const itemEl = document.createElement('div');
           itemEl.className = 'entry-item';
@@ -1176,10 +1176,10 @@ export function renderLog(log) {
       if (!isDiscount) {
         Object.entries(item.data || {}).forEach(([key, value]) => {
           // Группа 1: все поля уже отрисованы
-          if (RECIPIENT_LIST_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+          if (RECIPIENT_LIST_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // Группа 2: все поля уже отрисованы
-          if (DIRECT_RENDER_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^topup_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+          if (DIRECT_RENDER_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
 
           // Группа 3: quantity уже отрисован
           if (BUYOUT_FORMS.includes(toSelector(tid)) && key === 'quantity') return;
@@ -1347,7 +1347,7 @@ export function renderLog(log) {
             .filter(Boolean)
             .map(m => m[1]);
           idxs.forEach((idx) => {
-            const topupAmount = Number(dataObj[`topup_${idx}`]) || 0;
+            const topupAmount = Number(dataObj[`amount_${idx}`]) || 0;
             totalTopup += topupAmount;
           });
         });

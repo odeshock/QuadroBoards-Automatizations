@@ -135,15 +135,7 @@ function calculateGroupCost(group) {
       entered_amount = parseNumericAmount(String(dataObj.amount));
     }
 
-    // Для topup/ams - суммируем все topup_N значения
-    const topupKeys = Object.keys(dataObj).filter(k => /^topup_\d+$/.test(k));
-    if (topupKeys.length > 0) {
-      entered_amount = topupKeys.reduce((sum, key) => {
-        return sum + (Number(dataObj[key]) || 0);
-      }, 0);
-    }
-
-    // Для переводов - суммируем все amount_N значения
+    // Для форм с несколькими получателями - суммируем все amount_N значения
     const amountKeys = Object.keys(dataObj).filter(k => /^amount_\d+$/.test(k));
     if (amountKeys.length > 0) {
       entered_amount = amountKeys.reduce((sum, key) => {

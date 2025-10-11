@@ -3,7 +3,6 @@
 // ============================================================================
 
 import {
-  COUNTER_POLL_INTERVAL_MS,
   AMS_TIMEOUT_MS
 } from '../config.js';
 

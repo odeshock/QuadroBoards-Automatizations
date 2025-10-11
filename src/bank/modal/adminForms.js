@@ -4,8 +4,7 @@
 
 import {
   COUNTER_POLL_INTERVAL_MS,
-  FORM_TIMEOUT_MS,
-  AMS_TIMEOUT_MS
+  FORM_TIMEOUT_MS
 } from '../config.js';
 
 import {
@@ -34,239 +33,54 @@ import {
   updateModalAmount
 } from '../results.js';
 
+import {
+  clearModalFields,
+  showWaitMessage,
+  hideWaitMessage,
+  showErrorMessage,
+  waitForGlobalArray
+} from './helpers.js';
+
+import { createUserPicker } from './userPicker.js';
+
 export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
-  // 1) убрать лишние инфо-плашки из шаблона
-  (() => {
-    modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
-      .forEach(el => el.remove());
-    const maybeInfo = Array.from(modalFields.children)
-      .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
-    if (maybeInfo) maybeInfo.remove();
-  })();
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields, { includeInfo: false });
 
-  // 2) показать «ждём…» (якорь для ошибок)
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  modalFields.prepend(waitNote);
+  // Удаляем disclaimer об администраторе, если есть
+  const maybeInfo = Array.from(modalFields.children)
+    .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
+  if (maybeInfo) maybeInfo.remove();
 
-  const hideWait = () => { const el = modalFields.querySelector('.admin-wait-note'); if (el) el.remove(); };
-  const showError = (msg) => {
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      const anchor = modalFields.querySelector('.admin-wait-note');
-      if (anchor) anchor.insertAdjacentElement('afterend', err);
-      else modalFields.prepend(err);
-    }
-    err.textContent = msg || 'Произошла ошибка. Попробуйте обновить страницу.';
-  };
-  const clearError = () => { const err = modalFields.querySelector('.note-error.admin-error'); if (err) err.remove(); };
+  // 2) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
+  // 3) Функция для отображения ошибки
   const fail = () => {
-    if (canceled) return;
-    hideWait();
-    showError('Произошла ошибка. Попробуйте обновить страницу.');
+    showErrorMessage(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.');
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
-    cancel();
   };
 
-  const renderAdminPicker = (users) => {
-    if (!Array.isArray(users)) return fail();
-
-    hideWait();
-    clearError();
-
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-
-    const chosen = document.createElement('div');
-    chosen.className = 'chips';
-    wrap.appendChild(chosen);
-
-    const block = document.createElement('div');
-    block.className = 'field anketa-combobox';
-
-    const label = document.createElement('label');
-    label.textContent = 'Кому начислить*';
-    block.appendChild(label);
-
-    const box = document.createElement('div');
-    box.className = 'combo';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Начните вводить имя или id...';
-    input.setAttribute('autocomplete', 'off');
-
-    const list = document.createElement('div');
-    list.className = 'suggest';
-    list.setAttribute('role', 'listbox');
-
-    box.appendChild(input);
-    box.appendChild(list);
-    block.appendChild(box);
-    wrap.appendChild(block);
-    modalFields.appendChild(wrap);
-
-    const norm = (s) => String(s ?? '').trim().toLowerCase();
-    const picked = new Set();
-
-    const syncHiddenFields = () => {
-      modalFields.querySelectorAll('input[type="hidden"][name^="recipient_"]').forEach(n => n.remove());
-      let i = 1;
-      picked.forEach((id) => {
-        const hid = document.createElement('input');
-        hid.type = 'hidden';
-        hid.name = `recipient_${i++}`;
-        hid.value = String(id);
-        modalFields.appendChild(hid);
+  // 4) Ожидаем USERS_LIST и создаём user picker
+  counterWatcher = waitForGlobalArray(
+    'USERS_LIST',
+    timeoutMs,
+    (users) => {
+      hideWaitMessage(modalFields);
+      createUserPicker({
+        modalFields,
+        btnSubmit,
+        users,
+        data,
+        modalAmount,
+        basePrice,
+        labelText: 'Кому начислить*',
+        placeholder: 'Начните вводить имя или id...'
       });
-      btnSubmit.style.display = picked.size ? '' : 'none';
-      btnSubmit.disabled = picked.size === 0;
-
-      // Обновляем modalAmount: price × количество получателей
-      if (modalAmount && basePrice !== null) {
-        const price = Number(basePrice) || 0;
-        const totalRecipients = picked.size;
-        if (totalRecipients > 0) {
-          updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } }, { items: totalRecipients });
-        } else {
-          modalAmount.textContent = formatNumber(price);
-        }
-      }
-    };
-
-    const addChip = (user) => {
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.style.display = 'inline-flex';
-      chip.style.alignItems = 'center';
-      chip.style.gap = '8px';
-
-      const text = document.createElement('span');
-      text.textContent = `${user.name} (id: ${user.id})`;
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.textContent = '×';
-      del.title = 'Удалить';
-      del.style.border = 'none';
-      del.style.background = 'transparent';
-      del.style.cursor = 'pointer';
-      del.style.fontSize = '16px';
-      del.addEventListener('click', () => {
-        picked.delete(String(user.id));
-        chip.remove();
-        syncHiddenFields();
-      });
-
-      chip.append(text, del);
-      chosen.appendChild(chip);
-    };
-
-    const portalList = list;
-    portalList.style.position = 'fixed';
-    portalList.style.zIndex = '9999';
-    let portalMounted = false;
-    const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
-    const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
-    const positionPortal = () => {
-      const r = input.getBoundingClientRect();
-      portalList.style.left = `${r.left}px`;
-      portalList.style.top  = `${r.bottom + 6}px`;
-      portalList.style.width = `${r.width}px`;
-    };
-    const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
-    const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
-
-    const buildItem = (u) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'suggest-item';
-      item.setAttribute('role', 'option');
-      item.textContent = `${u.name} (id: ${u.id})`;
-      item.addEventListener('click', () => {
-        const sid = String(u.id);
-        if (picked.has(sid)) { closeSuggest(); input.value = ''; return; }
-        picked.add(sid);
-        addChip(u);
-        syncHiddenFields();
-        input.value = '';
-        closeSuggest();
-        input.focus();
-      });
-      return item;
-    };
-
-    const doSearch = () => {
-      const q = norm(input.value);
-      portalList.innerHTML = '';
-      if (!q) { closeSuggest(); return; }
-      const res = users
-        .filter(u => norm(u.name).includes(q) || String(u.id).includes(q))
-        .slice(0, 20);
-      if (!res.length) { closeSuggest(); return; }
-      res.forEach(u => portalList.appendChild(buildItem(u)));
-      openSuggest();
-    };
-
-    input.addEventListener('input', doSearch);
-    input.addEventListener('focus', doSearch);
-    document.addEventListener('click', (e) => {
-      if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
-    });
-    window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
-    window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
-
-    // Prefill из data
-    if (data) {
-      const ids = Object.keys(data)
-        .filter(k => /^recipient_\d+$/.test(k))
-        .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10))
-        .map(k => String(data[k]).trim())
-        .filter(Boolean);
-
-      ids.forEach((id) => {
-        if (picked.has(id)) return;
-        const u = Array.isArray(users) ? users.find(x => String(x.id) === id) : null;
-        if (u) {
-          picked.add(String(u.id));
-          addChip(u);
-        } else {
-          picked.add(id);
-          addChip({ name: 'Неизвестный', id });
-        }
-      });
-
-      syncHiddenFields();
-    }
-
-    if (!picked.size) {
-      btnSubmit.style.display = 'none';
-      btnSubmit.disabled = true;
-    }
-  };
-
-  const to = setTimeout(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) return fail();
-    return fail();
-  }, timeoutMs);
-
-  const poll = setInterval(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
-    if (Array.isArray(window.USERS_LIST)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      renderAdminPicker(window.USERS_LIST);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
+    },
+    fail
+  );
 
   return counterWatcher;
 }

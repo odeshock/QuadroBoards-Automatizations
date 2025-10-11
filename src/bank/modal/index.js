@@ -3,10 +3,7 @@
 // ============================================================================
 
 import {
-  ALLOWED_PARENTS,
-  BASE_URL,
   COUNTER_POLL_INTERVAL_MS,
-  ADS_TIMEOUT_MS,
   counterConfigs,
   counterPrefixMap
 } from '../config.js';
@@ -16,10 +13,7 @@ import {
   parseNumericAmount,
   roundNewToAnchorDOM,
   fullMonthsDiffVirtualDOM,
-  fmtYMD,
-  submissionGroups,
-  formatEntryKey,
-  updateAutoDiscounts
+  fmtYMD
 } from '../services.js';
 
 import {

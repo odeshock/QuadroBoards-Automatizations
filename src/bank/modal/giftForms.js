@@ -4,8 +4,7 @@
 
 import {
   COUNTER_POLL_INTERVAL_MS,
-  GIFT_TIMEOUT_MS,
-  FORM_TIMEOUT_MS
+  GIFT_TIMEOUT_MS
 } from '../config.js';
 
 import {

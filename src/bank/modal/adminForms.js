@@ -119,10 +119,9 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
 
 /**
  * Рендерит пикер для администраторского начисления с вводом суммы на каждого получателя
+ * @param {Array} users - Список пользователей (гарантированно массив от waitForGlobalArray)
  */
-function renderAdminTopupPicker({ users, modalFields, btnSubmit, fail, data, requireComment, modalAmount, basePrice }) {
-  if (!Array.isArray(users)) return fail();
-
+function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireComment, modalAmount, basePrice }) {
   hideWaitMessage(modalFields);
 
   // Каркас
@@ -369,7 +368,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 
   // 3) Ждём USERS_LIST и рисуем пикер
   counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs,
-    (users) => renderAdminTopupPicker({ users, modalFields, btnSubmit, fail, data, requireComment, modalAmount, basePrice }),
+    (users) => renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireComment, modalAmount, basePrice }),
     fail
   );
 

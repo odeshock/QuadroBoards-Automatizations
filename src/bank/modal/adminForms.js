@@ -356,7 +356,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 
 export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice = null }) {
   // 1) Очищаем модальное окно
-  clearModalFields(modalFields);
+  clearModalFields(modalFields, { includeInfo: true }));
 
   // Устанавливаем начальное значение modalAmount
   if (modalAmount && basePrice !== null) {

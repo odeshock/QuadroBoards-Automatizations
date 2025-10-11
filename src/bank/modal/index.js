@@ -13,12 +13,7 @@ import {
 } from '../results.js';
 
 import {
-  URL_FIELD_FORMS,
   TEXT_MESSAGES,
-  FORM_INCOME_NEEDREQUEST,
-  FORM_INCOME_RPGTOP,
-  FORM_INCOME_EP_PERSONAL,
-  FORM_INCOME_EP_PLOT,
   FORM_INCOME_TOPUP,
   FORM_INCOME_AMS,
   toSelector
@@ -56,6 +51,10 @@ import {
 import {
   handleBuyoutForms
 } from './buyoutForms.js';
+
+import {
+  setupUrlFieldLogic
+} from './urlFieldForms.js';
 
 // ============================================================================
 // BANNER ALREADY PROCESSED CHECK
@@ -266,30 +265,10 @@ if (buyoutResult.handled) {
   // Buyout forms не требуют counterWatcher
 }
 
-  // === URL FIELDS: формы с дополнительными URL полями ===
-  const isUrlFieldForm = URL_FIELD_FORMS.includes(toSelector(template.id));
-  const isNeedRequest = template.id === FORM_INCOME_NEEDREQUEST;
-  const isRpgTop = template.id === FORM_INCOME_RPGTOP;
-  const isEpPersonal = template.id === FORM_INCOME_EP_PERSONAL;
-  const isEpPlot = template.id === FORM_INCOME_EP_PLOT;
-
-  const scrollContainer = modalFields.parentElement;
-  const addExtraBtn = modalFields.querySelector('[data-add-extra]');
+  // === URL FIELDS & GIFT GROUPS: динамические поля ===
   const giftContainer = modalFields.querySelector('[data-gift-container]');
   const giftAddBtn = modalFields.querySelector('[data-add-gift-group]');
   const giftTemplateGroup = giftContainer ? giftContainer.querySelector('[data-gift-group]') : null;
-  const extraPrefixAttr = addExtraBtn ? addExtraBtn.getAttribute('data-extra-prefix') : null;
-  const extraLabelBase = addExtraBtn ? addExtraBtn.getAttribute('data-extra-label') : null;
-  const extraPlaceholderCustom = addExtraBtn ? addExtraBtn.getAttribute('data-extra-placeholder') : null;
-  const extraStartAttr = addExtraBtn ? Number.parseInt(addExtraBtn.getAttribute('data-extra-start'), 10) : NaN;
-  const requiresUrlType = isUrlFieldForm;
-  const typeOverride = requiresUrlType ? 'url' : null;
-  const extraPrefix = extraPrefixAttr || (isNeedRequest ? 'need_extra_' : 'extra_');
-  const baseIndex = Number.isFinite(extraStartAttr)
-    ? extraStartAttr
-    : ((isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) ? 2 : 1);
-
-
 
   const getExtraFields = () => Array.from(modalFields.querySelectorAll('.extra-field'));
   const getGiftGroups = () => giftContainer ? Array.from(giftContainer.querySelectorAll('[data-gift-group]')) : [];
@@ -303,12 +282,11 @@ if (buyoutResult.handled) {
       return groups.length ? groups.length : 1;
     }
     // Для форм счетчиков multiplier берётся из form.dataset.currentMultiplier
-    if (COUNTER_FORMS.includes(toSelector(template.id))) {
-      const storedRaw = form.dataset.currentMultiplier;
-      const stored = storedRaw !== undefined ? Number.parseFloat(storedRaw) : NaN;
-      return Number.isFinite(stored) ? stored : 1;
+    const storedRaw = form.dataset.currentMultiplier;
+    if (storedRaw !== undefined) {
+      const stored = Number.parseFloat(storedRaw);
+      if (Number.isFinite(stored)) return stored;
     }
-    if (!addExtraBtn) return 1;
     return 1 + getExtraFields().length;
   };
 
@@ -359,138 +337,8 @@ if (buyoutResult.handled) {
     modalAmount.textContent = `${formatNumber(amountNumber)} x ${multiplier} = ${formatNumber(total)}`;
   };
 
-  const parseSuffix = (key) => {
-    if (!key || !key.startsWith(extraPrefix)) return NaN;
-    const trimmed = key.slice(extraPrefix.length);
-    const parsed = parseInt(trimmed, 10);
-    return Number.isNaN(parsed) ? NaN : parsed;
-  };
-
-  const refreshExtraFields = () => {
-    getExtraFields().forEach((field, idx) => {
-      const input = field.querySelector('input, textarea, select');
-      if (!input) return;
-      const label = field.querySelector('label');
-      const suffix = baseIndex + idx;
-      const nameAttr = `${extraPrefix}${suffix}`;
-      input.name = nameAttr;
-      input.id = nameAttr;
-      input.required = true;
-      if (label) {
-        let computedLabel;
-        if (extraLabelBase) {
-          computedLabel = `${extraLabelBase} ${suffix}`;
-        } else if (template.id === FORM_INCOME_NEEDREQUEST) {
-          computedLabel = `Ссылка на «нужного» ${suffix}`;
-        } else if (template.id === FORM_INCOME_RPGTOP) {
-          computedLabel = `Ссылка на скрин ${suffix}`;
-        } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {
-          computedLabel = `Ссылка на эпизод ${suffix}`;
-        } else {
-          computedLabel = `Доп. поле ${suffix}`;
-        }
-        label.textContent = computedLabel;
-
-        label.setAttribute('for', nameAttr);
-      }
-    });
-  };
-
-  const getNextSuffix = () => {
-    const suffixes = getExtraFields()
-      .map((field) => {
-        const input = field.querySelector('input, textarea, select');
-        const currentName = input && input.name ? input.name : '';
-        return parseSuffix(currentName);
-      })
-      .filter((num) => Number.isFinite(num));
-    if (!suffixes.length) return baseIndex;
-    return Math.max(...suffixes) + 1;
-  };
-
-  let addExtraField = null;
-  if (addExtraBtn) {
-    addExtraField = (options = {}) => {
-      const { silent = false, presetKey = null } = options;
-      let suffix = parseSuffix(presetKey);
-      if (!Number.isFinite(suffix)) {
-        suffix = getNextSuffix();
-      }
-      const nameAttr = `${extraPrefix}${suffix}`;
-      const wrap = document.createElement('div');
-      wrap.className = 'field extra-field';
-
-      const label = document.createElement('label');
-
-      let labelText = '';
-      if (template.id === FORM_INCOME_NEEDREQUEST) {
-        labelText = `Ссылка на «нужного» ${suffix}`;
-      } else if (template.id === FORM_INCOME_RPGTOP) {
-        labelText = `Ссылка на скрин ${suffix}`;
-      } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {
-        labelText = `Ссылка на эпизод ${suffix}`;
-      } else {
-        labelText = `Доп. поле ${suffix}`;
-      }
-      label.textContent = labelText;
-
-      const inputType = typeOverride || (isNeedRequest ? 'url' : 'text');
-      const placeholderAttr = extraPlaceholderCustom ? ` placeholder="${extraPlaceholderCustom}"` : '';
-
-      wrap.innerHTML = `
-        <label for="${nameAttr}">${labelText}</label>
-        <div class="extra-input">
-          <input id="${nameAttr}" name="${nameAttr}" type="${inputType}"${placeholderAttr} required>
-          <button type="button" class="btn-remove-extra" aria-label="Удалить поле" title="Удалить поле">×</button>
-        </div>
-      `;
-
-      addExtraBtn.parentElement.insertAdjacentElement('beforebegin', wrap);
-
-      const input = wrap.querySelector('input, textarea, select');
-      if (input) input.required = true;
-
-      const removeBtn = wrap.querySelector('.btn-remove-extra');
-      if (removeBtn) {
-        removeBtn.addEventListener('click', () => {
-          wrap.remove();
-          refreshExtraFields();
-          updateAmountSummary();
-        });
-      }
-
-      if (!presetKey) {
-        refreshExtraFields();
-      }
-
-      requestAnimationFrame(() => {
-        if (silent) return;
-        if (scrollContainer) {
-          const top = scrollContainer.scrollHeight;
-          scrollContainer.scrollTo({ top, behavior: 'smooth' });
-        } else {
-          wrap.scrollIntoView({ block: 'end', behavior: 'smooth' });
-        }
-        if (input && typeof input.focus === 'function') {
-          try {
-            input.focus({ preventScroll: true });
-          } catch (err) {
-            input.focus();
-          }
-        }
-      });
-
-      if (!silent && !presetKey) {
-        updateAmountSummary();
-      }
-
-      return wrap;
-    };
-
-    addExtraBtn.addEventListener('click', () => {
-      addExtraField();
-    });
-  }
+  // === URL FIELDS: вызываем логику для форм с дополнительными URL полями ===
+  setupUrlFieldLogic({ template, modalFields, updateAmountSummary, data });
 
   let addGiftGroup = null;
   let refreshGiftGroups = () => {};
@@ -612,13 +460,6 @@ if (buyoutResult.handled) {
       }
       refreshGiftGroups();
     }
-    const baseNames = Array.from(modalFields.querySelectorAll('[name]')).map((el) => el.name);
-    const toAdd = Object.keys(data).filter((key) => !baseNames.includes(key));
-    if (addExtraField && toAdd.length) {
-      toAdd
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-        .forEach((key) => addExtraField({ silent: true, presetKey: key }));
-    }
     Object.entries(data).forEach(([key, value]) => {
       const field = modalFields.querySelector(`[name="${key}"]`);
       if (!field) return;
@@ -628,7 +469,6 @@ if (buyoutResult.handled) {
         field.value = value;
       }
     });
-    refreshExtraFields();
     refreshGiftGroups();
     updateAmountSummary();
   }

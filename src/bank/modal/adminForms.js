@@ -126,6 +126,9 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
 function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireComment, modalAmount, basePrice }) {
   hideWaitMessage(modalFields);
 
+  // Удаляем старые формы, если они есть
+  modalFields.querySelectorAll('.field').forEach(el => el.remove());
+
   // Каркас
   const wrap = document.createElement('div');
   wrap.className = 'field';
@@ -331,15 +334,17 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
   disableSubmitButton(btnSubmit);
 }
 
-export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null }) {
+export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null, templateId = null }) {
   // 1) Очищаем модальное окно (включая disclaimer)
   clearModalFields(modalFields, { includeInfo: true });
 
-  // 2) Добавляем информационное сообщение о системе подсчёта
-  const systemInfoBlock = document.createElement('div');
-  systemInfoBlock.className = 'system-info';
-  systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> по галлеону за 1 кредит или 100 баллов, внесённые в «<strong><a href="${BASE_URL}/mod/foundation" target="_blank">Фонд форума</a></strong>».`;
-  modalFields.appendChild(systemInfoBlock);
+  // 2) Добавляем информационное сообщение о системе подсчёта (только для FORM_INCOME_TOPUP)
+  if (templateId === FORM_INCOME_TOPUP) {
+    const systemInfoBlock = document.createElement('div');
+    systemInfoBlock.className = 'system-info';
+    systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> по галлеону за 1 кредит или 100 баллов, внесённые в «<strong><a href="${BASE_URL}/mod/foundation" target="_blank">Фонд форума</a></strong>».`;
+    modalFields.appendChild(systemInfoBlock);
+  }
 
   // 3) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
@@ -687,7 +692,8 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
         data,
         requireComment: config.requireComment,
         modalAmount,
-        basePrice: price
+        basePrice: price,
+        templateId: template.id
       });
     }
   }

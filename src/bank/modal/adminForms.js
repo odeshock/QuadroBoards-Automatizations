@@ -453,7 +453,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
   const systemInfoBlock = document.createElement('div');
   systemInfoBlock.className = 'system-info';
   const commissionText = basePrice !== null ? formatNumber(basePrice) : '10';
-  systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> ваша сумма + ${commissionText} галлеонов за каждого пользователя`;
+  systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> ваша сумма + ${commissionText} галлеонов за каждого пользователя.`;
   modalFields.appendChild(systemInfoBlock);
 
   // Устанавливаем начальное значение modalAmount

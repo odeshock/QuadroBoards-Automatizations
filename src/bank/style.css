@@ -294,7 +294,7 @@
       border: 1px solid var(--border);
       border-radius: 14px;
       box-shadow: var(--shadow);
-      overflow: hidden;
+      overflow: visible;
       max-height: 85vh;
       display: flex;
       flex-direction: column;
@@ -452,9 +452,8 @@
     /* Combobox for ANKETA admin */
   .combo { position: relative; }
   .suggest {
-    position: absolute;
-    top: 100%; left: 0; right: 0;
-    z-index: 10;
+    position: fixed;
+    z-index: 9999;
     display: none;
     background: #fff;
     border: 1px solid var(--border);

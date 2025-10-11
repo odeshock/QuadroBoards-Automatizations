@@ -334,6 +334,12 @@ function renderUserAmountPicker({
     const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
     if (!res.length) { list.style.display = 'none'; return; }
     res.forEach(u => list.appendChild(buildItem(u)));
+
+    // Позиционируем suggest относительно input (fixed positioning)
+    const rect = input.getBoundingClientRect();
+    list.style.top = `${rect.bottom + 6}px`;
+    list.style.left = `${rect.left}px`;
+    list.style.width = `${rect.width}px`;
     list.style.display = 'block';
   };
   input.addEventListener('input', doSearch);

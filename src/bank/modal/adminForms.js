@@ -120,10 +120,31 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
 }
 
 /**
- * Рендерит пикер для администраторского начисления с вводом суммы на каждого получателя
- * @param {Array} users - Список пользователей (гарантированно массив от waitForGlobalArray)
+ * Универсальный рендер пикера для выбора пользователей с вводом суммы
+ * @param {Object} config - Конфигурация пикера
+ * @param {Array} config.users - Список пользователей
+ * @param {HTMLElement} config.modalFields - Контейнер модального окна
+ * @param {HTMLElement} config.btnSubmit - Кнопка отправки
+ * @param {Object} config.data - Данные для prefill
+ * @param {boolean} config.requireComment - Требуется ли комментарий
+ * @param {HTMLElement} config.modalAmount - Элемент для отображения итоговой суммы
+ * @param {number|null} config.basePrice - Базовая цена (для расчетов)
+ * @param {string} config.labelText - Текст лейбла
+ * @param {string} config.amountFieldName - Имя поля для суммы ('topup' или 'amount')
+ * @param {Function} config.onAmountUpdate - Callback для обновления итоговой суммы
  */
-function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireComment, modalAmount, basePrice }) {
+function renderUserAmountPicker({
+  users,
+  modalFields,
+  btnSubmit,
+  data,
+  requireComment = false,
+  modalAmount = null,
+  basePrice = null,
+  labelText = 'Кому начислить и сколько *',
+  amountFieldName = 'topup',
+  onAmountUpdate = null
+}) {
   hideWaitMessage(modalFields);
 
   // Удаляем старые формы, если они есть
@@ -141,7 +162,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
   block.className = 'field anketa-combobox';
 
   const label = document.createElement('label');
-  label.textContent = 'Кому начислить и сколько *';
+  label.textContent = labelText;
   block.appendChild(label);
 
   const box = document.createElement('div');
@@ -173,10 +194,10 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
   const syncHiddenFields = () => {
     // очищаем прошлые скрытые
     modalFields
-      .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="topup_"], input[type="hidden"][name^="comment_"]')
+      .querySelectorAll(`input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="${amountFieldName}_"], input[type="hidden"][name^="comment_"]`)
       .forEach(n => n.remove());
 
-    // пересобираем пары recipient_i + topup_i (+ comment_i для AMS) только для валидных сумм
+    // пересобираем пары recipient_i + amount_i (+ comment_i) только для валидных сумм
     let i = 1;
     let totalAmount = 0;
     for (const { id, amountInput, commentInput } of picked.values()) {
@@ -196,7 +217,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
 
       const hidA = document.createElement('input');
       hidA.type = 'hidden';
-      hidA.name = `topup_${i}`;
+      hidA.name = `${amountFieldName}_${i}`;
       hidA.value = String(val).trim().replace(',', '.');
 
       modalFields.append(hidR, hidA);
@@ -219,8 +240,10 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     btnSubmit.style.display = hasAny ? '' : 'none';
     btnSubmit.disabled = !hasAny;
 
-    // Обновляем modal-amount: price × total = итого
-    if (modalAmount && basePrice !== null) {
+    // Обновляем modal-amount через callback или дефолтную логику
+    if (onAmountUpdate) {
+      onAmountUpdate(picked, modalAmount, basePrice);
+    } else if (modalAmount && basePrice !== null) {
       const price = Number(basePrice);
       const total = price * totalAmount;
       modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
@@ -312,7 +335,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     if (!block.contains(e.target)) list.style.display = 'none';
   });
 
-  // Prefill из data: recipient_i + topup_i (+ comment_i для AMS)
+  // Prefill из data: recipient_i + amount_i (+ comment_i)
   if (data) {
     const ids = Object.keys(data)
       .filter(k => /^recipient_\d+$/.test(k))
@@ -321,7 +344,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
       const idx = rk.slice(10);
       const rid = String(data[rk]).trim();
       if (!rid) return;
-      const amount = String(data[`topup_${idx}`] ?? '').trim();
+      const amount = String(data[`${amountFieldName}_${idx}`] ?? '').trim();
       const comment = requireComment ? String(data[`comment_${idx}`] ?? '').trim() : '';
       const u = users.find(x => String(x.id) === rid);
       if (u) addChip(u, amount, comment);
@@ -332,6 +355,23 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
 
   // изначально submit скрыт, пока нет валидных пар
   disableSubmitButton(btnSubmit);
+}
+
+/**
+ * Обертка для рендера пикера админского начисления (Докупить кредиты / Выдать денежку дополнительно)
+ */
+function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireComment, modalAmount, basePrice }) {
+  return renderUserAmountPicker({
+    users,
+    modalFields,
+    btnSubmit,
+    data,
+    requireComment,
+    modalAmount,
+    basePrice,
+    labelText: 'Кому начислить и сколько *',
+    amountFieldName: 'topup'
+  });
 }
 
 export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null, templateId = null }) {
@@ -391,8 +431,8 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
     disableSubmitButton(btnSubmit);
   };
 
-  // === 3) Функция обновления стоимости ===
-  const updateTotalCost = (picked) => {
+  // === 3) Callback для обновления стоимости в Transfer форме ===
+  const handleTransferAmountUpdate = (picked, modalAmount, basePrice) => {
     let totalAmount = 0;
     let count = 0;
 
@@ -433,169 +473,18 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
   const renderTransferPicker = (users) => {
     if (!Array.isArray(users)) return fail();
 
-    hideWaitMessage(modalFields);
-
-    // Каркас
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-
-    const chosen = document.createElement('div');
-    chosen.className = 'chips';
-    wrap.appendChild(chosen);
-
-    const block = document.createElement('div');
-    block.className = 'field anketa-combobox';
-
-    const label = document.createElement('label');
-    label.textContent = 'Кому перевести и сколько*';
-    block.appendChild(label);
-
-    const box = document.createElement('div');
-    box.className = 'combo';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Начните вводить имя или id...';
-    input.setAttribute('autocomplete', 'off');
-
-    const list = document.createElement('div');
-    list.className = 'suggest';
-    list.setAttribute('role', 'listbox');
-
-    box.appendChild(input);
-    box.appendChild(list);
-    block.appendChild(box);
-    wrap.appendChild(block);
-    modalFields.appendChild(wrap);
-
-    // Выбранные: Map<id, { id, name, amountInput, el }>
-    const picked = new Map();
-
-    const isValidAmount = (raw) => {
-      const num = parseNumericAmount(raw);
-      return Number.isFinite(num) && num > 0;
-    };
-
-    const syncHiddenFields = () => {
-      // очищаем прошлые скрытые
-      modalFields
-        .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="amount_"]')
-        .forEach(n => n.remove());
-
-      // пересобираем пары recipient_i + amount_i только для валидных сумм
-      let i = 1;
-      for (const { id, amountInput } of picked.values()) {
-        const val = amountInput?.value ?? '';
-        if (!isValidAmount(val)) continue;
-
-        const hidR = document.createElement('input');
-        hidR.type = 'hidden';
-        hidR.name = `recipient_${i}`;
-        hidR.value = String(id);
-
-        const hidA = document.createElement('input');
-        hidA.type = 'hidden';
-        hidA.name = `amount_${i}`;
-        hidA.value = String(val).trim().replace(',', '.');
-
-        modalFields.append(hidR, hidA);
-        i++;
-      }
-
-      const { count } = updateTotalCost(picked);
-      const hasAny = count > 0;
-      btnSubmit.style.display = hasAny ? '' : 'none';
-      btnSubmit.disabled = !hasAny;
-    };
-
-    const removeChip = (id) => {
-      const item = picked.get(id);
-      if (item && item.el) item.el.remove();
-      picked.delete(id);
-      syncHiddenFields();
-    };
-
-    const addChip = (user, prefillAmount = '') => {
-      const sid = String(user.id);
-      if (picked.has(sid)) return;
-
-      const chip = document.createElement('span');
-      chip.className = 'chip chip--flex';
-
-      const text = document.createElement('span');
-      text.textContent = `${user.name} (id: ${user.id})`;
-
-      const amount = document.createElement('input');
-      amount.type = 'number';
-      amount.min = '1';
-      amount.step = '1';
-      amount.placeholder = 'сколько';
-      amount.value = prefillAmount || '';
-      amount.required = true;
-      amount.addEventListener('input', syncHiddenFields);
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'chip__delete-btn';
-      del.textContent = '×';
-      del.title = 'Удалить';
-      del.addEventListener('click', () => removeChip(sid));
-
-      chip.append(text, amount, del);
-      chosen.appendChild(chip);
-
-      picked.set(sid, { id: sid, name: user.name, amountInput: amount, el: chip });
-      syncHiddenFields();
-    };
-
-    // Подсказки
-    const buildItem = (u) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'suggest-item';
-      item.textContent = `${u.name} (id: ${u.id})`;
-      item.setAttribute('role', 'option');
-      item.addEventListener('click', () => {
-        addChip(u);
-        input.value = '';
-        list.style.display = 'none';
-        input.focus();
-      });
-      return item;
-    };
-
-    const doSearch = () => {
-      const q = input.value.trim().toLowerCase();
-      list.innerHTML = '';
-      if (!q) { list.style.display = 'none'; return; }
-      const matches = users
-        .filter(u => u.name.toLowerCase().includes(q) || String(u.id).includes(q))
-        .slice(0, 10);
-      if (!matches.length) { list.style.display = 'none'; return; }
-      matches.forEach(u => list.appendChild(buildItem(u)));
-      list.style.display = 'block';
-    };
-
-    input.addEventListener('input', doSearch);
-    input.addEventListener('focus', doSearch);
-    document.addEventListener('click', (e) => {
-      if (!block.contains(e.target)) list.style.display = 'none';
+    return renderUserAmountPicker({
+      users,
+      modalFields,
+      btnSubmit,
+      data,
+      requireComment: false,
+      modalAmount,
+      basePrice,
+      labelText: 'Кому перевести и сколько *',
+      amountFieldName: 'amount',
+      onAmountUpdate: handleTransferAmountUpdate
     });
-
-    // Восстановление данных при редактировании
-    if (data) {
-      const entries = Object.entries(data);
-      const recipientEntries = entries.filter(([k]) => k.startsWith('recipient_'));
-      recipientEntries.forEach(([key, userId]) => {
-        const idx = key.replace('recipient_', '');
-        const amountKey = `amount_${idx}`;
-        const amountVal = data[amountKey] || '';
-        const user = users.find(u => String(u.id) === String(userId));
-        if (user) addChip(user, amountVal);
-      });
-    }
-
-    syncHiddenFields();
   };
 
   // === 5) Ждём USERS_LIST с таймаутом ===

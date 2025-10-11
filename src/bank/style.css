@@ -472,6 +472,9 @@
     border: 0;
     background: transparent;
     cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
   }
   .suggest-item:hover { background: #f3f4f6; }
 

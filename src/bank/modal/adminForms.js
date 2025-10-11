@@ -42,6 +42,7 @@ import {
 } from './helpers.js';
 
 import { createUserPicker } from './userPicker.js';
+import { createSingleUserPicker } from './singleUserPicker.js';
 
 export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
   // 1) Очищаем модальное окно
@@ -86,241 +87,69 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
 }
 
 export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
-  // удалить инфо-элементы
-  (() => {
-    modalFields.querySelectorAll('.gift-note, .muted-note, .note-error, .callout, [data-info]')
-      .forEach(el => el.remove());
-    const maybeInfo = Array.from(modalFields.children)
-      .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
-    if (maybeInfo) maybeInfo.remove();
-  })();
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields, { includeInfo: false });
 
-  // "ждём..."
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  modalFields.prepend(waitNote);
+  // Удаляем disclaimer об администраторе, если есть
+  const maybeInfo = Array.from(modalFields.children)
+    .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
+  if (maybeInfo) maybeInfo.remove();
 
-  const hideWait = () => { const el = modalFields.querySelector('.admin-wait-note'); if (el) el.remove(); };
-  const showError = (msg) => {
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      const anchor = modalFields.querySelector('.admin-wait-note');
-      if (anchor) anchor.insertAdjacentElement('afterend', err);
-      else modalFields.prepend(err);
-    }
-    err.textContent = msg || 'Произошла ошибка. Попробуйте обновить страницу.';
-  };
+  // 2) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
+  // 3) Функция для отображения ошибки
   const fail = () => {
-    if (canceled) return;
-    hideWait();
-    showError('Произошла ошибка. Попробуйте обновить страницу.');
+    showErrorMessage(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.');
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
-    cancel();
   };
 
-  const renderAdminPicker = (users) => {
-    if (!Array.isArray(users)) return fail();
-
-    hideWait();
-
-    const block = document.createElement('div');
-    block.className = 'field anketa-combobox';
-
-    const label = document.createElement('label');
-    label.textContent = 'Получатель *';
-    block.appendChild(label);
-
-    const box = document.createElement('div');
-    box.className = 'combo';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Начните вводить имя или id...';
-    input.setAttribute('autocomplete', 'off');
-    input.required = true;
-
-    const list = document.createElement('div');
-    list.className = 'suggest';
-    list.setAttribute('role', 'listbox');
-
-    box.appendChild(input);
-    box.appendChild(list);
-    block.appendChild(box);
-    modalFields.appendChild(block);
-
-    // единственный выбранный id (строка)
-    let pickedId = '';
-    let pickedName = '';
-
-    const syncHiddenFields = () => {
-      modalFields.querySelectorAll('input[type="hidden"][name^="recipient_"]').forEach(n => n.remove());
-      if (pickedId) {
-        const hid = document.createElement('input');
-        hid.type = 'hidden';
-        hid.name = 'recipient_1';
-        hid.value = pickedId;
-        modalFields.appendChild(hid);
-      }
-      btnSubmit.style.display = pickedId ? '' : 'none';
-      btnSubmit.disabled = !pickedId;
-
-      // Обновляем modalAmount: показываем price (для 1 получателя)
-      if (modalAmount && basePrice !== null) {
-        const price = Number(basePrice) || 0;
-        modalAmount.textContent = formatNumber(price);
-      }
-    };
-
-    const portalList = list;
-    portalList.style.position = 'fixed';
-    portalList.style.zIndex = '9999';
-    let portalMounted = false;
-    const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
-    const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
-    const positionPortal = () => {
-      const r = input.getBoundingClientRect();
-      portalList.style.left = `${r.left}px`;
-      portalList.style.top  = `${r.bottom + 6}px`;
-      portalList.style.width = `${r.width}px`;
-    };
-    const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
-    const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
-
-    const buildItem = (u) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'suggest-item';
-      item.setAttribute('role', 'option');
-      item.textContent = `${u.name} (id: ${u.id})`;
-      item.addEventListener('click', () => {
-        pickedId = String(u.id);
-        pickedName = u.name;
-        input.value = `${u.name} (id: ${u.id})`;
-        syncHiddenFields();
-        closeSuggest();
+  // 4) Ожидаем USERS_LIST и создаём single user picker
+  counterWatcher = waitForGlobalArray(
+    'USERS_LIST',
+    timeoutMs,
+    (users) => {
+      hideWaitMessage(modalFields);
+      createSingleUserPicker({
+        modalFields,
+        btnSubmit,
+        users,
+        data,
+        modalAmount,
+        basePrice,
+        labelText: 'Получатель *',
+        placeholder: 'Начните вводить имя или id...'
       });
-      return item;
-    };
-
-    const norm = (s) => String(s ?? '').trim().toLowerCase();
-    const doSearch = () => {
-      const q = norm(input.value);
-      portalList.innerHTML = '';
-      if (!q) { closeSuggest(); return; }
-      const res = users
-        .filter(u => norm(u.name).includes(q) || String(u.id).includes(q))
-        .slice(0, 20);
-      if (!res.length) { closeSuggest(); return; }
-      res.forEach(u => portalList.appendChild(buildItem(u)));
-      openSuggest();
-    };
-
-    input.addEventListener('input', doSearch);
-    input.addEventListener('focus', doSearch);
-    document.addEventListener('click', (e) => {
-      if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
-    });
-    window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
-    window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
-
-    // Prefill из data (берём только первого)
-    if (data) {
-      const ids = Object.keys(data)
-        .filter(k => /^recipient_\d+$/.test(k))
-        .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10))
-        .map(k => String(data[k]).trim())
-        .filter(Boolean);
-      const first = ids[0];
-      if (first) {
-        const u = users.find(x => String(x.id) === first);
-        if (u) {
-          pickedId = String(u.id);
-          pickedName = u.name;
-          input.value = `${u.name} (id: ${u.id})`;
-        } else {
-          pickedId = first;
-          pickedName = 'Неизвестный';
-          input.value = `Неизвестный (id: ${first})`;
-        }
-      }
-      syncHiddenFields();
-    }
-
-    // изначально скрыта
-    if (!pickedId) {
-      btnSubmit.style.display = 'none';
-      btnSubmit.disabled = true;
-    }
-  };
-
-  const to = setTimeout(fail, timeoutMs);
-  const poll = setInterval(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
-    if (Array.isArray(window.USERS_LIST)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      renderAdminPicker(window.USERS_LIST);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
+    },
+    fail
+  );
 
   return counterWatcher;
 }
 
 export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null }) {
-  // === 1) Удаляем дисклеймер и прочие инфо-элементы — у админа их быть НЕ должно ===
-  modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info]')
-    .forEach(el => el.remove());
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields);
+
   const maybeInfo = Array.from(modalFields.children)
     .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
   if (maybeInfo) maybeInfo.remove();
 
-  // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  modalFields.prepend(waitNote);
+  // 2) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
-  const hideWait = () => {
-    const el = modalFields.querySelector('.admin-wait-note');
-    if (el) el.remove();
-  };
-  const showError = (msg) => {
-    hideWait();
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      modalFields.prepend(err);
-    }
-    err.textContent = msg || 'Произошла ошибка. Попробуйте обновить страницу.';
+  const fail = () => {
+    showErrorMessage(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.');
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = true;
   };
 
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const fail = () => {
-    if (canceled) return;
-    showError('Произошла ошибка. Попробуйте обновить страницу.');
-    cancel();
-  };
-
-  // === 3) Когда USERS_LIST готов — рисуем пикер с суммой на каждого ===
+  // 3) Когда USERS_LIST готов — рисуем пикер с суммой на каждого
   const renderAdminPicker = (users) => {
     if (!Array.isArray(users)) return fail();
 
-    hideWait();
+    hideWaitMessage(modalFields);
 
     // Каркас
     const wrap = document.createElement('div');
@@ -553,16 +382,8 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
     btnSubmit.disabled = true;
   };
 
-  // === 4) Ждём USERS_LIST с таймаутом ===
-  const to = setTimeout(fail, timeoutMs);
-  const poll = setInterval(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
-    if (Array.isArray(window.USERS_LIST)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      renderAdminPicker(window.USERS_LIST);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
+  // 4) Ждём USERS_LIST с таймаутом
+  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs, renderAdminPicker, fail);
 
   return counterWatcher;
 }
@@ -572,48 +393,21 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 // ============================================================================
 
 export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice = null }) {
-  // === 1) Удаляем существующие поля формы ===
-  modalFields.querySelectorAll('.info, .gift-note, .muted-note, .note-error, .callout, [data-info], .field')
-    .forEach(el => el.remove());
+  // 1) Очищаем модальное окно
+  clearModalFields(modalFields);
 
   // Устанавливаем начальное значение modalAmount
   if (modalAmount && basePrice !== null) {
     modalAmount.textContent = formatNumber(basePrice);
   }
 
-  // === 2) Показываем "Пожалуйста, подождите..." пока ждём USERS_LIST ===
-  const waitNote = document.createElement('p');
-  waitNote.className = 'muted-note admin-wait-note';
-  waitNote.textContent = TEXT_MESSAGES.PLEASE_WAIT;
-  modalFields.prepend(waitNote);
-
-  const hideWait = () => {
-    const el = modalFields.querySelector('.admin-wait-note');
-    if (el) el.remove();
-  };
-
-  const showError = (msg) => {
-    hideWait();
-    let err = modalFields.querySelector('.note-error.admin-error');
-    if (!err) {
-      err = document.createElement('p');
-      err.className = 'note-error admin-error';
-      err.style.color = 'var(--danger)';
-      modalFields.prepend(err);
-    }
-    err.textContent = msg || 'Произошла ошибка. Пожалуйста, обновите страницу.';
-    btnSubmit.style.display = 'none';
-    btnSubmit.disabled = true;
-  };
-
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
+  // 2) Показываем сообщение ожидания
+  showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   const fail = () => {
-    if (canceled) return;
-    showError('Произошла ошибка. Пожалуйста, обновите страницу.');
-    cancel();
+    showErrorMessage(modalFields, 'Произошла ошибка. Пожалуйста, обновите страницу.');
+    btnSubmit.style.display = 'none';
+    btnSubmit.disabled = true;
   };
 
   // === 3) Функция обновления стоимости ===
@@ -846,16 +640,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
   };
 
   // === 5) Ждём USERS_LIST с таймаутом ===
-  const to = setTimeout(fail, timeoutMs);
-  const poll = setInterval(() => {
-    if (typeof window.USERS_LIST !== 'undefined' && !Array.isArray(window.USERS_LIST)) { fail(); return; }
-    if (Array.isArray(window.USERS_LIST)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      renderTransferPicker(window.USERS_LIST);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
-
+  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs, renderTransferPicker, fail);
   return counterWatcher;
 }
 

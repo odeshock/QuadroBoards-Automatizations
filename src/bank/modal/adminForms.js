@@ -50,7 +50,7 @@ import { createSingleUserPicker } from './singleUserPicker.js';
 
 export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
   // 1) Очищаем модальное окно (включая disclaimer)
-  clearModalFields(modalFields, { includeInfo: true });
+  clearModalFields(modalFields);
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
@@ -86,7 +86,7 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
 
 export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
   // 1) Очищаем модальное окно (включая disclaimer)
-  clearModalFields(modalFields, { includeInfo: true });
+  clearModalFields(modalFields);
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
@@ -390,7 +390,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
 
 export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null, templateId = null }) {
   // 1) Очищаем модальное окно (включая disclaimer)
-  clearModalFields(modalFields, { includeInfo: true });
+  clearModalFields(modalFields);
 
   // 2) Добавляем информационное сообщение о системе подсчёта (только для FORM_INCOME_TOPUP)
   if (templateId === FORM_INCOME_TOPUP) {
@@ -428,7 +428,7 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
 
 export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice = null }) {
   // 1) Очищаем модальное окно
-  clearModalFields(modalFields, { includeInfo: true });
+  clearModalFields(modalFields);
 
   // 2) Добавляем информационное сообщение о системе подсчёта
   const systemInfoBlock = document.createElement('div');
@@ -573,7 +573,7 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
     });
   } else if (!window.IS_ADMIN) {
     // Для админских форм (TOPUP, AMS) показываем информацию для не-админов
-    clearModalFields(modalFields, { includeInfo: true });
+    clearModalFields(modalFields);
 
     // Для TOPUP показываем info и system-info
     if (template.id === FORM_INCOME_TOPUP) {

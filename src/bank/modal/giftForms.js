@@ -32,7 +32,7 @@ import {
 
 export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
   // 1) Очищаем модальное окно
-  clearModalFields(modalFields, { includeInfo: false });
+  clearModalFields(modalFields);
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);

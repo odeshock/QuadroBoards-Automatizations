@@ -89,13 +89,13 @@ export function disableSubmitButton(btnSubmit, options = {}) {
  * Очищает поля модального окна
  * @param {HTMLElement} modalFields - Контейнер полей модального окна
  * @param {Object} options - Опции очистки
- * @param {boolean} options.includeInfo - Удалять .info элементы (по умолчанию false)
+ * @param {boolean} options.includeInfo - Удалять .info элементы (по умолчанию true)
  * @param {boolean} options.includeFields - Удалять .field элементы (по умолчанию true)
  * @param {boolean} options.includeGiftGroups - Удалять .gift-groups элементы (по умолчанию true)
  */
 export function clearModalFields(modalFields, options = {}) {
   const {
-    includeInfo = false,
+    includeInfo = true,
     includeFields = true,
     includeGiftGroups = true
   } = options;

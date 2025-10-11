@@ -117,6 +117,244 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
   return counterWatcher;
 }
 
+/**
+ * Рендерит пикер для администраторского начисления с вводом суммы на каждого получателя
+ */
+function renderAdminTopupPicker({ users, modalFields, btnSubmit, fail, data, requireComment, modalAmount, basePrice }) {
+  if (!Array.isArray(users)) return fail();
+
+  hideWaitMessage(modalFields);
+
+  // Каркас
+  const wrap = document.createElement('div');
+  wrap.className = 'field';
+
+  const chosen = document.createElement('div');
+  chosen.className = 'chips';
+  wrap.appendChild(chosen);
+
+  const block = document.createElement('div');
+  block.className = 'field anketa-combobox';
+
+  const label = document.createElement('label');
+  label.textContent = 'Кому начислить и сколько*';
+  block.appendChild(label);
+
+  const box = document.createElement('div');
+  box.className = 'combo';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Начните вводить имя или id...';
+  input.setAttribute('autocomplete', 'off');
+
+  const list = document.createElement('div');
+  list.className = 'suggest';
+  list.setAttribute('role', 'listbox');
+
+  box.appendChild(input);
+  box.appendChild(list);
+  block.appendChild(box);
+  wrap.appendChild(block);
+  modalFields.appendChild(wrap);
+
+  // Выбранные: Map<id, { id, name, amountInput, commentInput, el }>
+  const picked = new Map();
+
+  const isValidAmount = (raw) => {
+    const num = parseNumericAmount(raw);
+    return Number.isFinite(num) && num > 0;
+  };
+
+  const syncHiddenFields = () => {
+    // очищаем прошлые скрытые
+    modalFields
+      .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="topup_"], input[type="hidden"][name^="comment_"]')
+      .forEach(n => n.remove());
+
+    // пересобираем пары recipient_i + topup_i (+ comment_i для AMS) только для валидных сумм
+    let i = 1;
+    let totalAmount = 0;
+    for (const { id, amountInput, commentInput } of picked.values()) {
+      const val = amountInput?.value ?? '';
+      if (!isValidAmount(val)) continue;
+
+      // Для AMS проверяем наличие комментария
+      if (requireComment) {
+        const comment = commentInput?.value?.trim() ?? '';
+        if (!comment) continue;
+      }
+
+      const hidR = document.createElement('input');
+      hidR.type = 'hidden';
+      hidR.name = `recipient_${i}`;
+      hidR.value = String(id);
+
+      const hidA = document.createElement('input');
+      hidA.type = 'hidden';
+      hidA.name = `topup_${i}`;
+      hidA.value = String(val).trim().replace(',', '.');
+
+      modalFields.append(hidR, hidA);
+
+      // Для AMS добавляем комментарий
+      if (requireComment && commentInput) {
+        const hidC = document.createElement('input');
+        hidC.type = 'hidden';
+        hidC.name = `comment_${i}`;
+        hidC.value = commentInput.value.trim();
+        modalFields.append(hidC);
+      }
+
+      // Суммируем количество получателей для расчета итого
+      totalAmount += parseNumericAmount(val) || 0;
+      i++;
+    }
+
+    const hasAny = i > 1;
+    btnSubmit.style.display = hasAny ? '' : 'none';
+    btnSubmit.disabled = !hasAny;
+
+    // Обновляем modal-amount: price × total = итого
+    if (modalAmount && basePrice !== null) {
+      const price = Number(basePrice);
+      const total = price * totalAmount;
+      modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
+    }
+  };
+
+  const removeChip = (id) => {
+    const item = picked.get(id);
+    if (item && item.el) item.el.remove();
+    picked.delete(id);
+    syncHiddenFields();
+  };
+
+  const addChip = (user, prefillAmount = '', prefillComment = '') => {
+    const sid = String(user.id);
+    if (picked.has(sid)) return;
+
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.style.display = 'inline-flex';
+    chip.style.alignItems = 'center';
+    chip.style.gap = '8px';
+
+    const text = document.createElement('span');
+    text.textContent = `${user.name} (id: ${user.id})`;
+
+    const amount = document.createElement('input');
+    amount.type = 'number';
+    amount.min = '1';
+    amount.step = '1';
+    amount.placeholder = 'сколько';
+    amount.value = prefillAmount || '';
+    amount.required = true;
+    amount.style.width = '90px';
+    amount.addEventListener('input', syncHiddenFields);
+
+    let commentInput = null;
+    if (requireComment) {
+      commentInput = document.createElement('input');
+      commentInput.type = 'text';
+      commentInput.placeholder = 'за что *';
+      commentInput.value = prefillComment || '';
+      commentInput.style.width = '150px';
+      commentInput.required = true;
+      commentInput.addEventListener('input', syncHiddenFields);
+    }
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '×';
+    del.title = 'Удалить';
+    del.style.border = 'none';
+    del.style.background = 'transparent';
+    del.style.cursor = 'pointer';
+    del.style.fontSize = '16px';
+    del.addEventListener('click', () => removeChip(sid));
+
+    if (requireComment) {
+      chip.append(text, amount, commentInput, del);
+    } else {
+      chip.append(text, amount, del);
+    }
+    chosen.appendChild(chip);
+
+    picked.set(sid, { id: sid, name: user.name, amountInput: amount, commentInput, el: chip });
+    syncHiddenFields();
+  };
+
+  // Подсказки (портал)
+  const portalList = list;
+  portalList.style.position = 'fixed';
+  portalList.style.zIndex = '9999';
+  let portalMounted = false;
+  const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
+  const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
+  const positionPortal = () => {
+    const r = input.getBoundingClientRect();
+    portalList.style.left = `${r.left}px`;
+    portalList.style.top  = `${r.bottom + 6}px`;
+    portalList.style.width = `${r.width}px`;
+  };
+  const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
+  const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
+
+  const norm = (s) => String(s ?? '').trim().toLowerCase();
+  const buildItem = (u) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'suggest-item';
+    item.setAttribute('role', 'option');
+    item.textContent = `${u.name} (id: ${u.id})`;
+    item.addEventListener('click', () => {
+      addChip(u);
+      input.value = '';
+      closeSuggest();
+      input.focus();
+    });
+    return item;
+  };
+  const doSearch = () => {
+    const q = norm(input.value);
+    portalList.innerHTML = '';
+    if (!q) { closeSuggest(); return; }
+    const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
+    if (!res.length) { closeSuggest(); return; }
+    res.forEach(u => portalList.appendChild(buildItem(u)));
+    openSuggest();
+  };
+  input.addEventListener('input', doSearch);
+  input.addEventListener('focus', doSearch);
+  document.addEventListener('click', (e) => {
+    if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
+  });
+  window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
+  window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
+
+  // Prefill из data: recipient_i + topup_i (+ comment_i для AMS)
+  if (data) {
+    const ids = Object.keys(data)
+      .filter(k => /^recipient_\d+$/.test(k))
+      .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10));
+    ids.forEach((rk) => {
+      const idx = rk.slice(10);
+      const rid = String(data[rk]).trim();
+      if (!rid) return;
+      const amount = String(data[`topup_${idx}`] ?? '').trim();
+      const comment = requireComment ? String(data[`comment_${idx}`] ?? '').trim() : '';
+      const u = users.find(x => String(x.id) === rid);
+      if (u) addChip(u, amount, comment);
+      else   addChip({ id: rid, name: 'Неизвестный' }, amount, comment);
+    });
+    syncHiddenFields();
+  }
+
+  // изначально submit скрыт, пока нет валидных пар
+  disableSubmitButton(btnSubmit);
+}
+
 export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null }) {
   // 1) Очищаем модальное окно (включая disclaimer)
   clearModalFields(modalFields, { includeInfo: true });
@@ -129,244 +367,11 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
     disableSubmitButton(btnSubmit);
   };
 
-  // 3) Когда USERS_LIST готов — рисуем пикер с суммой на каждого
-  const renderAdminPicker = (users) => {
-    if (!Array.isArray(users)) return fail();
-
-    hideWaitMessage(modalFields);
-
-    // Каркас
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-
-    const chosen = document.createElement('div');
-    chosen.className = 'chips';
-    wrap.appendChild(chosen);
-
-    const block = document.createElement('div');
-    block.className = 'field anketa-combobox';
-
-    const label = document.createElement('label');
-    label.textContent = 'Кому начислить и сколько*';
-    block.appendChild(label);
-
-    const box = document.createElement('div');
-    box.className = 'combo';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Начните вводить имя или id...';
-    input.setAttribute('autocomplete', 'off');
-
-    const list = document.createElement('div');
-    list.className = 'suggest';
-    list.setAttribute('role', 'listbox');
-
-    box.appendChild(input);
-    box.appendChild(list);
-    block.appendChild(box);
-    wrap.appendChild(block);
-    modalFields.appendChild(wrap);
-
-    // Выбранные: Map<id, { id, name, amountInput, commentInput, el }>
-    const picked = new Map();
-
-    const isValidAmount = (raw) => {
-      const num = parseNumericAmount(raw);
-      return Number.isFinite(num) && num > 0;
-    };
-
-    const syncHiddenFields = () => {
-      // очищаем прошлые скрытые
-      modalFields
-        .querySelectorAll('input[type="hidden"][name^="recipient_"], input[type="hidden"][name^="topup_"], input[type="hidden"][name^="comment_"]')
-        .forEach(n => n.remove());
-
-      // пересобираем пары recipient_i + topup_i (+ comment_i для AMS) только для валидных сумм
-      let i = 1;
-      let totalAmount = 0;
-      for (const { id, amountInput, commentInput } of picked.values()) {
-        const val = amountInput?.value ?? '';
-        if (!isValidAmount(val)) continue;
-
-        // Для AMS проверяем наличие комментария
-        if (requireComment) {
-          const comment = commentInput?.value?.trim() ?? '';
-          if (!comment) continue;
-        }
-
-        const hidR = document.createElement('input');
-        hidR.type = 'hidden';
-        hidR.name = `recipient_${i}`;
-        hidR.value = String(id);
-
-        const hidA = document.createElement('input');
-        hidA.type = 'hidden';
-        hidA.name = `topup_${i}`;
-        hidA.value = String(val).trim().replace(',', '.');
-
-        modalFields.append(hidR, hidA);
-
-        // Для AMS добавляем комментарий
-        if (requireComment && commentInput) {
-          const hidC = document.createElement('input');
-          hidC.type = 'hidden';
-          hidC.name = `comment_${i}`;
-          hidC.value = commentInput.value.trim();
-          modalFields.append(hidC);
-        }
-
-        // Суммируем количество получателей для расчета итого
-        totalAmount += parseNumericAmount(val) || 0;
-        i++;
-      }
-
-      const hasAny = i > 1;
-      btnSubmit.style.display = hasAny ? '' : 'none';
-      btnSubmit.disabled = !hasAny;
-
-      // Обновляем modal-amount: price × total = итого
-      if (modalAmount && basePrice !== null) {
-        const price = Number(basePrice);
-        const total = price * totalAmount;
-        modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
-      }
-    };
-
-    const removeChip = (id) => {
-      const item = picked.get(id);
-      if (item && item.el) item.el.remove();
-      picked.delete(id);
-      syncHiddenFields();
-    };
-
-    const addChip = (user, prefillAmount = '', prefillComment = '') => {
-      const sid = String(user.id);
-      if (picked.has(sid)) return;
-
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.style.display = 'inline-flex';
-      chip.style.alignItems = 'center';
-      chip.style.gap = '8px';
-
-      const text = document.createElement('span');
-      text.textContent = `${user.name} (id: ${user.id})`;
-
-      const amount = document.createElement('input');
-      amount.type = 'number';
-      amount.min = '1';
-      amount.step = '1';
-      amount.placeholder = 'сколько';
-      amount.value = prefillAmount || '';
-      amount.required = true;
-      amount.style.width = '90px';
-      amount.addEventListener('input', syncHiddenFields);
-
-      let commentInput = null;
-      if (requireComment) {
-        commentInput = document.createElement('input');
-        commentInput.type = 'text';
-        commentInput.placeholder = 'за что *';
-        commentInput.value = prefillComment || '';
-        commentInput.style.width = '150px';
-        commentInput.required = true;
-        commentInput.addEventListener('input', syncHiddenFields);
-      }
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.textContent = '×';
-      del.title = 'Удалить';
-      del.style.border = 'none';
-      del.style.background = 'transparent';
-      del.style.cursor = 'pointer';
-      del.style.fontSize = '16px';
-      del.addEventListener('click', () => removeChip(sid));
-
-      if (requireComment) {
-        chip.append(text, amount, commentInput, del);
-      } else {
-        chip.append(text, amount, del);
-      }
-      chosen.appendChild(chip);
-
-      picked.set(sid, { id: sid, name: user.name, amountInput: amount, commentInput, el: chip });
-      syncHiddenFields();
-    };
-
-    // Подсказки (портал)
-    const portalList = list;
-    portalList.style.position = 'fixed';
-    portalList.style.zIndex = '9999';
-    let portalMounted = false;
-    const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
-    const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
-    const positionPortal = () => {
-      const r = input.getBoundingClientRect();
-      portalList.style.left = `${r.left}px`;
-      portalList.style.top  = `${r.bottom + 6}px`;
-      portalList.style.width = `${r.width}px`;
-    };
-    const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
-    const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
-
-    const norm = (s) => String(s ?? '').trim().toLowerCase();
-    const buildItem = (u) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'suggest-item';
-      item.setAttribute('role', 'option');
-      item.textContent = `${u.name} (id: ${u.id})`;
-      item.addEventListener('click', () => {
-        addChip(u);
-        input.value = '';
-        closeSuggest();
-        input.focus();
-      });
-      return item;
-    };
-    const doSearch = () => {
-      const q = norm(input.value);
-      portalList.innerHTML = '';
-      if (!q) { closeSuggest(); return; }
-      const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
-      if (!res.length) { closeSuggest(); return; }
-      res.forEach(u => portalList.appendChild(buildItem(u)));
-      openSuggest();
-    };
-    input.addEventListener('input', doSearch);
-    input.addEventListener('focus', doSearch);
-    document.addEventListener('click', (e) => {
-      if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
-    });
-    window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
-    window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
-
-    // Prefill из data: recipient_i + topup_i (+ comment_i для AMS)
-    if (data) {
-      const ids = Object.keys(data)
-        .filter(k => /^recipient_\d+$/.test(k))
-        .sort((a, b) => parseInt(a.slice(10), 10) - parseInt(b.slice(10), 10));
-      ids.forEach((rk) => {
-        const idx = rk.slice(10);
-        const rid = String(data[rk]).trim();
-        if (!rid) return;
-        const amount = String(data[`topup_${idx}`] ?? '').trim();
-        const comment = requireComment ? String(data[`comment_${idx}`] ?? '').trim() : '';
-        const u = users.find(x => String(x.id) === rid);
-        if (u) addChip(u, amount, comment);
-        else   addChip({ id: rid, name: 'Неизвестный' }, amount, comment);
-      });
-      syncHiddenFields();
-    }
-
-    // изначально submit скрыт, пока нет валидных пар
-    disableSubmitButton(btnSubmit);
-  };
-
-  // 4) Ждём USERS_LIST с таймаутом
-  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs, renderAdminPicker, fail);
+  // 3) Ждём USERS_LIST и рисуем пикер
+  counterWatcher = waitForGlobalArray('USERS_LIST', timeoutMs,
+    (users) => renderAdminTopupPicker({ users, modalFields, btnSubmit, fail, data, requireComment, modalAmount, basePrice }),
+    fail
+  );
 
   return counterWatcher;
 }

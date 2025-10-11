@@ -175,10 +175,11 @@ export function openModal({
       updateModalAmount(modalAmount, form, { items: initialItems });
     }
   } else {
-    // Для форм TOPUP и AMS не-админам показываем "определяется индивидуально"
+    // Для форм TOPUP и AMS показываем специальные значения
     const isTopupOrAms = templateSelector === toSelector(FORM_INCOME_TOPUP) || templateSelector === toSelector(FORM_INCOME_AMS);
-    if (isTopupOrAms && !window.IS_ADMIN) {
-      modalAmount.textContent = 'определяется индивидуально';
+    if (isTopupOrAms) {
+      // Не-админам показываем "определяется индивидуально", админам - пусто (обновится при вводе данных)
+      modalAmount.textContent = window.IS_ADMIN ? '' : 'определяется индивидуально';
     } else {
       modalAmount.textContent = amount || '';
     }
@@ -328,10 +329,11 @@ if (flyerResult.handled) {
       return;
     }
 
-    // Для форм TOPUP и AMS не-админам показываем "определяется индивидуально"
+    // Для форм TOPUP и AMS показываем специальные значения
     const isTopupOrAms = templateSelector === toSelector(FORM_INCOME_TOPUP) || templateSelector === toSelector(FORM_INCOME_AMS);
-    if (isTopupOrAms && !window.IS_ADMIN) {
-      modalAmount.textContent = 'определяется индивидуально';
+    if (isTopupOrAms) {
+      // Не-админам показываем "определяется индивидуально", админам - пусто
+      modalAmount.textContent = window.IS_ADMIN ? '' : 'определяется индивидуально';
       return;
     }
 

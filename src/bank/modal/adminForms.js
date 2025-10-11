@@ -394,6 +394,11 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
     modalFields.appendChild(systemInfoBlock);
   }
 
+  // Очищаем modalAmount для админов (будет обновлено при вводе данных)
+  if (modalAmount) {
+    modalAmount.textContent = '';
+  }
+
   // 3) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 

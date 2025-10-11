@@ -59,22 +59,51 @@ export function handleCounterForms({ template, modalFields, btnSubmit, counterWa
       ? 'условно округлено'
       : 'округлено до сотен';
 
-    const lines = [
-      `**Последнее обработанное значение:** ${oldVal}`,
-      newVal !== rounded
-        ? `**Новое значение:** ${newVal} **→ ${roundLabel}:** ${rounded}`
-        : `**Новое значение:** ${newVal}`
-    ];
+    // Удаляем старый muted-note если есть
+    const oldNote = modalFields.querySelector('.muted-note');
+    if (oldNote) oldNote.remove();
+
+    // Удаляем старый field если есть
+    const oldField = modalFields.querySelector('.field');
+    if (oldField) oldField.remove();
+
+    // Создаем новый field со списком
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.innerHTML = `
+      <div style="max-height:320px; overflow:auto">
+        <ul style="list-style: none; padding: 0; margin: 0;"></ul>
+      </div>`;
+    const ul = wrap.querySelector('ul');
+
+    // Добавляем пункты списка
+    const li1 = document.createElement('li');
+    li1.innerHTML = `<strong>Последнее обработанное значение:</strong> ${oldVal}`;
+    ul.appendChild(li1);
+
+    const li2 = document.createElement('li');
+    if (newVal !== rounded) {
+      li2.innerHTML = `<strong>Новое значение:</strong> ${newVal} → <strong>${roundLabel}:</strong> ${rounded}`;
+    } else {
+      li2.innerHTML = `<strong>Новое значение:</strong> ${newVal}`;
+    }
+    ul.appendChild(li2);
 
     if (diff === 0) {
-      lines.push('', `**Для новых начислений не хватает ${cfg.unitLabel}.**`);
-      updateNote(modalFields, lines, { error: false });
+      const li3 = document.createElement('li');
+      li3.innerHTML = `<br><strong>Для новых начислений не хватает ${cfg.unitLabel}.</strong>`;
+      ul.appendChild(li3);
+
+      modalFields.appendChild(wrap);
       btnSubmit.style.display = 'none';
       btnSubmit.disabled = true;
       updateAmountSummary(0);
     } else {
-      lines.push('', `**Будет начислена выплата за** ${rounded} - ${oldVal} = ${diff} **${cfg.diffNoteLabel}.**`);
-      updateNote(modalFields, lines, { error: false });
+      const li3 = document.createElement('li');
+      li3.innerHTML = `<br><strong>Будет начислена выплата за</strong> ${rounded} - ${oldVal} = ${diff} <strong>${cfg.diffNoteLabel}.</strong>`;
+      ul.appendChild(li3);
+
+      modalFields.appendChild(wrap);
       btnSubmit.style.display = '';
       btnSubmit.disabled = false;
       updateAmountSummary(units);

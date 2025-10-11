@@ -316,11 +316,20 @@ export function handlePostForms({ template, modalFields, btnSubmit, counterWatch
 // HANDLER: FLYER FORM
 // ============================================================================
 
-export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount }) {
+export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount, price }) {
   if (template.id !== FORM_INCOME_FLYER) return { handled: false, counterWatcher };
 
   // показываем «ждём…» (у вас уже есть <p class="muted-note">Пожалуйста, подождите...</p>)
   updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
+
+  // Добавляем system-info блок сразу после элемента .info
+  const infoBlock = modalFields.querySelector('.info');
+  if (infoBlock) {
+    const systemInfo = document.createElement('div');
+    systemInfo.className = 'system-info';
+    systemInfo.innerHTML = `<strong>Система подсчета:</strong> за каждую листовку, размещенную с <strong>Вашего профиля</strong> — ${formatNumber(price)}.`;
+    infoBlock.insertAdjacentElement('afterend', systemInfo);
+  }
 
   // helper для извлечения {src, text} из элемента массива (поддержим и вложенный словарь)
   const pickLink = (item) => {
@@ -400,7 +409,7 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
     // заголовок «Список листовок:»
     const caption = document.createElement('p');
     caption.className = 'list-caption';
-    caption.innerHTML = '<strong>Список листовок:</strong>';
+    caption.innerHTML = '<strong>Список найденных листовок:</strong>';
 
     // контейнер со скроллом + нумерованный список (как в «Личный пост»)
     const wrap = document.createElement('div');

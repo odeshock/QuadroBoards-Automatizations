@@ -84,8 +84,9 @@ export function showErrorMessage(modalFields, message = TEXT_MESSAGES.ERROR_REFR
     err.className = 'note-error admin-error';
     err.style.color = 'var(--danger)';
 
-    // Вставляем после system-info, info или admin-wait-note
-    const anchor = modalFields.querySelector('.system-info, .info, .admin-wait-note');
+    // Вставляем после system-info (если есть), иначе после info или admin-wait-note
+    const systemInfo = modalFields.querySelector('.system-info');
+    const anchor = systemInfo || modalFields.querySelector('.info, .admin-wait-note');
     if (anchor) {
       anchor.insertAdjacentElement('afterend', err);
     } else {

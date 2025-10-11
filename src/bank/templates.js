@@ -2,6 +2,7 @@
 // templates.js — Шаблоны модальных окон
 // ============================================================================
 
+import { BASE_URL } from './config.js';
 import {
   TEXT_MESSAGES,
   FORM_INCOME_ANKETA, FORM_INCOME_AKCION, FORM_INCOME_NEEDCHAR, FORM_INCOME_NEEDREQUEST,

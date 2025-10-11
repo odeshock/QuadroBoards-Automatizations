@@ -15,8 +15,7 @@ import {
 } from './config.js';
 
 import {
-  showErrorMessage,
-  updateNote
+  showErrorMessage
 } from './helpers.js';
 
 export function handleBannerForms({ template, modalFields, btnSubmit, counterWatcher }) {
@@ -54,7 +53,21 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
 
     // Если флаг false - уже обработано
     if (flagValue === false) {
-      updateNote(modalFields, `**${message}**`, { error: false });
+      // Удаляем "Пожалуйста, подождите..."
+      const waitEl = modalFields.querySelector('.muted-note');
+      if (waitEl) waitEl.remove();
+
+      // Создаем сообщение и вставляем после info
+      const msg = document.createElement('p');
+      msg.innerHTML = `<strong>${message}</strong>`;
+
+      const infoBlock = modalFields.querySelector('.info');
+      if (infoBlock) {
+        infoBlock.insertAdjacentElement('afterend', msg);
+      } else {
+        modalFields.appendChild(msg);
+      }
+
       btnSubmit.style.display = 'none';
       cancel();
       return;

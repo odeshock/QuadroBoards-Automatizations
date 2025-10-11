@@ -335,7 +335,7 @@ function renderUserAmountPicker({
     if (!block.contains(e.target)) list.style.display = 'none';
   });
 
-  // Prefill из data: recipient_i + amount_i (+ comment_i)
+  // Prefill из data: recipient_i + amount_i (+ comment_i если requireComment)
   if (data) {
     const ids = Object.keys(data)
       .filter(k => /^recipient_\d+$/.test(k))
@@ -345,10 +345,11 @@ function renderUserAmountPicker({
       const rid = String(data[rk]).trim();
       if (!rid) return;
       const amount = String(data[`${amountFieldName}_${idx}`] ?? '').trim();
-      const comment = requireComment ? String(data[`comment_${idx}`] ?? '').trim() : '';
       const u = users.find(x => String(x.id) === rid);
-      if (u) addChip(u, amount, comment);
-      else   addChip({ id: rid, name: 'Неизвестный' }, amount, comment);
+      if (u) {
+        const comment = requireComment ? String(data[`comment_${idx}`] ?? '').trim() : '';
+        addChip(u, amount, comment);
+      }
     });
     syncHiddenFields();
   }

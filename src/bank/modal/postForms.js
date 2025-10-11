@@ -130,7 +130,18 @@ export function setupPostsModalFlow({
   const succeed = (posts) => {
     if (canceled) return;
 
-    const items = Array.isArray(posts) ? posts.map(normalizePostItem).filter(Boolean) : [];
+    // Сначала проверяем пустоту
+    if (!Array.isArray(posts) || posts.length === 0) {
+      updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
+      btnSubmit.style.display = 'none';
+      setHiddenField(modalFields, hiddenFieldName, '');
+      setSummary(0, 0);
+      cancel();
+      return;
+    }
+
+    // Потом нормализуем
+    const items = posts.map(normalizePostItem).filter(Boolean);
     if (!items.length) {
       updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
       btnSubmit.style.display = 'none';

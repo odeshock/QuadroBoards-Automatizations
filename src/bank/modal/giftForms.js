@@ -46,7 +46,8 @@ function renderGiftPickerUniversal({
   price,
   updateTotalCost,
   showPreview = false,
-  includeGiftDataField = false
+  includeGiftDataField = false,
+  title = null
 }) {
   return renderRecipientPickerUniversal({
     users,
@@ -60,7 +61,7 @@ function renderGiftPickerUniversal({
     showPreview: showPreview,
     allowDuplicateRecipients: true,
 
-    giftData: { id: giftId, icon: giftIcon },
+    giftData: { id: giftId, icon: giftIcon, title: title },
     priceData: null,
 
     updateCostCallback: updateTotalCost,
@@ -68,7 +69,7 @@ function renderGiftPickerUniversal({
   });
 }
 
-export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
+export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price, title }) {
   // 1) Очищаем модальное окно
   clearModalFields(modalFields);
 
@@ -112,7 +113,8 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
       price,
       updateTotalCost,
       showPreview: false,
-      includeGiftDataField: true
+      includeGiftDataField: true,
+      title
     });
   };
 
@@ -125,7 +127,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 // SETUP GIFT FLOW - Подарки
 // ============================================================================
 
-export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
+export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price, title }) {
   // 1) Очищаем модальное окно
   clearModalFields(modalFields);
 
@@ -170,7 +172,8 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
       price,
       updateTotalCost,
       showPreview: true,
-      includeGiftDataField: false
+      includeGiftDataField: false,
+      title
     });
   };
 
@@ -192,8 +195,8 @@ export function handleGiftsAndDesignForms({ template, modalFields, btnSubmit, co
   const timeoutMs = config.timeoutMs || GIFT_TIMEOUT_MS;
 
   counterWatcher = isCustom
-    ? setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price })
-    : setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price });
+    ? setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price, title: config.title })
+    : setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price, title: config.title });
 
   return { handled: true, counterWatcher };
 }

@@ -56,13 +56,14 @@ export function renderRecipientPickerUniversal({
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'icon-prw';
+    // Вставляем HTML ДО добавления в DOM чтобы браузер мог начать предзагрузку
     iconSpan.innerHTML = giftData.icon || '';
 
-    const idSpan = document.createElement('span');
-    idSpan.style.fontWeight = '600';
-    idSpan.textContent = `ID: ${giftData.id || ''}`;
+    const titleSpan = document.createElement('span');
+    titleSpan.style.fontWeight = '600';
+    titleSpan.textContent = giftData.title || `ID: ${giftData.id || ''}`;
 
-    preview.append(iconSpan, idSpan);
+    preview.append(iconSpan, titleSpan);
     modalFields.appendChild(preview);
   }
 

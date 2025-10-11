@@ -27,6 +27,7 @@ import {
 
 // Вспомогательные функции для создания шаблонов
 const infoTemplate = (text) => `<div class="info">${text}</div>`;
+const systemInfoTemplate = (text) => `<div class="system-info">${text}</div>`;
 const infoWithNote = (text, note = '') => `<div class="info">${text}</div><p class="muted-note">${note}</p>`;
 const waitingTemplate = (text) => infoWithNote(text, TEXT_MESSAGES.PLEASE_WAIT);
 
@@ -37,15 +38,16 @@ const quantityField = (idPrefix) => {
 };
 
 // Генератор шаблона для поля с URL и кнопкой "+ Еще"
-const urlFieldWithExtra = ({ id, name, label, buttonData, info = '' }) => {
+const urlFieldWithExtra = ({ id, name, label, buttonData, info = '', systemInfo = '' }) => {
   const infoBlock = info ? infoTemplate(info) : '';
+  const systemInfoBlock = systemInfo ? systemInfoTemplate(systemInfo) : '';
   const isCountBase = buttonData.type === 'count-base';
 
   const buttonAttrs = isCountBase
     ? `data-add-extra data-count-base="${buttonData.value}"`
     : `data-add-extra data-extra-label="${buttonData.label}" data-extra-start="${buttonData.start || 2}"`;
 
-  return `${infoBlock}<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${name}" type="url" required></div><div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
+  return `${infoBlock}${systemInfoBlock}<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${name}" type="url" required></div><div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
 };
 
 // Генератор шаблона для простого поля (input/textarea)
@@ -93,13 +95,15 @@ export const formTemplates = {
     id: 'ep-link',
     name: 'ep',
     label: 'Ссылка на эпизод *',
-    buttonData: { type: 'count-base', value: 'ep' }
+    buttonData: { type: 'count-base', value: 'ep' },
+    systemInfo: 'Каждый завершённый эпизод учитывается <strong>лишь раз</strong>. При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_EP_PLOT]: urlFieldWithExtra({
     id: 'plot-ep-link',
     name: 'plot_ep',
     label: 'Ссылка на эпизод *',
-    buttonData: { type: 'count-base', value: 'plot_ep' }
+    buttonData: { type: 'count-base', value: 'plot_ep' },
+    systemInfo: 'Каждый завершённый эпизод учитывается <strong>лишь раз</strong>. При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_CONTEST]: urlFieldWithExtra({
     id: 'uc',
@@ -134,8 +138,8 @@ export const formTemplates = {
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 }
   }),
-  [FORM_INCOME_BANNER_RENO]: waitingTemplate(TEXT_MESSAGES.BANNER_INFO),
-  [FORM_INCOME_BANNER_MAYAK]: waitingTemplate(TEXT_MESSAGES.BANNER_INFO),
+  [FORM_INCOME_BANNER_RENO]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
+  [FORM_INCOME_BANNER_MAYAK]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
   [FORM_INCOME_RPGTOP]: urlFieldWithExtra({
     id: 'rpgtop-link',
     name: 'need',

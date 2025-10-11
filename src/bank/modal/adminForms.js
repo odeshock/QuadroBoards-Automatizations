@@ -71,7 +71,7 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
         data,
         modalAmount,
         basePrice,
-        labelText: 'Кому начислить*',
+        labelText: 'Кому начислить *',
         placeholder: 'Начните вводить имя или id...'
       });
     },

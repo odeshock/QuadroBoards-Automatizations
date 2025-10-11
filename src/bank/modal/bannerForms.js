@@ -70,7 +70,7 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
       fieldWrap.className = 'field';
       fieldWrap.innerHTML = `
         <label for="url">Ссылка на скрин *</label>
-        <input id="url" name="url" type="url" required placeholder="https://...">
+        <input id="url" name="url" type="url" required">
       `;
       modalFields.appendChild(fieldWrap);
 

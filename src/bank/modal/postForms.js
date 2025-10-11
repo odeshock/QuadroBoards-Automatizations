@@ -136,7 +136,21 @@ export function setupPostsModalFlow({
 
     // Сначала проверяем пустоту
     if (!Array.isArray(posts) || posts.length === 0) {
-      updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
+      // Удаляем "Пожалуйста, подождите..."
+      const waitEl = modalFields.querySelector('.muted-note');
+      if (waitEl) waitEl.remove();
+
+      // Создаем сообщение и вставляем после system-info/info
+      const msg = document.createElement('p');
+      msg.innerHTML = '<strong>Для новых начислений не хватает новых постов.</strong>';
+
+      const anchor = modalFields.querySelector('.system-info') || modalFields.querySelector('.info');
+      if (anchor) {
+        anchor.insertAdjacentElement('afterend', msg);
+      } else {
+        modalFields.appendChild(msg);
+      }
+
       btnSubmit.style.display = 'none';
       setHiddenField(modalFields, hiddenFieldName, '');
       setSummary(0, 0);
@@ -147,7 +161,21 @@ export function setupPostsModalFlow({
     // Потом нормализуем
     const items = posts.map(normalizePostItem).filter(Boolean);
     if (!items.length) {
-      updateNote(modalFields, '**Для новых начислений не хватает новых постов.**');
+      // Удаляем "Пожалуйста, подождите..."
+      const waitEl = modalFields.querySelector('.muted-note');
+      if (waitEl) waitEl.remove();
+
+      // Создаем сообщение и вставляем после system-info/info
+      const msg = document.createElement('p');
+      msg.innerHTML = '<strong>Для новых начислений не хватает новых постов.</strong>';
+
+      const anchor = modalFields.querySelector('.system-info') || modalFields.querySelector('.info');
+      if (anchor) {
+        anchor.insertAdjacentElement('afterend', msg);
+      } else {
+        modalFields.appendChild(msg);
+      }
+
       btnSubmit.style.display = 'none';
       setHiddenField(modalFields, hiddenFieldName, '');
       setSummary(0, 0);
@@ -384,7 +412,26 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
 
     // ⛔ если массив пустой — показываем сообщение и скрываем кнопку
     if (!Array.isArray(posts) || posts.length === 0) {
-      updateNote(modalFields, '**Для новых начислений не хватает новых реклам.**');
+      // Удаляем "Пожалуйста, подождите..."
+      const waitEl = modalFields.querySelector('.muted-note');
+      if (waitEl) waitEl.remove();
+
+      // Создаем сообщение и вставляем после system-info
+      const msg = document.createElement('p');
+      msg.innerHTML = '<strong>Для новых начислений не хватает новых реклам.</strong>';
+
+      const systemInfo = modalFields.querySelector('.system-info');
+      if (systemInfo) {
+        systemInfo.insertAdjacentElement('afterend', msg);
+      } else {
+        const infoBlock = modalFields.querySelector('.info');
+        if (infoBlock) {
+          infoBlock.insertAdjacentElement('afterend', msg);
+        } else {
+          modalFields.appendChild(msg);
+        }
+      }
+
       btnSubmit.style.display = 'none'; // скрываем кнопку полностью
       setHiddenField(modalFields, 'flyer_links_json', '');
       form.dataset.currentMultiplier = '0';

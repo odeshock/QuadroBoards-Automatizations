@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { formatNumber } from '../services.js';
-import { clearRecipientFields, disableSubmitButton } from './helpers.js';
+import { clearRecipientFields, disableSubmitButton, createPortal } from './helpers.js';
 
 /**
  * Создаёт интерактивный компонент выбора ОДНОГО пользователя
@@ -69,21 +69,7 @@ export function createSingleUserPicker(options) {
     if (onUpdate) onUpdate(pickedId ? { id: pickedId, name: pickedName } : null);
   };
 
-  const portalList = list;
-  portalList.style.position = 'fixed';
-  portalList.style.zIndex = '9999';
-  let portalMounted = false;
-
-  const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
-  const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
-  const positionPortal = () => {
-    const r = input.getBoundingClientRect();
-    portalList.style.left = r.left + 'px';
-    portalList.style.top = (r.bottom + 6) + 'px';
-    portalList.style.width = r.width + 'px';
-  };
-  const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
-  const openSuggest = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
+  const portal = createPortal(list, input, block);
 
   const buildItem = (u) => {
     const item = document.createElement('button');
@@ -96,28 +82,23 @@ export function createSingleUserPicker(options) {
       pickedName = u.name;
       input.value = u.name + ' (id: ' + u.id + ')';
       syncHiddenFields();
-      closeSuggest();
+      portal.close();
     });
     return item;
   };
 
   const doSearch = () => {
     const q = norm(input.value);
-    portalList.innerHTML = '';
-    if (!q) { closeSuggest(); return; }
+    list.innerHTML = '';
+    if (!q) { portal.close(); return; }
     const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
-    if (!res.length) { closeSuggest(); return; }
-    res.forEach(u => portalList.appendChild(buildItem(u)));
-    openSuggest();
+    if (!res.length) { portal.close(); return; }
+    res.forEach(u => list.appendChild(buildItem(u)));
+    portal.open();
   };
 
   input.addEventListener('input', doSearch);
   input.addEventListener('focus', doSearch);
-  document.addEventListener('click', (e) => {
-    if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
-  });
-  window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
-  window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
 
   if (data) {
     const ids = Object.keys(data).filter(k => /^recipient_\d+$/.test(k))
@@ -153,6 +134,6 @@ export function createSingleUserPicker(options) {
       syncHiddenFields();
     },
     clear: () => { pickedId = ''; pickedName = ''; input.value = ''; syncHiddenFields(); },
-    destroy: () => { unmountPortal(); block.remove(); }
+    destroy: () => { portal.destroy(); block.remove(); }
   };
 }

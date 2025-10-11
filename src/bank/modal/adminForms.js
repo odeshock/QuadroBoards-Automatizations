@@ -39,7 +39,8 @@ import {
   hideWaitMessage,
   showErrorMessage,
   disableSubmitButton,
-  waitForGlobalArray
+  waitForGlobalArray,
+  createPortal
 } from './helpers.js';
 
 import { createUserPicker } from './userPicker.js';
@@ -277,20 +278,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
   };
 
   // Подсказки (портал)
-  const portalList = list;
-  portalList.style.position = 'fixed';
-  portalList.style.zIndex = '9999';
-  let portalMounted = false;
-  const mountPortal = () => { if (!portalMounted) { document.body.appendChild(portalList); portalMounted = true; } };
-  const unmountPortal = () => { if (portalMounted) { portalList.remove(); portalMounted = false; } };
-  const positionPortal = () => {
-    const r = input.getBoundingClientRect();
-    portalList.style.left = `${r.left}px`;
-    portalList.style.top  = `${r.bottom + 6}px`;
-    portalList.style.width = `${r.width}px`;
-  };
-  const closeSuggest = () => { portalList.style.display = 'none'; unmountPortal(); };
-  const openSuggest  = () => { mountPortal(); positionPortal(); portalList.style.display = 'block'; };
+  const portal = createPortal(list, input, block);
 
   const norm = (s) => String(s ?? '').trim().toLowerCase();
   const buildItem = (u) => {
@@ -302,27 +290,22 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
     item.addEventListener('click', () => {
       addChip(u);
       input.value = '';
-      closeSuggest();
+      portal.close();
       input.focus();
     });
     return item;
   };
   const doSearch = () => {
     const q = norm(input.value);
-    portalList.innerHTML = '';
-    if (!q) { closeSuggest(); return; }
+    list.innerHTML = '';
+    if (!q) { portal.close(); return; }
     const res = users.filter(u => norm(u.name).includes(q) || String(u.id).includes(q)).slice(0, 20);
-    if (!res.length) { closeSuggest(); return; }
-    res.forEach(u => portalList.appendChild(buildItem(u)));
-    openSuggest();
+    if (!res.length) { portal.close(); return; }
+    res.forEach(u => list.appendChild(buildItem(u)));
+    portal.open();
   };
   input.addEventListener('input', doSearch);
   input.addEventListener('focus', doSearch);
-  document.addEventListener('click', (e) => {
-    if (!block.contains(e.target) && !portalList.contains(e.target)) closeSuggest();
-  });
-  window.addEventListener('scroll', () => { if (portalList.style.display === 'block') positionPortal(); }, true);
-  window.addEventListener('resize', () => { if (portalList.style.display === 'block') positionPortal(); });
 
   // Prefill из data: recipient_i + topup_i (+ comment_i для AMS)
   if (data) {
@@ -553,46 +536,35 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
     };
 
     // Подсказки (портал)
-    const portalList = list;
-    portalList.style.position = 'fixed';
-    portalList.style.zIndex = '9999';
+    const portal = createPortal(list, input, block);
 
-    const hideList = () => { portalList.innerHTML = ''; portalList.style.display = 'none'; };
-
-    const showList = (items) => {
-      portalList.innerHTML = '';
-      if (!items.length) { hideList(); return; }
-
-      items.forEach(u => {
-        const item = document.createElement('div');
-        item.className = 'suggest-item';
-        item.textContent = `${u.name} (id: ${u.id})`;
-        item.setAttribute('role', 'option');
-        item.addEventListener('click', () => {
-          addChip(u);
-          input.value = '';
-          hideList();
-        });
-        portalList.appendChild(item);
+    const buildItem = (u) => {
+      const item = document.createElement('div');
+      item.className = 'suggest-item';
+      item.textContent = `${u.name} (id: ${u.id})`;
+      item.setAttribute('role', 'option');
+      item.addEventListener('click', () => {
+        addChip(u);
+        input.value = '';
+        portal.close();
       });
-
-      const rect = input.getBoundingClientRect();
-      portalList.style.left = rect.left + 'px';
-      portalList.style.top = rect.bottom + 'px';
-      portalList.style.width = rect.width + 'px';
-      portalList.style.display = 'block';
+      return item;
     };
 
-    input.addEventListener('input', () => {
+    const doSearch = () => {
       const q = input.value.trim().toLowerCase();
-      if (!q) { hideList(); return; }
+      list.innerHTML = '';
+      if (!q) { portal.close(); return; }
       const matches = users
         .filter(u => u.name.toLowerCase().includes(q) || String(u.id).includes(q))
         .slice(0, 10);
-      showList(matches);
-    });
+      if (!matches.length) { portal.close(); return; }
+      matches.forEach(u => list.appendChild(buildItem(u)));
+      portal.open();
+    };
 
-    input.addEventListener('blur', () => setTimeout(hideList, 200));
+    input.addEventListener('input', doSearch);
+    input.addEventListener('blur', () => setTimeout(() => portal.close(), 200));
 
     // Восстановление данных при редактировании
     if (data) {

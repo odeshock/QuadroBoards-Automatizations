@@ -35,6 +35,9 @@ import {
   FORM_EXP_THIRDCHAR,
   FORM_INCOME_TOPUP,
   FORM_INCOME_AMS,
+  FORM_INCOME_ANKETA,
+  FORM_INCOME_AKCION,
+  FORM_INCOME_NEEDCHAR,
   toSelector
 } from './constants.js';
 
@@ -691,6 +694,14 @@ export function renderLog(log) {
           meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${group.amount}</span>`;
         }
         header.appendChild(meta);
+      } else if (
+        group.templateSelector === toSelector(FORM_INCOME_ANKETA) ||
+        group.templateSelector === toSelector(FORM_INCOME_AKCION) ||
+        group.templateSelector === toSelector(FORM_INCOME_NEEDCHAR)
+      ) {
+        // Приём анкеты, Взятие акционного персонажа, Взятие нужного персонажа: всегда показываем 0
+        meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}0</span>`;
+        header.appendChild(meta);
       } else {
         // Используем mode для расчета стоимости
         const mode = group.mode;
@@ -1278,6 +1289,15 @@ export function renderLog(log) {
     let totalSum = 0;
     sortedGroups.forEach((group) => {
       if (!group.amount) return;
+
+      // Пропускаем формы, для которых всегда показываем 0
+      if (
+        group.templateSelector === toSelector(FORM_INCOME_ANKETA) ||
+        group.templateSelector === toSelector(FORM_INCOME_AKCION) ||
+        group.templateSelector === toSelector(FORM_INCOME_NEEDCHAR)
+      ) {
+        return;
+      }
 
       const isIncome = group.isDiscount || group.templateSelector?.includes('income');
       const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);

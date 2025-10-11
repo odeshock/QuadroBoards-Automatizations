@@ -30,6 +30,8 @@ import {
   FORM_INCOME_RPGTOP,
   FORM_INCOME_EP_PERSONAL,
   FORM_INCOME_EP_PLOT,
+  FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS,
   toSelector
 } from '../constants.js';
 
@@ -173,7 +175,13 @@ export function openModal({
       updateModalAmount(modalAmount, form, { items: initialItems });
     }
   } else {
-    modalAmount.textContent = amount || '';
+    // Для форм TOPUP и AMS не-админам показываем "определяется индивидуально"
+    const isTopupOrAms = templateSelector === toSelector(FORM_INCOME_TOPUP) || templateSelector === toSelector(FORM_INCOME_AMS);
+    if (isTopupOrAms && !window.IS_ADMIN) {
+      modalAmount.textContent = 'определяется индивидуально';
+    } else {
+      modalAmount.textContent = amount || '';
+    }
   }
 
   if (entryId) {
@@ -306,8 +314,8 @@ if (flyerResult.handled) {
       return;
     }
 
-    // Для topup/ams (mode='entered_amount') показываем просто price
-    if (mode === 'entered_amount' && form.dataset.price) {
+    // Для topup/ams (mode='entered_amount') показываем просто price (только для админов)
+    if (mode === 'entered_amount' && form.dataset.price && window.IS_ADMIN) {
       const priceNum = Number(form.dataset.price);
       modalAmount.textContent = formatNumber(priceNum);
       return;
@@ -317,6 +325,13 @@ if (flyerResult.handled) {
     if (mode === 'price_w_entered_amount' && form.dataset.price) {
       const priceNum = Number(form.dataset.price);
       modalAmount.textContent = formatNumber(priceNum);
+      return;
+    }
+
+    // Для форм TOPUP и AMS не-админам показываем "определяется индивидуально"
+    const isTopupOrAms = templateSelector === toSelector(FORM_INCOME_TOPUP) || templateSelector === toSelector(FORM_INCOME_AMS);
+    if (isTopupOrAms && !window.IS_ADMIN) {
+      modalAmount.textContent = 'определяется индивидуально';
       return;
     }
 

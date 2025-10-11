@@ -244,10 +244,16 @@ function renderUserAmountPicker({
     // Обновляем modal-amount через callback или дефолтную логику
     if (onAmountUpdate) {
       onAmountUpdate(picked, modalAmount, basePrice);
-    } else if (modalAmount && basePrice !== null) {
-      const price = Number(basePrice);
-      const total = price * totalAmount;
-      modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
+    } else if (modalAmount) {
+      // Для форм с basePrice показываем: price × totalAmount = total
+      if (basePrice !== null) {
+        const price = Number(basePrice);
+        const total = price * totalAmount;
+        modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
+      } else {
+        // Для форм без basePrice (TOPUP/AMS) показываем просто сумму
+        modalAmount.textContent = totalAmount > 0 ? formatNumber(totalAmount) : '';
+      }
     }
   };
 
@@ -577,6 +583,11 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
       infoBlock.className = 'info';
       infoBlock.textContent = TEXT_MESSAGES.AMS_INFO;
       modalFields.appendChild(infoBlock);
+    }
+
+    // Показываем информационное сообщение для не-админов
+    if (modalAmount) {
+      modalAmount.textContent = 'определяется индивидуально';
     }
 
     btnSubmit.style.display = 'none';

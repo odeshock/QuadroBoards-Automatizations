@@ -363,6 +363,12 @@ export function updateModalAmount(modalAmount, form, params = {}) {
     return;
   }
 
+  // Для режима 'entered_amount' (TOPUP/AMS) не-админам не обновляем modalAmount
+  // (оно будет установлено в handleAdminAmountForms как "определяется индивидуально")
+  if (mode === 'entered_amount' && !window.IS_ADMIN) {
+    return;
+  }
+
   const displayText = formatCostDisplay(mode, price, bonus, items, additional_items, entered_amount);
   modalAmount.textContent = displayText;
 }

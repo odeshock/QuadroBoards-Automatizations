@@ -134,18 +134,8 @@ export const formTemplates = {
     label: 'Ссылка на эпизод *',
     buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 }
   }),
-  [FORM_INCOME_BANNER_RENO]: simpleField({
-    id: 'reno',
-    name: 'url',
-    label: 'Ссылка на скрин *',
-    type: 'url'
-  }),
-  [FORM_INCOME_BANNER_MAYAK]: simpleField({
-    id: 'mayak',
-    name: 'url',
-    label: 'Ссылка на скрин *',
-    type: 'url'
-  }),
+  [FORM_INCOME_BANNER_RENO]: waitingTemplate(TEXT_MESSAGES.BANNER_INFO),
+  [FORM_INCOME_BANNER_MAYAK]: waitingTemplate(TEXT_MESSAGES.BANNER_INFO),
   [FORM_INCOME_RPGTOP]: urlFieldWithExtra({
     id: 'rpgtop-link',
     name: 'need',
@@ -233,7 +223,8 @@ const infoForms = [
   FORM_INCOME_100MSGS, FORM_INCOME_100REP, FORM_INCOME_100POS,
   FORM_INCOME_MONTH, FORM_INCOME_FLYER, FORM_INCOME_TOPUP,
   FORM_INCOME_AMS, FORM_INCOME_WRITER, FORM_INCOME_POST_OF,
-  FORM_INCOME_EPISODE_OF, FORM_INCOME_ACTIVIST
+  FORM_INCOME_EPISODE_OF, FORM_INCOME_ACTIVIST,
+  FORM_INCOME_BANNER_RENO, FORM_INCOME_BANNER_MAYAK
 ];
 
 // Функция для инжекта шаблонов в DOM

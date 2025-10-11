@@ -41,6 +41,7 @@ export const TOPUP_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 export const AMS_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 export const TRANSFER_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 export const GIFT_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+export const BANNER_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 
 // Конфигурация для счётчиков (сообщения, репутация, позитив, месяцы)
 export const counterConfigs = {

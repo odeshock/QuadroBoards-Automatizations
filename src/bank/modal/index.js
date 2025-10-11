@@ -52,7 +52,7 @@ import {
 } from './urlFieldForms.js';
 
 import {
-  handleBannerAlreadyProcessed
+  handleBannerForms
 } from './bannerForms.js';
 
 export function openModal({
@@ -176,11 +176,16 @@ export function openModal({
   counterWatcher = cleanupCounterWatcher(counterWatcher, modalFields, form);
   modalFields.innerHTML = template.innerHTML;
 
-const bannerState = handleBannerAlreadyProcessed({ template, modalFields, btnSubmit });
-if (bannerState.shouldReturn) {
+  // Открываем backdrop СРАЗУ после установки контента
+  backdrop.setAttribute('open', '');
+  backdrop.removeAttribute('aria-hidden');
+
+// === BANNER: баннеры Рено и Маяк ===
+const bannerResult = handleBannerForms({ template, modalFields, btnSubmit, counterWatcher });
+if (bannerResult.handled) {
+  counterWatcher = bannerResult.counterWatcher;
   return { counterWatcher };
 }
-
 
 // === ADMIN multi-recipient начисления (анкета, акция, нужный, эпизод) ===
 const adminMultiResult = handleAdminRecipientMultiForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, price });
@@ -450,9 +455,6 @@ if (buyoutResult.handled) {
     refreshGiftGroups();
     updateAmountSummary();
   }
-
-  backdrop.setAttribute('open', '');
-  backdrop.removeAttribute('aria-hidden');
 
   return { counterWatcher };
 }

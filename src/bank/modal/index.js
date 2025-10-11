@@ -133,7 +133,7 @@ export function openModal({
       initialItems = 1;
     }
 
-    // Для форм с получателями (бонусы, маска, жилет, подарки) показываем базовую цену
+    // Для форм с получателями (бонусы, маска, жилет, подарки) и баннеров показываем базовую цену
     const hasRecipientField = templateSelector?.includes('bonus') ||
                               templateSelector?.includes('mask') ||
                               templateSelector?.includes('clean') ||
@@ -142,7 +142,9 @@ export function openModal({
                               templateSelector?.includes('badge') ||
                               templateSelector?.includes('bg');
 
-    if (initialItems === 0 && hasRecipientField) {
+    const isBanner = templateSelector?.includes('banner');
+
+    if (initialItems === 0 && (hasRecipientField || isBanner)) {
       // Показываем просто price за единицу
       modalAmount.textContent = formatNumber(price);
     } else {

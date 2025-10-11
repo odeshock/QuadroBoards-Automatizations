@@ -381,9 +381,15 @@ export function updateModalAmount(modalAmount, form, params = {}) {
 }
 
 export function cleanupCounterWatcher(counterWatcher, modalFields, form) {
-  if (counterWatcher && typeof counterWatcher.cancel === 'function') {
+  // Проверяем, если это объект с вложенным counterWatcher (например, {counterWatcher: {cancel: fn}})
+  if (counterWatcher && counterWatcher.counterWatcher && typeof counterWatcher.counterWatcher.cancel === 'function') {
+    counterWatcher.counterWatcher.cancel();
+  }
+  // Или если это прямой counterWatcher с cancel функцией
+  else if (counterWatcher && typeof counterWatcher.cancel === 'function') {
     counterWatcher.cancel();
   }
+
   counterWatcher = null;
   modalFields.querySelectorAll('input[type="hidden"][data-auto-field]').forEach((el) => el.remove());
   delete form.dataset.currentMultiplier;

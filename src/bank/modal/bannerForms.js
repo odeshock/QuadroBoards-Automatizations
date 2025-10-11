@@ -31,10 +31,12 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
   // 3) Создаем механизм отмены
   let canceled = false;
   let timeoutHandle = null;
+  let checkInterval = null;
 
   const cancel = () => {
     canceled = true;
     if (timeoutHandle) clearTimeout(timeoutHandle);
+    if (checkInterval) clearInterval(checkInterval);
   };
   counterWatcher = { cancel };
 
@@ -67,7 +69,7 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
       const fieldWrap = document.createElement('div');
       fieldWrap.className = 'field';
       fieldWrap.innerHTML = `
-        <label for="url">Ссылка на профиль или скрин *</label>
+        <label for="url">Ссылка на скрин *</label>
         <input id="url" name="url" type="url" required placeholder="https://...">
       `;
       modalFields.appendChild(fieldWrap);
@@ -87,7 +89,7 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
   // 6) Запускаем проверку с таймаутом
   timeoutHandle = setTimeout(onTimeout, BANNER_TIMEOUT_MS);
 
-  const checkInterval = setInterval(() => {
+  checkInterval = setInterval(() => {
     if (canceled) {
       clearInterval(checkInterval);
       return;

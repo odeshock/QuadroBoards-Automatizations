@@ -90,8 +90,7 @@ function handleOpenModal(config) {
 }
 
 function handleCloseModal() {
-  closeModal({ backdrop, form, modalFields, counterWatcher });
-  counterWatcher = null;
+  counterWatcher = closeModal({ backdrop, form, modalFields, counterWatcher });
 }
 
 // ============================================================================

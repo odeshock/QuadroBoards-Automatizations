@@ -23,6 +23,10 @@ function formatBankOperations(operations) {
         result += comment
           .map((c, idx) => `${idx + 1}. ${c}`)
           .join('\n') + '\n\n';
+      } else if (type === 'list separated') {
+        result += comment
+          .map((c, idx) => `${idx + 1}. ${c}`)
+          .join('\n\n') + '\n\n';
       } else {
         // неизвестный тип — просто выводим как есть
         result += comment.join('\n') + '\n\n';

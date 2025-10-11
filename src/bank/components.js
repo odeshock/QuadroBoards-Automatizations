@@ -50,8 +50,6 @@ import {
   FORM_INCOME_NEEDCHAR,
   FORM_INCOME_TOPUP,
   FORM_INCOME_AMS,
-  FORM_GIFT_CUSTOM,
-  FORM_GIFT_PRESENT,
   FORM_INCOME_EPISODE_OF,
   FORM_INCOME_POST_OF,
   FORM_INCOME_WRITER,
@@ -64,7 +62,7 @@ import {
   FORM_INCOME_RPGTOP,
   FORM_INCOME_EP_PERSONAL,
   FORM_INCOME_EP_PLOT,
-  DESIGN_FORMS,
+  GIFT_AND_DESIGN_FORMS,
   ADMIN_RECIPIENT_MULTI_FORMS,
   ADMIN_SINGLE_RECIPIENT_FORMS,
   ADMIN_AMOUNT_FORMS,
@@ -2635,30 +2633,8 @@ if (SPECIAL_EXPENSE_FORMS.includes(toSelector(template.id))) {
   counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: price });
 }
 
-// === GIFT: «Подарить подарок» — выбор пользователей с опциональными полями "от кого" и "комментарий"
-if (template.id === FORM_GIFT_CUSTOM) {
-  counterWatcher = setupCustomGiftFlow({
-    modalFields, btnSubmit, counterWatcher,
-    timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
-    giftId: config.giftId,
-    giftIcon: config.giftIcon,
-    price: config.price
-  });
-}
-
-if (template.id === FORM_GIFT_PRESENT) {
-  counterWatcher = setupGiftFlow({
-    modalFields, btnSubmit, counterWatcher,
-    timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
-    giftId: config.giftId,
-    giftIcon: config.giftIcon,
-    price: config.price
-  });
-}
-
-// === DESIGN: Оформление (иконки, плашки, фоны) — как подарки ===
-// designForms заменены на DESIGN_FORMS
-if (DESIGN_FORMS.map(f => f.replace("#", "")).includes(template.id)) {
+// === GIFTS & DESIGN: подарки и оформление (иконки, плашки, фоны) ===
+if (GIFT_AND_DESIGN_FORMS.map(f => f.replace("#", "")).includes(template.id)) {
   const isCustom = template.id.includes('custom');
   counterWatcher = isCustom
     ? setupCustomGiftFlow({

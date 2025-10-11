@@ -126,6 +126,12 @@ export const GIFT_FORMS = [
   toSelector(FORM_GIFT_PRESENT)
 ];
 
+// Объединенный массив подарков и оформления (все используют setupGiftFlow/setupCustomGiftFlow)
+export const GIFT_AND_DESIGN_FORMS = [
+  ...GIFT_FORMS,
+  ...DESIGN_FORMS
+];
+
 // Формы с получателями (для рендеринга списком)
 export const RECIPIENT_LIST_FORMS = [
   toSelector(FORM_INCOME_ANKETA),

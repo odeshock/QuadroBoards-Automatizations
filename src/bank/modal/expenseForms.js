@@ -171,6 +171,8 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
       recipientInput.setAttribute('autocomplete', 'off');
       if (prefillUser) {
         recipientInput.value = prefillUser.name;
+      } else {
+        recipientInput.setCustomValidity('Выберите получателя из списка');
       }
 
       const suggestDiv = document.createElement('div');
@@ -299,6 +301,7 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
 
       recipientInput.addEventListener('input', () => {
         group.recipientId = '';
+        recipientInput.setCustomValidity('Выберите получателя из списка');
         doSearch();
         syncHiddenFields();
       });

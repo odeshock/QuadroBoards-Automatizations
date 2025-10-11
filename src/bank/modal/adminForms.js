@@ -45,13 +45,8 @@ import { createUserPicker } from './userPicker.js';
 import { createSingleUserPicker } from './singleUserPicker.js';
 
 export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
-  // 1) Очищаем модальное окно
-  clearModalFields(modalFields, { includeInfo: false });
-
-  // Удаляем disclaimer об администраторе, если есть
-  const maybeInfo = Array.from(modalFields.children)
-    .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
-  if (maybeInfo) maybeInfo.remove();
+  // 1) Очищаем модальное окно (включая disclaimer)
+  clearModalFields(modalFields, { includeInfo: true });
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
@@ -87,13 +82,8 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
 }
 
 export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
-  // 1) Очищаем модальное окно
-  clearModalFields(modalFields, { includeInfo: false });
-
-  // Удаляем disclaimer об администраторе, если есть
-  const maybeInfo = Array.from(modalFields.children)
-    .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
-  if (maybeInfo) maybeInfo.remove();
+  // 1) Очищаем модальное окно (включая disclaimer)
+  clearModalFields(modalFields, { includeInfo: true });
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
@@ -129,12 +119,8 @@ export function setupAdminSingleRecipientFlow({ modalFields, btnSubmit, counterW
 }
 
 export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, requireComment = false, modalAmount, basePrice = null }) {
-  // 1) Очищаем модальное окно
-  clearModalFields(modalFields);
-
-  const maybeInfo = Array.from(modalFields.children)
-    .find(el => /Начисление производит администратор/i.test(el.textContent || ''));
-  if (maybeInfo) maybeInfo.remove();
+  // 1) Очищаем модальное окно (включая disclaimer)
+  clearModalFields(modalFields, { includeInfo: true });
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);

@@ -136,7 +136,7 @@ function renderAdminTopupPicker({ users, modalFields, btnSubmit, data, requireCo
   block.className = 'field anketa-combobox';
 
   const label = document.createElement('label');
-  label.textContent = 'Кому начислить и сколько*';
+  label.textContent = 'Кому начислить и сколько *';
   block.appendChild(label);
 
   const box = document.createElement('div');

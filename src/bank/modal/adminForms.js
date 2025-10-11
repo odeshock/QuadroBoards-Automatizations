@@ -22,7 +22,8 @@ import {
   ADMIN_RECIPIENT_MULTI_FORMS,
   ADMIN_SINGLE_RECIPIENT_FORMS,
   ADMIN_AMOUNT_FORMS,
-  FORM_INCOME_TOPUP
+  FORM_INCOME_TOPUP,
+  FORM_INCOME_AMS
 } from '../constants.js';
 
 import {
@@ -568,6 +569,14 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
       systemInfoBlock.className = 'system-info';
       systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> по галлеону за 1 кредит или 100 баллов, внесённые в «<strong><a href="${BASE_URL}/mod/foundation" target="_blank">Фонд форума</a></strong>».`;
       modalFields.appendChild(systemInfoBlock);
+    }
+
+    // Для AMS показываем только info
+    if (template.id === FORM_INCOME_AMS) {
+      const infoBlock = document.createElement('div');
+      infoBlock.className = 'info';
+      infoBlock.textContent = TEXT_MESSAGES.AMS_INFO;
+      modalFields.appendChild(infoBlock);
     }
 
     btnSubmit.style.display = 'none';

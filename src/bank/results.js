@@ -146,7 +146,8 @@ function buildOperationsArray(logElement) {
         if (comments.length > 0) {
           info.push({
             comment: comments,
-            type: 'list'
+            type: (entryLists.classList.contains('separated')) ? 'list separated' : 'list'
+
           });
         }
       } else {

@@ -147,7 +147,7 @@ export const formTemplates = {
     name: 'need',
     label: 'Ссылка на скрин *',
     buttonData: { type: 'count-base', value: 'need' },
-    info: TEXT_MESSAGES.SCREENSHOT_INFO
+    systemInfo: `Доступно использование не чаще, чем <strong>раз в неделю</strong>.<br>Загрузите свои скриншоты в «<a href="${BASE_URL}/profile.php?section=uploads&id=${window.USER_ID}" target="_blank" rel="noopener noreferrer"><strong>Мои загрузки</strong></a>» и вставьте сюда ссылки.`
   }),
 
   // РАСХОДЫ

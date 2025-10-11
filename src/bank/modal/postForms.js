@@ -257,38 +257,9 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
     btnSubmit.disabled = hideBtn ? true : false;
   };
 
-  const succeed = () => {
-    if (canceled) return;
-
-    const flag = window.FIRST_POST_FLAG;
-    const personal = window.PERSONAL_POSTS;
-    const plot = window.PLOT_POSTS;
-
-    // строгая проверка типов
-    if (typeof flag !== 'boolean' || !Array.isArray(personal) || !Array.isArray(plot)) {
-      fail(); return;
-    }
-
-    // 1) уже начисляли
-    if (flag === false) {
-      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
-      cancel(); return;
-    }
-
-    // 2) флаг true, но оба массива пустые
-    if (flag === true && personal.length === 0 && plot.length === 0) {
-      show('**Для начисления не хватает поста.**', { hideBtn: true });
-      cancel(); return;
-    }
-
-    // 3) флаг true и хотя бы один массив непустой — успех
-    show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
-    cancel();
-  };
-
   const to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
   const poll = setInterval(() => {
-    // Сначала проверяем флаг
+    // Проверяем наличие FIRST_POST_FLAG
     if (typeof window.FIRST_POST_FLAG === 'undefined') return;
 
     // Если флаг есть, но не boolean — ошибка
@@ -296,7 +267,7 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
       fail(); return;
     }
 
-    // Если флаг false — сразу показываем сообщение, не ждём массивы
+    // Если FIRST_POST_FLAG = false — сразу выходим успешно (уже выплачивалось)
     if (window.FIRST_POST_FLAG === false) {
       clearTimeout(to);
       clearInterval(poll);
@@ -305,20 +276,56 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
       return;
     }
 
-    // Если флаг true — ждём появления обоих массивов
-    if (typeof window.PERSONAL_POSTS === 'undefined' || typeof window.PLOT_POSTS === 'undefined') {
-      return;
+    // FIRST_POST_FLAG = true — проверяем условия по мере появления переменных
+
+    // Проверяем PERSONAL_POSTS
+    if (typeof window.PERSONAL_POSTS !== 'undefined') {
+      if (!Array.isArray(window.PERSONAL_POSTS)) {
+        fail(); return;
+      }
+      if (window.PERSONAL_POSTS.length > 0) {
+        clearTimeout(to);
+        clearInterval(poll);
+        show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
+        cancel();
+        return;
+      }
     }
 
-    clearTimeout(to);
-    clearInterval(poll);
-
-    // Проверяем типы массивов
-    if (!Array.isArray(window.PERSONAL_POSTS) || !Array.isArray(window.PLOT_POSTS)) {
-      fail(); return;
+    // Проверяем PLOT_POSTS
+    if (typeof window.PLOT_POSTS !== 'undefined') {
+      if (!Array.isArray(window.PLOT_POSTS)) {
+        fail(); return;
+      }
+      if (window.PLOT_POSTS.length > 0) {
+        clearTimeout(to);
+        clearInterval(poll);
+        show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
+        cancel();
+        return;
+      }
     }
 
-    succeed();
+    // Проверяем FIRST_POST_MISSED_FLAG
+    if (typeof window.FIRST_POST_MISSED_FLAG !== 'undefined') {
+      if (window.FIRST_POST_MISSED_FLAG === true) {
+        clearTimeout(to);
+        clearInterval(poll);
+        show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
+        cancel();
+        return;
+      }
+    }
+
+    // Если все три переменные появились, но ни одно условие не выполнено
+    if (typeof window.PERSONAL_POSTS !== 'undefined' &&
+        typeof window.PLOT_POSTS !== 'undefined' &&
+        typeof window.FIRST_POST_MISSED_FLAG !== 'undefined') {
+      clearTimeout(to);
+      clearInterval(poll);
+      show('**Для начисления не хватает поста.**', { hideBtn: true });
+      cancel();
+    }
   }, COUNTER_POLL_INTERVAL_MS);
 
   return { handled: true, counterWatcher };

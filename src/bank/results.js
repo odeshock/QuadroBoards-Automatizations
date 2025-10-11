@@ -105,6 +105,9 @@ function buildOperationsArray(logElement) {
     // Убираем номер в начале (например "#1 · ")
     const title = titleText.replace(/^#\d+\s*·\s*/, '');
 
+    // Получаем form_id из data-form-id
+    const formId = entryEl.dataset.formId || '';
+
     // Получаем сумму из entry-meta
     const metaEl = entryEl.querySelector('.entry-meta');
     let sum = 0;
@@ -175,7 +178,8 @@ function buildOperationsArray(logElement) {
     operations.push({
       title: title,
       sum: sum,
-      info: info
+      info: info,
+      form_id: formId
     });
   });
 
@@ -436,6 +440,10 @@ export function renderLog(log) {
     const entryEl = document.createElement('div');
     entryEl.className = 'entry';
     entryEl.dataset.groupId = group.id;
+    // Сохраняем form_id для передачи в операции
+    if (group.templateSelector) {
+      entryEl.dataset.formId = group.templateSelector;
+    }
 
     // ====== header ======
     const header = document.createElement('div');
@@ -480,7 +488,7 @@ export function renderLog(log) {
           itemTitle = isCustom ? 'Индивидуальный фон' : `Фон из коллекции (#${giftId})`;
         } else {
           // Подарки
-          itemTitle = `Подарок из коллекции (#${giftId})`;
+          itemTitle = isCustom ? 'Индивидуальный подарок' : `Подарок из коллекции (#${giftId})`;
         }
 
         title.textContent = `#${index + 1} · ${itemTitle}`;

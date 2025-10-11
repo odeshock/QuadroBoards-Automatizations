@@ -1602,25 +1602,30 @@ async function ensureAllowed(group_ids) {
 
 /* MODULE 7: bank/parent.js */
 const HIDDEN_OPERATIONS = [
-  "Подарок из коллекции",
-  "Индивидуальная иконка",
-  "Иконка из коллекции",
-  "Индивидуальная плашка",
-  "Плашка из коллекции",
-  "Индивидуальный фон",
-  "Фон из коллекции",
-  "Отказ от персонажа",
+  'form-gift-custom',
+  'form-gift-present',
+  'form-icon-custom',
+  'form-icon-present',
+  'form-badge-custom',
+  'form-badge-present',
+  'form-bg-custom',
+  'form-bg-present',
 ];
 
 
 function formatBankOperations(operations) {
-  console.log("hahaha");
   let result = '';
 
-  operations.forEach((op, i) => {
-    const hidden = HIDDEN_OPERATIONS.some(prefix => op.title.startsWith(prefix));
-    result += (hidden) ? "[hide=9999999999]" : "";
+  operations.forEach((op) => {
+    const cleanId = op.form_id.replace(/^#/, '');
+    const isHidden = HIDDEN_OPERATIONS.includes(cleanId);
+    result += (isHidden) ? "[hide=9999999999]" : "";
     result += `[b]— ${op.title}[/b] = ${op.sum}\n`;
+
+    // Добавляем form_id если он есть
+    if (op.form_id) {
+      result += `[size=9]form_id: ${op.form_id}[/size]\n`;
+    }
 
     // проверяем, есть ли info и comment
     const info = op.info?.[0];
@@ -1648,7 +1653,7 @@ function formatBankOperations(operations) {
       }
     }
 
-    result += (hidden) ? "[/hide]\n\n" : "\n\n";
+    result += (isHidden) ? "[/hide]\n\n" : "\n\n";
   });
 
   return result.trim();

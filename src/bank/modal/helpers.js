@@ -13,15 +13,15 @@ import { TEXT_MESSAGES } from '../constants.js';
  * Показывает сообщение ожидания в модальном окне
  */
 export function showWaitMessage(modalFields, message = TEXT_MESSAGES.PLEASE_WAIT) {
-  let waitNote = modalFields.querySelector('.admin-wait-note');
+  let waitNote = modalFields.querySelector('.muted-note');
   if (!waitNote) {
     waitNote = document.createElement('p');
-    waitNote.className = 'muted-note admin-wait-note';
+    waitNote.className = 'muted-note';
 
-    // Вставляем после disclaimer, если есть, иначе в начало
-    const disclaimer = modalFields.querySelector('.info');
-    if (disclaimer) {
-      disclaimer.insertAdjacentElement('afterend', waitNote);
+    // Вставляем после system-info или info, если есть, иначе в начало
+    const infoBlock = modalFields.querySelector('.system-info, .info');
+    if (infoBlock) {
+      infoBlock.insertAdjacentElement('afterend', waitNote);
     } else {
       modalFields.prepend(waitNote);
     }
@@ -34,7 +34,7 @@ export function showWaitMessage(modalFields, message = TEXT_MESSAGES.PLEASE_WAIT
  * Скрывает сообщение ожидания
  */
 export function hideWaitMessage(modalFields) {
-  const el = modalFields.querySelector('.admin-wait-note');
+  const el = modalFields.querySelector('.muted-note');
   if (el) el.remove();
 }
 
@@ -50,7 +50,8 @@ export function showErrorMessage(modalFields, message = TEXT_MESSAGES.ERROR_REFR
     err.className = 'note-error admin-error';
     err.style.color = 'var(--danger)';
 
-    const anchor = modalFields.querySelector('.admin-wait-note') || modalFields.querySelector('.info');
+    // Вставляем после system-info, info или admin-wait-note
+    const anchor = modalFields.querySelector('.system-info, .info, .admin-wait-note');
     if (anchor) {
       anchor.insertAdjacentElement('afterend', err);
     } else {

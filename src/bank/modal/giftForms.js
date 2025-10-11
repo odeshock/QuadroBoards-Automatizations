@@ -346,8 +346,6 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 // ============================================================================
 
 export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
-  console.log('[DEBUG setupGiftFlow] price:', price, 'giftId:', giftId);
-
   // 1) Очищаем модальное окно
   clearModalFields(modalFields);
 

@@ -207,7 +207,7 @@ export const formTemplates = {
     placeholder: 'Укажите, какой фантастической тварью Вы хотите стать и, если у вас несколько профилей, какой один оставить.'
   }),
   [FORM_EXP_CLEAN]: waitingTemplate(TEXT_MESSAGES.PLAYER_CHOICE_INFO),
-  [FORM_EXP_TRANSFER]: waitingTemplate(''),
+  [FORM_EXP_TRANSFER]: `<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
 
   // ПОДАРКИ
   [FORM_GIFT_CUSTOM]: waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),

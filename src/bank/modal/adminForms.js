@@ -358,12 +358,19 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
   // 1) Очищаем модальное окно
   clearModalFields(modalFields, { includeInfo: true });
 
+  // 2) Добавляем информационное сообщение о системе подсчёта
+  const systemInfoBlock = document.createElement('div');
+  systemInfoBlock.className = 'system-info';
+  const commissionText = basePrice !== null ? formatNumber(basePrice) : '10';
+  systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> ваша сумма + ${commissionText} галлеонов за каждого пользователя`;
+  modalFields.appendChild(systemInfoBlock);
+
   // Устанавливаем начальное значение modalAmount
   if (modalAmount && basePrice !== null) {
     modalAmount.textContent = formatNumber(basePrice);
   }
 
-  // 2) Показываем сообщение ожидания
+  // 3) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   const fail = () => {
@@ -413,14 +420,7 @@ export function setupTransferFlow({ modalFields, btnSubmit, counterWatcher, time
   const renderTransferPicker = (users) => {
     if (!Array.isArray(users)) return fail();
 
-    hideWait();
-
-    // Добавляем информационное сообщение
-    const infoBlock = document.createElement('div');
-    infoBlock.className = 'info';
-    const commissionText = basePrice !== null ? formatNumber(basePrice) : '10';
-    infoBlock.innerHTML = `<strong>Система подсчета:</strong> ваша сумма + ${commissionText} галлеонов за каждого пользователя`;
-    modalFields.appendChild(infoBlock);
+    hideWaitMessage(modalFields);
 
     // Каркас
     const wrap = document.createElement('div');
@@ -634,10 +634,24 @@ export function handleAdminSingleRecipientForms({ template, modalFields, btnSubm
 export function handleAdminAmountForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, price }) {
   if (!ADMIN_AMOUNT_FORMS.includes(template.id)) return { handled: false, counterWatcher };
 
-  if (!window.IS_ADMIN) {
+  const config = ADMIN_AMOUNT_CONFIG[template.id];
+
+  // FORM_EXP_TRANSFER доступен всем пользователям, остальные формы - только админам
+  if (config.setupFn === 'setupTransferFlow') {
+    counterWatcher = setupTransferFlow({
+      modalFields,
+      btnSubmit,
+      counterWatcher,
+      timeoutMs: config.timeoutMs,
+      data,
+      modalAmount,
+      basePrice: price
+    });
+  } else if (!window.IS_ADMIN) {
+    // Для админских форм (TOPUP, AMS) скрываем кнопку для не-админов
     btnSubmit.style.display = 'none';
   } else {
-    const config = ADMIN_AMOUNT_CONFIG[template.id];
+    // Админские формы для админов
     if (config.setupFn === 'setupAdminTopupFlow') {
       counterWatcher = setupAdminTopupFlow({
         modalFields,
@@ -646,16 +660,6 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
         timeoutMs: config.timeoutMs,
         data,
         requireComment: config.requireComment,
-        modalAmount,
-        basePrice: price
-      });
-    } else if (config.setupFn === 'setupTransferFlow') {
-      counterWatcher = setupTransferFlow({
-        modalFields,
-        btnSubmit,
-        counterWatcher,
-        timeoutMs: config.timeoutMs,
-        data,
         modalAmount,
         basePrice: price
       });

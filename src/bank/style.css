@@ -418,8 +418,18 @@
     .entry-item-title { font-weight: 500; color: var(--text); }
     .muted-note { color: var(--muted); font-style: italic; margin: 0; }
     .note-error { color: var(--danger); font-style: normal; margin: 0; }
-    .info {background: #f9fafb; border: 1px solid var(--border); padding: 12px; border-radius: 12px; color: var(--text); margin-bottom: 14px;}  
+    .info {background: #f9fafb; border: 1px solid var(--border); padding: 12px; border-radius: 12px; color: var(--text); margin-bottom: 14px;}
     .info strong { color: var(--text); }
+
+    .system-info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 12px;
+      border-radius: 12px;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    .system-info strong { color: var(--accent); }
 
     .calc-info{
       margin-bottom: 12px;

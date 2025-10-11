@@ -4,7 +4,8 @@
 
 import {
   COUNTER_POLL_INTERVAL_MS,
-  FORM_TIMEOUT_MS
+  FORM_TIMEOUT_MS,
+  BASE_URL
 } from '../config.js';
 
 import {
@@ -20,7 +21,8 @@ import {
   TEXT_MESSAGES,
   ADMIN_RECIPIENT_MULTI_FORMS,
   ADMIN_SINGLE_RECIPIENT_FORMS,
-  ADMIN_AMOUNT_FORMS
+  ADMIN_AMOUNT_FORMS,
+  FORM_INCOME_TOPUP
 } from '../constants.js';
 
 import {
@@ -333,7 +335,13 @@ export function setupAdminTopupFlow({ modalFields, btnSubmit, counterWatcher, ti
   // 1) Очищаем модальное окно (включая disclaimer)
   clearModalFields(modalFields, { includeInfo: true });
 
-  // 2) Показываем сообщение ожидания
+  // 2) Добавляем информационное сообщение о системе подсчёта
+  const systemInfoBlock = document.createElement('div');
+  systemInfoBlock.className = 'system-info';
+  systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> по галлеону за 1 кредит или 100 баллов, внесённые в «<strong><a href="${BASE_URL}/mod/foundation" target="_blank">Фонд форума</a></strong>».`;
+  modalFields.appendChild(systemInfoBlock);
+
+  // 3) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   const fail = () => {
@@ -648,7 +656,22 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
       basePrice: price
     });
   } else if (!window.IS_ADMIN) {
-    // Для админских форм (TOPUP, AMS) скрываем кнопку для не-админов
+    // Для админских форм (TOPUP, AMS) показываем информацию для не-админов
+    clearModalFields(modalFields, { includeInfo: true });
+
+    // Для TOPUP показываем info и system-info
+    if (template.id === FORM_INCOME_TOPUP) {
+      const infoBlock = document.createElement('div');
+      infoBlock.className = 'info';
+      infoBlock.textContent = TEXT_MESSAGES.TOPUP_INFO;
+      modalFields.appendChild(infoBlock);
+
+      const systemInfoBlock = document.createElement('div');
+      systemInfoBlock.className = 'system-info';
+      systemInfoBlock.innerHTML = `<strong>Система подсчета:</strong> по галлеону за 1 кредит или 100 баллов, внесённые в «<strong><a href="${BASE_URL}/mod/foundation" target="_blank">Фонд форума</a></strong>».`;
+      modalFields.appendChild(systemInfoBlock);
+    }
+
     btnSubmit.style.display = 'none';
   } else {
     // Админские формы для админов

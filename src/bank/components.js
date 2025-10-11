@@ -6,10 +6,6 @@ import {
   ALLOWED_PARENTS,
   BASE_URL,
   COUNTER_POLL_INTERVAL_MS,
-  FORM_TIMEOUT_MS,
-  AMS_TIMEOUT_MS,
-  GIFT_TIMEOUT_MS,
-  FIRST_POST_TIMEOUT_MS,
   ADS_TIMEOUT_MS,
   counterConfigs,
   counterPrefixMap
@@ -27,45 +23,67 @@ import {
 } from './services.js';
 
 import {
-  SPECIAL_EXPENSE_FORMS,
+  updateModalAmount,
+  cleanupCounterWatcher
+} from './results.js';
+
+import {
   COUNTER_FORMS,
   BUYOUT_FORMS,
   URL_FIELD_FORMS,
   TEXT_MESSAGES,
-  FORM_INCOME_FIRSTPOST,
-  FORM_INCOME_FLYER,
   FORM_INCOME_NEEDREQUEST,
   FORM_INCOME_RPGTOP,
   FORM_INCOME_EP_PERSONAL,
   FORM_INCOME_EP_PLOT,
-  GIFT_AND_DESIGN_FORMS,
-  ADMIN_RECIPIENT_MULTI_FORMS,
-  ADMIN_SINGLE_RECIPIENT_FORMS,
-  ADMIN_AMOUNT_FORMS,
-  POST_FORMS,
   toSelector
 } from './constants.js';
 
 import {
-  ADMIN_RECIPIENT_FLOW_TIMEOUTS,
-  ADMIN_SINGLE_RECIPIENT_TIMEOUTS,
-  ADMIN_AMOUNT_CONFIG,
-  POST_CONFIG,
   BANNER_ALREADY_PROCESSED_CONFIG
 } from './components/modalConfig.js';
 
 
 import {
-  handleBannerAlreadyProcessed,
-  setupAdminRecipientsFlow,
-  setupAdminSingleRecipientFlow,
-  setupAdminTopupFlow,
-  setupTransferFlow,
-  setupCustomGiftFlow,
-  setupGiftFlow,
-  setupBonusMaskCleanFlow,
-  setupPostsModalFlow
-} from './components/modalSetup.js';
+  handleAdminRecipientMultiForms,
+  handleAdminSingleRecipientForms,
+  handleAdminAmountForms
+} from './components/adminForms.js';
+
+import {
+  handleGiftsAndDesignForms
+} from './components/giftForms.js';
+
+import {
+  handleBonusMaskCleanForms
+} from './components/expenseForms.js';
+
+import {
+  handleFirstPostForm,
+  handlePostForms,
+  handleFlyerForm
+} from './components/postForms.js';
+
+// ============================================================================
+// BANNER ALREADY PROCESSED CHECK
+// ============================================================================
+
+function handleBannerAlreadyProcessed({ template, modalFields, btnSubmit }) {
+  const config = BANNER_ALREADY_PROCESSED_CONFIG[template.id];
+  if (!config) return { shouldReturn: false };
+
+  const { flagKey, message } = config;
+  // Проверяем, что флаг определён и равен false (уже обработан)
+  if (typeof window[flagKey] === 'undefined' || window[flagKey] !== false) {
+    return { shouldReturn: false };
+  }
+
+  // Баннер уже обработан - показываем сообщение
+  modalFields.innerHTML = `<p><strong>${message}</strong></p>`;
+  btnSubmit.style.display = 'none';
+
+  return { shouldReturn: true };
+}
 
 export function openModal({
   backdrop,
@@ -181,349 +199,59 @@ export function openModal({
   counterWatcher = cleanupCounterWatcher(counterWatcher, modalFields, form);
   modalFields.innerHTML = template.innerHTML;
 
-const bannerState = handleBannerAlreadyProcessed({ template, modalTitle, modalFields, btnSubmit, backdrop });
+const bannerState = handleBannerAlreadyProcessed({ template, modalFields, btnSubmit });
 if (bannerState.shouldReturn) {
   return { counterWatcher };
 }
 
 
 // === ADMIN multi-recipient начисления (анкета, акция, нужный, эпизод) ===
-if (ADMIN_RECIPIENT_MULTI_FORMS.includes(template.id)) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none';
-  } else {
-    const timeoutMs = ADMIN_RECIPIENT_FLOW_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;
-    counterWatcher = setupAdminRecipientsFlow({
-      modalFields,
-      btnSubmit,
-      counterWatcher,
-      timeoutMs,
-      data,
-      modalAmount,
-      basePrice: price
-    });
-  }
+const adminMultiResult = handleAdminRecipientMultiForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, price });
+if (adminMultiResult.handled) {
+  counterWatcher = adminMultiResult.counterWatcher;
 }
 
 // === ADMIN AMOUNT: докупка кредитов, доп.деньги, переводы
-if (ADMIN_AMOUNT_FORMS.includes(template.id)) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none'; // инфо-режим (data-info)
-  } else {
-    const config = ADMIN_AMOUNT_CONFIG[template.id];
-    if (config.setupFn === 'setupAdminTopupFlow') {
-      counterWatcher = setupAdminTopupFlow({
-        modalFields,
-        btnSubmit,
-        counterWatcher,
-        timeoutMs: config.timeoutMs,
-        data,
-        requireComment: config.requireComment,
-        modalAmount,
-        basePrice: price
-      });
-    } else if (config.setupFn === 'setupTransferFlow') {
-      counterWatcher = setupTransferFlow({
-        modalFields,
-        btnSubmit,
-        counterWatcher,
-        timeoutMs: config.timeoutMs,
-        data,
-        modalAmount,
-        basePrice: price
-      });
-    }
-  }
+const adminAmountResult = handleAdminAmountForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, price });
+if (adminAmountResult.handled) {
+  counterWatcher = adminAmountResult.counterWatcher;
 }
 
 // === BONUSES, MASK, CLEAN: выбор получателя + количество + от кого + комментарий
-if (SPECIAL_EXPENSE_FORMS.includes(toSelector(template.id))) {
-  counterWatcher = setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs: AMS_TIMEOUT_MS, data, modalAmount, basePrice: price });
+const bonusResult = handleBonusMaskCleanForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, price });
+if (bonusResult.handled) {
+  counterWatcher = bonusResult.counterWatcher;
 }
 
 // === GIFTS & DESIGN: подарки и оформление (иконки, плашки, фоны) ===
-if (GIFT_AND_DESIGN_FORMS.map(f => f.replace("#", "")).includes(template.id)) {
-  const isCustom = template.id.includes('custom');
-  counterWatcher = isCustom
-    ? setupCustomGiftFlow({
-        modalFields, btnSubmit, counterWatcher,
-        timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
-        giftId: config.giftId,
-        giftIcon: config.giftIcon,
-        price: config.price
-      })
-    : setupGiftFlow({
-        modalFields, btnSubmit, counterWatcher,
-        timeoutMs: GIFT_TIMEOUT_MS, data, modalAmount,
-        giftId: config.giftId,
-        giftIcon: config.giftIcon,
-        price: config.price
-      });
+const giftResult = handleGiftsAndDesignForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, config });
+if (giftResult.handled) {
+  counterWatcher = giftResult.counterWatcher;
 }
 
 // === ADMIN single-recipient начисления (активист, постописец, пост полумесяца) ===
-if (ADMIN_SINGLE_RECIPIENT_FORMS.includes(template.id)) {
-  if (!window.IS_ADMIN) {
-    btnSubmit.style.display = 'none';
-  } else {
-    const timeoutMs = ADMIN_SINGLE_RECIPIENT_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;
-    counterWatcher = setupAdminSingleRecipientFlow({
-      modalFields,
-      btnSubmit,
-      counterWatcher,
-      timeoutMs,
-      data,
-      modalAmount,
-      basePrice: price
-    });
-  }
+const adminSingleResult = handleAdminSingleRecipientForms({ template, modalFields, btnSubmit, counterWatcher, data, modalAmount, price });
+if (adminSingleResult.handled) {
+  counterWatcher = adminSingleResult.counterWatcher;
 }
 
 
 // === FIRST POST: ждём FIRST_POST_FLAG, PLOT_POSTS и PERSONAL_POSTS ===
-if (template.id === FORM_INCOME_FIRSTPOST) {
-  // якорь "подождите..."
-  const waitEl = updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
-
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel };
-
-  const fail = () => {
-    if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
-    btnSubmit.style.display = 'none';
-    cancel();
-  };
-
-  const show = (html, { ok = false, hideBtn = true } = {}) => {
-    const el = updateNote(modalFields, html);
-    if (ok && el) el.style.color = 'var(--ok)'; // зелёный для «Поздравляем…»
-    btnSubmit.style.display = hideBtn ? 'none' : '';
-    btnSubmit.disabled = hideBtn ? true : false;
-  };
-
-  const succeed = () => {
-    if (canceled) return;
-
-    const flag = window.FIRST_POST_FLAG;
-    const personal = window.PERSONAL_POSTS;
-    const plot = window.PLOT_POSTS;
-
-    // строгая проверка типов
-    if (typeof flag !== 'boolean' || !Array.isArray(personal) || !Array.isArray(plot)) {
-      fail(); return;
-    }
-
-    // 1) уже начисляли
-    if (flag === false) {
-      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
-      cancel(); return;
-    }
-
-    // 2) флаг true, но оба массива пустые
-    if (flag === true && personal.length === 0 && plot.length === 0) {
-      show('**Для начисления не хватает поста.**', { hideBtn: true });
-      cancel(); return;
-    }
-
-    // 3) флаг true и хотя бы один массив непустой — успех
-    show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
-    cancel();
-  };
-
-  const to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
-  const poll = setInterval(() => {
-    // Сначала проверяем флаг
-    if (typeof window.FIRST_POST_FLAG === 'undefined') return;
-
-    // Если флаг есть, но не boolean — ошибка
-    if (typeof window.FIRST_POST_FLAG !== 'boolean') {
-      fail(); return;
-    }
-
-    // Если флаг false — сразу показываем сообщение, не ждём массивы
-    if (window.FIRST_POST_FLAG === false) {
-      clearTimeout(to);
-      clearInterval(poll);
-      show('**Начисление за первый пост на профиле уже производилось.**', { hideBtn: true });
-      cancel();
-      return;
-    }
-
-    // Если флаг true — ждём появления обоих массивов
-    if (typeof window.PERSONAL_POSTS === 'undefined' || typeof window.PLOT_POSTS === 'undefined') {
-      return;
-    }
-
-    clearTimeout(to);
-    clearInterval(poll);
-
-    // Проверяем типы массивов
-    if (!Array.isArray(window.PERSONAL_POSTS) || !Array.isArray(window.PLOT_POSTS)) {
-      fail(); return;
-    }
-
-    succeed();
-  }, COUNTER_POLL_INTERVAL_MS);
+const firstPostResult = handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher });
+if (firstPostResult.handled) {
+  counterWatcher = firstPostResult.counterWatcher;
 }
 
-
 // === POST: личные и сюжетные посты ===
-if (POST_FORMS.includes(template.id)) {
-  const config = POST_CONFIG[template.id];
-  counterWatcher = setupPostsModalFlow({
-    modalFields,
-    btnSubmit,
-    counterWatcher,
-    form,
-    modalAmount,
-    modalAmountLabel,
-    ...config
-  });
+const postResult = handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel });
+if (postResult.handled) {
+  counterWatcher = postResult.counterWatcher;
 }
 
 // === FLYER: ждём ADS_POSTS и рисуем список ===
-if (template.id === FORM_INCOME_FLYER) {
-  // показываем «ждём…» (у вас уже есть <p class="muted-note">Пожалуйста, подождите...</p>)
-  updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
-
-  // helper для извлечения {src, text} из элемента массива (поддержим и вложенный словарь)
-  const pickLink = (item) => {
-    const dict = (item && (item.link || item.a || item)) || null;
-    const src = dict && typeof dict.src === 'string' ? dict.src : null;
-    const text = dict && (dict.text || src);
-    return src ? { src, text } : null;
-  };
-
-  // отмена по закрытию
-  let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
-  counterWatcher = { cancel }; // используем существующий механизм очистки
-
-  // если что-то пошло не так
-  const fail = () => {
-    if (canceled) return;
-    updateNote(modalFields, 'Произошла ошибка. Попробуйте обновить страницу.', { error: true });
-    btnSubmit.style.display = '';      // кнопку всё же покажем
-    btnSubmit.disabled = true;         // ...но заблокируем
-    cancel();
-  };
-
-  const updateAmountSummary = (multiplier) => {
-    form.dataset.currentMultiplier = String(multiplier);
-
-    // Для форм с mode используем новую универсальную функцию
-    const mode = form.dataset.mode;
-    if (mode === 'price_per_item' && form.dataset.price) {
-      updateModalAmount(modalAmount, form, { items: multiplier });
-      return;
-    }
-
-    // Старая логика для форм без mode
-    const amountRaw = amount || '';
-    const amountNumber = parseNumericAmount(amountRaw);
-    if (amountNumber === null) {
-      modalAmount.textContent = amountRaw;
-      return;
-    }
-    if (multiplier === 1) {
-      modalAmount.textContent = formatNumber(amountNumber);
-      return;
-    }
-    const total = amountNumber * multiplier;
-    modalAmount.textContent = `${formatNumber(amountNumber)} x ${multiplier} = ${formatNumber(total)}`;
-  };
-
-  // удачный исход
-  const succeed = (posts) => {
-    if (canceled) return;
-
-    // ⛔ если массив пустой — показываем сообщение и скрываем кнопку
-    if (!Array.isArray(posts) || posts.length === 0) {
-      updateNote(modalFields, '**Для новых начислений не хватает новых реклам.**');
-      btnSubmit.style.display = 'none'; // скрываем кнопку полностью
-      setHiddenField(modalFields, 'flyer_links_json', '');
-      form.dataset.currentMultiplier = '0';
-      updateAmountSummary(0);
-      cancel();
-      return;
-    }
-
-    // ✅ обычный успешный случай
-    const links = posts.map(pickLink).filter(Boolean);
-    setHiddenField(modalFields, 'flyer_links_json', JSON.stringify(links));
-
-    form.dataset.currentMultiplier = String(links.length);
-    updateAmountSummary(links.length);
-
-    const note = updateNote(modalFields, '');
-    if (note) note.remove();
-
-    // НЕ удаляем «Пожалуйста, подождите...», а вставляем список ПОД ним
-    const waitEl = modalFields.querySelector('.muted-note');
-
-    // заголовок «Список листовок:»
-    const caption = document.createElement('p');
-    caption.className = 'list-caption';
-    caption.innerHTML = '<strong>Список листовок:</strong>';
-
-    // контейнер со скроллом + нумерованный список (как в «Личный пост»)
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-    wrap.innerHTML = `
-      <div style="max-height:320px; overflow:auto">
-        <ol class="entry-list" id="flyer-preview"></ol>
-      </div>`;
-    const ol = wrap.querySelector('#flyer-preview');
-
-    // вставляем ПОД «Пожалуйста, подождите...»
-    if (waitEl && waitEl.parentNode) {
-      waitEl.insertAdjacentElement('afterend', caption);
-      caption.insertAdjacentElement('afterend', wrap);
-    } else {
-      // если по каким-то причинам .muted-note нет — просто добавим в конец
-      modalFields.appendChild(caption);
-      modalFields.appendChild(wrap);
-    }
-
-    links.forEach(({ src, text }) => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = src;
-      a.textContent = text || src;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      li.appendChild(a);
-      ol.appendChild(li);
-    });
-
-    btnSubmit.style.display = '';
-    btnSubmit.disabled = false;
-    cancel();
-  };
-
-
-  // ждём ADS_POSTS не дольше ADS_TIMEOUT_MS
-  const to = setTimeout(() => {
-    // если переменная есть, но это не массив — это тоже ошибка
-    if (typeof window.ADS_POSTS !== 'undefined' && !Array.isArray(window.ADS_POSTS)) return fail();
-    return fail();
-  }, ADS_TIMEOUT_MS);
-
-  const poll = setInterval(() => {
-    // моментально «фейлим», если тип неверный
-    if (typeof window.ADS_POSTS !== 'undefined' && !Array.isArray(window.ADS_POSTS)) {
-      fail();
-      return;
-    }
-    // удача
-    if (Array.isArray(window.ADS_POSTS)) {
-      clearTimeout(to);
-      clearInterval(poll);
-      succeed(window.ADS_POSTS);
-    }
-  }, COUNTER_POLL_INTERVAL_MS);
+const flyerResult = handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount });
+if (flyerResult.handled) {
+  counterWatcher = flyerResult.counterWatcher;
 }
 
   // === URL FIELDS: формы с дополнительными URL полями ===

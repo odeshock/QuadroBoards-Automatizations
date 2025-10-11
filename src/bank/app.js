@@ -3,7 +3,8 @@
 // ============================================================================
 
 import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq } from './services.js';
-import { renderLog, openModal, closeModal, showConfirmModal } from './components.js';
+import { openModal, closeModal } from './components.js';
+import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
 import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems, itemPrices } from './data.js';
 import {

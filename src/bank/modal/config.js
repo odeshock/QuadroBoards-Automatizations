@@ -34,6 +34,10 @@ import {
   FORM_INCOME_PLOTPOST
 } from '../constants.js';
 
+import {
+  formatNumber
+} from '../services.js';
+
 // Таймауты для форм админских начислений с несколькими получателями
 export const ADMIN_RECIPIENT_FLOW_TIMEOUTS = {
   [FORM_INCOME_ANKETA]: FORM_TIMEOUT_MS,
@@ -77,8 +81,8 @@ export const POST_CONFIG = {
     previewId: 'personal-preview',
     infoBuilder: ({ price, bonus }) => (
       `<strong>Система подсчета:</strong><br>
-      — фиксированная выплата за пост — ${price},<br>
-      — дополнительная выплата за каждую тысячу символов в посте — ${bonus}.`
+      — фиксированная выплата за пост — ${formatNumber(price)},<br>
+      — дополнительная выплата за каждую тысячу символов в посте — ${formatNumber(bonus)}.`
     ),
     additionalItemsAggregator: (items) => items.reduce(
       (sum, item) => sum + Math.floor(item.symbols_num / 1000),
@@ -92,8 +96,8 @@ export const POST_CONFIG = {
     previewId: 'plot-preview',
     infoBuilder: ({ price, bonus }) => (
       `<strong>Система подсчета:</strong><br>
-      — фиксированная выплата за пост — ${price},<br>
-      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${bonus}.`
+      — фиксированная выплата за пост — ${formatNumber(price)},<br>
+      — дополнительная выплата за каждую тысячу символов в посте (но не более, чем за три тысячи) — ${formatNumber(bonus)}.`
     ),
     additionalItemsAggregator: (items) => items.reduce((sum, item) => {
       const thousands = Math.floor(item.symbols_num / 1000);

@@ -65,14 +65,18 @@ export function setupPostsModalFlow({
   const price = Number(form.dataset.price) || 0;
   const bonus = Number(form.dataset.bonus) || 0;
 
-  const info = document.createElement('div');
-  info.className = 'calc-info';
-  info.innerHTML = infoBuilder({ price, bonus });
+  // Создаем system-info блок и вставляем после .info
+  const systemInfo = document.createElement('div');
+  systemInfo.className = 'system-info';
+  systemInfo.innerHTML = infoBuilder({ price, bonus });
 
-  if (waitEl && waitEl.parentNode) {
-    waitEl.parentNode.insertBefore(info, waitEl);
+  const infoBlock = modalFields.querySelector('.info');
+  if (infoBlock) {
+    infoBlock.insertAdjacentElement('afterend', systemInfo);
+  } else if (waitEl && waitEl.parentNode) {
+    waitEl.parentNode.insertBefore(systemInfo, waitEl);
   } else {
-    modalFields.appendChild(info);
+    modalFields.appendChild(systemInfo);
   }
 
   let canceled = false;

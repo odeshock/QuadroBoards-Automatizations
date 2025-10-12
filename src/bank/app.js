@@ -216,16 +216,13 @@ log.addEventListener('click', async (e) => {
   const { action, groupId, entryId } = actionBtn.dataset;
   if (!groupId) return;
 
-  // Приводим ID к числам, так как dataset хранит строки
-  const numericGroupId = Number(groupId);
-  const numericEntryId = entryId ? Number(entryId) : null;
-
-  const group = submissionGroups.find((item) => item.id === numericGroupId);
+  // ID - это строки, сравниваем напрямую
+  const group = submissionGroups.find((item) => item.id === groupId);
   if (!group) return;
 
   if (action === 'edit') {
-    if (!numericEntryId) return;
-    const entry = group.entries.find((item) => item.id === numericEntryId);
+    if (!entryId) return;
+    const entry = group.entries.find((item) => item.id === entryId);
     if (!entry) return;
 
     // Для подарков и оформления берём giftId и giftIcon из данных записи (первого получателя)
@@ -255,17 +252,17 @@ log.addEventListener('click', async (e) => {
   }
 
   if (action === 'delete') {
-    if (!numericEntryId) return;
+    if (!entryId) return;
 
     // Подтверждение удаления
     const confirmed = await showConfirmModal(TEXT_MESSAGES.CONFIRM_DELETE);
     if (!confirmed) return;
 
-    const entryIndex = group.entries.findIndex((item) => item.id === numericEntryId);
+    const entryIndex = group.entries.findIndex((item) => item.id === entryId);
     if (entryIndex !== -1) {
       group.entries.splice(entryIndex, 1);
       if (!group.entries.length) {
-        const groupIndex = submissionGroups.findIndex((item) => item.id === numericGroupId);
+        const groupIndex = submissionGroups.findIndex((item) => item.id === groupId);
         if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
       }
 

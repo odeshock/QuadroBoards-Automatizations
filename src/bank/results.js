@@ -1654,6 +1654,9 @@ export function renderLog(log) {
     buyBtn.className = 'button primary';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
+      // Получаем текущий timestamp
+      const timestamp = new Date().toISOString();
+
       // Формируем массив операций из отрендеренного DOM (старый формат)
       const operations = buildOperationsArray(log);
 
@@ -1678,6 +1681,7 @@ export function renderLog(log) {
       };
 
       console.log('=== Итоги операций ===');
+      console.log('Timestamp:', timestamp);
       console.log('Всего операций:', operations.length);
       console.log('Общая сумма:', totalSum);
       console.log('\nДетали операций (DOM):');
@@ -1693,6 +1697,7 @@ export function renderLog(log) {
         try {
           window.parent.postMessage({
             type: "PURCHASE",
+            timestamp: timestamp,     // timestamp нажатия "Купить"
             operations: operations,   // старый формат для совместимости
             fullData: fullData,       // новый формат с полными данными
             environment: environment, // переменные окружения

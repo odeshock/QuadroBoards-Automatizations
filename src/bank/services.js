@@ -114,22 +114,80 @@ export function restoreFromBackup(backupData) {
   const restoredCount = submissionGroups.length;
   console.log(`Восстановлено ${restoredCount} операций из backup`);
 
-  // Применяем новые корректировки и скидки, которых нет в backup
+  // Применяем корректировки (вечные) и скидки (только те, что были активны на момент backup'а)
   let newAdjustmentsCount = 0;
-  let newDiscountsCount = 0;
+  let historicalDiscountsCount = 0;
 
-  // Применяем новые автоматические корректировки
+  // Применяем новые автоматические корректировки (которых нет в backup)
   updateAutoPriceAdjustments();
   const currentAdjustments = submissionGroups.filter(g => g.isPriceAdjustment);
   newAdjustmentsCount = currentAdjustments.length - backupAdjustmentIds.size;
 
-  // Применяем новые автоматические скидки
-  updateAutoDiscounts();
-  const currentDiscounts = submissionGroups.filter(g => g.isDiscount);
-  newDiscountsCount = currentDiscounts.length - backupDiscountIds.size;
+  // Получаем timestamp из backup'а
+  const backupTimestamp = backupData.timestamp;
 
-  if (newAdjustmentsCount > 0 || newDiscountsCount > 0) {
-    console.log(`Применено новых правил: корректировок - ${newAdjustmentsCount}, скидок - ${newDiscountsCount}`);
+  if (backupTimestamp) {
+    // Проверяем, какие скидки были активны на момент backup'а
+    const historicallyActiveDiscounts = autoDiscounts.filter(discount => {
+      // Пропускаем скидки, которые уже есть в backup'е
+      if (backupDiscountIds.has(discount.id)) return false;
+      // Проверяем, была ли скидка активна на момент backup'а
+      return wasDiscountActiveAt(discount, backupTimestamp);
+    });
+
+    // Применяем исторически активные скидки
+    if (historicallyActiveDiscounts.length > 0) {
+      console.log(`Найдено ${historicallyActiveDiscounts.length} скидок, которые были активны на момент backup'а`);
+
+      historicallyActiveDiscounts.forEach(discount => {
+        // Применяем каждую историческую скидку вручную
+        const entries = [];
+        const totalItems = submissionGroups
+          .filter(g => !g.isDiscount && !g.isPriceAdjustment)
+          .reduce((sum, g) => sum + g.entries.length, 0);
+
+        if (totalItems === 0) return;
+
+        const calculation = calculateDiscountForRule(discount, submissionGroups);
+
+        if (calculation && calculation.discount > 0) {
+          entries.push({
+            id: incrementEntrySeq(),
+            template_id: `auto-discount-${discount.id}`,
+            data: {
+              discount_id: discount.id,
+              discount_title: discount.title,
+              discount_type: discount.type,
+              total_items: totalItems,
+              discount_amount: calculation.discount,
+              calculation,
+              startDate: discount.startDate,
+              expiresAt: discount.expiresAt || null
+            },
+            multiplier: 1
+          });
+
+          const discountGroup = {
+            id: incrementGroupSeq(),
+            key: `auto-discount-${discount.id}`,
+            templateSelector: '',
+            title: discount.title,
+            price: -calculation.discount,
+            bonus: 0,
+            amountLabel: 'Скидка',
+            entries: entries,
+            isDiscount: true
+          };
+
+          submissionGroups.push(discountGroup);
+          historicalDiscountsCount++;
+        }
+      });
+    }
+  }
+
+  if (newAdjustmentsCount > 0 || historicalDiscountsCount > 0) {
+    console.log(`Применено правил: новых корректировок - ${newAdjustmentsCount}, исторических скидок - ${historicalDiscountsCount}`);
   }
 }
 
@@ -265,6 +323,37 @@ function calculateGroupCost(group) {
  * @param {string} expiresAt - Дата окончания в формате 'YYYY-MM-DD' (скидка действует до конца этого дня)
  * @returns {boolean} - true, если скидка истекла
  */
+/**
+ * Проверяет, началась ли уже скидка (по московскому времени)
+ * @param {string} startDate - дата начала в формате 'YYYY-MM-DD'
+ * @returns {boolean} - true если скидка уже началась (текущее московское время >= startDate 00:00:00)
+ */
+function isDiscountStarted(startDate) {
+  if (!startDate) return false;
+
+  // Получаем текущее время
+  const now = new Date();
+
+  // Добавляем время начала дня (00:00:00) к дате
+  const startDateString = `${startDate}T00:00:00`;
+
+  // Парсим дату начала (предполагаем, что она указана в московском времени)
+  const startDateObj = new Date(startDateString);
+
+  // Московское время = UTC+3
+  // Конвертируем текущее время в московское
+  const moscowOffset = 3 * 60; // 3 часа в минутах
+  const localOffset = now.getTimezoneOffset(); // смещение локального времени от UTC в минутах
+  const moscowTime = new Date(now.getTime() + (moscowOffset + localOffset) * 60 * 1000);
+
+  return moscowTime >= startDateObj;
+}
+
+/**
+ * Проверяет, истекла ли скидка (по московскому времени)
+ * @param {string} expiresAt - дата окончания в формате 'YYYY-MM-DD'
+ * @returns {boolean} - true если скидка уже истекла (текущее московское время >= expiresAt 23:59:59)
+ */
 function isDiscountExpired(expiresAt) {
   if (!expiresAt) return false;
 
@@ -286,6 +375,148 @@ function isDiscountExpired(expiresAt) {
   return moscowTime >= expiryDate;
 }
 
+/**
+ * Проверяет, была ли скидка активна на указанный момент времени
+ * @param {Object} discount - объект скидки с полями startDate и expiresAt
+ * @param {string} timestamp - ISO 8601 timestamp (UTC)
+ * @returns {boolean} - true если скидка была активна на указанный момент
+ */
+function wasDiscountActiveAt(discount, timestamp) {
+  if (!timestamp) return false;
+
+  const ts = new Date(timestamp);
+
+  // Проверяем startDate
+  if (discount.startDate) {
+    const startDateString = `${discount.startDate}T00:00:00`;
+    const startDateObj = new Date(startDateString);
+
+    // Конвертируем timestamp в московское время для сравнения
+    const moscowOffset = 3 * 60; // 3 часа в минутах
+    const localOffset = ts.getTimezoneOffset();
+    const tsMoscow = new Date(ts.getTime() + (moscowOffset + localOffset) * 60 * 1000);
+
+    if (tsMoscow < startDateObj) return false;
+  }
+
+  // Проверяем expiresAt
+  if (discount.expiresAt) {
+    const expiryDateString = `${discount.expiresAt}T23:59:59`;
+    const expiryDate = new Date(expiryDateString);
+
+    // Конвертируем timestamp в московское время для сравнения
+    const moscowOffset = 3 * 60; // 3 часа в минутах
+    const localOffset = ts.getTimezoneOffset();
+    const tsMoscow = new Date(ts.getTime() + (moscowOffset + localOffset) * 60 * 1000);
+
+    if (tsMoscow > expiryDate) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Вычисляет скидку для одного правила
+ * @param {Object} rule - правило скидки
+ * @param {Array} groups - массив submissionGroups
+ * @returns {Object|null} - объект с discount, calculation, totalItems или null если скидка не применима
+ */
+function calculateDiscountForRule(rule, groups) {
+  let { id, title, forms, type, discountValue, condition, startDate, expiresAt } = rule;
+
+  // Для процентной скидки ограничиваем значение до 100
+  if (type === 'percent' && discountValue > 100) {
+    discountValue = 100;
+  }
+
+  // Определяем, какие группы подходят под это правило
+  const matchingGroups = groups.filter(g => {
+    // Пропускаем скидки и корректировки
+    if (g.isDiscount || g.isPriceAdjustment) return false;
+    // Для 'all' берём только расходы (kind === 'expense')
+    if (forms === 'all') return g.kind === 'expense';
+    return forms.includes(g.templateSelector);
+  });
+
+  if (matchingGroups.length === 0) return null;
+
+  // Подсчитываем общее количество элементов
+  let totalItems = 0;
+  matchingGroups.forEach(group => {
+    group.entries.forEach(entry => {
+      const dataObj = entry.data || {};
+      const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+      totalItems += recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+    });
+  });
+
+  // Проверяем условие
+  let conditionMet = false;
+  if (condition.type === 'none') {
+    conditionMet = true;
+  } else if (condition.type === 'min_items') {
+    conditionMet = totalItems >= condition.value;
+  }
+
+  // Для процентной скидки не требуем totalItems > 0, т.к. считаем по суммам
+  if (!conditionMet) return null;
+  if (totalItems === 0 && type !== 'percent') return null;
+
+  // Вычисляем сумму операций для этих форм (для проверки лимита скидки)
+  let operationTotal = 0;
+  matchingGroups.forEach(group => {
+    const groupCost = calculateGroupCost(group);
+    operationTotal += Math.abs(groupCost);
+  });
+
+  // Вычитаем корректировки для этих форм (если есть)
+  const adjustmentGroup = groups.find(g => g.isPriceAdjustment);
+  if (adjustmentGroup) {
+    adjustmentGroup.entries.forEach(entry => {
+      const adjustmentForm = entry.data?.form;
+      if (matchingGroups.some(g => g.templateSelector === adjustmentForm)) {
+        const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+        operationTotal -= adjustmentAmount;
+      }
+    });
+  }
+
+  // Вычисляем скидку в зависимости от типа
+  let discount = 0;
+  let calculation = '';
+
+  if (type === 'per_item') {
+    // Скидка за каждый элемент
+    discount = discountValue * totalItems;
+    calculation = `${discountValue} × ${totalItems}`;
+  } else if (type === 'per_batch') {
+    // Скидка за каждые N элементов
+    const { batchSize = 1 } = rule;
+    const batches = Math.floor(totalItems / batchSize);
+    discount = discountValue * batches;
+    calculation = `${discountValue} × ${batches}`;
+  } else if (type === 'fixed') {
+    // Фиксированная скидка
+    discount = discountValue;
+    calculation = String(discountValue);
+  } else if (type === 'percent') {
+    // Процентная скидка
+    discount = operationTotal * (discountValue / 100);
+    // Всегда округляем в большую сторону
+    discount = Math.ceil(discount);
+    calculation = `${formatNumber(operationTotal)} × ${discountValue}%`;
+  }
+
+  // Скидка не может превышать сумму операций для этих форм
+  if (discount > operationTotal) {
+    discount = operationTotal;
+  }
+
+  if (discount <= 0) return null;
+
+  return { discount, calculation, totalItems };
+}
+
 export function updateAutoDiscounts() {
   // Находим существующую группу скидок
   const discountKey = buildGroupKey({
@@ -302,7 +533,18 @@ export function updateAutoDiscounts() {
 
   // Проходим по всем правилам скидок
   autoDiscounts.forEach(rule => {
-    let { id, title, forms, type, discountValue, condition, expiresAt } = rule;
+    let { id, title, forms, type, discountValue, condition, startDate, expiresAt } = rule;
+
+    // Проверяем обязательное поле startDate
+    if (!startDate) {
+      console.warn(`Скидка "${title}" (${id}) пропущена: отсутствует обязательное поле startDate`);
+      return;
+    }
+
+    // Проверяем, наступила ли дата начала скидки
+    if (!isDiscountStarted(startDate)) {
+      return; // Пропускаем скидку, которая ещё не начала действовать
+    }
 
     // Проверяем, не истекла ли скидка
     if (isDiscountExpired(expiresAt)) {
@@ -406,7 +648,9 @@ export function updateAutoDiscounts() {
           discount_type: type,
           total_items: totalItems,
           discount_amount: discount,
-          calculation
+          calculation,
+          startDate: startDate,           // Дата начала действия скидки
+          expiresAt: expiresAt || null    // Дата окончания (или null если бессрочно)
         },
         multiplier: 1
       });

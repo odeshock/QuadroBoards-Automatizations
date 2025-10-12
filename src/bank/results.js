@@ -144,8 +144,17 @@ function buildFullOperationsData() {
     // Добавляем метаинформацию группы
     operation.price = group.price;
     operation.bonus = group.bonus;
-    operation.mode = group.mode;  // Сохраняем mode для пересоздания amount
+    operation.mode = group.mode;
+    operation.kind = group.kind;  // Тип операции (income/expense)
     operation.amountLabel = group.amountLabel;
+
+    // Для подарков сохраняем дополнительные поля
+    if (group.giftId) {
+      operation.giftId = group.giftId;
+    }
+    if (group.giftIcon) {
+      operation.giftIcon = group.giftIcon;
+    }
 
     operations.push(operation);
   });

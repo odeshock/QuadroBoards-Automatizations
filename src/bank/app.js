@@ -247,17 +247,17 @@ log.addEventListener('click', async (e) => {
   }
 
   if (action === 'delete') {
-    if (!entryId) return;
+    if (!numericEntryId) return;
 
     // Подтверждение удаления
     const confirmed = await showConfirmModal(TEXT_MESSAGES.CONFIRM_DELETE);
     if (!confirmed) return;
 
-    const entryIndex = group.entries.findIndex((item) => item.id === entryId);
+    const entryIndex = group.entries.findIndex((item) => item.id === numericEntryId);
     if (entryIndex !== -1) {
       group.entries.splice(entryIndex, 1);
       if (!group.entries.length) {
-        const groupIndex = submissionGroups.findIndex((item) => item.id === group.id);
+        const groupIndex = submissionGroups.findIndex((item) => item.id === numericGroupId);
         if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
       }
 

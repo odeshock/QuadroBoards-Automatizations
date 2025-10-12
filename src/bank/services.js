@@ -75,10 +75,19 @@ export function restoreFromBackup(backupData) {
       title: operation.title,
       price: operation.price || 0,
       bonus: operation.bonus || 0,
-      mode: operation.mode,  // Восстанавливаем mode
+      mode: operation.mode,
+      kind: operation.kind,  // Восстанавливаем kind (income/expense)
       amountLabel: operation.amountLabel || 'Сумма',
       entries: []
     };
+
+    // Восстанавливаем дополнительные поля для подарков
+    if (operation.giftId) {
+      group.giftId = operation.giftId;
+    }
+    if (operation.giftIcon) {
+      group.giftIcon = operation.giftIcon;
+    }
 
     // Пересоздаём amount на основе price, bonus и mode
     if (operation.price !== undefined && operation.price !== null) {

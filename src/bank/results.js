@@ -1715,24 +1715,44 @@ export function renderLog(log) {
       console.log('\nПолные данные (все поля форм):');
       console.log(JSON.stringify(fullData, null, 2));
       console.log('\nПеременные окружения:');
-      console.log(JSON.stringify(environment, null, 2));
+      console.log(JSON.stringify(environment, (_key, value) => {
+        // Показываем undefined как строку "undefined" вместо пропуска поля
+        return value === undefined ? 'undefined' : value;
+      }, 2));
       console.log('\n======================');
+
+      // Формируем полный объект для сохранения
+      const purchaseData = {
+        type: "PURCHASE",
+        timestamp: timestamp,
+        operations: operations,
+        fullData: fullData,
+        environment: environment,
+        totalSum: totalSum
+      };
 
       // Отправляем сообщение родительскому окну с операциями
       for (const origin of ALLOWED_PARENTS) {
         try {
-          window.parent.postMessage({
-            type: "PURCHASE",
-            timestamp: timestamp,     // timestamp нажатия "Купить"
-            operations: operations,   // старый формат для совместимости
-            fullData: fullData,       // новый формат с полными данными
-            environment: environment, // переменные окружения
-            totalSum: totalSum
-          }, '*');
+          window.parent.postMessage(purchaseData, '*');
         } catch {
           console.log("ты пытался что-то купить");
         }
       }
+
+      // Предлагаем скачать JSON файл (с сохранением undefined как строк)
+      const jsonString = JSON.stringify(purchaseData, (_key, value) => {
+        return value === undefined ? 'undefined' : value;
+      }, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `purchase_${timestamp.replace(/[:.]/g, '-')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     });
 
     buttonsWrap.appendChild(resetBtn);

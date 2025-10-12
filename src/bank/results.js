@@ -122,10 +122,14 @@ function buildFullOperationsData() {
     group.entries.forEach((entry) => {
       const entryData = {
         template_id: entry.template_id,  // Сохраняем template_id для корректного рендеринга
-        key: entry.key,
         data: entry.data || {},
         multiplier: entry.multiplier
       };
+
+      // Для скидок и корректировок сохраняем key (содержит ID)
+      if (group.isDiscount || group.isPriceAdjustment) {
+        entryData.key = entry.key;
+      }
 
       // Если есть скидка или корректировка
       if (entry.data?.discount_amount) {

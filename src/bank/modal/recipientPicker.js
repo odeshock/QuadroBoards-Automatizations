@@ -340,6 +340,23 @@ export function renderRecipientPickerUniversal({
 
     itemGroups.push(group);
 
+    // Функция для скрытия/показа полей "От кого" и "Комментарий"
+    const updateFieldsVisibility = () => {
+      const isCurrentUser = group.recipientId && String(group.recipientId) === String(window.USER_ID);
+      if (isCurrentUser) {
+        // Скрываем и очищаем поля "От кого" и "Комментарий"
+        fromField.style.display = 'none';
+        wishField.style.display = 'none';
+        fromInput.value = '';
+        wishInput.value = '';
+      } else {
+        // Показываем поля
+        fromField.style.display = '';
+        wishField.style.display = '';
+      }
+      syncHiddenFields();
+    };
+
     // Автокомплит с portal
     const portalList = suggestDiv;
     portalList.style.position = 'fixed';
@@ -367,7 +384,7 @@ export function renderRecipientPickerUniversal({
         group.recipientId = u.id;
         recipientInput.setCustomValidity('');
         closeSuggest();
-        syncHiddenFields();
+        updateFieldsVisibility();
       });
       return item;
     };
@@ -410,7 +427,7 @@ export function renderRecipientPickerUniversal({
       group.recipientId = '';
       recipientInput.setCustomValidity('Выберите получателя из списка');
       doSearch();
-      syncHiddenFields();
+      updateFieldsVisibility();
     });
     recipientInput.addEventListener('focus', doSearch);
 
@@ -426,7 +443,7 @@ export function renderRecipientPickerUniversal({
             recipientInput.value = exactMatch.name;
             group.recipientId = exactMatch.id;
             recipientInput.setCustomValidity('');
-            syncHiddenFields();
+            updateFieldsVisibility();
           }
         }
       }, 200);
@@ -445,7 +462,7 @@ export function renderRecipientPickerUniversal({
     removeBtn.addEventListener('click', () => removeGroup(group));
 
     updateRemoveButtons();
-    syncHiddenFields();
+    updateFieldsVisibility(); // Проверяем видимость полей при создании группы
     return group;
   };
 
@@ -491,10 +508,14 @@ export function renderRecipientPickerUniversal({
         createGroup(user, qty, from, wish, giftDataVal);
       });
     } else {
-      createGroup();
+      // Нет сохранённых данных - создаём первую группу с текущим пользователем
+      const currentUser = users.find(u => String(u.id) === String(window.USER_ID));
+      createGroup(currentUser || null);
     }
   } else {
-    createGroup();
+    // Новая форма - предзаполняем первого получателя текущим пользователем
+    const currentUser = users.find(u => String(u.id) === String(window.USER_ID));
+    createGroup(currentUser || null);
   }
 
   syncHiddenFields();

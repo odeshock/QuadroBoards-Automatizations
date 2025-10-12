@@ -5,9 +5,6 @@
 import {
   URL_FIELD_FORMS,
   FORM_INCOME_NEEDREQUEST,
-  FORM_INCOME_RPGTOP,
-  FORM_INCOME_EP_PERSONAL,
-  FORM_INCOME_EP_PLOT,
   toSelector
 } from '../constants.js';
 
@@ -16,9 +13,6 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
   if (!isUrlFieldForm) return { handled: false };
 
   const isNeedRequest = template.id === FORM_INCOME_NEEDREQUEST;
-  const isRpgTop = template.id === FORM_INCOME_RPGTOP;
-  const isEpPersonal = template.id === FORM_INCOME_EP_PERSONAL;
-  const isEpPlot = template.id === FORM_INCOME_EP_PLOT;
 
   const scrollContainer = modalFields.parentElement;
   const addExtraBtn = modalFields.querySelector('[data-add-extra]');
@@ -31,9 +25,7 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
   const requiresUrlType = isUrlFieldForm;
   const typeOverride = requiresUrlType ? 'url' : null;
   const extraPrefix = extraPrefixAttr || (isNeedRequest ? 'need_extra_' : 'extra_');
-  const baseIndex = Number.isFinite(extraStartAttr)
-    ? extraStartAttr
-    : ((isNeedRequest || isRpgTop || isEpPersonal || isEpPlot) ? 2 : 1);
+  const baseIndex = Number.isFinite(extraStartAttr) ? extraStartAttr : 1;
 
   const parseSuffix = (key) => {
     if (!key || !key.startsWith(extraPrefix)) return NaN;
@@ -127,8 +119,11 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
     if (removeBtn) {
       removeBtn.addEventListener('click', () => {
         wrap.remove();
-        refreshExtraFields();
-        updateAmountSummary();
+        // Обновляем после удаления из DOM
+        requestAnimationFrame(() => {
+          refreshExtraFields();
+          updateAmountSummary();
+        });
       });
     }
 
@@ -163,6 +158,14 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
   addExtraBtn.addEventListener('click', () => {
     addExtraField();
   });
+
+  // Если нет data (создание новой операции), автоматически создаём первое поле
+  // Если есть data (редактирование), создадим поля из data ниже
+  if (!data) {
+    addExtraField({ silent: true });
+    // Обновляем сумму после создания первого поля
+    updateAmountSummary();
+  }
 
   // Prefill из data
   if (data) {

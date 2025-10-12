@@ -326,8 +326,10 @@
       background: #f3f4f6;
     }
     .btn.primary { border-color: #60a5fa; background: #dbeafe; color: #1e3a8a; }
-    .extra-field .extra-input { display:flex; gap:8px; align-items: center; }
-    .extra-field .extra-input input, .extra-field .extra-input textarea, .extra-field .extra-input select { flex: 1 1 auto; }
+    .extra-field .extra-input,
+    .field .extra-input { display:flex; gap:8px; align-items: center; }
+    .extra-field .extra-input input, .extra-field .extra-input textarea, .extra-field .extra-input select,
+    .field .extra-input input, .field .extra-input textarea, .field .extra-input select { flex: 1 1 auto; }
     .btn-remove-extra {
       appearance: none;
       border: 1px solid rgba(220,38,38,.35);

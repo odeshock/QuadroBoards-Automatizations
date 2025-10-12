@@ -39,16 +39,17 @@ const quantityField = (idPrefix) => {
 };
 
 // Генератор шаблона для поля с URL и кнопкой "+ Еще"
-const urlFieldWithExtra = ({ id, name, label, buttonData, info = '', systemInfo = '' }) => {
+const urlFieldWithExtra = ({ name, buttonData, info = '', systemInfo = '' }) => {
   const infoBlock = info ? infoTemplate(info) : '';
   const systemInfoBlock = systemInfo ? systemInfoTemplate(systemInfo) : '';
   const isCountBase = buttonData.type === 'count-base';
 
   const buttonAttrs = isCountBase
-    ? `data-add-extra data-count-base="${buttonData.value}"`
-    : `data-add-extra data-extra-label="${buttonData.label}" data-extra-start="${buttonData.start || 2}"`;
+    ? `data-add-extra data-count-base="${buttonData.value}" data-extra-prefix="${name}_extra_" data-extra-start="1"`
+    : `data-add-extra data-extra-label="${buttonData.label}" data-extra-start="${buttonData.start || 1}"`;
 
-  return `${infoBlock}${systemInfoBlock}<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${name}" type="url" required></div><div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
+  // Больше не создаём базовое поле - только кнопку "Еще"
+  return `${infoBlock}${systemInfoBlock}<div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
 };
 
 // Генератор шаблона для простого поля (input/textarea)
@@ -87,66 +88,48 @@ export const formTemplates = {
   
   // ДОХОДЫ (формы)
   [FORM_INCOME_NEEDREQUEST]: urlFieldWithExtra({
-    id: 'need-link',
     name: 'need',
-    label: 'Ссылка на «нужного» *',
     buttonData: { type: 'count-base', value: 'need' }
   }),
   [FORM_INCOME_EP_PERSONAL]: urlFieldWithExtra({
-    id: 'ep-link',
     name: 'ep',
-    label: 'Ссылка на эпизод *',
     buttonData: { type: 'count-base', value: 'ep' },
     systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br>При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_EP_PLOT]: urlFieldWithExtra({
-    id: 'plot-ep-link',
     name: 'plot_ep',
-    label: 'Ссылка на эпизод *',
     buttonData: { type: 'count-base', value: 'plot_ep' },
     systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br>При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_CONTEST]: urlFieldWithExtra({
-    id: 'uc',
     name: 'contest',
-    label: 'Ссылка на конкурс *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 },
+    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 1 },
     systemInfo: TEXT_MESSAGES.CONTEST_INFO
   }),
   [FORM_INCOME_AVATAR]: urlFieldWithExtra({
-    id: 'ava-link',
     name: 'link',
-    label: 'Ссылка на граф.тему *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
+    buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 1 },
     systemInfo: TEXT_MESSAGES.GRAPHIC_WORK_INFO
   }),
   [FORM_INCOME_DESIGN_OTHER]: urlFieldWithExtra({
-    id: 'do-link',
     name: 'link',
-    label: 'Ссылка на граф.тему *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 2 },
+    buttonData: { type: 'extra-label', label: 'Ссылка на граф.тему', start: 1 },
     systemInfo: TEXT_MESSAGES.GRAPHIC_WORK_INFO
   }),
   [FORM_INCOME_RUN_CONTEST]: urlFieldWithExtra({
-    id: 'rc',
     name: 'contest',
-    label: 'Ссылка на конкурс *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 2 },
+    buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 1 },
     systemInfo: 'Каждый конкурс учитывается только один раз.'
   }),
   [FORM_INCOME_MASTERING]: urlFieldWithExtra({
-    id: 'ms',
     name: 'ep',
-    label: 'Ссылка на эпизод *',
-    buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 2 },
+    buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 1 },
     systemInfo: 'Каждый сюжетный эпизод учитывается <strong>только один раз</strong>.'
   }),
   [FORM_INCOME_BANNER_RENO]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
   [FORM_INCOME_BANNER_MAYAK]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
   [FORM_INCOME_RPGTOP]: urlFieldWithExtra({
-    id: 'rpgtop-link',
     name: 'need',
-    label: 'Ссылка на скрин *',
     buttonData: { type: 'count-base', value: 'need' },
     systemInfo: `Учитываются голоса, отправленные не чаще, чем <strong>раз в неделю</strong>.<br>Загрузите свои скриншоты в «<a href="${BASE_URL}/profile.php?section=uploads&id=${window.USER_ID}" target="_blank" rel="noopener noreferrer"><strong>Мои загрузки</strong></a>» и вставьте сюда ссылки.`
   }),

@@ -387,15 +387,15 @@ export function formatCostDisplay(mode, price, bonus = 0, items = 0, additional_
   switch (mode) {
     case 'price_per_item':
       // Формат: "price × items = total"
-      // Когда items = 0, показываем базовую цену
-      if (items === 0) return formatNumber(price);
+      // Когда items = 0, показываем "price × 0 = 0"
+      if (items === 0) return `${formatNumber(price)} × 0 = 0`;
       if (items === 1) return formatNumber(total);
       return `${formatNumber(price)} × ${items} = ${formatNumber(total)}`;
 
     case 'price_per_item_w_bonus':
       // Формат: "price × items + bonus × additional_items = total"
-      // Когда items = 0 и additional_items = 0, показываем базовую цену
-      if (items === 0 && additional_items === 0) return formatNumber(price);
+      // Когда items = 0 и additional_items = 0, показываем "price × 0 = 0"
+      if (items === 0 && additional_items === 0) return `${formatNumber(price)} × 0 = 0`;
       if (additional_items === 0) {
         if (items === 1) return formatNumber(total);
         return `${formatNumber(price)} × ${items} = ${formatNumber(total)}`;

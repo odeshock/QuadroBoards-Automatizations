@@ -273,6 +273,12 @@ if (buyoutResult.handled) {
       const stored = Number.parseFloat(storedRaw);
       if (Number.isFinite(stored)) return stored;
     }
+    // Для URL форм все поля теперь extra (нет базового поля)
+    const isUrlFieldForm = URL_FIELD_FORMS.includes(templateSelector);
+    if (isUrlFieldForm) {
+      return getExtraFields().length;
+    }
+    // Для других форм: базовое поле (1) + дополнительные
     return 1 + getExtraFields().length;
   };
 

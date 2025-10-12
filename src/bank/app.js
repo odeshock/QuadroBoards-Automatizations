@@ -285,8 +285,54 @@ form.addEventListener('submit', (e) => {
     obj[key] = value;
   });
 
+  // Проверяем: если это форма с URL полями и все поля удалены (нет данных),
+  // то удаляем запись или не создаём новую
+  const templateSelector = form.dataset.templateSelector;
+  const isUrlFieldForm = templateSelector && [
+    '#form-income-needrequest',
+    '#form-income-rpgtop',
+    '#form-income-ep-personal',
+    '#form-income-ep-plot',
+    '#form-income-contest',
+    '#form-income-avatar',
+    '#form-income-design-other',
+    '#form-income-run-contest',
+    '#form-income-mastering'
+  ].includes(templateSelector);
+
+  // Если это URL форма и нет полей с данными (кроме системных полей вроде quantity)
+  const hasUrlFields = isUrlFieldForm && Object.keys(obj).some(key =>
+    key.includes('_extra_') ||
+    ['need', 'ep', 'plot_ep', 'contest', 'link'].includes(key)
+  );
+
   const editingEntryId = form.dataset.editingId || null;
   const editingGroupId = form.dataset.groupId || null;
+
+  // Если URL форма без данных - удаляем entry и выходим
+  if (isUrlFieldForm && !hasUrlFields) {
+    if (editingEntryId) {
+      // Удаляем существующую запись
+      const originGroup = submissionGroups.find((item) =>
+        item.entries.some((entry) => entry.id === editingEntryId)
+      );
+      if (originGroup) {
+        const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
+        if (idx !== -1) {
+          originGroup.entries.splice(idx, 1);
+          // Если группа стала пустой - удаляем её
+          if (!originGroup.entries.length) {
+            const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
+            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+          }
+        }
+      }
+      renderLog(log);
+    }
+    // Просто закрываем модалку, не создавая новую запись
+    handleCloseModal();
+    return;
+  }
 
   // amount используется только для отображения в UI
   const displayAmount = form.dataset.amount || '';

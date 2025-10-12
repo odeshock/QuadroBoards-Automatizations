@@ -1025,7 +1025,7 @@
       </div>
     </div>
     <div class="actions">
-      <button class="btn" id="resetBtn">Сбросить</button>
+      <button class="button" id="resetBtn">Сбросить</button>
     </div>
   </div>
   

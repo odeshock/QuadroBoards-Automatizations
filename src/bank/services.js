@@ -218,16 +218,16 @@ export function updateAutoDiscounts() {
 
   // Проходим по всем правилам скидок
   autoDiscounts.forEach(rule => {
-    const { id, title, forms, type, discountValue, condition, expiresAt } = rule;
+    let { id, title, forms, type, discountValue, condition, expiresAt } = rule;
 
     // Проверяем, не истекла ли скидка
     if (isDiscountExpired(expiresAt)) {
       return; // Пропускаем истекшую скидку
     }
 
-    // Для процентной скидки проверяем, что значение не больше 100
+    // Для процентной скидки ограничиваем значение до 100
     if (type === 'percent' && discountValue > 100) {
-      return; // Скидка не работает
+      discountValue = 100;
     }
 
     // Определяем, какие группы подходят под это правило

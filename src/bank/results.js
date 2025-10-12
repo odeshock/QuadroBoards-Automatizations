@@ -1754,7 +1754,9 @@ export function renderLog(log) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `purchase_${timestamp.replace(/[:.]/g, '-')}.json`;
+      // Создаём читаемое имя файла из ISO даты
+      const fileTimestamp = new Date(timestamp * 1000).toISOString().replace(/[:.]/g, '-');
+      link.download = `purchase_${fileTimestamp}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

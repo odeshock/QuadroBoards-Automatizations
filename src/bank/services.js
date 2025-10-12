@@ -36,8 +36,14 @@ export const submissionGroups = [];
 export let groupSeq = 0;
 export let entrySeq = 0;
 
-export const buildGroupKey = ({ templateSelector = '', title = '', amount = '', amountLabel = '', kind = '', giftId = '' }) =>
-  [templateSelector, title, amount, amountLabel, kind, giftId].join('||');
+export const buildGroupKey = ({ templateSelector = '', title = '', amount = '', amountLabel = '', kind = '', giftId = '' }) => {
+  // Для подарков используем полный ключ (чтобы различать разные типы подарков)
+  if (giftId) {
+    return [templateSelector, title, amount, amountLabel, kind, giftId].join('||');
+  }
+  // Для всех остальных форм используем только templateSelector
+  return templateSelector;
+};
 
 export function incrementGroupSeq() {
   groupSeq += 1;
@@ -58,6 +64,8 @@ export function restoreFromBackup(backupData) {
     throw new Error('Invalid backup data: missing fullData');
   }
 
+  console.log('🔄 Начало восстановления из backup:', backupData);
+
   // Очищаем текущие операции
   submissionGroups.length = 0;
 
@@ -69,7 +77,7 @@ export function restoreFromBackup(backupData) {
   backupData.fullData.forEach((operation) => {
     // Создаём группу
     const group = {
-      id: incrementGroupSeq(),
+      id: `group-${incrementGroupSeq()}`,
       templateSelector: operation.form_id ? `#${operation.form_id}` : '',
       title: operation.title,
       price: operation.price || 0,
@@ -129,9 +137,9 @@ export function restoreFromBackup(backupData) {
     // Восстанавливаем записи
     operation.entries.forEach((entry) => {
       const restoredEntry = {
-        id: incrementEntrySeq(),
+        id: `entry-${incrementEntrySeq()}`,
         template_id: entry.template_id,  // Сохраняем template_id из backup
-        key: entry.key,
+        key: entry.key || group.key,  // Используем entry.key или group.key как fallback
         data: entry.data || {},
         multiplier: entry.multiplier || 1
       };
@@ -139,11 +147,20 @@ export function restoreFromBackup(backupData) {
       group.entries.push(restoredEntry);
     });
 
+    console.log('✅ Восстановлена группа:', {
+      id: group.id,
+      key: group.key,
+      title: group.title,
+      entries: group.entries.length,
+      firstEntry: group.entries[0]
+    });
+
     submissionGroups.push(group);
   });
 
   const restoredCount = submissionGroups.length;
-  console.log(`Восстановлено ${restoredCount} операций из backup`);
+  console.log(`✅ Восстановлено ${restoredCount} операций из backup`);
+  console.log('📋 submissionGroups:', submissionGroups);
 
   // Применяем корректировки (вечные) и скидки (только те, что были активны на момент backup'а)
   let newAdjustmentsCount = 0;

@@ -127,6 +127,18 @@ function buildFullOperationsData() {
         multiplier: entry.multiplier
       };
 
+      // Рассчитываем modalAmount для этой записи (как показывалось в модалке)
+      if (group.mode && group.price !== undefined && group.price !== null) {
+        entryData.modalAmount = formatCostDisplay(
+          group.mode,
+          group.price,
+          group.bonus || 0,
+          entry.multiplier || 0,
+          0, // additional_items для bonus
+          0  // entered_amount
+        );
+      }
+
       // Если есть скидка или корректировка
       if (entry.data?.discount_amount) {
         entryData.discount_amount = entry.data.discount_amount;
@@ -147,7 +159,6 @@ function buildFullOperationsData() {
     operation.mode = group.mode;
     operation.kind = group.kind;  // Тип операции (income/expense)
     operation.amountLabel = group.amountLabel;
-    operation.amount = group.amount;  // Для отображения (например "4 ч" или "5 + x6")
 
     // Для подарков сохраняем дополнительные поля
     if (group.giftId) {

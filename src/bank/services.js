@@ -75,10 +75,21 @@ export function restoreFromBackup(backupData) {
       title: operation.title,
       price: operation.price || 0,
       bonus: operation.bonus || 0,
-      amount: operation.amount,  // Восстанавливаем amount для отображения entry-meta
+      mode: operation.mode,  // Восстанавливаем mode
       amountLabel: operation.amountLabel || 'Сумма',
       entries: []
     };
+
+    // Пересоздаём amount на основе price, bonus и mode
+    if (operation.price !== undefined && operation.price !== null) {
+      if (operation.bonus && operation.mode === 'price_per_item_w_bonus') {
+        group.amount = `${operation.price} + x${operation.bonus}`;
+      } else if (operation.bonus) {
+        group.amount = `${operation.price} + x${operation.bonus}`;
+      } else {
+        group.amount = String(operation.price);
+      }
+    }
 
     // Восстанавливаем специальные флаги для скидок и корректировок
     if (operation.type === 'discount') {

@@ -121,6 +121,7 @@ function buildFullOperationsData() {
     // Собираем данные по каждой записи в группе
     group.entries.forEach((entry) => {
       const entryData = {
+        template_id: entry.template_id,  // Сохраняем template_id для корректного рендеринга
         key: entry.key,
         data: entry.data || {},
         multiplier: entry.multiplier
@@ -143,7 +144,7 @@ function buildFullOperationsData() {
     // Добавляем метаинформацию группы
     operation.price = group.price;
     operation.bonus = group.bonus;
-    operation.amount = group.amount;  // Сохраняем amount для корректного восстановления
+    operation.mode = group.mode;  // Сохраняем mode для пересоздания amount
     operation.amountLabel = group.amountLabel;
 
     operations.push(operation);

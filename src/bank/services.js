@@ -138,7 +138,8 @@ export function restoreFromBackup(backupData) {
     operation.entries.forEach((entry) => {
       const restoredEntry = {
         id: `entry-${incrementEntrySeq()}`,
-        template_id: entry.template_id,  // Сохраняем template_id из backup
+        // Для обычных операций template_id = form_id, для скидок/корректировок берём из entry
+        template_id: entry.template_id || operation.form_id,
         key: entry.key || group.key,  // Используем entry.key или group.key как fallback
         data: entry.data || {},
         multiplier: entry.multiplier || 1

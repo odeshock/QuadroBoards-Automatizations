@@ -121,14 +121,14 @@ function buildFullOperationsData() {
     // Собираем данные по каждой записи в группе
     group.entries.forEach((entry) => {
       const entryData = {
-        template_id: entry.template_id,  // Сохраняем template_id для корректного рендеринга
         data: entry.data || {},
         multiplier: entry.multiplier
       };
 
-      // Для скидок и корректировок сохраняем key (содержит ID)
+      // Для скидок и корректировок сохраняем key и template_id (содержат ID правила)
       if (group.isDiscount || group.isPriceAdjustment) {
         entryData.key = entry.key;
+        entryData.template_id = entry.template_id;
       }
 
       // Если есть скидка или корректировка

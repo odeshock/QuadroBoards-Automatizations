@@ -89,7 +89,9 @@ export const formTemplates = {
   // ДОХОДЫ (формы)
   [FORM_INCOME_NEEDREQUEST]: urlFieldWithExtra({
     name: 'need',
-    buttonData: { type: 'count-base', value: 'need' }
+    buttonData: { type: 'count-base', value: 'need' },
+    info: 'Разместите свою заявку на нужного в соответствующей теме и получите вознаграждение.',
+    systemInfo: 'За заявки, которые дублируют Ваши старые или были возвращены из архива, галлеоны <strong>повторно не начисляются</strong>.'
   }),
   [FORM_INCOME_EP_PERSONAL]: urlFieldWithExtra({
     name: 'ep',

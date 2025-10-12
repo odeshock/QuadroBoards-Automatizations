@@ -437,9 +437,9 @@ export function setHiddenField(modalFields, name, value) {
 // ============================================================================
 
 export function renderLog(log) {
-  // Пересчитываем автоматические скидки и корректировки цен перед рендерингом
-  updateAutoDiscounts();
+  // Сначала пересчитываем корректировки цен, затем скидки (скидки учитывают корректировки)
   updateAutoPriceAdjustments();
+  updateAutoDiscounts();
 
   log.innerHTML = '';
   if (!submissionGroups.length) {
@@ -657,6 +657,15 @@ export function renderLog(log) {
           totalDiscount += amount;
         });
         meta.innerHTML = `${group.amountLabel}: <span style="color: ${color}">${prefix}${formatNumber(totalDiscount)}</span>`;
+        header.appendChild(meta);
+      } else if (group.isPriceAdjustment) {
+        // Корректировки цен: сумма всех adjustment_amount (отображаем как доход)
+        let totalAdjustment = 0;
+        group.entries.forEach((item) => {
+          const amount = Number(item.data?.adjustment_amount) || 0;
+          totalAdjustment += amount;
+        });
+        meta.innerHTML = `${group.amountLabel}: <span style="color: #22c55e">+ ${formatNumber(totalAdjustment)}</span>`;
         header.appendChild(meta);
       } else if (
         group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||

@@ -215,19 +215,6 @@ export const backgroundItems = [
  */
 export const autoDiscounts = [
   {
-    id: 'gift-collection-bulk-discount',
-    title: 'Скидка за каждые 5 подарков из коллекции',
-    forms: [toSelector(FORM_GIFT_PRESENT)], // Только подарки из коллекции (не custom!)
-    type: 'per_batch',
-    discountValue: itemPrices.gift.collection*5 - itemDiscountPrices.gift.collection.per5,
-    batchSize: 5,      // за каждые 5 подарков
-    roundResult: false,
-    condition: {
-      type: 'min_items', // минимальное количество элементов в операциях этого типа
-      value: 5
-    }
-  },
-  {
     id: 'global-75-percent-discount',
     title: 'Скидка 75% на все расходы',
     forms: 'all', // Применяется ко всем расходам (kind === 'expense')
@@ -239,19 +226,8 @@ export const autoDiscounts = [
       type: 'none' // Всегда работает
     }
   },
-  {
-    id: 'gift-custom-bulk-discount',
-    title: 'Скидка за каждые 5 индивидуальных подарков',
-    forms: [toSelector(FORM_GIFT_CUSTOM)], // Только индивидуальные подарки (custom!)
-    type: 'per_batch',
-    discountValue: itemPrices.gift.custom*5 - itemDiscountPrices.gift.custom.per5,
-    batchSize: 5,      // за каждые 5 подарков
-    roundResult: false,
-    condition: {
-      type: 'min_items', // минимальное количество элементов в операциях этого типа
-      value: 5
-    }
-  }
+
+  
   // Можно добавить больше правил скидок здесь
 
   // ============================================================================
@@ -318,4 +294,18 @@ export const autoPriceAdjustments = [
   //   batchSize: 5,
   //   newPrice: 20
   // }
+  {
+    id: 'gift-collection-5-discount',
+    title: 'Пересчёт за 5 подарков из коллекции',
+    form: toSelector(FORM_GIFT_PRESENT),
+    batchSize: 5, 
+    newPrice: itemDiscountPrices.gift.collection.per5
+  },
+  {
+    id: 'gift-custom-5-discount',
+    title: 'Пересчёт за 5 индивидуальных подарков',
+    form: toSelector(FORM_GIFT_CUSTOM),
+    batchSize: 5,
+    newPrice: itemDiscountPrices.gift.custom.per5
+  }
 ];

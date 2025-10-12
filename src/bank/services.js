@@ -359,17 +359,18 @@ export function updateAutoPriceAdjustments() {
   autoPriceAdjustments.forEach(rule => {
     const { id, title, form, batchSize, newPrice } = rule;
 
-    // Находим группу, соответствующую форме
-    const targetGroup = submissionGroups.find(g => g.templateSelector === form);
-    if (!targetGroup) return;
+    // Находим ВСЕ группы, соответствующие форме
+    const targetGroups = submissionGroups.filter(g => g.templateSelector === form);
+    if (targetGroups.length === 0) return;
 
-    // Получаем старую цену из группы
-    const oldPrice = Number(targetGroup.price) || 0;
+    // Получаем старую цену из первой группы
+    const oldPrice = Number(targetGroups[0].price) || 0;
     if (oldPrice === 0) return;
 
-    // Подсчитываем общее количество элементов в операции
+    // Подсчитываем общее количество элементов во ВСЕХ операциях данной формы
     let totalItems = 0;
-    targetGroup.entries.forEach(entry => {
+    targetGroups.forEach(targetGroup => {
+      targetGroup.entries.forEach(entry => {
       const dataObj = entry.data || {};
 
       // Для постов подсчитываем количество постов из JSON
@@ -399,6 +400,7 @@ export function updateAutoPriceAdjustments() {
         const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
         totalItems += recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
       }
+      });
     });
 
     // Проверяем условие применения: itemCount >= batchSize
@@ -416,16 +418,19 @@ export function updateAutoPriceAdjustments() {
     // Проверяем, что корректировка положительная
     if (adjustment <= 0) return;
 
-    // Получаем сумму операции
-    const operationTotal = calculateGroupCost(targetGroup);
+    // Получаем сумму ВСЕХ операций данной формы
+    let operationTotal = 0;
+    targetGroups.forEach(group => {
+      operationTotal += Math.abs(calculateGroupCost(group));
+    });
 
-    // Корректировка не может быть больше суммы операции
-    const finalAdjustment = Math.min(adjustment, Math.abs(operationTotal));
+    // Корректировка не может быть больше суммы операций
+    const finalAdjustment = Math.min(adjustment, operationTotal);
 
     if (finalAdjustment <= 0) return;
 
     // Формируем название и расчёт
-    const adjustmentTitle = title.replace('{title}', targetGroup.title || 'Операция');
+    const adjustmentTitle = title.replace('{title}', targetGroups[0].title || 'Операция');
     const calculation = `${formatNumber(oldPrice)} × ${batches} × ${batchSize} − ${formatNumber(newPrice)} × ${batches}`;
 
     totalAdjustment += finalAdjustment;

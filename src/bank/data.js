@@ -192,25 +192,29 @@ export const backgroundItems = [
  * - title: название скидки для отображения
  * - forms: массив form селекторов (например, [toSelector(FORM_GIFT_PRESENT)]) или 'all' для всех операций
  * - type: тип скидки
- *   - 'percent': процентная скидка (discountValue = процент, например 20 для 20%)
+ *   - 'percent': процентная скидка (discountValue = процент от 0 до 100, всегда округляется вверх)
  *   - 'fixed': фиксированная скидка (discountValue = фиксированная сумма)
  *   - 'per_item': скидка за каждый элемент (discountValue = сумма за штуку)
  *   - 'per_batch': скидка за каждые N элементов (discountValue = сумма за партию, batchSize = размер партии)
- * - discountValue: значение скидки (зависит от type)
+ * - discountValue: значение скидки (зависит от type). Для 'percent' не должно превышать 100
  * - batchSize: размер партии (только для type='per_batch', например 5 = за каждые 5 штук)
- * - roundResult: округлять ли результат (true/false), применяется для percent
  * - expiresAt: (необязательно) дата окончания действия скидки в формате 'YYYY-MM-DD'
  *   Например: '2025-01-31' означает, что скидка действует до конца 31 января 2025 (23:59:59 по Москве)
  *   Скидка не будет применяться с 1 февраля 2025 00:00:00 по Москве
  * - condition: условие применения скидки
- *   - type: 'none' | 'min_items' | 'min_operation_total' | 'min_grand_total'
+ *   - type: 'none' | 'min_items'
  *   - value: пороговое значение
  *
+ * Ограничения:
+ * - Скидка для конкретных операций не может превышать сумму этих операций
+ * - Общая сумма всех скидок не может превышать общую сумму всех операций
+ * - Процентная скидка всегда округляется вверх (Math.ceil)
+ *
  * Примеры:
- * 1. Скидка 20% на подарки при сумме операции >= 300
- * 2. Фиксированная скидка 50 галлеонов при итоговой сумме >= 1000
- * 3. Скидка 4 галлеона за каждый подарок при количестве >= 5
- * 4. Скидка 20 галлеонов за каждые 5 подарков (per_batch)
+ * 1. Скидка 20% на подарки при количестве >= 5
+ * 2. Фиксированная скидка 50 за операцию
+ * 3. Скидка 4 за каждый подарок при количестве >= 5
+ * 4. Скидка 20 за каждые 5 подарков (per_batch)
  * 5. Временная скидка 75% действует до конца дня 31 января 2025 (expiresAt: '2025-01-31')
  */
 export const autoDiscounts = [
@@ -220,7 +224,6 @@ export const autoDiscounts = [
     forms: 'all', // Применяется ко всем расходам (kind === 'expense')
     type: 'percent',
     discountValue: 75, // 75% скидка
-    roundResult: true,
     // expiresAt: '2025-10-10', // Действует до конца 31 января 2025 по Москве
     condition: {
       type: 'none' // Всегда работает
@@ -244,7 +247,6 @@ export const autoDiscounts = [
   //   forms: 'all',
   //   type: 'percent',
   //   discountValue: 50,
-  //   roundResult: true,
   //   expiresAt: '2025-01-10',
   //   condition: { type: 'none' }
   // }
@@ -256,10 +258,20 @@ export const autoDiscounts = [
   //   forms: [toSelector(FORM_GIFT_PRESENT), toSelector(FORM_GIFT_CUSTOM)],
   //   type: 'percent',
   //   discountValue: 30,
-  //   roundResult: true,
   //   expiresAt: '2025-01-31',
   //   condition: { type: 'min_items', value: 3 }
   // }
+
+  // {
+  //   id: 'new-year-discount',
+  //   title: 'Новогодняя скидка 50% на оформление',
+  //   forms: 'all',
+  //   type: 'percent',
+  //   discountValue: 120,
+  //   roundResult: true,
+  //   expiresAt: '2026-01-10',
+  //   condition: { type: 'none' }
+  // },
 ];
 
 // ============================================================================

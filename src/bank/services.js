@@ -218,11 +218,16 @@ export function updateAutoDiscounts() {
 
   // Проходим по всем правилам скидок
   autoDiscounts.forEach(rule => {
-    const { id, title, forms, type, discountValue, roundResult, condition, expiresAt } = rule;
+    const { id, title, forms, type, discountValue, condition, expiresAt } = rule;
 
     // Проверяем, не истекла ли скидка
     if (isDiscountExpired(expiresAt)) {
       return; // Пропускаем истекшую скидку
+    }
+
+    // Для процентной скидки проверяем, что значение не больше 100
+    if (type === 'percent' && discountValue > 100) {
+      return; // Скидка не работает
     }
 
     // Определяем, какие группы подходят под это правило
@@ -256,6 +261,25 @@ export function updateAutoDiscounts() {
     if (!conditionMet) return;
     if (totalItems === 0 && type !== 'percent') return;
 
+    // Вычисляем сумму операций для этих форм (для проверки лимита скидки)
+    let operationTotal = 0;
+    matchingGroups.forEach(group => {
+      const groupCost = calculateGroupCost(group);
+      operationTotal += Math.abs(groupCost);
+    });
+
+    // Вычитаем корректировки для этих форм (если есть)
+    const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+    if (adjustmentGroup) {
+      adjustmentGroup.entries.forEach(entry => {
+        const adjustmentForm = entry.data?.form;
+        if (matchingGroups.some(g => g.templateSelector === adjustmentForm)) {
+          const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+          operationTotal -= adjustmentAmount;
+        }
+      });
+    }
+
     // Вычисляем скидку в зависимости от типа
     let discount = 0;
     let calculation = '';
@@ -275,32 +299,16 @@ export function updateAutoDiscounts() {
       discount = discountValue;
       calculation = String(discountValue);
     } else if (type === 'percent') {
-      // Процентная скидка - вычисляем общую стоимость операций
-      let operationTotal = 0;
-      matchingGroups.forEach(group => {
-        // Вычисляем реальную стоимость группы на основе записей
-        const groupCost = calculateGroupCost(group);
-        operationTotal += Math.abs(groupCost); // Используем abs, т.к. расходы могут быть отрицательными
-      });
-
-      // Вычитаем корректировки для этих форм (если есть)
-      const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
-      if (adjustmentGroup) {
-        adjustmentGroup.entries.forEach(entry => {
-          const adjustmentForm = entry.data?.form;
-          // Проверяем, применяется ли корректировка к формам из matchingGroups
-          if (matchingGroups.some(g => g.templateSelector === adjustmentForm)) {
-            const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
-            operationTotal -= adjustmentAmount; // Вычитаем корректировку из суммы
-          }
-        });
-      }
-
+      // Процентная скидка
       discount = operationTotal * (discountValue / 100);
-      if (roundResult) {
-        discount = Math.round(discount);
-      }
+      // Всегда округляем в большую сторону
+      discount = Math.ceil(discount);
       calculation = `${formatNumber(operationTotal)} × ${discountValue}%`;
+    }
+
+    // Скидка не может превышать сумму операций для этих форм
+    if (discount > operationTotal) {
+      discount = operationTotal;
     }
 
     if (discount > 0) {
@@ -320,6 +328,34 @@ export function updateAutoDiscounts() {
       });
     }
   });
+
+  // Вычисляем общую сумму всех операций (для проверки лимита общей скидки)
+  let grandTotal = 0;
+  submissionGroups.forEach(g => {
+    if (g.isDiscount || g.isPriceAdjustment) return; // Пропускаем скидки и корректировки
+    const cost = calculateGroupCost(g);
+    grandTotal += Math.abs(cost);
+  });
+
+  // Вычитаем все корректировки
+  const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+  if (adjustmentGroup) {
+    adjustmentGroup.entries.forEach(entry => {
+      const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+      grandTotal -= adjustmentAmount;
+    });
+  }
+
+  // Общая сумма скидок не может превышать общую сумму операций
+  if (totalDiscount > grandTotal) {
+    // Пропорционально уменьшаем все скидки
+    const ratio = grandTotal / totalDiscount;
+    entries.forEach(entry => {
+      const oldAmount = entry.data.discount_amount;
+      entry.data.discount_amount = Math.ceil(oldAmount * ratio);
+    });
+    totalDiscount = grandTotal;
+  }
 
   // Обновляем или удаляем группу скидок
   if (entries.length > 0) {

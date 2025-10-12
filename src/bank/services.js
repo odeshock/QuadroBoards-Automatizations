@@ -282,6 +282,20 @@ export function updateAutoDiscounts() {
         const groupCost = calculateGroupCost(group);
         operationTotal += Math.abs(groupCost); // Используем abs, т.к. расходы могут быть отрицательными
       });
+
+      // Вычитаем корректировки для этих форм (если есть)
+      const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+      if (adjustmentGroup) {
+        adjustmentGroup.entries.forEach(entry => {
+          const adjustmentForm = entry.data?.form;
+          // Проверяем, применяется ли корректировка к формам из matchingGroups
+          if (matchingGroups.some(g => g.templateSelector === adjustmentForm)) {
+            const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+            operationTotal -= adjustmentAmount; // Вычитаем корректировку из суммы
+          }
+        });
+      }
+
       discount = operationTotal * (discountValue / 100);
       if (roundResult) {
         discount = Math.round(discount);

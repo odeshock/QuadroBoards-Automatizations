@@ -144,9 +144,24 @@ document.addEventListener('click', (e) => {
   const bonus = btn.getAttribute('data-bonus');
   const mode = btn.getAttribute('data-mode');
 
+  // Для подарков из коллекции используем общий title вместо названия конкретного подарка
+  let finalTitle = titleText;
+  if (giftId && giftId !== 'custom') {
+    // Определяем тип формы для правильного названия
+    if (selector === '#form-gift-present') {
+      finalTitle = `Подарок из коллекции (#${giftId})`;
+    } else if (selector === '#form-icon-present') {
+      finalTitle = `Иконка из коллекции (#${giftId})`;
+    } else if (selector === '#form-badge-present') {
+      finalTitle = `Плашка из коллекции (#${giftId})`;
+    } else if (selector === '#form-bg-present') {
+      finalTitle = `Фон из коллекции (#${giftId})`;
+    }
+  }
+
   const meta = {
     templateSelector: selector,
-    title: titleText,
+    title: finalTitle,
     amount,
     kind,
     amountLabel,

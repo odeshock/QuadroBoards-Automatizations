@@ -298,10 +298,8 @@ form.addEventListener('submit', (e) => {
   ].includes(templateSelector);
 
   // Если это URL форма и нет полей с данными (кроме системных полей вроде quantity)
-  const hasUrlFields = isUrlFieldForm && Object.keys(obj).some(key =>
-    key.includes('_extra_') ||
-    ['need', 'ep', 'plot_ep', 'contest', 'link'].includes(key)
-  );
+  // Все URL поля теперь имеют формат {prefix}_extra_N
+  const hasUrlFields = isUrlFieldForm && Object.keys(obj).some(key => key.includes('_extra_'));
 
   const editingEntryId = form.dataset.editingId || null;
   const editingGroupId = form.dataset.groupId || null;

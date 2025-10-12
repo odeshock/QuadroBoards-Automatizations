@@ -46,7 +46,7 @@ const urlFieldWithExtra = ({ name, buttonData, info = '', systemInfo = '' }) => 
 
   const buttonAttrs = isCountBase
     ? `data-add-extra data-count-base="${buttonData.value}" data-extra-prefix="${name}_extra_" data-extra-start="1"`
-    : `data-add-extra data-extra-label="${buttonData.label}" data-extra-start="${buttonData.start || 1}"`;
+    : `data-add-extra data-extra-label="${buttonData.label}" data-extra-prefix="${name}_extra_" data-extra-start="${buttonData.start || 1}"`;
 
   // Больше не создаём базовое поле - только кнопку "Еще"
   return `${infoBlock}${systemInfoBlock}<div class="field"><button type="button" class="btn" ${buttonAttrs}>+ Еще</button></div>`;
@@ -121,7 +121,7 @@ export const formTemplates = {
   [FORM_INCOME_RUN_CONTEST]: urlFieldWithExtra({
     name: 'contest',
     buttonData: { type: 'extra-label', label: 'Ссылка на конкурс', start: 1 },
-    systemInfo: 'Каждый конкурс учитывается только один раз.'
+    systemInfo: 'Каждый конкурс учитывается <strong>только один раз</strong>.'
   }),
   [FORM_INCOME_MASTERING]: urlFieldWithExtra({
     name: 'ep',

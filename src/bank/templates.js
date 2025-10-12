@@ -133,7 +133,7 @@ export const formTemplates = {
   [FORM_INCOME_RPGTOP]: urlFieldWithExtra({
     name: 'need',
     buttonData: { type: 'count-base', value: 'need' },
-    systemInfo: `Учитываются голоса, отправленные не чаще, чем <strong>раз в неделю</strong>.<br>Загрузите свои скриншоты в «<a href="${BASE_URL}/profile.php?section=uploads&id=${window.USER_ID}" target="_blank" rel="noopener noreferrer"><strong>Мои загрузки</strong></a>» и вставьте сюда ссылки.`
+    systemInfo: `Учитываются голоса, отправленные не чаще, чем <strong>раз в неделю</strong>.<br><br>Загрузите свои скриншоты в <a href="${BASE_URL}/profile.php?section=uploads&id=${window.USER_ID}" target="_blank" rel="noopener noreferrer"><strong>«Мои загрузки»</strong></a> и вставьте сюда ссылки.`
   }),
 
   // РАСХОДЫ

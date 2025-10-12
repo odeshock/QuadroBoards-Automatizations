@@ -46,16 +46,17 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
       input.required = true;
       if (label) {
         let computedLabel;
+        const suffixText = suffix === 1 ? '' : ` ${suffix}`;
         if (extraLabelBase) {
-          computedLabel = `${extraLabelBase} ${suffix}`;
+          computedLabel = suffix === 1 ? extraLabelBase : `${extraLabelBase} ${suffix}`;
         } else if (template.id === FORM_INCOME_NEEDREQUEST) {
-          computedLabel = `Ссылка на «нужного» ${suffix}`;
+          computedLabel = `Ссылка на «нужного»${suffixText}`;
         } else if (template.id === FORM_INCOME_RPGTOP) {
-          computedLabel = `Ссылка на скрин ${suffix}`;
+          computedLabel = `Ссылка на скрин${suffixText}`;
         } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {
-          computedLabel = `Ссылка на эпизод ${suffix}`;
+          computedLabel = `Ссылка на эпизод${suffixText}`;
         } else {
-          computedLabel = `Доп. поле ${suffix}`;
+          computedLabel = `Доп. поле${suffixText}`;
         }
         label.textContent = computedLabel;
         label.setAttribute('for', nameAttr);
@@ -88,14 +89,15 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
     const label = document.createElement('label');
 
     let labelText = '';
+    const suffixText = suffix === 1 ? '' : ` ${suffix}`;
     if (template.id === FORM_INCOME_NEEDREQUEST) {
-      labelText = `Ссылка на «нужного» ${suffix}`;
+      labelText = `Ссылка на «нужного»${suffixText}`;
     } else if (template.id === FORM_INCOME_RPGTOP) {
-      labelText = `Ссылка на скрин ${suffix}`;
+      labelText = `Ссылка на скрин${suffixText}`;
     } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {
-      labelText = `Ссылка на эпизод ${suffix}`;
+      labelText = `Ссылка на эпизод${suffixText}`;
     } else {
-      labelText = `Доп. поле ${suffix}`;
+      labelText = `Доп. поле${suffixText}`;
     }
     label.textContent = labelText;
 

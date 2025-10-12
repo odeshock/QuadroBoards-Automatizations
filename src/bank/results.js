@@ -147,6 +147,7 @@ function buildFullOperationsData() {
     operation.mode = group.mode;
     operation.kind = group.kind;  // Тип операции (income/expense)
     operation.amountLabel = group.amountLabel;
+    operation.amount = group.amount;  // Для отображения (например "4 ч" или "5 + x6")
 
     // Для подарков сохраняем дополнительные поля
     if (group.giftId) {
@@ -1665,13 +1666,10 @@ export function renderLog(log) {
     buyBtn.className = 'button primary';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
-      // Получаем текущий timestamp
-      const timestamp = new Date().toISOString();
+      // Получаем текущий timestamp в секундах
+      const timestamp = Math.floor(Date.now() / 1000);
 
-      // Формируем массив операций из отрендеренного DOM (старый формат)
-      const operations = buildOperationsArray(log);
-
-      // Собираем полную информацию из submissionGroups (новый формат)
+      // Собираем полную информацию из submissionGroups
       const fullData = buildFullOperationsData();
 
       // Собираем ВСЕ переменные окружения из window (даже если они undefined)
@@ -1718,12 +1716,10 @@ export function renderLog(log) {
       };
 
       console.log('=== Итоги операций ===');
-      console.log('Timestamp:', timestamp);
-      console.log('Всего операций:', operations.length);
+      console.log('Timestamp (секунды):', timestamp);
+      console.log('Всего операций:', fullData.length);
       console.log('Общая сумма:', totalSum);
-      console.log('\nДетали операций (DOM):');
-      console.log(operations);
-      console.log('\nПолные данные (все поля форм):');
+      console.log('\nПолные данные операций:');
       console.log(JSON.stringify(fullData, null, 2));
       console.log('\nПеременные окружения:');
       console.log(JSON.stringify(environment, (_key, value) => {
@@ -1736,7 +1732,6 @@ export function renderLog(log) {
       const purchaseData = {
         type: "PURCHASE",
         timestamp: timestamp,
-        operations: operations,
         fullData: fullData,
         environment: environment,
         totalSum: totalSum

@@ -184,7 +184,7 @@ export function openModal({
   backdrop.removeAttribute('aria-hidden');
 
 // === BANNER: баннеры Рено и Маяк ===
-const bannerResult = handleBannerForms({ template, modalFields, btnSubmit, counterWatcher });
+const bannerResult = handleBannerForms({ template, modalFields, btnSubmit, counterWatcher, data });
 if (bannerResult.handled) {
   counterWatcher = bannerResult.counterWatcher;
   return { counterWatcher };

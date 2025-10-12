@@ -18,7 +18,7 @@ import {
   showErrorMessage
 } from './helpers.js';
 
-export function handleBannerForms({ template, modalFields, btnSubmit, counterWatcher }) {
+export function handleBannerForms({ template, modalFields, btnSubmit, counterWatcher, data }) {
   const config = BANNER_ALREADY_PROCESSED_CONFIG[template.id];
   if (!config) return { handled: false, counterWatcher };
 
@@ -78,12 +78,13 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
       const note = modalFields.querySelector('.muted-note');
       if (note) note.remove();
 
-      // Создаем поле для ссылки
+      // Создаем поле для ссылки (с предзаполнением, если есть data)
       const fieldWrap = document.createElement('div');
       fieldWrap.className = 'field';
+      const urlValue = (data && data.url) ? data.url : '';
       fieldWrap.innerHTML = `
         <label for="url">Ссылка на скрин *</label>
-        <input id="url" name="url" type="url" required">
+        <input id="url" name="url" type="url" required value="${urlValue}">
       `;
       modalFields.appendChild(fieldWrap);
 

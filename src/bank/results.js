@@ -17,6 +17,11 @@ import {
 } from './services.js';
 
 import {
+  MIN_PERSONAL_POST_SYMBOLS,
+  MIN_PLOT_POST_SYMBOLS
+} from './data.js';
+
+import {
   SPECIAL_EXPENSE_FORMS,
   RECIPIENT_LIST_FORMS,
   DIRECT_RENDER_FORMS,
@@ -563,8 +568,13 @@ export function renderLog(log) {
             try {
               const arr = JSON.parse(rawPersonal);
               if (Array.isArray(arr) && arr.length) {
-                totalCount += arr.length;
-                totalThousands += arr.reduce((s, it) => {
+                // Считаем только посты с symbols_num >= MIN_PERSONAL_POST_SYMBOLS
+                const validPosts = arr.filter(it => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  return n >= MIN_PERSONAL_POST_SYMBOLS;
+                });
+                totalCount += validPosts.length;
+                totalThousands += validPosts.reduce((s, it) => {
                   const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
                   return s + Math.floor(Math.max(0, n) / 1000);
                 }, 0);
@@ -577,8 +587,13 @@ export function renderLog(log) {
             try {
               const arr = JSON.parse(rawPlot);
               if (Array.isArray(arr) && arr.length) {
-                totalCount += arr.length;
-                totalThousands += arr.reduce((s, it) => {
+                // Считаем только посты с symbols_num >= MIN_PLOT_POST_SYMBOLS
+                const validPosts = arr.filter(it => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  return n >= MIN_PLOT_POST_SYMBOLS;
+                });
+                totalCount += validPosts.length;
+                totalThousands += validPosts.reduce((s, it) => {
                   const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
                   const k = Math.floor(Math.max(0, n) / 1000);
                   return s + Math.min(k, 3);
@@ -1380,8 +1395,13 @@ export function renderLog(log) {
             try {
               const arr = JSON.parse(rawPersonal);
               if (Array.isArray(arr) && arr.length) {
-                totalCount += arr.length;
-                totalThousands += arr.reduce((s, it) => {
+                // Считаем только посты с symbols_num >= MIN_PERSONAL_POST_SYMBOLS
+                const validPosts = arr.filter(it => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  return n >= MIN_PERSONAL_POST_SYMBOLS;
+                });
+                totalCount += validPosts.length;
+                totalThousands += validPosts.reduce((s, it) => {
                   const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
                   return s + Math.floor(Math.max(0, n) / 1000);
                 }, 0);
@@ -1393,8 +1413,13 @@ export function renderLog(log) {
             try {
               const arr = JSON.parse(rawPlot);
               if (Array.isArray(arr) && arr.length) {
-                totalCount += arr.length;
-                totalThousands += arr.reduce((s, it) => {
+                // Считаем только посты с symbols_num >= MIN_PLOT_POST_SYMBOLS
+                const validPosts = arr.filter(it => {
+                  const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
+                  return n >= MIN_PLOT_POST_SYMBOLS;
+                });
+                totalCount += validPosts.length;
+                totalThousands += validPosts.reduce((s, it) => {
                   const n = Number.isFinite(it?.symbols_num) ? it.symbols_num : parseInt(it?.symbols_num, 10) || 0;
                   const k = Math.floor(Math.max(0, n) / 1000);
                   return s + Math.min(k, 3);

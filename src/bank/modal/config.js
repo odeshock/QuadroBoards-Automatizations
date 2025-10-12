@@ -35,6 +35,11 @@ import {
 } from '../constants.js';
 
 import {
+  MIN_PERSONAL_POST_SYMBOLS,
+  MIN_PLOT_POST_SYMBOLS
+} from '../data.js';
+
+import {
   formatNumber
 } from '../services.js';
 
@@ -87,7 +92,8 @@ export const POST_CONFIG = {
     additionalItemsAggregator: (items) => items.reduce(
       (sum, item) => sum + Math.floor(item.symbols_num / 1000),
       0
-    )
+    ),
+    itemCountFilter: (items) => items.filter(item => item.symbols_num >= MIN_PERSONAL_POST_SYMBOLS).length
   },
   [FORM_INCOME_PLOTPOST]: {
     hiddenFieldName: 'plot_posts_json',
@@ -102,7 +108,8 @@ export const POST_CONFIG = {
     additionalItemsAggregator: (items) => items.reduce((sum, item) => {
       const thousands = Math.floor(item.symbols_num / 1000);
       return sum + Math.min(Math.max(0, thousands), 3);
-    }, 0)
+    }, 0),
+    itemCountFilter: (items) => items.filter(item => item.symbols_num >= MIN_PLOT_POST_SYMBOLS).length
   }
 };
 

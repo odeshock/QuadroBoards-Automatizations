@@ -58,7 +58,8 @@ export function setupPostsModalFlow({
   timeoutMs,
   previewId,
   infoBuilder,
-  additionalItemsAggregator
+  additionalItemsAggregator,
+  itemCountFilter
 }) {
   const waitEl = updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
@@ -195,9 +196,10 @@ export function setupPostsModalFlow({
     renderList(items);
 
     const additionalItems = additionalItemsAggregator(items);
-    setSummary(items.length, additionalItems);
+    const itemCount = itemCountFilter ? itemCountFilter(items) : items.length;
+    setSummary(itemCount, additionalItems);
 
-    form.dataset.currentMultiplier = String(items.length);
+    form.dataset.currentMultiplier = String(itemCount);
     btnSubmit.style.display = '';
     btnSubmit.disabled = false;
     cancel();

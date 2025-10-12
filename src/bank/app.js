@@ -282,14 +282,11 @@ form.addEventListener('submit', (e) => {
   const multiplierValue = Number.parseFloat(form.dataset.currentMultiplier || '1');
   const normalizedMultiplier = Number.isFinite(multiplierValue) && multiplierValue >= 0 ? multiplierValue : 1;
 
-  // Для подарков всегда создаём новую группу (не группируем)
-  const isGift = meta.templateSelector === FORM_GIFT_PRESENT || meta.templateSelector === FORM_GIFT_CUSTOM;
-
   if (editingGroupId) {
     group = submissionGroups.find((item) => item.id === editingGroupId) || null;
   }
-  if (!group && !isGift) {
-    // Для НЕ-подарков ищем существующую группу по ключу
+  if (!group) {
+    // Ищем существующую группу по ключу (включая подарки с одинаковым giftId)
     group = submissionGroups.find((item) => item.key === key) || null;
   }
   if (!group) {

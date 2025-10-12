@@ -103,6 +103,57 @@ function nodeToBBCode(node) {
  * @param {HTMLElement} logElement - элемент лога с отрендеренными операциями
  * @returns {Array} - массив операций с форматированными данными
  */
+/**
+ * Собирает полную информацию об операциях из submissionGroups
+ * включая все поля форм, корректировки и скидки
+ */
+function buildFullOperationsData() {
+  const operations = [];
+
+  submissionGroups.forEach((group) => {
+    const operation = {
+      title: group.title,
+      form_id: group.templateSelector?.replace('#', '') || '',
+      type: group.isDiscount ? 'discount' : (group.isPriceAdjustment ? 'adjustment' : 'operation'),
+      entries: []
+    };
+
+    // Собираем данные по каждой записи в группе
+    group.entries.forEach((entry) => {
+      const entryData = {
+        key: entry.key,
+        data: entry.data || {},
+        multiplier: entry.multiplier
+      };
+
+      // Если есть скидка или корректировка
+      if (entry.data?.discount_amount) {
+        entryData.discount_amount = entry.data.discount_amount;
+      }
+      if (entry.data?.adjustment_amount) {
+        entryData.adjustment_amount = entry.data.adjustment_amount;
+      }
+      if (entry.data?.calculation) {
+        entryData.calculation = entry.data.calculation;
+      }
+
+      operation.entries.push(entryData);
+    });
+
+    // Добавляем метаинформацию группы
+    operation.price = group.price;
+    operation.bonus = group.bonus;
+    operation.amountLabel = group.amountLabel;
+
+    operations.push(operation);
+  });
+
+  return operations;
+}
+
+/**
+ * Старая функция для обратной совместимости - собирает операции из DOM
+ */
 function buildOperationsArray(logElement) {
   const operations = [];
 
@@ -1603,14 +1654,38 @@ export function renderLog(log) {
     buyBtn.className = 'button primary';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
-      // Формируем массив операций из отрендеренного DOM
+      // Формируем массив операций из отрендеренного DOM (старый формат)
       const operations = buildOperationsArray(log);
+
+      // Собираем полную информацию из submissionGroups (новый формат)
+      const fullData = buildFullOperationsData();
+
+      // Собираем все переменные окружения из window
+      const environment = {
+        USER_ID: window.USER_ID,
+        USER_NAME: window.USER_NAME,
+        IS_ADMIN: window.IS_ADMIN,
+        USERS_LIST: window.USERS_LIST,
+        PERSONAL_POSTS: window.PERSONAL_POSTS,
+        PLOT_POSTS: window.PLOT_POSTS,
+        ADS_POSTS: window.ADS_POSTS,
+        FIRST_POST_FLAG: window.FIRST_POST_FLAG,
+        FIRST_POST_MISSED_FLAG: window.FIRST_POST_MISSED_FLAG,
+        BANNER_RENO_FLAG: window.BANNER_RENO_FLAG,
+        BANNER_MAYAK_FLAG: window.BANNER_MAYAK_FLAG,
+        ALLOWED_PARENTS: ALLOWED_PARENTS,
+        BASE_URL: BASE_URL
+      };
 
       console.log('=== Итоги операций ===');
       console.log('Всего операций:', operations.length);
       console.log('Общая сумма:', totalSum);
-      console.log('\nДетали операций:');
+      console.log('\nДетали операций (DOM):');
       console.log(operations);
+      console.log('\nПолные данные (все поля форм):');
+      console.log(JSON.stringify(fullData, null, 2));
+      console.log('\nПеременные окружения:');
+      console.log(JSON.stringify(environment, null, 2));
       console.log('\n======================');
 
       // Отправляем сообщение родительскому окну с операциями
@@ -1618,7 +1693,9 @@ export function renderLog(log) {
         try {
           window.parent.postMessage({
             type: "PURCHASE",
-            operations: operations,
+            operations: operations,   // старый формат для совместимости
+            fullData: fullData,       // новый формат с полными данными
+            environment: environment, // переменные окружения
             totalSum: totalSum
           }, '*');
         } catch {

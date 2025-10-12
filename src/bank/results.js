@@ -1562,7 +1562,8 @@ export function renderLog(log) {
 
     const resetBtn = document.createElement('button');
     resetBtn.type = 'button';
-    resetBtn.classList = ['button','cancel'];
+    resetBtn.classList.add('button');
+    resetBtn.classList.add('cancel');
     resetBtn.textContent = 'Сбросить';
     resetBtn.addEventListener('click', async () => {
       const confirmed = await showConfirmModal('Вы уверены, что хотите очистить все операции?');

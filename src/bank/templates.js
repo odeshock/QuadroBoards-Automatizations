@@ -96,12 +96,12 @@ export const formTemplates = {
   [FORM_INCOME_EP_PERSONAL]: urlFieldWithExtra({
     name: 'ep',
     buttonData: { type: 'count-base', value: 'ep' },
-    systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br>При переоткрытии <strong>не начисляется</strong> заново.'
+    systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br><br>При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_EP_PLOT]: urlFieldWithExtra({
     name: 'plot_ep',
     buttonData: { type: 'count-base', value: 'plot_ep' },
-    systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br>При переоткрытии <strong>не начисляется</strong> заново.'
+    systemInfo: 'Каждый завершённый эпизод учитывается <strong>только один раз</strong>.<br><br>При переоткрытии <strong>не начисляется</strong> заново.'
   }),
   [FORM_INCOME_CONTEST]: urlFieldWithExtra({
     name: 'contest',

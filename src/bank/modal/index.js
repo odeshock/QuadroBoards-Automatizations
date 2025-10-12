@@ -228,7 +228,7 @@ if (firstPostResult.handled) {
 }
 
 // === POST: личные и сюжетные посты ===
-const postResult = handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel });
+const postResult = handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel, data });
 if (postResult.handled) {
   counterWatcher = postResult.counterWatcher;
 }

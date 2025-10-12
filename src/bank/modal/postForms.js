@@ -59,7 +59,8 @@ export function setupPostsModalFlow({
   previewId,
   infoBuilder,
   additionalItemsAggregator,
-  itemCountFilter
+  itemCountFilter,
+  data
 }) {
   const waitEl = updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
@@ -205,6 +206,19 @@ export function setupPostsModalFlow({
     cancel();
   };
 
+  // Если есть data (редактирование/восстановление), сразу используем данные
+  if (data && data[hiddenFieldName]) {
+    try {
+      const posts = JSON.parse(data[hiddenFieldName]);
+      if (Array.isArray(posts)) {
+        succeed(posts);
+        return counterWatcher;
+      }
+    } catch (e) {
+      console.error('Failed to parse posts JSON from data:', e);
+    }
+  }
+
   const globalObj = typeof window !== 'undefined' ? window : undefined;
 
   timeoutHandle = setTimeout(fail, timeoutMs);
@@ -337,7 +351,7 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
 // HANDLER: POST FORMS
 // ============================================================================
 
-export function handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel }) {
+export function handlePostForms({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, modalAmountLabel, data }) {
   if (!POST_FORMS.includes(template.id)) return { handled: false, counterWatcher };
 
   const config = POST_CONFIG[template.id];
@@ -348,6 +362,7 @@ export function handlePostForms({ template, modalFields, btnSubmit, counterWatch
     form,
     modalAmount,
     modalAmountLabel,
+    data,
     ...config
   });
   return { handled: true, counterWatcher };

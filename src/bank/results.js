@@ -22,6 +22,7 @@ import {
 } from './data.js';
 
 import {
+  REGEX,
   SPECIAL_EXPENSE_FORMS,
   RECIPIENT_LIST_FORMS,
   DIRECT_RENDER_FORMS,
@@ -156,13 +157,63 @@ function buildFullOperationsData() {
     if (group.mode && group.price !== undefined && group.price !== null) {
       let totalModalAmount = 0;
       group.entries.forEach((entry) => {
+        const dataObj = entry.data || {};
+
+        // Подсчёт основных элементов (получателей)
+        const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+        const recipientCount = recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+
+        // Подсчёт количества через quantity_N (для форм типа спасительный жилет)
+        const quantityKeys = Object.keys(dataObj).filter(k => /^quantity_\d+$/.test(k));
+        let totalQuantity = 0;
+        quantityKeys.forEach(key => {
+          const idx = key.match(/^quantity_(\d+)$/)[1];
+          const recipientKey = `recipient_${idx}`;
+          // Учитываем quantity только если есть получатель
+          if (String(dataObj[recipientKey] || '').trim()) {
+            totalQuantity += Number(dataObj[key]) || 0;
+          }
+        });
+
+        // Проверяем простое поле quantity (без индекса)
+        if (totalQuantity === 0 && dataObj.quantity) {
+          totalQuantity = Number(dataObj.quantity) || 0;
+        }
+
+        // Если есть quantity - используем его, иначе - количество получателей, иначе - multiplier
+        const items = totalQuantity > 0 ? totalQuantity : (recipientCount > 0 ? recipientCount : (entry.multiplier || 0));
+
+        // Подсчёт дополнительных элементов (тысячи для бонусов)
+        const thousandKeys = Object.keys(dataObj).filter(k => /^thousand_\d+$/.test(k));
+        const additional_items = thousandKeys.reduce((sum, key) => sum + (Number(dataObj[key]) || 0), 0);
+
+        // Введённая сумма
+        let entered_amount = 0;
+        if (dataObj.amount) {
+          entered_amount = parseNumericAmount(String(dataObj.amount));
+        }
+
+        // Для форм с несколькими получателями - суммируем все amount_N значения
+        const amountKeys = Object.keys(dataObj).filter(k => /^amount_\d+$/.test(k));
+        if (amountKeys.length > 0) {
+          entered_amount = amountKeys.reduce((sum, key) => {
+            const idx = key.match(/^amount_(\d+)$/)[1];
+            const recipientKey = `recipient_${idx}`;
+            // Учитываем amount только если есть получатель
+            if (String(dataObj[recipientKey] || '').trim()) {
+              return sum + (parseNumericAmount(String(dataObj[key] || '0')));
+            }
+            return sum;
+          }, 0);
+        }
+
         totalModalAmount += calculateCost(
           group.mode,
           group.price,
           group.bonus || 0,
-          entry.multiplier || 0,
-          0, // additional_items для bonus
-          0  // entered_amount
+          items,
+          additional_items,
+          entered_amount
         );
       });
       operation.modalAmount = totalModalAmount;

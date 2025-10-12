@@ -70,7 +70,6 @@ export function restoreFromBackup(backupData) {
     // Создаём группу
     const group = {
       id: incrementGroupSeq(),
-      key: operation.form_id ? `#${operation.form_id}` : '',
       templateSelector: operation.form_id ? `#${operation.form_id}` : '',
       title: operation.title,
       price: operation.price || 0,
@@ -89,7 +88,7 @@ export function restoreFromBackup(backupData) {
       group.giftIcon = operation.giftIcon;
     }
 
-    // Пересоздаём amount на основе price, bonus и mode
+    // Пересоздаём amount на основе price, bonus и mode (ДО создания ключа!)
     if (operation.price !== undefined && operation.price !== null) {
       if (operation.bonus && operation.mode === 'price_per_item_w_bonus') {
         group.amount = `${operation.price} + x${operation.bonus}`;
@@ -99,6 +98,16 @@ export function restoreFromBackup(backupData) {
         group.amount = String(operation.price);
       }
     }
+
+    // Пересоздаём правильный key через buildGroupKey (с amount!)
+    group.key = buildGroupKey({
+      templateSelector: group.templateSelector,
+      title: group.title,
+      amount: group.amount || '',
+      amountLabel: group.amountLabel,
+      kind: group.kind || '',
+      giftId: group.giftId || ''
+    });
 
     // Восстанавливаем специальные флаги для скидок и корректировок
     if (operation.type === 'discount') {

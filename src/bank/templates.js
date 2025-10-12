@@ -128,8 +128,8 @@ export const formTemplates = {
     buttonData: { type: 'extra-label', label: 'Ссылка на эпизод', start: 1 },
     systemInfo: 'Каждый сюжетный эпизод учитывается <strong>только один раз</strong>.'
   }),
-  [FORM_INCOME_BANNER_RENO]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
-  [FORM_INCOME_BANNER_MAYAK]: `${systemInfoTemplate(TEXT_MESSAGES.BANNER_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
+  [FORM_INCOME_BANNER_RENO]: `${infoTemplate(TEXT_MESSAGES.BANNER_INFO)}${systemInfoTemplate(TEXT_MESSAGES.BANNER_SYSTEM_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
+  [FORM_INCOME_BANNER_MAYAK]: `${infoTemplate(TEXT_MESSAGES.BANNER_INFO)}${systemInfoTemplate(TEXT_MESSAGES.BANNER_SYSTEM_INFO)}<p class="muted-note">${TEXT_MESSAGES.PLEASE_WAIT}</p>`,
   [FORM_INCOME_RPGTOP]: urlFieldWithExtra({
     name: 'need',
     buttonData: { type: 'count-base', value: 'need' },

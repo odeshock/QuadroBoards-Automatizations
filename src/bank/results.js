@@ -1663,21 +1663,47 @@ export function renderLog(log) {
       // Собираем полную информацию из submissionGroups (новый формат)
       const fullData = buildFullOperationsData();
 
-      // Собираем все переменные окружения из window
+      // Собираем ВСЕ переменные окружения из window (даже если они undefined)
       const environment = {
+        // Пользователь
         USER_ID: window.USER_ID,
         USER_NAME: window.USER_NAME,
         IS_ADMIN: window.IS_ADMIN,
         USERS_LIST: window.USERS_LIST,
+
+        // Посты
         PERSONAL_POSTS: window.PERSONAL_POSTS,
         PLOT_POSTS: window.PLOT_POSTS,
         ADS_POSTS: window.ADS_POSTS,
+
+        // Флаги
         FIRST_POST_FLAG: window.FIRST_POST_FLAG,
         FIRST_POST_MISSED_FLAG: window.FIRST_POST_MISSED_FLAG,
         BANNER_RENO_FLAG: window.BANNER_RENO_FLAG,
         BANNER_MAYAK_FLAG: window.BANNER_MAYAK_FLAG,
+
+        // Комментарий (для будущих функций)
+        COMMENT_ID: window.COMMENT_ID,
+        COMMENT_AUTHOR_ID: window.COMMENT_AUTHOR_ID,
+        COMMENT_AUTHOR_NAME: window.COMMENT_AUTHOR_NAME,
+        CURRENT_BANK: window.CURRENT_BANK,
+
+        // Конфигурация
         ALLOWED_PARENTS: ALLOWED_PARENTS,
-        BASE_URL: BASE_URL
+        BASE_URL: BASE_URL,
+
+        // Счётчики (могут быть undefined, но добавляем для полноты)
+        MSG100_OLD: window.MSG100_OLD,
+        MSG100_NEW: window.MSG100_NEW,
+        REP100_OLD: window.REP100_OLD,
+        REP100_NEW: window.REP100_NEW,
+        POS100_OLD: window.POS100_OLD,
+        POS100_NEW: window.POS100_NEW,
+        MONTH_OLD: window.MONTH_OLD,
+        MONTH_NEW: window.MONTH_NEW,
+
+        // Backup (обычно очищается, но добавляем на случай)
+        BACKUP_DATA: window.BACKUP_DATA
       };
 
       console.log('=== Итоги операций ===');

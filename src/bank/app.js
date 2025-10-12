@@ -555,21 +555,29 @@ if (typeof window.IS_ADMIN !== 'undefined') {
   }, 100);
 }
 
-// Проверка наличия BACKUP_DATA для восстановления операций
-if (typeof window.BACKUP_DATA !== 'undefined' && window.BACKUP_DATA) {
-  showConfirmModal('Обнаружены сохранённые данные. Восстановить банковскую операцию?')
-    .then((confirmed) => {
-      if (confirmed) {
-        try {
-          restoreFromBackup(window.BACKUP_DATA);
-          renderLog(log);
-          console.log('Операции успешно восстановлены из backup');
-        } catch (error) {
-          console.error('Ошибка при восстановлении операций:', error);
-          alert('Ошибка при восстановлении данных. Проверьте консоль для деталей.');
+// Функция обработки BACKUP_DATA
+function checkAndRestoreBackup() {
+  if (typeof window.BACKUP_DATA !== 'undefined' && window.BACKUP_DATA) {
+    const backupData = window.BACKUP_DATA;
+    // Сразу очищаем, чтобы не обрабатывать дважды
+    window.BACKUP_DATA = undefined;
+
+    showConfirmModal('Обнаружены сохранённые данные. Восстановить банковскую операцию?')
+      .then((confirmed) => {
+        if (confirmed) {
+          try {
+            restoreFromBackup(backupData);
+            renderLog(log);
+            console.log('Операции успешно восстановлены из backup');
+          } catch (error) {
+            console.error('Ошибка при восстановлении операций:', error);
+            alert('Ошибка при восстановлении данных. Проверьте консоль для деталей.');
+          }
         }
-      }
-      // Очищаем BACKUP_DATA независимо от выбора
-      window.BACKUP_DATA = undefined;
-    });
+      });
+  }
 }
+
+// Проверка наличия BACKUP_DATA при загрузке и каждую секунду
+checkAndRestoreBackup();
+setInterval(checkAndRestoreBackup, 1000);

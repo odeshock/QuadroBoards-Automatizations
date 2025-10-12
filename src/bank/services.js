@@ -100,6 +100,7 @@ export function restoreFromBackup(backupData) {
     operation.entries.forEach((entry) => {
       const restoredEntry = {
         id: incrementEntrySeq(),
+        template_id: entry.template_id,  // Сохраняем template_id из backup
         key: entry.key,
         data: entry.data || {},
         multiplier: entry.multiplier || 1

@@ -1003,7 +1003,7 @@ export function renderLog(log) {
       const list = document.createElement('ol');
 
       // Добавляем класс separated для форм с комментариями/получателями
-      const needsSeparation = isBonusMaskClean || tid === FORM_INCOME_AMS || tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift');
+      const needsSeparation = isBonusMaskClean || tid === FORM_INCOME_AMS || (tid && (tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift')));
       list.className = needsSeparation ? 'entry-list separated' : 'entry-list';
 
       // ===== спец-рендеры =====
@@ -1101,7 +1101,7 @@ export function renderLog(log) {
           .sort((a, b) => Number(a) - Number(b));
 
         // Определяем, запрашивается ли FROM (от кого) для этой формы
-        const hasFromField = isBonusMaskClean || tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift');
+        const hasFromField = isBonusMaskClean || (tid && (tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift')));
 
         idxs.forEach((idx) => {
           const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();

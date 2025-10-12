@@ -11,7 +11,10 @@
  * @param {string} formId - ID формы (с # или без)
  * @returns {string} - ID формы с #
  */
-export const toSelector = (formId) => formId.startsWith('#') ? formId : `#${formId}`;
+export const toSelector = (formId) => {
+  if (!formId) return '';
+  return formId.startsWith('#') ? formId : `#${formId}`;
+};
 
 // ============================================================================
 // СЕЛЕКТОРЫ ФОРМ (без #, используйте toSelector() для селекторов)

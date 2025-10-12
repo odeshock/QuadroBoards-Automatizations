@@ -49,6 +49,90 @@ export function incrementEntrySeq() {
   return entrySeq;
 }
 
+/**
+ * Восстанавливает операции из backup данных
+ * @param {Object} backupData - объект с fullData из JSON
+ */
+export function restoreFromBackup(backupData) {
+  if (!backupData || !backupData.fullData) {
+    throw new Error('Invalid backup data: missing fullData');
+  }
+
+  // Очищаем текущие операции
+  submissionGroups.length = 0;
+
+  // Собираем ID корректировок и скидок из backup для проверки дубликатов
+  const backupAdjustmentIds = new Set();
+  const backupDiscountIds = new Set();
+
+  // Восстанавливаем каждую операцию из backup (включая корректировки и скидки)
+  backupData.fullData.forEach((operation) => {
+    // Создаём группу
+    const group = {
+      id: incrementGroupSeq(),
+      key: operation.form_id ? `#${operation.form_id}` : '',
+      templateSelector: operation.form_id ? `#${operation.form_id}` : '',
+      title: operation.title,
+      price: operation.price || 0,
+      bonus: operation.bonus || 0,
+      amountLabel: operation.amountLabel || 'Сумма',
+      entries: []
+    };
+
+    // Восстанавливаем специальные флаги для скидок и корректировок
+    if (operation.type === 'discount') {
+      group.isDiscount = true;
+      // Собираем ID скидок из backup
+      operation.entries.forEach((entry) => {
+        const discountId = entry.key.split('_').pop();
+        if (discountId) backupDiscountIds.add(discountId);
+      });
+    } else if (operation.type === 'adjustment') {
+      group.isPriceAdjustment = true;
+      // Собираем ID корректировок из backup
+      operation.entries.forEach((entry) => {
+        const adjustmentId = entry.key.split('_').pop();
+        if (adjustmentId) backupAdjustmentIds.add(adjustmentId);
+      });
+    }
+
+    // Восстанавливаем записи
+    operation.entries.forEach((entry) => {
+      const restoredEntry = {
+        id: incrementEntrySeq(),
+        key: entry.key,
+        data: entry.data || {},
+        multiplier: entry.multiplier || 1
+      };
+
+      group.entries.push(restoredEntry);
+    });
+
+    submissionGroups.push(group);
+  });
+
+  const restoredCount = submissionGroups.length;
+  console.log(`Восстановлено ${restoredCount} операций из backup`);
+
+  // Применяем новые корректировки и скидки, которых нет в backup
+  let newAdjustmentsCount = 0;
+  let newDiscountsCount = 0;
+
+  // Применяем новые автоматические корректировки
+  updateAutoPriceAdjustments();
+  const currentAdjustments = submissionGroups.filter(g => g.isPriceAdjustment);
+  newAdjustmentsCount = currentAdjustments.length - backupAdjustmentIds.size;
+
+  // Применяем новые автоматические скидки
+  updateAutoDiscounts();
+  const currentDiscounts = submissionGroups.filter(g => g.isDiscount);
+  newDiscountsCount = currentDiscounts.length - backupDiscountIds.size;
+
+  if (newAdjustmentsCount > 0 || newDiscountsCount > 0) {
+    console.log(`Применено новых правил: корректировок - ${newAdjustmentsCount}, скидок - ${newDiscountsCount}`);
+  }
+}
+
 // ============================================================================
 // УТИЛИТЫ — форматирование ключей для отображения в логе
 // ============================================================================

@@ -2,7 +2,7 @@
 // app.js — Основная точка входа
 // ============================================================================
 
-import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq } from './services.js';
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup } from './services.js';
 import { openModal, closeModal } from './modal/index.js';
 import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
@@ -553,4 +553,23 @@ if (typeof window.IS_ADMIN !== 'undefined') {
       initializeAccessControl();
     }
   }, 100);
+}
+
+// Проверка наличия BACKUP_DATA для восстановления операций
+if (typeof window.BACKUP_DATA !== 'undefined' && window.BACKUP_DATA) {
+  showConfirmModal('Обнаружены сохранённые данные. Восстановить банковскую операцию?')
+    .then((confirmed) => {
+      if (confirmed) {
+        try {
+          restoreFromBackup(window.BACKUP_DATA);
+          renderLog(log);
+          console.log('Операции успешно восстановлены из backup');
+        } catch (error) {
+          console.error('Ошибка при восстановлении операций:', error);
+          alert('Ошибка при восстановлении данных. Проверьте консоль для деталей.');
+        }
+      }
+      // Очищаем BACKUP_DATA независимо от выбора
+      window.BACKUP_DATA = undefined;
+    });
 }

@@ -16,6 +16,7 @@ import {
   FORM_INCOME_TOPUP,
   FORM_INCOME_AMS,
   URL_FIELD_FORMS,
+  POST_FORMS,
   toSelector
 } from '../constants.js';
 
@@ -284,6 +285,11 @@ if (buyoutResult.handled) {
 
   const updateAmountSummary = (multiplierOverride = null) => {
     modalAmountLabel.textContent = resolvedAmountLabel;
+
+    // Для форм постов НЕ обновляем сумму здесь - они управляют отображением сами через setSummary()
+    if (POST_FORMS.includes(template.id)) {
+      return;
+    }
 
     // Для urlFieldForms НЕ используем сохраненный currentMultiplier, всегда пересчитываем
     const isUrlFieldForm = URL_FIELD_FORMS.includes(templateSelector);

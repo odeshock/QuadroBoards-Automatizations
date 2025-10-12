@@ -505,6 +505,9 @@ export function updateModalAmount(modalAmount, form, params = {}) {
 
   const { items = 0, additional_items = 0, entered_amount = 0 } = params;
 
+  console.log('💰 updateModalAmount called:', { mode, price, bonus, items, additional_items, entered_amount });
+  console.trace('💰 Call stack:');
+
   // Если mode не указан, показываем базовый amount
   if (!mode) {
     modalAmount.textContent = form.dataset.amount || '';
@@ -518,6 +521,7 @@ export function updateModalAmount(modalAmount, form, params = {}) {
   }
 
   const displayText = formatCostDisplay(mode, price, bonus, items, additional_items, entered_amount);
+  console.log('💰 displayText:', displayText);
   modalAmount.textContent = displayText;
 }
 

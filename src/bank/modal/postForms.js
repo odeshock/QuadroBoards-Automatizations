@@ -196,8 +196,9 @@ export function setupPostsModalFlow({
 
     renderList(items);
 
-    const additionalItems = additionalItemsAggregator(items);
+    const additionalItems = additionalItemsAggregator ? additionalItemsAggregator(items) : 0;
     const itemCount = itemCountFilter ? itemCountFilter(items) : items.length;
+    console.log('📊 Post calculation:', { items, itemCount, additionalItems, hasAggregator: !!additionalItemsAggregator });
     setSummary(itemCount, additionalItems);
 
     form.dataset.currentMultiplier = String(itemCount);

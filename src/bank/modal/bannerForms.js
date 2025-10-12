@@ -24,6 +24,26 @@ export function handleBannerForms({ template, modalFields, btnSubmit, counterWat
 
   const { flagKey, message } = config;
 
+  // Если есть data (редактирование/восстановление), сразу показываем поле с данными
+  if (data && data.url) {
+    const note = modalFields.querySelector('.muted-note');
+    if (note) note.remove();
+
+    // Создаем поле для ссылки с предзаполненным значением
+    const fieldWrap = document.createElement('div');
+    fieldWrap.className = 'field';
+    fieldWrap.innerHTML = `
+      <label for="url">Ссылка на скрин *</label>
+      <input id="url" name="url" type="url" required value="${data.url}">
+    `;
+    modalFields.appendChild(fieldWrap);
+
+    btnSubmit.style.display = '';
+    btnSubmit.disabled = false;
+
+    return { handled: true, counterWatcher };
+  }
+
   // Шаблон уже содержит info block и "Пожалуйста, подождите..."
   // Ничего дополнительно добавлять не нужно
 

@@ -75,6 +75,7 @@ export function restoreFromBackup(backupData) {
       title: operation.title,
       price: operation.price || 0,
       bonus: operation.bonus || 0,
+      amount: operation.amount,  // Восстанавливаем amount для отображения entry-meta
       amountLabel: operation.amountLabel || 'Сумма',
       entries: []
     };
@@ -119,10 +120,25 @@ export function restoreFromBackup(backupData) {
   let newAdjustmentsCount = 0;
   let historicalDiscountsCount = 0;
 
-  // Применяем новые автоматические корректировки (которых нет в backup)
+  // Применяем новые автоматические корректировки (только те, которых нет в backup)
+  // Сначала получаем текущее количество корректировок из backup
+  const adjustmentsFromBackup = submissionGroups.filter(g => g.isPriceAdjustment);
+
+  // Временно удаляем группу корректировок, чтобы updateAutoPriceAdjustments создала новую
+  const backupAdjustmentGroup = adjustmentsFromBackup.length > 0 ? adjustmentsFromBackup[0] : null;
+  if (backupAdjustmentGroup) {
+    const index = submissionGroups.indexOf(backupAdjustmentGroup);
+    submissionGroups.splice(index, 1);
+  }
+
+  // Применяем ВСЕ актуальные корректировки
   updateAutoPriceAdjustments();
+
   const currentAdjustments = submissionGroups.filter(g => g.isPriceAdjustment);
-  newAdjustmentsCount = currentAdjustments.length - backupAdjustmentIds.size;
+
+  // Если корректировок не было в backup, считаем все новыми
+  // Если были, считаем разницу
+  newAdjustmentsCount = backupAdjustmentGroup ? (currentAdjustments.length > 0 ? 1 : 0) : currentAdjustments.length;
 
   // Получаем timestamp из backup'а
   const backupTimestamp = backupData.timestamp;

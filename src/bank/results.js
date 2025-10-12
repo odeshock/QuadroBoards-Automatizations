@@ -143,6 +143,7 @@ function buildFullOperationsData() {
     // Добавляем метаинформацию группы
     operation.price = group.price;
     operation.bonus = group.bonus;
+    operation.amount = group.amount;  // Сохраняем amount для корректного восстановления
     operation.amountLabel = group.amountLabel;
 
     operations.push(operation);

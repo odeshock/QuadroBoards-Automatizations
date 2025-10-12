@@ -12,7 +12,8 @@ import {
   parseNumericAmount,
   submissionGroups,
   formatEntryKey,
-  updateAutoDiscounts
+  updateAutoDiscounts,
+  updateAutoPriceAdjustments
 } from './services.js';
 
 import {
@@ -436,8 +437,9 @@ export function setHiddenField(modalFields, name, value) {
 // ============================================================================
 
 export function renderLog(log) {
-  // Пересчитываем автоматические скидки перед рендерингом
+  // Пересчитываем автоматические скидки и корректировки цен перед рендерингом
   updateAutoDiscounts();
+  updateAutoPriceAdjustments();
 
   log.innerHTML = '';
   if (!submissionGroups.length) {
@@ -448,13 +450,18 @@ export function renderLog(log) {
     return;
   }
 
-  // Сортируем группы: скидки в конец
+  // Сортируем группы: сначала операции, потом корректировки, потом скидки
   const sortedGroups = [...submissionGroups].sort((a, b) => {
     const aIsDiscount = a.isDiscount || a.templateSelector === '#gift-discount';
     const bIsDiscount = b.isDiscount || b.templateSelector === '#gift-discount';
-    if (aIsDiscount && !bIsDiscount) return 1;
-    if (!aIsDiscount && bIsDiscount) return -1;
-    return 0;
+    const aIsAdjustment = a.isPriceAdjustment || a.templateSelector === '#price-adjustment';
+    const bIsAdjustment = b.isPriceAdjustment || b.templateSelector === '#price-adjustment';
+
+    // Сначала обычные операции (0), потом корректировки (1), потом скидки (2)
+    const aOrder = aIsDiscount ? 2 : (aIsAdjustment ? 1 : 0);
+    const bOrder = bIsDiscount ? 2 : (bIsAdjustment ? 1 : 0);
+
+    return aOrder - bOrder;
   });
 
   sortedGroups.forEach((group, index) => {
@@ -767,8 +774,8 @@ export function renderLog(log) {
       }
     }
 
-    // Для скидок не показываем "Записей: X"
-    if (group.entries.length > 1 && !group.isDiscount) {
+    // Для скидок и корректировок не показываем "Записей: X"
+    if (group.entries.length > 1 && !group.isDiscount && !group.isPriceAdjustment) {
       const countMeta = document.createElement('span');
       countMeta.className = 'entry-meta';
       if (totalEntryMultiplier > group.entries.length) {
@@ -779,8 +786,8 @@ export function renderLog(log) {
       header.appendChild(countMeta);
     }
 
-    // Добавляем кнопки в заголовок для каждой записи (кроме скидки)
-    if (!group.isDiscount) {
+    // Добавляем кнопки в заголовок для каждой записи (кроме скидок и корректировок)
+    if (!group.isDiscount && !group.isPriceAdjustment) {
       group.entries.forEach((item) => {
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
@@ -847,6 +854,35 @@ export function renderLog(log) {
 
         const calculation = document.createElement('span');
         calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.discount_amount || 0)}`;
+
+        li.append(label, calculation);
+        list.appendChild(li);
+      });
+
+      itemEl.appendChild(list);
+      itemsWrap.appendChild(itemEl);
+      entryEl.appendChild(itemsWrap);
+      log.appendChild(entryEl);
+      return;
+    }
+
+    // Для корректировок цен: собираем все в один общий список
+    if (group.isPriceAdjustment) {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'entry-item';
+
+      const list = document.createElement('ol');
+      list.className = 'entry-list';
+
+      group.entries.forEach((item) => {
+        const dataObj = item.data || {};
+        const li = document.createElement('li');
+
+        const label = document.createElement('strong');
+        label.textContent = `${dataObj.adjustment_title || 'Корректировка'}: `;
+
+        const calculation = document.createElement('span');
+        calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.adjustment_amount || 0)}`;
 
         li.append(label, calculation);
         list.appendChild(li);
@@ -1199,14 +1235,15 @@ export function renderLog(log) {
       }
 
       // ===== Скидка на подарки =====
-      // (скидки уже отрисованы выше в едином списке, этот блок больше не нужен)
+      // (скидки и корректировки уже отрисованы выше в едином списке, этот блок больше не нужен)
       const isDiscount = group.isDiscount || (item.template_id === 'gift-discount') ||
                          (item.template_id === 'gift-discount-regular') ||
                          (item.template_id === 'gift-discount-custom');
+      const isAdjustment = group.isPriceAdjustment || item.template_id?.startsWith('auto-adjustment-');
 
       // ===== остальные поля =====
-      // Для скидок пропускаем вывод всех остальных полей (они уже показаны в виде расчёта выше)
-      if (!isDiscount) {
+      // Для скидок и корректировок пропускаем вывод всех остальных полей (они уже показаны в виде расчёта выше)
+      if (!isDiscount && !isAdjustment) {
         Object.entries(item.data || {}).forEach(([key, value]) => {
           // Группа 1: все поля уже отрисованы
           if (RECIPIENT_LIST_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
@@ -1409,6 +1446,14 @@ export function renderLog(log) {
           totalDiscount += amount;
         });
         totalSum += totalDiscount;
+      } else if (group.isPriceAdjustment) {
+        // Корректировки цен: вычитаем из итога (это расход)
+        let totalAdjustment = 0;
+        group.entries.forEach((item) => {
+          const amount = Number(item.data?.adjustment_amount) || 0;
+          totalAdjustment += amount;
+        });
+        totalSum -= totalAdjustment;
       } else if (
         group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||
         group.templateSelector === toSelector(FORM_GIFT_CUSTOM) ||

@@ -16,7 +16,7 @@ import {
   fullMonthsDiffVirtualDOM,
   fmtYMD
 } from './utils.js';
-import { autoDiscounts } from './data.js';
+import { autoDiscounts, autoPriceAdjustments } from './data.js';
 
 // Реэкспортируем для обратной совместимости
 export {
@@ -329,5 +329,146 @@ export function updateAutoDiscounts() {
     }
   } else if (discountGroupIndex !== -1) {
     submissionGroups.splice(discountGroupIndex, 1);
+  }
+}
+
+// ============================================================================
+// АВТОМАТИЧЕСКАЯ КОРРЕКТИРОВКА ЦЕН
+// ============================================================================
+
+export function updateAutoPriceAdjustments() {
+  // Константа для идентификатора корректировки
+  const FORM_PRICE_ADJUSTMENT = '#price-adjustment';
+  const ADJUSTMENT_TITLE = 'Автоматическая корректировка цен';
+  const ADJUSTMENT_LABEL = 'Корректировка';
+
+  // Находим существующую группу корректировок
+  const adjustmentKey = buildGroupKey({
+    templateSelector: FORM_PRICE_ADJUSTMENT,
+    title: ADJUSTMENT_TITLE,
+    amount: '',
+    amountLabel: ADJUSTMENT_LABEL,
+    kind: 'expense'
+  });
+
+  const adjustmentGroupIndex = submissionGroups.findIndex(g => g.key === adjustmentKey);
+  const entries = [];
+  let totalAdjustment = 0;
+
+  // Проходим по всем правилам корректировок
+  autoPriceAdjustments.forEach(rule => {
+    const { id, title, form, batchSize, newPrice } = rule;
+
+    // Находим группу, соответствующую форме
+    const targetGroup = submissionGroups.find(g => g.templateSelector === form);
+    if (!targetGroup) return;
+
+    // Получаем старую цену из группы
+    const oldPrice = Number(targetGroup.price) || 0;
+    if (oldPrice === 0) return;
+
+    // Подсчитываем общее количество элементов в операции
+    let totalItems = 0;
+    targetGroup.entries.forEach(entry => {
+      const dataObj = entry.data || {};
+
+      // Для постов подсчитываем количество постов из JSON
+      const personalPostsJson = dataObj.personal_posts_json;
+      const plotPostsJson = dataObj.plot_posts_json;
+
+      if (personalPostsJson) {
+        try {
+          const posts = JSON.parse(personalPostsJson);
+          if (Array.isArray(posts)) {
+            totalItems += posts.length;
+          }
+        } catch (_) {}
+      }
+
+      if (plotPostsJson) {
+        try {
+          const posts = JSON.parse(plotPostsJson);
+          if (Array.isArray(posts)) {
+            totalItems += posts.length;
+          }
+        } catch (_) {}
+      }
+
+      // Для других форм подсчитываем получателей
+      if (!personalPostsJson && !plotPostsJson) {
+        const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+        totalItems += recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+      }
+    });
+
+    // Проверяем условие применения: itemCount >= batchSize
+    if (totalItems < batchSize) return;
+
+    // Вычисляем количество полных партий
+    const batches = Math.floor(totalItems / batchSize);
+    const batchItems = batches * batchSize;
+
+    // Вычисляем корректировку
+    const oldCost = oldPrice * batchItems;
+    const newCost = newPrice * batches;
+    const adjustment = oldCost - newCost;
+
+    // Проверяем, что корректировка положительная
+    if (adjustment <= 0) return;
+
+    // Получаем сумму операции
+    const operationTotal = calculateGroupCost(targetGroup);
+
+    // Корректировка не может быть больше суммы операции
+    const finalAdjustment = Math.min(adjustment, Math.abs(operationTotal));
+
+    if (finalAdjustment <= 0) return;
+
+    // Формируем название и расчёт
+    const adjustmentTitle = title.replace('{title}', targetGroup.title || 'Операция');
+    const calculation = `${formatNumber(oldPrice)} × ${batches} × ${batchSize} − ${formatNumber(newPrice)} × ${batches}`;
+
+    totalAdjustment += finalAdjustment;
+    entries.push({
+      id: incrementEntrySeq(),
+      template_id: `auto-adjustment-${id}`,
+      data: {
+        adjustment_id: id,
+        adjustment_title: adjustmentTitle,
+        form: form,
+        batch_size: batchSize,
+        old_price: oldPrice,
+        new_price: newPrice,
+        total_items: totalItems,
+        batches: batches,
+        adjustment_amount: finalAdjustment,
+        calculation
+      },
+      multiplier: 1
+    });
+  });
+
+  // Обновляем или удаляем группу корректировок
+  if (entries.length > 0) {
+    if (adjustmentGroupIndex === -1) {
+      const newGroup = {
+        id: incrementGroupSeq(),
+        key: adjustmentKey,
+        templateSelector: FORM_PRICE_ADJUSTMENT,
+        title: ADJUSTMENT_TITLE,
+        amount: totalAdjustment,
+        amountLabel: ADJUSTMENT_LABEL,
+        kind: 'expense',
+        entries,
+        isPriceAdjustment: true
+      };
+      submissionGroups.push(newGroup);
+    } else {
+      const group = submissionGroups[adjustmentGroupIndex];
+      group.amount = totalAdjustment;
+      group.entries = entries;
+    }
+  } else if (adjustmentGroupIndex !== -1) {
+    submissionGroups.splice(adjustmentGroupIndex, 1);
   }
 }

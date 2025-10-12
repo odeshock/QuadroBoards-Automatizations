@@ -50,7 +50,7 @@ export function setupUrlFieldLogic({ template, modalFields, getExtraFields, upda
         if (extraLabelBase) {
           computedLabel = suffix === 1 ? extraLabelBase : `${extraLabelBase} ${suffix}`;
         } else if (template.id === FORM_INCOME_NEEDREQUEST) {
-          computedLabel = `Ссылка на «нужного»${suffixText}`;
+          computedLabel = `Ссылка на заяку на нужного${suffixText}`;
         } else if (template.id === FORM_INCOME_RPGTOP) {
           computedLabel = `Ссылка на скрин${suffixText}`;
         } else if (template.id === FORM_INCOME_EP_PERSONAL || template.id === FORM_INCOME_EP_PLOT) {

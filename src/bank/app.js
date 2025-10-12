@@ -208,12 +208,16 @@ log.addEventListener('click', async (e) => {
   const { action, groupId, entryId } = actionBtn.dataset;
   if (!groupId) return;
 
-  const group = submissionGroups.find((item) => item.id === groupId);
+  // Приводим ID к числам, так как dataset хранит строки
+  const numericGroupId = Number(groupId);
+  const numericEntryId = entryId ? Number(entryId) : null;
+
+  const group = submissionGroups.find((item) => item.id === numericGroupId);
   if (!group) return;
 
   if (action === 'edit') {
-    if (!entryId) return;
-    const entry = group.entries.find((item) => item.id === entryId);
+    if (!numericEntryId) return;
+    const entry = group.entries.find((item) => item.id === numericEntryId);
     if (!entry) return;
 
     // Для подарков и оформления берём giftId и giftIcon из данных записи (первого получателя)

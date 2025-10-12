@@ -127,9 +127,9 @@ function buildFullOperationsData() {
         multiplier: entry.multiplier
       };
 
-      // Рассчитываем modalAmount для этой записи (как показывалось в модалке)
+      // Рассчитываем modalAmount для этой записи (итоговое значение)
       if (group.mode && group.price !== undefined && group.price !== null) {
-        entryData.modalAmount = formatCostDisplay(
+        entryData.modalAmount = calculateCost(
           group.mode,
           group.price,
           group.bonus || 0,

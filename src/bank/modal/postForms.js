@@ -249,14 +249,16 @@ export function setupPostsModalFlow({
 // HANDLER: FIRST POST FORM
 // ============================================================================
 
-export function handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher }) {
+export function handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher, data }) {
   if (template.id !== FORM_INCOME_FIRSTPOST) return { handled: false, counterWatcher };
 
   // якорь "подождите..."
   const waitEl = updateNote(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  let poll = null;
+  let to = null;
+  const cancel = () => { canceled = true; if (poll) clearInterval(poll); if (to) clearTimeout(to); };
   counterWatcher = { cancel };
 
   const fail = () => {
@@ -273,8 +275,15 @@ export function handleFirstPostForm({ template, modalFields, btnSubmit, counterW
     btnSubmit.disabled = hideBtn ? true : false;
   };
 
-  const to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
-  const poll = setInterval(() => {
+  // Если есть data (редактирование/восстановление), сразу показываем успешное сообщение
+  if (data && Object.keys(data).length === 0) {
+    // Для первого поста data всегда пустой объект, просто показываем "Поздравляем!"
+    show('**Поздравляем с первым постом!**', { ok: true, hideBtn: false });
+    return { handled: true, counterWatcher };
+  }
+
+  to = setTimeout(fail, FIRST_POST_TIMEOUT_MS);
+  poll = setInterval(() => {
     // Проверяем наличие FIRST_POST_FLAG
     if (typeof window.FIRST_POST_FLAG === 'undefined') return;
 

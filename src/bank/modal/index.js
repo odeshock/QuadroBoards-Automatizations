@@ -223,7 +223,7 @@ if (adminSingleResult.handled) {
 
 
 // === FIRST POST: ждём FIRST_POST_FLAG, PLOT_POSTS и PERSONAL_POSTS ===
-const firstPostResult = handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher });
+const firstPostResult = handleFirstPostForm({ template, modalFields, btnSubmit, counterWatcher, data });
 if (firstPostResult.handled) {
   counterWatcher = firstPostResult.counterWatcher;
 }

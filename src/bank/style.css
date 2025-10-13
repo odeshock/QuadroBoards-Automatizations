@@ -279,8 +279,8 @@
     }
 
     .chosen {
-      border-color: yellow !important; 
-      background: red !important;
+      border-color: #71b4ff !important; 
+      background: #dbeaff !important;
     }
 
     /* Modal */

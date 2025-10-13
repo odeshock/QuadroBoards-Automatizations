@@ -2155,7 +2155,8 @@ function formatBankText(data) {
 
   if (typeof data.totalSum !== "undefined" && data.totalSum !== null && data.totalSum !== "") {
     const clr = Number(data.totalSum) < 0 ? "red" : "green";
-    result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${data.totalSum}[/color][/align][/size][/quote]`;
+    const sign = Number(data.totalSum) > 0 ? "+" : "";
+    result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${sign}${data.totalSum}[/color][/align][/size][/quote]`;
   }
 
   return result;

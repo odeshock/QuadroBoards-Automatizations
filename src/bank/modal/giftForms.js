@@ -60,6 +60,8 @@ function renderGiftPickerUniversal({
     showGiftDataField: includeGiftDataField,
     showPreview: showPreview,
     allowDuplicateRecipients: true,
+    allowRemoveFirstGroup: true,
+    allowEmptySubmit: true,
 
     giftData: { id: giftId, icon: giftIcon, title: title },
     priceData: null,
@@ -88,11 +90,8 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
     const itemPrice = Number.parseInt(price, 10) || 100;
 
     if (modalAmount) {
-      if (totalCount > 0) {
-        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(itemPrice), bonus: '0' } }, { items: totalCount });
-      } else {
-        modalAmount.textContent = '';
-      }
+      // Всегда показываем формулу, даже когда totalCount === 0 (будет price × 0 = 0)
+      updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(itemPrice), bonus: '0' } }, { items: totalCount });
     }
 
     const totalCost = itemPrice * totalCount;
@@ -192,11 +191,8 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
     const itemPrice = Number.parseInt(price, 10) || 60;
 
     if (modalAmount) {
-      if (totalCount > 0) {
-        updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(itemPrice), bonus: '0' } }, { items: totalCount });
-      } else {
-        modalAmount.textContent = '';
-      }
+      // Всегда показываем формулу, даже когда totalCount === 0 (будет price × 0 = 0)
+      updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(itemPrice), bonus: '0' } }, { items: totalCount });
     }
 
     const totalCost = itemPrice * totalCount;

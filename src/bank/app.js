@@ -371,6 +371,46 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
+  // Проверяем формы подарков и оформления (иконки, плашки, фоны)
+  // Если все группы удалены (нет получателей), удаляем операцию или не создаём новую
+  const isGiftOrDesignForm = templateSelector && [
+    '#form-gift-custom',
+    '#form-gift-present',
+    '#form-icon-custom',
+    '#form-icon-present',
+    '#form-badge-custom',
+    '#form-badge-present',
+    '#form-bg-custom',
+    '#form-bg-present'
+  ].includes(templateSelector);
+
+  // Проверяем наличие хотя бы одного получателя
+  const hasGiftRecipients = isGiftOrDesignForm && Object.keys(obj).some(key => /^recipient_\d+$/.test(key) && obj[key]);
+
+  if (isGiftOrDesignForm && !hasGiftRecipients) {
+    if (editingEntryId) {
+      // Удаляем существующую запись
+      const originGroup = submissionGroups.find((item) =>
+        item.entries.some((entry) => entry.id === editingEntryId)
+      );
+      if (originGroup) {
+        const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
+        if (idx !== -1) {
+          originGroup.entries.splice(idx, 1);
+          // Если группа стала пустой - удаляем её
+          if (!originGroup.entries.length) {
+            const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
+            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+          }
+        }
+      }
+      renderLog(log);
+    }
+    // Просто закрываем модалку, не создавая новую запись
+    handleCloseModal();
+    return;
+  }
+
   // amount используется только для отображения в UI
   const displayAmount = form.dataset.amount || '';
 

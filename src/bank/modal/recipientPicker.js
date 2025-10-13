@@ -159,8 +159,14 @@ export function renderRecipientPickerUniversal({
     if (updateCostCallback) {
       const result = updateCostCallback(itemGroups);
       const hasAny = result.totalCount > 0;
-      btnSubmit.style.display = hasAny ? '' : 'none';
-      btnSubmit.disabled = !hasAny;
+      // Если allowEmptySubmit = true, кнопка всегда доступна
+      if (allowEmptySubmit) {
+        btnSubmit.style.display = '';
+        btnSubmit.disabled = false;
+      } else {
+        btnSubmit.style.display = hasAny ? '' : 'none';
+        btnSubmit.disabled = !hasAny;
+      }
     } else if (showQuantityField && priceData && modalAmount) {
       // Для форм с количеством и ценой (бонусы, маски и т.д.)
       let totalQuantity = 0;

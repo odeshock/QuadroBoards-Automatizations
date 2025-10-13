@@ -361,7 +361,7 @@ export function showConfirmModal(message) {
       </div>
       <div class="form-footer">
         <div style="display:flex; gap:8px; justify-content: center; width: 100%;">
-          <button type="button" class="button" data-action="cancel">Отмена</button>
+          <button type="button" class="button cancel" data-action="cancel">Отмена</button>
           <button type="button" class="button primary" data-action="confirm">Подтвердить</button>
         </div>
       </div>

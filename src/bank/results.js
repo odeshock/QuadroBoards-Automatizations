@@ -579,14 +579,19 @@ export function setHiddenField(modalFields, name, value) {
  */
 function updateButtonStates() {
   // Собираем все templateSelector из существующих групп (без учета giftId)
+  // Фильтруем только группы с entries
   const existingForms = new Set(
-    submissionGroups.map(group => group.templateSelector).filter(Boolean)
+    submissionGroups
+      .filter(group => group.entries && group.entries.length > 0)
+      .map(group => group.templateSelector)
+      .filter(Boolean)
   );
 
   // Собираем пары (templateSelector, giftId) для подарков/иконок/плашек/фонов
+  // Фильтруем только группы с entries
   const existingGifts = new Set(
     submissionGroups
-      .filter(group => group.giftId)
+      .filter(group => group.giftId && group.entries && group.entries.length > 0)
       .map(group => `${group.templateSelector}:${group.giftId}`)
   );
 

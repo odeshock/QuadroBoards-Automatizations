@@ -1851,7 +1851,7 @@ export function renderLog(log) {
         try {
           window.parent.postMessage(purchaseData, '*');
         } catch {
-          console.log("ты пытался что-то купить");
+          console.log("Ты пытался что-то купить");
         }
       }
 

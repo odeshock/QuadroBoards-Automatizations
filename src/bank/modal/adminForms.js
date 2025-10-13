@@ -384,10 +384,10 @@ function renderUserAmountPicker({
       }
     });
     syncHiddenFields();
+  } else {
+    // Изначально submit скрыт, только если нет данных для prefill
+    disableSubmitButton(btnSubmit);
   }
-
-  // изначально submit скрыт, пока нет валидных пар
-  disableSubmitButton(btnSubmit);
 }
 
 /**

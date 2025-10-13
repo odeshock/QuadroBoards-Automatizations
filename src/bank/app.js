@@ -727,7 +727,7 @@ function checkAndRestoreBackup() {
     // Сразу очищаем, чтобы не обрабатывать дважды
     window.BACKUP_DATA = undefined;
 
-    showConfirmModal('Обнаружены сохранённые данные. Восстановить банковскую операцию?')
+    showConfirmModal('Редактировать банковскую операцию?')
       .then((confirmed) => {
         if (confirmed) {
           try {
@@ -736,7 +736,7 @@ function checkAndRestoreBackup() {
             console.log('Операции успешно восстановлены из backup');
           } catch (error) {
             console.error('Ошибка при восстановлении операций:', error);
-            alert('Ошибка при восстановлении данных. Проверьте консоль для деталей.');
+            alert('Ошибка при восстановлении данных. Обратитесь в Приемную.');
           }
         }
       });

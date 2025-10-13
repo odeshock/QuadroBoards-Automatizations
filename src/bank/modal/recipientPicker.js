@@ -18,6 +18,8 @@ import { hideWaitMessage, normalizeString } from './helpers.js';
  * @param {boolean} config.showGiftDataField - Показывать ли поле "Данные для подарка"
  * @param {boolean} config.showPreview - Показывать ли превью (например, подарка)
  * @param {boolean} config.allowDuplicateRecipients - Разрешить ли добавлять одного получателя несколько раз
+ * @param {boolean} config.allowRemoveFirstGroup - Разрешить ли удалять первую группу (для бонусов/маски)
+ * @param {boolean} config.allowEmptySubmit - Разрешить ли сохранение при отсутствии всех групп
  *
  * @param {Object} config.giftData - Данные подарка (для форм подарков)
  * @param {string} config.giftData.id - ID подарка
@@ -40,6 +42,8 @@ export function renderRecipientPickerUniversal({
   showGiftDataField = false,
   showPreview = false,
   allowDuplicateRecipients = true,
+  allowRemoveFirstGroup = false,
+  allowEmptySubmit = false,
 
   giftData = null,
   priceData = null,
@@ -174,13 +178,25 @@ export function renderRecipientPickerUniversal({
       }
 
       const hasAny = totalQuantity > 0;
-      btnSubmit.style.display = hasAny ? '' : 'none';
-      btnSubmit.disabled = !hasAny;
+      // Если allowEmptySubmit = true, кнопка всегда доступна
+      if (allowEmptySubmit) {
+        btnSubmit.style.display = '';
+        btnSubmit.disabled = false;
+      } else {
+        btnSubmit.style.display = hasAny ? '' : 'none';
+        btnSubmit.disabled = !hasAny;
+      }
     } else {
       // Простой подсчёт групп с валидными получателями
       const validCount = itemGroups.filter(g => g.recipientId).length;
-      btnSubmit.style.display = validCount > 0 ? '' : 'none';
-      btnSubmit.disabled = validCount === 0;
+      // Если allowEmptySubmit = true, кнопка всегда доступна
+      if (allowEmptySubmit) {
+        btnSubmit.style.display = '';
+        btnSubmit.disabled = false;
+      } else {
+        btnSubmit.style.display = validCount > 0 ? '' : 'none';
+        btnSubmit.disabled = validCount === 0;
+      }
     }
 
     if (syncCallback) syncCallback();
@@ -197,7 +213,9 @@ export function renderRecipientPickerUniversal({
   const updateRemoveButtons = () => {
     const allRemoveBtns = groupsContainer.querySelectorAll('.gift-remove');
     allRemoveBtns.forEach((btn, i) => {
-      btn.disabled = i === 0;
+      // Если allowRemoveFirstGroup = true, все кнопки активны
+      // Иначе первая кнопка неактивна
+      btn.disabled = !allowRemoveFirstGroup && i === 0;
     });
   };
 
@@ -216,7 +234,7 @@ export function renderRecipientPickerUniversal({
     removeBtn.setAttribute('data-gift-remove', '');
     removeBtn.setAttribute('aria-label', 'Удалить получателя');
     removeBtn.textContent = '×';
-    removeBtn.disabled = isFirst;
+    removeBtn.disabled = isFirst && !allowRemoveFirstGroup;
 
     // Получатель с автокомплитом
     const recipientField = document.createElement('div');

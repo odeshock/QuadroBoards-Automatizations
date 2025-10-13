@@ -329,6 +329,48 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
+  // Проверяем формы с получателями (бонусы/маска/спасительный билет)
+  // Если все группы удалены (нет получателей), удаляем операцию или не создаём новую
+  const isRecipientForm = templateSelector && [
+    '#form-exp-bonus1d1',
+    '#form-exp-bonus2d1',
+    '#form-exp-bonus1w1',
+    '#form-exp-bonus2w1',
+    '#form-exp-bonus1m1',
+    '#form-exp-bonus2m1',
+    '#form-exp-bonus1m3',
+    '#form-exp-bonus2m3',
+    '#form-exp-mask',
+    '#form-exp-clean'
+  ].includes(templateSelector);
+
+  // Проверяем наличие хотя бы одного получателя (recipient_N поля)
+  const hasRecipients = isRecipientForm && Object.keys(obj).some(key => /^recipient_\d+$/.test(key) && obj[key]);
+
+  if (isRecipientForm && !hasRecipients) {
+    if (editingEntryId) {
+      // Удаляем существующую запись
+      const originGroup = submissionGroups.find((item) =>
+        item.entries.some((entry) => entry.id === editingEntryId)
+      );
+      if (originGroup) {
+        const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
+        if (idx !== -1) {
+          originGroup.entries.splice(idx, 1);
+          // Если группа стала пустой - удаляем её
+          if (!originGroup.entries.length) {
+            const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
+            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+          }
+        }
+      }
+      renderLog(log);
+    }
+    // Просто закрываем модалку, не создавая новую запись
+    handleCloseModal();
+    return;
+  }
+
   // amount используется только для отображения в UI
   const displayAmount = form.dataset.amount || '';
 

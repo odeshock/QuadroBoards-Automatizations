@@ -66,6 +66,8 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
       showGiftDataField: false,
       showPreview: false,
       allowDuplicateRecipients: false,
+      allowRemoveFirstGroup: true,
+      allowEmptySubmit: true,
 
       giftData: null,
       priceData: { basePrice: price },
@@ -83,19 +85,16 @@ export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher
             };
           });
 
+        // Считаем общее количество items независимо от того, выбран ли получатель
         let totalQuantity = 0;
         itemGroups.forEach(group => {
-          if (!group.recipientId) return;
           const qty = Number(group.quantityInput?.value) || 0;
           if (qty > 0) totalQuantity += qty;
         });
 
         if (modalAmount) {
-          if (totalQuantity > 0) {
-            updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } }, { items: totalQuantity });
-          } else {
-            modalAmount.textContent = formatNumber(price);
-          }
+          // Всегда показываем формулу, даже когда нет групп (будет price × 0 = 0)
+          updateModalAmount(modalAmount, { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } }, { items: totalQuantity });
         }
       }
     });

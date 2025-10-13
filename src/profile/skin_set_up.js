@@ -38,11 +38,12 @@
     }
 
     // --- тянем библиотеки через fetchCardsWrappedClean
-    let [libPlashka0, libIcon0, libBack0, libGift0] = await Promise.all([
+    let [libPlashka0, libIcon0, libBack0, libGift0, libCoupon0] = await Promise.all([
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID)
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftCouponID),
     ]);
 
     // подстраховка от null/undefined
@@ -50,6 +51,7 @@
     libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
     libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
     libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
+    libCoupon0 = Array.isArray(libCoupon0)   ? libCoupon0  : [];
 
     // --- контейнер под панели
     let grid = container.querySelector('.skins-setup-grid');
@@ -72,6 +74,16 @@
       external: true,
       startOpen,
       allowMultiAdd: true
+    });
+
+    const panelCoupon = window.createChoicePanel({
+      title: withHeaders ? 'Купон' : undefined,
+      targetClass: '_coupon',
+      library: libCoupon0,
+      mountEl: grid,
+      initialHtml,
+      external: true,
+      startOpen
     });
 
     const panelPlashka = window.createChoicePanel({
@@ -111,12 +123,13 @@
       if (panelIcon?.builder)    current = panelIcon.builder(current);
       if (panelBack?.builder)    current = panelBack.builder(current);
       if (panelGift?.builder)    current = panelGift.builder(current);
+      if (panelCoupon?.builder)  current = panelCoupon.builder(current);
       return current;
     }
 
     const api = {
       build,
-      panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift },
+      panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift, coupon: panelCoupon},
     };
     window.__skinsSetupMounted = api;
     return api;

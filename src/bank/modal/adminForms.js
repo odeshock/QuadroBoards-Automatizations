@@ -53,16 +53,7 @@ export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatche
   // 1) Очищаем модальное окно (включая disclaimer)
   clearModalFields(modalFields);
 
-  // 2) Добавляем info блок для форм полумесяца
-  const halfMonthForms = ['form-income-activist', 'form-income-writer', 'form-income-episode-of', 'form-income-post-of'];
-  if (halfMonthForms.includes(templateId)) {
-    const infoBlock = document.createElement('div');
-    infoBlock.className = 'info';
-    infoBlock.innerHTML = TEXT_MESSAGES.ADMIN_HALF_MONTH_INFO;
-    modalFields.appendChild(infoBlock);
-  }
-
-  // 3) Показываем сообщение ожидания
+  // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   // 3) Функция для отображения ошибки
@@ -548,6 +539,18 @@ export function handleAdminRecipientMultiForms({ template, modalFields, btnSubmi
   if (!ADMIN_RECIPIENT_MULTI_FORMS.includes(template.id)) return { handled: false, counterWatcher };
 
   if (!window.IS_ADMIN) {
+    // Очищаем модальное окно
+    clearModalFields(modalFields);
+
+    // Добавляем info блок для форм полумесяца
+    const halfMonthForms = ['form-income-activist', 'form-income-writer', 'form-income-episode-of', 'form-income-post-of'];
+    if (halfMonthForms.includes(template.id)) {
+      const infoBlock = document.createElement('div');
+      infoBlock.className = 'info';
+      infoBlock.innerHTML = TEXT_MESSAGES.ADMIN_HALF_MONTH_INFO;
+      modalFields.appendChild(infoBlock);
+    }
+
     btnSubmit.style.display = 'none';
   } else {
     const timeoutMs = ADMIN_RECIPIENT_FLOW_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;

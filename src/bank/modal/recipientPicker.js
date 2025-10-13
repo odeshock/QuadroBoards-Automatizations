@@ -20,6 +20,7 @@ import { hideWaitMessage, normalizeString } from './helpers.js';
  * @param {boolean} config.allowDuplicateRecipients - Разрешить ли добавлять одного получателя несколько раз
  * @param {boolean} config.allowRemoveFirstGroup - Разрешить ли удалять первую группу (для бонусов/маски)
  * @param {boolean} config.allowEmptySubmit - Разрешить ли сохранение при отсутствии всех групп
+ * @param {boolean} config.prefillCurrentUser - Предзаполнять ли первого получателя текущим пользователем
  *
  * @param {Object} config.giftData - Данные подарка (для форм подарков)
  * @param {string} config.giftData.id - ID подарка
@@ -44,6 +45,7 @@ export function renderRecipientPickerUniversal({
   allowDuplicateRecipients = true,
   allowRemoveFirstGroup = false,
   allowEmptySubmit = false,
+  prefillCurrentUser = true,
 
   giftData = null,
   priceData = null,
@@ -532,14 +534,22 @@ export function renderRecipientPickerUniversal({
         createGroup(user, qty, from, wish, giftDataVal);
       });
     } else {
-      // Нет сохранённых данных - создаём первую группу с текущим пользователем
-      const currentUser = users.find(u => String(u.id) === String(window.USER_ID));
-      createGroup(currentUser || null);
+      // Нет сохранённых данных - создаём первую группу
+      if (prefillCurrentUser) {
+        const currentUser = users.find(u => String(u.id) === String(window.USER_ID));
+        createGroup(currentUser || null);
+      } else {
+        createGroup(null);
+      }
     }
   } else {
-    // Новая форма - предзаполняем первого получателя текущим пользователем
-    const currentUser = users.find(u => String(u.id) === String(window.USER_ID));
-    createGroup(currentUser || null);
+    // Новая форма - создаём первую группу
+    if (prefillCurrentUser) {
+      const currentUser = users.find(u => String(u.id) === String(window.USER_ID));
+      createGroup(currentUser || null);
+    } else {
+      createGroup(null);
+    }
   }
 
   syncHiddenFields();

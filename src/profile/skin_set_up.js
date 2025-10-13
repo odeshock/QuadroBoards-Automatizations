@@ -83,7 +83,8 @@
       mountEl: grid,
       initialHtml,
       external: true,
-      startOpen
+      startOpen,
+      expirableAttr: 'data-expired-date'  // добавляем поддержку даты истечения
     });
 
     const panelPlashka = window.createChoicePanel({

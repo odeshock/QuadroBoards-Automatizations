@@ -46,6 +46,9 @@
   .ufo-lib .ufo-full a{pointer-events:none}
   .ufo-title-edit{grid-area:title;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px;white-space:pre-wrap;overflow:visible}
   .ufo-title-edit:focus{outline:none;background:#fffdf1}
+  .ufo-date-edit{grid-area:title;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px;margin-top:4px}
+  .ufo-date-edit input{border:none;background:transparent;font-size:13px;width:100%;font-family:inherit}
+  .ufo-date-edit input:focus{outline:none}
   `;
   (function injectCSS(){
     const s=document.createElement('style'); s.textContent=baseCSS; document.head.appendChild(s);
@@ -133,8 +136,9 @@
     const opts = Object.assign({
       title: 'Библиотека и выбранные', targetClass: '_section', library: [], startOpen: false,
       textareaSelector: '#page-content', anchorSelector: null, itemSelector: '.item', idAttr: 'data-id', editableAttr: 'title',
-      searchPlaceholder: 'поиск по id', mountEl: null, initialHtml: null, external: false, 
-      allowMultiAdd: false            // ← НОВОЕ: разрешать многоразовое добавление одного и того же id
+      searchPlaceholder: 'поиск по id', mountEl: null, initialHtml: null, external: false,
+      allowMultiAdd: false,            // ← НОВОЕ: разрешать многоразовое добавление одного и того же id
+      expirableAttr: null              // ← НОВОЕ: если задано (например 'data-expired-date'), добавляем инпут для даты
     }, userOpts || {});
     if (!Array.isArray(opts.library)) opts.library = [];
 
@@ -184,6 +188,20 @@
       const editor=document.createElement('div'); editor.className='ufo-title-edit'; editor.contentEditable=true;
       const elItem = full.querySelector(opts.itemSelector); const currentAttr = elItem ? (elItem.getAttribute(opts.editableAttr) || '') : '';
       editor.textContent = currentAttr;
+
+      // Если включен expirableAttr, добавляем поле для даты
+      let dateEditor = null;
+      if (opts.expirableAttr) {
+        dateEditor = document.createElement('div');
+        dateEditor.className = 'ufo-date-edit';
+        const dateInput = document.createElement('input');
+        dateInput.type = 'text';
+        dateInput.placeholder = 'Дата истечения (дд/мм/гг)';
+        const currentDate = elItem ? (elItem.getAttribute(opts.expirableAttr) || '') : '';
+        dateInput.value = currentDate;
+        dateEditor.appendChild(dateInput);
+      }
+
       const actions=document.createElement('div'); actions.className='ufo-actions';
       const recalc = ()=> computeTwoRowMaxSelected(selBox);
       const btnUp=mkBtn('↑', (e)=>{e.preventDefault(); e.stopPropagation(); if (row.previousElementSibling) row.parentElement.insertBefore(row, row.previousElementSibling); recalc();});
@@ -206,6 +224,7 @@
         row.dataset.pageHtml = o.usePageHtml.trim();
       }
       row.append(id, full, actions, editor);
+      if (dateEditor) row.appendChild(dateEditor);
       selBox.insertBefore(row, selBox.firstChild); recalc();
     }
 
@@ -284,8 +303,22 @@
         if (cleanTitle) {
           itemEl.setAttribute(ATTR, cleanTitle);
         } // если пусто — оставляем исходный title как есть
+
+        // Если включен expirableAttr, читаем дату и применяем атрибут
+        if (opts.expirableAttr) {
+          const dateEdit = row.querySelector('.ufo-date-edit input');
+          if (dateEdit) {
+            const dateValue = (dateEdit.value || '').trim();
+            if (dateValue) {
+              itemEl.setAttribute(opts.expirableAttr, dateValue);
+            } else {
+              // Если поле пустое, удаляем атрибут
+              itemEl.removeAttribute(opts.expirableAttr);
+            }
+          }
+        }
       }
-    
+
       // (Опционально) перенести текст в <wrds> из .ufo-text-edit
       const edText = row.querySelector('.ufo-text-edit');
       if (edText && itemEl) {
@@ -307,7 +340,11 @@
       const rows = [...selBox.querySelectorAll('.ufo-card')];
       return rows.map(row => {
         const html = row.dataset.html || '';
-        return buildSelectedInnerHTML(row, html, { editableAttr: opts.editableAttr });
+        return buildSelectedInnerHTML(row, html, {
+          editableAttr: opts.editableAttr,
+          expirableAttr: opts.expirableAttr,
+          itemSelector: opts.itemSelector
+        });
       }).join('\n');
     }
 

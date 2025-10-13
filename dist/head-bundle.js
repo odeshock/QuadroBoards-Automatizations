@@ -1601,7 +1601,7 @@ async function ensureAllowed(group_ids) {
 })();
 
 /* MODULE 7: bank/api.js */
-(function (w, ns) {
+function FMVbank(w, ns) {
   const API_URL = "/api.php";
   const USER_ID = () => 1; // всегда 1 в запросах
   let ticket = false;
@@ -1684,7 +1684,7 @@ async function ensureAllowed(group_ids) {
     const API_KEY = "fmv_bank_info_" + NEEDED_USER_ID;
     const json = await callStorage("storage.get", {}, NEEDED_USER_ID);
     const parsed = parseStorage(json, API_KEY);
-    return JSON.stringify(parsed);
+    return parsed;
   }
 
   async function storageSet(valueObj, NEEDED_USER_ID = 1) {
@@ -1701,7 +1701,7 @@ async function ensureAllowed(group_ids) {
   // экспорт
   w[ns] = { setTicket, storageGet, storageSet };
 
-})(window, "FMVbank");
+};
 
 // Пример использования:
 // const dataStr = await FMVbank.storageGet(15);
@@ -1711,6 +1711,8 @@ async function ensureAllowed(group_ids) {
 //     else console.warn("⚠ не удалось подтвердить запись");
 //   })
 //   .catch(err => console.error("❌ ошибка при записи:", err));
+
+window.FMVbank = FMVbank;
 /* MODULE 8: bank/parent.js */
 /**
  * Преобразует входной объект { fullData: [...] } в текст по заданным правилам.

@@ -142,7 +142,18 @@ function buildFullOperationsData() {
     operation.amountLabel = group.amountLabel;
 
     // Рассчитываем общий modalAmount для всей операции (сумма всех записей)
-    if (group.mode && group.price !== undefined && group.price !== null) {
+    if (group.isDiscount) {
+      // Для скидок суммируем discount_amount
+      operation.modalAmount = group.entries.reduce((sum, entry) => {
+        return sum + (Number(entry.data?.discount_amount) || 0);
+      }, 0);
+    } else if (group.isPriceAdjustment) {
+      // Для корректировок суммируем adjustment_amount
+      operation.modalAmount = group.entries.reduce((sum, entry) => {
+        return sum + (Number(entry.data?.adjustment_amount) || 0);
+      }, 0);
+    } else if (group.price !== undefined && group.price !== null) {
+      // Для обычных операций рассчитываем стоимость
       let totalModalAmount = 0;
       group.entries.forEach((entry) => {
         const dataObj = entry.data || {};
@@ -195,8 +206,10 @@ function buildFullOperationsData() {
           }, 0);
         }
 
+        // Для подарков/иконок/плашек/фонов без mode используем price × количество получателей
+        const mode = group.mode || '';
         totalModalAmount += calculateCost(
-          group.mode,
+          mode,
           group.price,
           group.bonus || 0,
           items,

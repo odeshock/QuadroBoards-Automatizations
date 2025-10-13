@@ -198,7 +198,6 @@ export function setupPostsModalFlow({
 
     const additionalItems = additionalItemsAggregator ? additionalItemsAggregator(items) : 0;
     const itemCount = itemCountFilter ? itemCountFilter(items) : items.length;
-    console.log('📊 Post calculation:', { items, itemCount, additionalItems, hasAggregator: !!additionalItemsAggregator });
     setSummary(itemCount, additionalItems);
 
     form.dataset.currentMultiplier = String(itemCount);
@@ -373,7 +372,7 @@ export function handlePostForms({ template, modalFields, btnSubmit, counterWatch
 // HANDLER: FLYER FORM
 // ============================================================================
 
-export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount, price }) {
+export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount, price, data }) {
   if (template.id !== FORM_INCOME_FLYER) return { handled: false, counterWatcher };
 
   // показываем «ждём…» (у вас уже есть <p class="muted-note">Пожалуйста, подождите...</p>)
@@ -398,7 +397,9 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
 
   // отмена по закрытию
   let canceled = false;
-  const cancel = () => { canceled = true; clearInterval(poll); clearTimeout(to); };
+  let poll = null;
+  let to = null;
+  const cancel = () => { canceled = true; if (poll) clearInterval(poll); if (to) clearTimeout(to); };
   counterWatcher = { cancel }; // используем существующий механизм очистки
 
   // если что-то пошло не так
@@ -522,15 +523,27 @@ export function handleFlyerForm({ template, modalFields, btnSubmit, counterWatch
     cancel();
   };
 
+  // Если есть data (редактирование/восстановление), сразу используем данные
+  if (data && data.flyer_links_json) {
+    try {
+      const links = JSON.parse(data.flyer_links_json);
+      if (Array.isArray(links)) {
+        succeed(links);
+        return { handled: true, counterWatcher };
+      }
+    } catch (e) {
+      console.error('Failed to parse flyer_links_json from data:', e);
+    }
+  }
 
   // ждём ADS_POSTS не дольше ADS_TIMEOUT_MS
-  const to = setTimeout(() => {
+  to = setTimeout(() => {
     // если переменная есть, но это не массив — это тоже ошибка
     if (typeof window.ADS_POSTS !== 'undefined' && !Array.isArray(window.ADS_POSTS)) return fail();
     return fail();
   }, ADS_TIMEOUT_MS);
 
-  const poll = setInterval(() => {
+  poll = setInterval(() => {
     // моментально «фейлим», если тип неверный
     if (typeof window.ADS_POSTS !== 'undefined' && !Array.isArray(window.ADS_POSTS)) {
       fail();

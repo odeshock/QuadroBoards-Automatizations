@@ -235,7 +235,7 @@ if (postResult.handled) {
 }
 
 // === FLYER: ждём ADS_POSTS и рисуем список ===
-const flyerResult = handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount, price });
+const flyerResult = handleFlyerForm({ template, modalFields, btnSubmit, counterWatcher, form, modalAmount, amount, price, data });
 if (flyerResult.handled) {
   counterWatcher = flyerResult.counterWatcher;
 }

@@ -36,10 +36,10 @@ export const submissionGroups = [];
 export let groupSeq = 0;
 export let entrySeq = 0;
 
-export const buildGroupKey = ({ templateSelector = '', title = '', amount = '', amountLabel = '', kind = '', giftId = '' }) => {
-  // Для подарков используем полный ключ (чтобы различать разные типы подарков)
+export const buildGroupKey = ({ templateSelector = '', giftId = '' }) => {
+  // Для подарков используем templateSelector + giftId
   if (giftId) {
-    return [templateSelector, title, amount, amountLabel, kind, giftId].join('||');
+    return [templateSelector, giftId].join('||');
   }
   // Для всех остальных форм используем только templateSelector
   return templateSelector;

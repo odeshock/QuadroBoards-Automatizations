@@ -389,23 +389,23 @@ export function showConfirmModal(message) {
       resolve(true);
     });
 
-    // Закрытие по клику на backdrop
-    confirmBackdrop.addEventListener('click', (e) => {
-      if (e.target === confirmBackdrop) {
-        closeModal();
-        resolve(false);
-      }
-    });
+    // Закрытие по клику на backdrop - отключено для предотвращения случайного закрытия
+    // confirmBackdrop.addEventListener('click', (e) => {
+    //   if (e.target === confirmBackdrop) {
+    //     closeModal();
+    //     resolve(false);
+    //   }
+    // });
 
-    // Закрытие по Escape
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        closeModal();
-        resolve(false);
-        document.removeEventListener('keydown', handleEscape);
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
+    // Закрытие по Escape - отключено для предотвращения случайного закрытия
+    // const handleEscape = (e) => {
+    //   if (e.key === 'Escape') {
+    //     closeModal();
+    //     resolve(false);
+    //     document.removeEventListener('keydown', handleEscape);
+    //   }
+    // };
+    // document.addEventListener('keydown', handleEscape);
   });
 }
 

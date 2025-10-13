@@ -86,22 +86,20 @@ export function createUserPicker(options) {
       modalFields.appendChild(hid);
     });
 
-    btnSubmit.style.display = picked.size ? '' : 'none';
-    btnSubmit.disabled = picked.size === 0;
+    // Кнопка всегда видна и активна (при пустых получателях операция удаляется в app.js)
+    btnSubmit.style.display = '';
+    btnSubmit.disabled = false;
 
     // Обновляем modalAmount если нужно
     if (modalAmount && basePrice !== null) {
       const price = Number(basePrice) || 0;
       const totalRecipients = picked.size;
-      if (totalRecipients > 0) {
-        updateModalAmount(
-          modalAmount,
-          { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } },
-          { items: totalRecipients }
-        );
-      } else {
-        modalAmount.textContent = formatNumber(price);
-      }
+      // Всегда показываем формулу с количеством получателей
+      updateModalAmount(
+        modalAmount,
+        { dataset: { mode: 'price_per_item', price: String(price), bonus: '0' } },
+        { items: totalRecipients }
+      );
     }
 
     // Вызываем колбэк если есть

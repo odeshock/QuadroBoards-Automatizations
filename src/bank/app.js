@@ -411,6 +411,42 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
+  // Проверяем админские формы с получателями (анкета, акция, нужный персонаж, эпизод полумесяца)
+  // Если все получатели удалены, удаляем операцию или не создаём новую
+  const isAdminRecipientForm = templateSelector && [
+    '#form-income-anketa',
+    '#form-income-akcion',
+    '#form-income-needchar',
+    '#form-income-episode-of'
+  ].includes(templateSelector);
+
+  // Проверяем наличие хотя бы одного получателя
+  const hasAdminRecipients = isAdminRecipientForm && Object.keys(obj).some(key => /^recipient_\d+$/.test(key) && obj[key]);
+
+  if (isAdminRecipientForm && !hasAdminRecipients) {
+    if (editingEntryId) {
+      // Удаляем существующую запись
+      const originGroup = submissionGroups.find((item) =>
+        item.entries.some((entry) => entry.id === editingEntryId)
+      );
+      if (originGroup) {
+        const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
+        if (idx !== -1) {
+          originGroup.entries.splice(idx, 1);
+          // Если группа стала пустой - удаляем её
+          if (!originGroup.entries.length) {
+            const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
+            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+          }
+        }
+      }
+      renderLog(log);
+    }
+    // Просто закрываем модалку, не создавая новую запись
+    handleCloseModal();
+    return;
+  }
+
   // amount используется только для отображения в UI
   const displayAmount = form.dataset.amount || '';
 

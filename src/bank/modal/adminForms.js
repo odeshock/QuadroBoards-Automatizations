@@ -542,15 +542,20 @@ export function handleAdminRecipientMultiForms({ template, modalFields, btnSubmi
     // Очищаем модальное окно
     clearModalFields(modalFields);
 
-    // Добавляем info блок для форм полумесяца
+    // Добавляем info блок
     const halfMonthForms = ['form-income-activist', 'form-income-writer', 'form-income-episode-of', 'form-income-post-of'];
+    const infoBlock = document.createElement('div');
+    infoBlock.className = 'info';
+
     if (halfMonthForms.includes(template.id)) {
-      const infoBlock = document.createElement('div');
-      infoBlock.className = 'info';
+      // Для форм полумесяца - специальное сообщение
       infoBlock.innerHTML = TEXT_MESSAGES.ADMIN_HALF_MONTH_INFO;
-      modalFields.appendChild(infoBlock);
+    } else {
+      // Для остальных админских форм (анкета, акционные, нужные персонажи)
+      infoBlock.innerHTML = TEXT_MESSAGES.ADMIN_INFO;
     }
 
+    modalFields.appendChild(infoBlock);
     btnSubmit.style.display = 'none';
   } else {
     const timeoutMs = ADMIN_RECIPIENT_FLOW_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;

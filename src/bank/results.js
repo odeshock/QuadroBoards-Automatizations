@@ -126,21 +126,9 @@ function buildFullOperationsData() {
         multiplier: entry.multiplier
       };
 
-      // Для скидок и корректировок сохраняем key и template_id (содержат ID правила)
+      // Для скидок и корректировок сохраняем template_id (содержит ID правила)
       if (group.isDiscount || group.isPriceAdjustment) {
-        entryData.key = entry.key;
         entryData.template_id = entry.template_id;
-      }
-
-      // Если есть скидка или корректировка
-      if (entry.data?.discount_amount) {
-        entryData.discount_amount = entry.data.discount_amount;
-      }
-      if (entry.data?.adjustment_amount) {
-        entryData.adjustment_amount = entry.data.adjustment_amount;
-      }
-      if (entry.data?.calculation) {
-        entryData.calculation = entry.data.calculation;
       }
 
       operation.entries.push(entryData);

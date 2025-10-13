@@ -175,15 +175,8 @@ document.addEventListener('click', (e) => {
   const key = buildGroupKey(meta);
   const existingGroup = submissionGroups.find((group) => group.key === key);
 
-  // Отладочный лог
-  console.log('🔍 Поиск существующей группы:');
-  console.log('  Ключ для поиска:', key);
-  console.log('  Найдена группа:', existingGroup);
-  console.log('  Все группы:', submissionGroups.map(g => ({ key: g.key, title: g.title })));
-
   if (existingGroup && existingGroup.entries.length) {
     const lastEntry = existingGroup.entries[existingGroup.entries.length - 1];
-    console.log('  ✅ Открываем с данными последней записи');
     handleOpenModal({
       ...meta,
       data: lastEntry.data,
@@ -191,7 +184,6 @@ document.addEventListener('click', (e) => {
       groupId: existingGroup.id
     });
   } else {
-    console.log('  ❌ Группа не найдена или пустая, открываем пустую форму');
     handleOpenModal(meta);
   }
 });

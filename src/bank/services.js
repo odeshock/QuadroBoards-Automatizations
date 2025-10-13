@@ -159,6 +159,58 @@ export function restoreFromBackup(backupData) {
     submissionGroups.push(group);
   });
 
+  // Фильтруем операции с получателями, у которых все получатели отсутствуют в USERS_LIST
+  if (typeof window.USERS_LIST !== 'undefined' && Array.isArray(window.USERS_LIST)) {
+    const validUserIds = new Set(window.USERS_LIST.map(u => String(u.id)));
+
+    // Список form_id, которые требуют получателей
+    const recipientForms = [
+      'form-income-anketa', 'form-income-akcion', 'form-income-needchar',
+      'form-income-episode-of', 'form-income-post-of', 'form-income-writer',
+      'form-income-activist', 'form-income-topup', 'form-income-ams',
+      'form-exp-transfer',
+      'form-exp-bonus1d1', 'form-exp-bonus2d1', 'form-exp-bonus1w1', 'form-exp-bonus2w1',
+      'form-exp-bonus1m1', 'form-exp-bonus2m1', 'form-exp-bonus1m3', 'form-exp-bonus2m3',
+      'form-exp-mask', 'form-exp-clean',
+      'form-gift-custom', 'form-gift-present',
+      'form-icon-custom', 'form-icon-present',
+      'form-badge-custom', 'form-badge-present',
+      'form-bg-custom', 'form-bg-present'
+    ];
+
+    // Фильтруем операции
+    for (let i = submissionGroups.length - 1; i >= 0; i--) {
+      const group = submissionGroups[i];
+      const formId = group.templateSelector?.replace('#', '');
+
+      if (recipientForms.includes(formId)) {
+        // Проверяем есть ли хоть один валидный получатель в любой entry
+        let hasValidRecipient = false;
+
+        for (const entry of group.entries) {
+          const data = entry.data || {};
+          const recipientKeys = Object.keys(data).filter(k => /^recipient_\d+$/.test(k));
+
+          for (const key of recipientKeys) {
+            const recipientId = String(data[key] || '').trim();
+            if (recipientId && validUserIds.has(recipientId)) {
+              hasValidRecipient = true;
+              break;
+            }
+          }
+
+          if (hasValidRecipient) break;
+        }
+
+        // Если нет ни одного валидного получателя, удаляем операцию
+        if (!hasValidRecipient) {
+          console.log(`🗑️ Удалена операция без валидных получателей: ${group.title} (${formId})`);
+          submissionGroups.splice(i, 1);
+        }
+      }
+    }
+  }
+
   const restoredCount = submissionGroups.length;
   console.log(`✅ Восстановлено ${restoredCount} операций из backup`);
   console.log('📋 submissionGroups:', submissionGroups);

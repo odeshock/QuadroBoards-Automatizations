@@ -77,7 +77,7 @@
     });
 
     const panelCoupon = window.createChoicePanel({
-      title: withHeaders ? 'Купон' : undefined,
+      title: withHeaders ? 'Купоны' : undefined,
       targetClass: '_coupon',
       library: libCoupon0,
       mountEl: grid,

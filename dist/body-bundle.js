@@ -3041,7 +3041,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
     libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
     libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
-    libCoupon0 = Array.isArray(libCoupon0)   ? libCoupon0  : [];
+    libCoupon0  = Array.isArray(libCoupon0)  ? libCoupon0  : [];
 
     // --- контейнер под панели
     let grid = container.querySelector('.skins-setup-grid');
@@ -3067,7 +3067,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
     });
 
     const panelCoupon = window.createChoicePanel({
-      title: withHeaders ? 'Купон' : undefined,
+      title: withHeaders ? 'Купоны' : undefined,
       targetClass: '_coupon',
       library: libCoupon0,
       mountEl: grid,

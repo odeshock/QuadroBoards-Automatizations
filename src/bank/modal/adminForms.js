@@ -577,6 +577,15 @@ export function handleAdminSingleRecipientForms({ template, modalFields, btnSubm
   if (!ADMIN_SINGLE_RECIPIENT_FORMS.includes(template.id)) return { handled: false, counterWatcher };
 
   if (!window.IS_ADMIN) {
+    // Очищаем модальное окно
+    clearModalFields(modalFields);
+
+    // Добавляем info блок для форм полумесяца
+    const infoBlock = document.createElement('div');
+    infoBlock.className = 'info';
+    infoBlock.innerHTML = TEXT_MESSAGES.ADMIN_HALF_MONTH_INFO;
+    modalFields.appendChild(infoBlock);
+
     btnSubmit.style.display = 'none';
   } else {
     const timeoutMs = ADMIN_SINGLE_RECIPIENT_TIMEOUTS[template.id] ?? FORM_TIMEOUT_MS;

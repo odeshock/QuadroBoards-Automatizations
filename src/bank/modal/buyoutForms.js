@@ -19,6 +19,15 @@ import {
 export function handleBuyoutForms({ template, modalFields, modalAmount, form, amount }) {
   if (!BUYOUT_FORMS.includes(toSelector(template.id))) return { handled: false };
 
+  // Добавляем info блок в начало
+  const existingInfo = modalFields.querySelector('.info');
+  if (!existingInfo) {
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'info';
+    infoDiv.innerHTML = 'Перед приобретением обязательно ознакомьтесь с <strong>ограничениями</strong>, указанными в правилах.<br><br><strong>Не забудьте активировать</strong> в гостевой.';
+    modalFields.insertBefore(infoDiv, modalFields.firstChild);
+  }
+
   const quantityInput = modalFields.querySelector('input[name="quantity"]');
   if (!quantityInput) return { handled: true };
 

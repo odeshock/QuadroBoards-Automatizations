@@ -199,15 +199,15 @@ document.addEventListener('click', (e) => {
 // Кнопка закрытия
 btnClose.addEventListener('click', handleCloseModal);
 
-// Клик по backdrop
-backdrop.addEventListener('click', (e) => {
-  if (e.target === backdrop) handleCloseModal();
-});
+// Клик по backdrop - отключён для предотвращения случайного закрытия
+// backdrop.addEventListener('click', (e) => {
+//   if (e.target === backdrop) handleCloseModal();
+// });
 
-// Escape key
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && backdrop.hasAttribute('open')) handleCloseModal();
-});
+// Escape key - отключён для предотвращения случайного закрытия
+// document.addEventListener('keydown', (e) => {
+//   if (e.key === 'Escape' && backdrop.hasAttribute('open')) handleCloseModal();
+// });
 
 // Редактирование/удаление в логе
 log.addEventListener('click', async (e) => {

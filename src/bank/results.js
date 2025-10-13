@@ -206,8 +206,8 @@ function buildFullOperationsData() {
           }, 0);
         }
 
-        // Для подарков/иконок/плашек/фонов без mode используем price × количество получателей
-        const mode = group.mode || '';
+        // Для подарков/иконок/плашек/фонов без mode используем режим 'price_per_item'
+        const mode = group.mode || 'price_per_item';
         totalModalAmount += calculateCost(
           mode,
           group.price,

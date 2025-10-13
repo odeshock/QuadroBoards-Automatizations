@@ -411,13 +411,15 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
-  // Проверяем админские формы с получателями (анкета, акция, нужный персонаж, эпизод полумесяца)
+  // Проверяем админские формы с получателями (анкета, акция, нужный персонаж, эпизод полумесяца, пополнение, индивидуальные выплаты)
   // Если все получатели удалены, удаляем операцию или не создаём новую
   const isAdminRecipientForm = templateSelector && [
     '#form-income-anketa',
     '#form-income-akcion',
     '#form-income-needchar',
-    '#form-income-episode-of'
+    '#form-income-episode-of',
+    '#form-income-topup',
+    '#form-income-ams'
   ].includes(templateSelector);
 
   // Проверяем наличие хотя бы одного получателя

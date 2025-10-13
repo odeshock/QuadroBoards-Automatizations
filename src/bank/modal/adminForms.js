@@ -239,8 +239,9 @@ function renderUserAmountPicker({
     }
 
     const hasAny = i > 1;
-    btnSubmit.style.display = hasAny ? '' : 'none';
-    btnSubmit.disabled = !hasAny;
+    // Кнопка всегда видна и активна (при пустых получателях операция удаляется в app.js)
+    btnSubmit.style.display = '';
+    btnSubmit.disabled = false;
 
     // Обновляем modal-amount через callback или дефолтную логику
     if (onAmountUpdate) {
@@ -252,8 +253,12 @@ function renderUserAmountPicker({
         const total = price * totalAmount;
         modalAmount.textContent = `${formatNumber(price)} × ${totalAmount} = ${formatNumber(total)}`;
       } else {
-        // Для форм без basePrice (TOPUP/AMS) показываем просто сумму
-        modalAmount.textContent = totalAmount > 0 ? formatNumber(totalAmount) : '';
+        // Для форм без basePrice (TOPUP/AMS) показываем: 0 × 0 = 0 когда нет получателей
+        if (totalAmount > 0) {
+          modalAmount.textContent = formatNumber(totalAmount);
+        } else {
+          modalAmount.textContent = '0 × 0 = 0';
+        }
       }
     }
   };

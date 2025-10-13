@@ -675,7 +675,10 @@ export function renderLog(log) {
       return sum + value;
     }, 0);
 
-    if (group.amount) {
+    // Для topup/ams amount может быть null, но нужно показать entry-meta
+    const isTopupOrAms = group.templateSelector === toSelector(FORM_INCOME_TOPUP) || group.templateSelector === toSelector(FORM_INCOME_AMS);
+
+    if (group.amount || isTopupOrAms) {
       const meta = document.createElement('span');
       meta.className = 'entry-meta';
 

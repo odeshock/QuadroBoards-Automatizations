@@ -559,4 +559,25 @@ function formatBankText(data) {
   return result;
 }
 
+// Функция кодирования JSON в короткий код (base64 + сжатие)
+function encodeJSON(obj) {
+  const json = JSON.stringify(obj);
+  // Преобразуем в UTF-8 и сжимаем через встроенный TextEncoder + base64
+  const bytes = new TextEncoder().encode(json);
+  const binary = Array.from(bytes, b => String.fromCharCode(b)).join('');
+  const base64 = btoa(binary);
+  return base64;
+}
+
+// Функция декодирования обратно в JSON
+function decodeJSON(code) {
+  const binary = atob(code);
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  const json = new TextDecoder().decode(bytes);
+  return JSON.parse(json);
+}
+
+
 window.formatBankText = formatBankText;
+window.encodeJSON = encodeJSON;
+window.decodeJSON = decodeJSON;

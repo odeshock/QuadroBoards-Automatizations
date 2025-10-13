@@ -132,16 +132,14 @@ export function createSingleUserPicker(options) {
     const first = ids[0];
     if (first) {
       const u = users.find(x => String(x.id) === first);
+      // Пропускаем пользователей, которых нет в USERS_LIST
       if (u) {
         pickedId = String(u.id);
         pickedName = u.name;
         input.value = u.name;
-      } else {
-        pickedId = first;
-        pickedName = 'Неизвестный';
-        input.value = 'Неизвестный';
+        syncHiddenFields();
       }
-      syncHiddenFields();
+      // Неизвестных пользователей просто игнорируем
     }
   }
 

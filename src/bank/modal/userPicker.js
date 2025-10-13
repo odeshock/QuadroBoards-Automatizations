@@ -223,13 +223,12 @@ export function createUserPicker(options) {
     ids.forEach((id) => {
       if (picked.has(id)) return;
       const u = users.find(x => String(x.id) === id);
+      // Пропускаем пользователей, которых нет в USERS_LIST
       if (u) {
         picked.add(String(u.id));
         addChip(u);
-      } else {
-        picked.add(id);
-        addChip({ name: 'Неизвестный', id });
       }
+      // Неизвестных пользователей просто игнорируем
     });
 
     syncHiddenFields();

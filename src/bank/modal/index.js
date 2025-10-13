@@ -493,9 +493,16 @@ if (buyoutResult.handled) {
       } else {
         field.value = value;
       }
+      // Диспатчим событие input для активации валидации и слушателей
+      field.dispatchEvent(new Event('input', { bubbles: true }));
     });
     refreshGiftGroups();
     updateAmountSummary();
+
+    // После заполнения полей из data активируем кнопку сохранения
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+    }
   }
 
   return { counterWatcher };

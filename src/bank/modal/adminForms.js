@@ -626,7 +626,7 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
     if (template.id === FORM_INCOME_TOPUP) {
       const infoBlock = document.createElement('div');
       infoBlock.className = 'info';
-      infoBlock.textContent = TEXT_MESSAGES.TOPUP_INFO;
+      infoBlock.innerHTML = TEXT_MESSAGES.TOPUP_INFO;
       modalFields.appendChild(infoBlock);
 
       const systemInfoBlock = document.createElement('div');
@@ -639,7 +639,7 @@ export function handleAdminAmountForms({ template, modalFields, btnSubmit, count
     if (template.id === FORM_INCOME_AMS) {
       const infoBlock = document.createElement('div');
       infoBlock.className = 'info';
-      infoBlock.textContent = TEXT_MESSAGES.AMS_INFO;
+      infoBlock.innerHTML = TEXT_MESSAGES.AMS_INFO;
       modalFields.appendChild(infoBlock);
     }
 

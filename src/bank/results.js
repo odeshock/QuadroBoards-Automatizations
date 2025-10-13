@@ -578,20 +578,40 @@ export function setHiddenField(modalFields, name, value) {
  * Обновляет класс 'chosen' для кнопок .btn-add в зависимости от наличия операций
  */
 function updateButtonStates() {
-  // Собираем все templateSelector из существующих групп
+  // Собираем все templateSelector из существующих групп (без учета giftId)
   const existingForms = new Set(
     submissionGroups.map(group => group.templateSelector).filter(Boolean)
+  );
+
+  // Собираем пары (templateSelector, giftId) для подарков/иконок/плашек/фонов
+  const existingGifts = new Set(
+    submissionGroups
+      .filter(group => group.giftId)
+      .map(group => `${group.templateSelector}:${group.giftId}`)
   );
 
   // Проходим по всем кнопкам и обновляем класс 'chosen'
   document.querySelectorAll('.btn-add').forEach(btn => {
     const formId = btn.getAttribute('data-form');
-    if (formId) {
-      if (existingForms.has(formId)) {
-        btn.classList.add('chosen');
-      } else {
-        btn.classList.remove('chosen');
-      }
+    const giftId = btn.getAttribute('data-gift-id');
+
+    if (!formId) return;
+
+    let hasOperation = false;
+
+    // Для кнопок с giftId (подарки, иконки, плашки, фоны) проверяем комбинацию formId:giftId
+    if (giftId) {
+      const key = `${formId}:${giftId}`;
+      hasOperation = existingGifts.has(key);
+    } else {
+      // Для обычных кнопок проверяем только formId
+      hasOperation = existingForms.has(formId);
+    }
+
+    if (hasOperation) {
+      btn.classList.add('chosen');
+    } else {
+      btn.classList.remove('chosen');
     }
   });
 }

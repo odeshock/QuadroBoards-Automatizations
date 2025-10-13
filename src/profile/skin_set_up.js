@@ -43,7 +43,7 @@
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftCouponID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID),
     ]);
 
     // подстраховка от null/undefined
@@ -51,7 +51,7 @@
     libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
     libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
     libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
-    libCoupon0 = Array.isArray(libCoupon0)   ? libCoupon0  : [];
+    libCoupon0  = Array.isArray(libCoupon0)  ? libCoupon0  : [];
 
     // --- контейнер под панели
     let grid = container.querySelector('.skins-setup-grid');

@@ -3033,7 +3033,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftCouponID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID),
     ]);
 
     // подстраховка от null/undefined

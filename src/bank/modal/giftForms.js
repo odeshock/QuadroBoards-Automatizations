@@ -63,6 +63,7 @@ function renderGiftPickerUniversal({
     allowRemoveFirstGroup: true,
     allowEmptySubmit: true,
     prefillCurrentUser: false,
+    hideFieldsForCurrentUser: false,
 
     giftData: { id: giftId, icon: giftIcon, title: title },
     priceData: null,

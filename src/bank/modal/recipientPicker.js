@@ -21,6 +21,7 @@ import { hideWaitMessage, normalizeString } from './helpers.js';
  * @param {boolean} config.allowRemoveFirstGroup - Разрешить ли удалять первую группу (для бонусов/маски)
  * @param {boolean} config.allowEmptySubmit - Разрешить ли сохранение при отсутствии всех групп
  * @param {boolean} config.prefillCurrentUser - Предзаполнять ли первого получателя текущим пользователем
+ * @param {boolean} config.hideFieldsForCurrentUser - Скрывать ли поля "От кого" и "Комментарий" при выборе себя
  *
  * @param {Object} config.giftData - Данные подарка (для форм подарков)
  * @param {string} config.giftData.id - ID подарка
@@ -46,6 +47,7 @@ export function renderRecipientPickerUniversal({
   allowRemoveFirstGroup = false,
   allowEmptySubmit = false,
   prefillCurrentUser = true,
+  hideFieldsForCurrentUser = true,
 
   giftData = null,
   priceData = null,
@@ -87,7 +89,8 @@ export function renderRecipientPickerUniversal({
     if (showQuantityField) hiddenFieldNames.push('quantity_');
     if (showGiftDataField) hiddenFieldNames.push('gift_data_');
     if (giftData) {
-      hiddenFieldNames.push('gift_id_', 'gift_icon_');
+      hiddenFieldNames.push('gift_id_');
+      // gift_icon_ больше не используется - иконка берется из operation.giftIcon
     }
 
     const selector = hiddenFieldNames.map(name => `input[type="hidden"][name^="${name}"], textarea[type="hidden"][name^="${name}"]`).join(', ');
@@ -146,12 +149,9 @@ export function renderRecipientPickerUniversal({
         hidGiftId.name = `gift_id_${i}`;
         hidGiftId.value = giftData.id || '';
 
-        const hidGiftIcon = document.createElement('input');
-        hidGiftIcon.type = 'hidden';
-        hidGiftIcon.name = `gift_icon_${i}`;
-        hidGiftIcon.value = giftData.icon || '';
+        // gift_icon больше не сохраняем в hidden fields - используется operation.giftIcon из JSON
 
-        fieldsToAppend.push(hidGiftId, hidGiftIcon);
+        fieldsToAppend.push(hidGiftId);
       }
 
       modalFields.append(...fieldsToAppend);
@@ -369,7 +369,8 @@ export function renderRecipientPickerUniversal({
     // Функция для скрытия/показа полей "От кого" и "Комментарий"
     const updateFieldsVisibility = () => {
       const isCurrentUser = group.recipientId && String(group.recipientId) === String(window.USER_ID);
-      if (isCurrentUser) {
+      // Скрываем поля только если hideFieldsForCurrentUser = true
+      if (hideFieldsForCurrentUser && isCurrentUser) {
         // Скрываем и очищаем поля "От кого" и "Комментарий"
         fromField.style.display = 'none';
         wishField.style.display = 'none';

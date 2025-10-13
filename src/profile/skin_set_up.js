@@ -84,6 +84,7 @@
       initialHtml,
       external: true,
       startOpen,
+      allowMultiAdd: true,
       expirableAttr: 'data-expired-date'  // добавляем поддержку даты истечения
     });
 

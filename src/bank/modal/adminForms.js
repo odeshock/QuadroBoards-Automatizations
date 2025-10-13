@@ -49,11 +49,20 @@ import {
 import { createUserPicker } from './userPicker.js';
 import { createSingleUserPicker } from './singleUserPicker.js';
 
-export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null }) {
+export function setupAdminRecipientsFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount = null, basePrice = null, templateId = null }) {
   // 1) Очищаем модальное окно (включая disclaimer)
   clearModalFields(modalFields);
 
-  // 2) Показываем сообщение ожидания
+  // 2) Добавляем info блок для форм полумесяца
+  const halfMonthForms = ['form-income-activist', 'form-income-writer', 'form-income-episode-of', 'form-income-post-of'];
+  if (halfMonthForms.includes(templateId)) {
+    const infoBlock = document.createElement('div');
+    infoBlock.className = 'info';
+    infoBlock.innerHTML = TEXT_MESSAGES.ADMIN_HALF_MONTH_INFO;
+    modalFields.appendChild(infoBlock);
+  }
+
+  // 3) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
 
   // 3) Функция для отображения ошибки
@@ -549,7 +558,8 @@ export function handleAdminRecipientMultiForms({ template, modalFields, btnSubmi
       timeoutMs,
       data,
       modalAmount,
-      basePrice: price
+      basePrice: price,
+      templateId: template.id
     });
   }
   return { handled: true, counterWatcher };

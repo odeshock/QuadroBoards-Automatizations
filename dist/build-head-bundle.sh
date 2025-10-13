@@ -33,7 +33,11 @@ echo "/* MODULE 6: load_main_users_money.js */" >> dist/head-bundle.js
 cat src/profile/load_main_users_money.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 7: bank/parent.js */" >> dist/head-bundle.js
+echo "/* MODULE 7: bank/api.js */" >> dist/head-bundle.js
+cat src/bank/api.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 8: bank/parent.js */" >> dist/head-bundle.js
 cat src/bank/parent.js >> dist/head-bundle.js
 
 echo "✅ head-bundle.js created!"

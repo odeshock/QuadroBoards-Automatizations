@@ -32,7 +32,7 @@
   .ufo-lib,.ufo-selected{border:1px dashed #c9c9d9;border-radius:8px;background:#fafafd;padding:8px;overflow:auto}
   .ufo-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
   .ufo-lib .ufo-card{margin:0}
-  .ufo-card{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto auto;grid-template-areas:"id full actions" "id title actions" "id date actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
+  .ufo-card{display:grid;grid-template-columns:auto 1fr auto auto;grid-template-rows:auto auto;grid-template-areas:"id full date actions" "id title title actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
   .ufo-idtag{grid-area:id;font-size:11px;opacity:.7;align-self:start}
   .ufo-actions{grid-area:actions;display:flex;align-items:center;gap:6px}
   .ufo-btn{border:1px solid #d7d7e0;background:#f3f3f7;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.15;display:inline-flex;align-items:center}
@@ -46,7 +46,7 @@
   .ufo-lib .ufo-full a{pointer-events:none}
   .ufo-title-edit{grid-area:title;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px;white-space:pre-wrap;overflow:visible}
   .ufo-title-edit:focus{outline:none;background:#fffdf1}
-  .ufo-date-edit{grid-area:date;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px}
+  .ufo-date-edit{grid-area:date;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px;align-self:start}
   .ufo-date-edit input{border:none;background:transparent;font-size:13px;width:100%;font-family:inherit}
   .ufo-date-edit input:focus{outline:none}
   `;
@@ -191,18 +191,14 @@
 
       // Если включен expirableAttr, добавляем поле для даты
       let dateEditor = null;
-      console.log('[DEBUG] opts.expirableAttr:', opts.expirableAttr, 'targetClass:', opts.targetClass);
       if (opts.expirableAttr) {
-        console.log('[DEBUG] Creating date editor for item:', item.id);
         dateEditor = document.createElement('div');
         dateEditor.className = 'ufo-date-edit';
         const dateInput = document.createElement('input');
-        dateInput.type = 'text';
-        dateInput.placeholder = 'Дата истечения (дд/мм/гг)';
+        dateInput.type = 'date';
         const currentDate = elItem ? (elItem.getAttribute(opts.expirableAttr) || '') : '';
         dateInput.value = currentDate;
         dateEditor.appendChild(dateInput);
-        console.log('[DEBUG] Date editor created:', dateEditor);
       }
 
       const actions=document.createElement('div'); actions.className='ufo-actions';
@@ -307,16 +303,45 @@
           itemEl.setAttribute(ATTR, cleanTitle);
         } // если пусто — оставляем исходный title как есть
 
-        // Если включен expirableAttr, читаем дату и применяем атрибут
+        // Если включен expirableAttr, читаем дату и применяем атрибут + span.coupon_deadline
         if (opts.expirableAttr) {
           const dateEdit = row.querySelector('.ufo-date-edit input');
           if (dateEdit) {
-            const dateValue = (dateEdit.value || '').trim();
+            const dateValue = (dateEdit.value || '').trim(); // yyyy-mm-dd из input type="date"
+
+            // Удаляем старый span.coupon_deadline если есть
+            const oldSpan = itemEl.querySelector('.coupon_deadline');
+            if (oldSpan) oldSpan.remove();
+
+            // Создаём новый span.coupon_deadline после img
+            const imgEl = itemEl.querySelector('img');
+            const newSpan = document.createElement('span');
+            newSpan.className = 'coupon_deadline';
+
             if (dateValue) {
+              // Конвертируем yyyy-mm-dd -> dd/mm/yy для отображения
+              const parts = dateValue.split('-');
+              if (parts.length === 3) {
+                const year = parts[0].slice(2); // берём последние 2 цифры года
+                const month = parts[1];
+                const day = parts[2];
+                newSpan.textContent = `${day}/${month}/${year}`;
+              }
+              // Устанавливаем data-expired-date в формате yyyy-mm-dd
               itemEl.setAttribute(opts.expirableAttr, dateValue);
             } else {
-              // Если поле пустое, удаляем атрибут
+              // Если дата не заполнена, span остаётся пустым
+              newSpan.textContent = '';
               itemEl.removeAttribute(opts.expirableAttr);
+            }
+
+            // Вставляем span после img (или в конец если img нет)
+            if (imgEl && imgEl.nextSibling) {
+              itemEl.insertBefore(newSpan, imgEl.nextSibling);
+            } else if (imgEl) {
+              imgEl.parentNode.appendChild(newSpan);
+            } else {
+              itemEl.appendChild(newSpan);
             }
           }
         }

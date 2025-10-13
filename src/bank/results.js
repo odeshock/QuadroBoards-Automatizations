@@ -571,6 +571,32 @@ export function setHiddenField(modalFields, name, value) {
 }
 
 // ============================================================================
+// UPDATE BUTTON STATES
+// ============================================================================
+
+/**
+ * Обновляет класс 'chosen' для кнопок .btn-add в зависимости от наличия операций
+ */
+function updateButtonStates() {
+  // Собираем все templateSelector из существующих групп
+  const existingForms = new Set(
+    submissionGroups.map(group => group.templateSelector).filter(Boolean)
+  );
+
+  // Проходим по всем кнопкам и обновляем класс 'chosen'
+  document.querySelectorAll('.btn-add').forEach(btn => {
+    const formId = btn.getAttribute('data-form');
+    if (formId) {
+      if (existingForms.has(formId)) {
+        btn.classList.add('chosen');
+      } else {
+        btn.classList.remove('chosen');
+      }
+    }
+  });
+}
+
+// ============================================================================
 // RENDER LOG
 // ============================================================================
 
@@ -1842,6 +1868,9 @@ export function renderLog(log) {
 
     log.appendChild(summaryPanel);
   }
+
+  // Обновляем состояние кнопок после рендеринга
+  updateButtonStates();
 }
 
 // ============================================================================

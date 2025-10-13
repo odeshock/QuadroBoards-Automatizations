@@ -68,10 +68,10 @@ export const incomeItems = [
   { title: 'Голос в RPG-top', amount: 'ч', price: 22, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_RPGTOP },
   { title: 'Баннер FMV в подписи на Рено', amount: 'ч', price: 23, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_BANNER_RENO },
   { title: 'Баннер FMV в подписи на Маяке', amount: 'ч', price: 24, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_BANNER_MAYAK },
-  { title: 'Активист полумесяца', amount: 'ч', price: 25, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_ACTIVIST },
-  { title: 'Постописец полумесяца', amount: 'ч', price: 26, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_WRITER },
   { title: 'Эпизод полумесяца', amount: 'ч', price: 27, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_EPISODE_OF },
   { title: 'Пост полумесяца', amount: 'ч', price: 28, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_POST_OF },
+  { title: 'Постописец полумесяца', amount: 'ч', price: 26, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_WRITER },
+  { title: 'Активист полумесяца', amount: 'ч', price: 25, mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_ACTIVIST },
   { title: 'Пополнение фонда форума', amount: 'ч', mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_TOPUP },
   { title: 'Индивидуальные выплаты', amount: 'ч', mode: CALC_MODES.PRICE_PER_ITEM, form: FORM_INCOME_AMS },
 ];

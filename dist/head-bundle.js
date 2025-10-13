@@ -1601,7 +1601,7 @@ async function ensureAllowed(group_ids) {
 })();
 
 /* MODULE 7: bank/api.js */
-function FMVbank(w, ns) {
+(function (w, ns) {
   const API_URL = "/api.php";
   const USER_ID = () => 1; // всегда 1 в запросах
   let ticket = false;
@@ -1701,7 +1701,7 @@ function FMVbank(w, ns) {
   // экспорт
   w[ns] = { setTicket, storageGet, storageSet };
 
-};
+})(window, "FMVbank");
 
 // Пример использования:
 // const dataStr = await FMVbank.storageGet(15);
@@ -1712,7 +1712,6 @@ function FMVbank(w, ns) {
 //   })
 //   .catch(err => console.error("❌ ошибка при записи:", err));
 
-window.FMVbank = FMVbank;
 /* MODULE 8: bank/parent.js */
 /**
  * Преобразует входной объект { fullData: [...] } в текст по заданным правилам.

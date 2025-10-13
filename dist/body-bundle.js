@@ -2019,7 +2019,7 @@ async function collectSkinSets() {
   .ufo-btn:hover{background:#ececf4}
   .ufo-card.disabled{opacity:.4;pointer-events:none}
   .ufo-full{grid-area:full;box-sizing:border-box;margin:0;padding:0;border:0;background:transparent;overflow:hidden}
-  .ufo-full .item{position:relative;display:block;margin:0}
+  .ufo-full .item{position:relative;margin:0}
   .ufo-full .item .modal-link{display:block}
   .ufo-full .item img{display:block;max-width:100%;height:auto;border-radius:6px}
   .ufo-lib .ufo-full .item img{height:90px;width:100%;object-fit:cover}

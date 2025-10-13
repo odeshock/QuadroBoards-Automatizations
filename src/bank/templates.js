@@ -178,7 +178,8 @@ export const formTemplates = {
     id: 'new',
     name: 'text',
     label: 'Имя нового персонажа на английском *',
-    type: 'text'
+    type: 'text',
+    info: TEXT_MESSAGES.CHANGECHAR_INFO
   }),
   [FORM_EXP_REFUSE]: simpleField({
     id: 'rf-r',

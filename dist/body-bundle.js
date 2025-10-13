@@ -2012,7 +2012,7 @@ async function collectSkinSets() {
   .ufo-lib,.ufo-selected{border:1px dashed #c9c9d9;border-radius:8px;background:#fafafd;padding:8px;overflow:auto}
   .ufo-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
   .ufo-lib .ufo-card{margin:0}
-  .ufo-card{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;grid-template-areas:"id full actions" "id title actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
+  .ufo-card{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto auto;grid-template-areas:"id full actions" "id title actions" "id date actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
   .ufo-idtag{grid-area:id;font-size:11px;opacity:.7;align-self:start}
   .ufo-actions{grid-area:actions;display:flex;align-items:center;gap:6px}
   .ufo-btn{border:1px solid #d7d7e0;background:#f3f3f7;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.15;display:inline-flex;align-items:center}
@@ -2026,7 +2026,7 @@ async function collectSkinSets() {
   .ufo-lib .ufo-full a{pointer-events:none}
   .ufo-title-edit{grid-area:title;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px;white-space:pre-wrap;overflow:visible}
   .ufo-title-edit:focus{outline:none;background:#fffdf1}
-  .ufo-date-edit{grid-area:title;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px;margin-top:4px}
+  .ufo-date-edit{grid-area:date;border:1px dashed #aaa;border-radius:6px;padding:6px 8px;background:#fffef7;font-size:13px}
   .ufo-date-edit input{border:none;background:transparent;font-size:13px;width:100%;font-family:inherit}
   .ufo-date-edit input:focus{outline:none}
   `;
@@ -3111,6 +3111,7 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
       initialHtml,
       external: true,
       startOpen,
+      allowMultiAdd: true,
       expirableAttr: 'data-expired-date'  // добавляем поддержку даты истечения
     });
 

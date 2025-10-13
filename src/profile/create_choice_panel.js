@@ -191,7 +191,9 @@
 
       // Если включен expirableAttr, добавляем поле для даты
       let dateEditor = null;
+      console.log('[DEBUG] opts.expirableAttr:', opts.expirableAttr, 'targetClass:', opts.targetClass);
       if (opts.expirableAttr) {
+        console.log('[DEBUG] Creating date editor for item:', item.id);
         dateEditor = document.createElement('div');
         dateEditor.className = 'ufo-date-edit';
         const dateInput = document.createElement('input');
@@ -200,6 +202,7 @@
         const currentDate = elItem ? (elItem.getAttribute(opts.expirableAttr) || '') : '';
         dateInput.value = currentDate;
         dateEditor.appendChild(dateInput);
+        console.log('[DEBUG] Date editor created:', dateEditor);
       }
 
       const actions=document.createElement('div'); actions.className='ufo-actions';

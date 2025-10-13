@@ -31,14 +31,31 @@ import {
 
 import { renderRecipientPickerUniversal } from './recipientPicker.js';
 
-export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice }) {
+export function setupBonusMaskCleanFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, basePrice, templateId }) {
   // 1) Очищаем модальное окно
   clearModalFields(modalFields);
 
   // 2) Добавляем disclaimer
   const disclaimer = document.createElement('div');
   disclaimer.className = 'info';
-  disclaimer.textContent = TEXT_MESSAGES.PLAYER_CHOICE_INFO;
+
+  // Для маски и бонусов добавляем дополнительный текст в начало
+  const isBonusOrMask = templateId && (
+    templateId === 'form-exp-mask' ||
+    templateId.startsWith('form-exp-bonus')
+  );
+
+  // Для спасения от чистки добавляем свой специальный текст
+  const isClean = templateId === 'form-exp-clean';
+
+  if (isBonusOrMask) {
+    disclaimer.innerHTML = 'Приобретается только <strong>для сюжетных эпизодов</strong>.<br><br>Перед использованием в игре <strong>не забудьте активировать</strong> в теме записи в сюжетный эпизод.<br><br>' + TEXT_MESSAGES.PLAYER_CHOICE_INFO;
+  } else if (isClean) {
+    disclaimer.innerHTML = 'Позволяет получить отсрочку от удаления. Обязательно учитывайте <strong>особые условия для применения</strong>, указанные в правилах.<br><br><strong>Не забудьте активировать</strong> в теме отпуска.<br><br>' + TEXT_MESSAGES.PLAYER_CHOICE_INFO;
+  } else {
+    disclaimer.textContent = TEXT_MESSAGES.PLAYER_CHOICE_INFO;
+  }
+
   modalFields.insertBefore(disclaimer, modalFields.firstChild);
 
   // 3) Показываем сообщение ожидания
@@ -119,7 +136,8 @@ export function handleBonusMaskCleanForms({ template, modalFields, btnSubmit, co
     timeoutMs: AMS_TIMEOUT_MS,
     data,
     modalAmount,
-    basePrice: price
+    basePrice: price,
+    templateId: template.id
   });
   return { handled: true, counterWatcher };
 }

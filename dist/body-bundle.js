@@ -3538,7 +3538,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
       color:#999!important;text-decoration:none!important;
       pointer-events:none;cursor:default;opacity:.8;
     }`).appendTo(document.head || document.documentElement);
-
+  console.log('fff');
   function insertSlot() {
     var $right = $(PROFILE_RIGHT_SEL);
     if (!$right.length) return null;
@@ -3563,7 +3563,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
   function setLink($a, href) {
     $a.removeClass("is-empty").attr({ href }).text("Последняя");
   }
-
+  console.log('blyyyyyyy');
   async function ensureScrapePosts(timeoutMs = 8000, intervalMs = 250) {
     const started = Date.now();
     while (Date.now() - started <= timeoutMs) {

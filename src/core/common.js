@@ -466,12 +466,13 @@
    * @param {Object} [options]
    * @param {number} [options.maxPages=999]
    * @param {number} [options.delayMs=300]
+   * @param {string}  [options.keywords=""] - Дополнительные ключевые слова для поиска
    * @returns {Promise<Array<string>>} список ссылок вида ...viewtopic.php?pid=K#pK
    */
   window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(
     author,
     forums,
-    { maxPages = 999, delayMs = 300 } = {}
+    { maxPages = 999, delayMs = 300, keywords = "" } = {}
   ) {
     if (!author) throw new Error("author обязателен");
     if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
@@ -479,19 +480,25 @@
     const forumsParam = forums.join(",");
     const basePath = "/search.php";
     const targetAuthor = author;
+    const keywordsRaw   = String(keywords ?? "").trim();
 
     const buildSearchUrl = (p) => {
       // используем старый «совместимый» формат: forum=, show_as=topics
       const params = [
         ['action',   'search'],
-        ['author',   encodeForSearch(targetAuthor.trim())],
+        ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],
+        ['author',   encodeForSearch(author.trim())],
         ['forum',    forumsParam],
+        ['search_in','0'],
+        ['sort_by',  '0'],
         ['sort_dir', 'DESC'],
         ['show_as',  'topics'],
-        ['p',        String(p)],
-      ];
+        ['search',   encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
+        ['p',        String(p)]
+      ].filter(([_, v]) => v !== '');
+
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
-      console.log("[scrapeTopicFirstPostLinks] search params:", `?${query}`);
+      console.log("[scrapePosts] search params:", `?${query}`);
       return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
@@ -577,15 +584,20 @@
 
     const doc1 = await getDoc(buildSearchUrl(1));
     const links1 = extractTopicPageLinks(doc1);
-    const sig1 = hash(links1.join("\n"));
     const topics = [...links1];
     await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
 
     for (let p = 2; p <= maxPages; p++) {
       const doc = await getDoc(buildSearchUrl(p));
-      const links = extractTopicPageLinks(doc);
-      const sig = hash(links.join("\n"));
-      if (sig === sig1) break;
+      const currentPageNum = Number(doc.querySelector('div.linkst div.pagelink strong')?.textContent || 1);
+        if (currentPageNum === 1 && p !== 1) {
+          // сервер снова выдал первую страницу — выходим из цикла
+          break;
+        }
+
+      const links = extractTopicPageLinks(doc, keywords = keywords);
+      if (!links.length) break;
+
       topics.push(...links);
       await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
     }

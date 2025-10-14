@@ -3522,55 +3522,35 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
 // @grant        none
 // ==/UserScript==
 (function () {
-  if (!window.jQuery) return;
-  var $ = jQuery;
+  'use strict';
 
-  var PROFILE_RIGHT_SEL = "#viewprofile #profile-right";
+  const PROFILE_PATH_RE = /\/profile\.php$/i;
+  const PROFILE_ID_RE = /[?&]id=\d+/;
+  const PROFILE_RIGHT_SEL = '#viewprofile #profile-right';
 
-  // запуск строго на /profile.php?id=...
-  if (!/\/profile\.php$/i.test(location.pathname)) return;
-  if (!/[?&]id=\d+/.test(location.search)) return;
-  console.log("на месте");
+  if (!PROFILE_PATH_RE.test(location.pathname)) return;
+  if (!PROFILE_ID_RE.test(location.search)) return;
 
-  // оформление «пустого» состояния
-  $("<style>").text(`
-    #pa-bank-link a.is-empty{
-      color:#999!important;text-decoration:none!important;
-      pointer-events:none;cursor:default;opacity:.8;
-    }`).appendTo(document.head || document.documentElement);
-  console.log('fff');
-  async function waitForElement(selector, timeoutMs = 8000, intervalMs = 200) {
-    const started = Date.now();
-    while (Date.now() - started <= timeoutMs) {
-      const $el = jQuery(selector);
-      if ($el.length) return $el;
-      await new Promise(r => setTimeout(r, intervalMs));
+  const style = document.createElement('style');
+  style.textContent = `
+    #pa-bank-link a.is-empty {
+      color: #999 !important;
+      text-decoration: none !important;
+      pointer-events: none;
+      cursor: default;
+      opacity: .8;
     }
-    return jQuery(); // пустая коллекция
+  `;
+  (document.head || document.documentElement).appendChild(style);
+
+  function ready(callback) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', callback, { once: true });
+    } else {
+      callback();
+    }
   }
 
-  async function insertSlotAsync() {
-    const $right = await waitForElement("#viewprofile #profile-right");
-    if (!$right.length) return null;
-    const $li = jQuery(`
-      <li id="pa-bank-link">
-        <span>Банковские операции:</span>
-        <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
-      </li>
-    `);
-    const $after = $right.find('#pa-last-visit');
-    if ($after.length) $li.insertAfter($after); else $right.append($li);
-    return $li.find("a");
-  }
-
-  function setEmpty($a, reason) {
-    var text = "Не найдена";
-    $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
-  }
-  function setLink($a, href) {
-    $a.removeClass("is-empty").attr({ href }).text("Последняя");
-  }
-  console.log('blyyyyyyy');
   async function ensureScrapePosts(timeoutMs = 8000, intervalMs = 250) {
     const started = Date.now();
     while (Date.now() - started <= timeoutMs) {
@@ -3579,46 +3559,83 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
     }
     return false;
   }
-  console.log(typeof scrapePosts);
-  $(async function () {
-    console.log("aaaa");
-    var $slot = await insertSlotAsync();
-    if (!$slot || !$slot.length) {
-      console.warn('[bank_last_comment] profile-right не появился');
-      return;
+
+  function insertSlot() {
+    const right = document.querySelector(PROFILE_RIGHT_SEL);
+    if (!right) return null;
+
+    const li = document.createElement('li');
+    li.id = 'pa-bank-link';
+    li.innerHTML = `
+      <span>Банковские операции:</span>
+      <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
+    `;
+
+    const after = right.querySelector('#pa-last-visit');
+    if (after && after.parentElement === right) {
+      after.insertAdjacentElement('afterend', li);
+    } else {
+      right.appendChild(li);
     }
-    console.log("aaaa1");
+
+    return li.querySelector('a');
+  }
+
+  function setEmpty(anchor, reason) {
+    const text = 'Не найдена';
+    anchor.classList.add('is-empty');
+    anchor.href = '#';
+    anchor.title = reason || text;
+    anchor.textContent = text;
+  }
+
+  function setLink(anchor, href) {
+    anchor.classList.remove('is-empty');
+    anchor.href = href;
+    anchor.textContent = 'Последняя';
+  }
+
+  ready(async () => {
+    const anchor = insertSlot();
+    if (!anchor) return;
+
     const hasScrape = await ensureScrapePosts();
-    if (!hasScrape) { setEmpty($slot, "нет доступа к поиску"); return; }
-    console.log("aaaa2");
-    if (!window.UserLogin || !window.SITE_URL) {
-      setEmpty($slot, "нет данных пользователя");
+    if (!hasScrape) {
+      setEmpty(anchor, 'нет доступа к поиску');
       return;
     }
-    console.log("aaaa2");
-    var forums = Array.isArray(window.BANK_FORUMS) ? window.BANK_FORUMS : [];
-    console.log('ny vot');
+
+    if (!window.UserLogin) {
+      setEmpty(anchor, 'нет данных пользователя');
+      return;
+    }
+
+    const forumsRaw = window.BANK_FORUMS;
+    const forums = Array.isArray(forumsRaw)
+      ? forumsRaw
+      : typeof forumsRaw === 'string' && forumsRaw.trim()
+        ? forumsRaw.split(',').map(id => id.trim()).filter(Boolean)
+        : [];
+
     try {
-      var posts = await window.scrapePosts(
-        window.UserLogin,
-        forums,
-        {
-          title_prefix: "Гринготтс",
-          stopOnFirstNonEmpty: true,
-          keywords: "ДОХОДЫ OR РАСХОДЫ AND ИТОГО"
-        }
-      );
+      const posts = await window.scrapePosts(window.UserLogin, forums, {
+        title_prefix: 'Гринготтс',
+        stopOnFirstNonEmpty: true,
+        keywords: 'ДОХОДЫ OR РАСХОДЫ AND ИТОГО'
+      });
 
       if (Array.isArray(posts) && posts.length && posts[0]?.src) {
-        var href = String(window.SITE_URL || "").replace(/\/$/, "") + "/viewtopic.php?" + posts[0].src;
-        setLink($slot, href);
+        const siteBase = (typeof window.SITE_URL === 'string' && window.SITE_URL.trim())
+          ? window.SITE_URL.trim().replace(/\/$/, '')
+          : location.origin.replace(/\/$/, '');
+        const href = `${siteBase}/viewtopic.php?${posts[0].src}`;
+        setLink(anchor, href);
       } else {
-        setEmpty($slot);
+        setEmpty(anchor);
       }
-      console.log("i gde");
-    } catch (err) {
-      console.error("[bank_last_comment] scrapePosts failed", err);
-      setEmpty($slot, "ошибка поиска");
+    } catch (error) {
+      console.error('[bank_last_comment] scrapePosts failed', error);
+      setEmpty(anchor, 'ошибка поиска');
     }
   });
 })();

@@ -441,26 +441,37 @@
    * @param {string} text - Текст для кодирования
    * @returns {string}
    */
-  // window.encodeForSearch = function encodeForSearch(text) {
-  //   return String(text ?? '')
-  //     .split('')
-  //     .map(ch => (/[A-Za-z0-9'`~_]/.test(ch) ? ch : encodeURIComponent(ch)))
-  //     .join('');
-  // };
-
+  
   window.encodeForSearch = function encodeForSearch(text) {
-  // создаём текстовый encoder для Windows-1251
-  const encoder = new TextEncoder('windows-1251', { NONSTANDARD_allowLegacyEncoding: true });
-  const bytes = encoder.encode(text);
+    let out = '';
+    for (const ch of text) {
+      const cp = ch.codePointAt(0);
 
-  // преобразуем байты в URL-кодировку (%XX)
-  return Array.from(bytes)
-    .map(b => {
-      // пробел → '+', всё остальное в %HEX
-      return b === 0x20 ? '+' : '%' + b.toString(16).toUpperCase().padStart(2, '0');
-    })
-    .join('');
-}
+      let b = null;
+      if (cp <= 0x7F) {
+        // ASCII совпадает в UTF-8 и CP1251
+        b = cp;
+      } else if (cp >= 0x0410 && cp <= 0x044F) {
+        // Кириллица А(0x0410)…я(0x044F) -> 0xC0…0xFF
+        b = 0xC0 + (cp - 0x0410);
+      } else if (cp === 0x0401) {        // Ё
+        b = 0xA8;
+      } else if (cp === 0x0451) {        // ё
+        b = 0xB8;
+      } else {
+        // Здесь можно:
+        // 1) кинуть ошибку,
+        // 2) заменить на '?',
+        // 3) добавить маппинг для нужных тебе символов.
+        // Я выберу '?':
+        b = 0x3F; // '?'
+      }
+
+      out += (b === 0x20) ? '+' : '%' + b.toString(16).toUpperCase().padStart(2, '0');
+    }
+    return out;
+  }
+
 
 
   /* ---------- scrapePosts - парсинг постов автора ---------- */
@@ -488,27 +499,24 @@
     const keywordsRaw = String(keywords ?? "").trim();
 
     const buildUrl = (p) => {
-      const u = new URL(basePath, location.origin);
-      const encodeWord = (word) =>
-        (typeof window.encodeForSearch === 'function'
-          ? window.encodeForSearch(word)
-          : encodeURIComponent(String(word ?? '')));
+      const params = [
+        ['action', 'search'],
+        ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''], // можно убрать пару, если пусто
+        ['author', encodeForSearch(author.trim())],
+        ['forum', forumsParam],            // <— было forums
+        ['search_in', '0'],
+        ['sort_by', '0'],
+        ['sort_dir', 'DESC'],
+        ['show_as', 'posts'],
+        ['search', encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
+        ['p', String(p)]
+      ].filter(([_, v]) => v !== ''); // не отправляем пустые
 
-      const params = new URLSearchParams({
-        action: "search",
-        author: encodeWord(author.trim()),
-        forums: forumsParam,
-        sort_dir: "DESC",
-        p: String(p)
-      });
-      if (keywordsRaw) {
-        const encodedKeywords = encodeWord(keywords().trim())
-        params.set("keywords", encodedKeywords);
-      }
-      u.search = params.toString();
-      console.log("[scrapePosts] search params:", u.search);
-      return u.toString();
+      const query = params.map(([k, v]) => `${k}=${v}`).join('&');
+      console.log("[scrapePosts] search params:", `?${query}`);
+      return new URL(`/search.php?${query}`, location.origin).toString();
     };
+
 
     async function getDoc(url) {
       if (window.FMV?.fetchDoc) return await window.FMV.fetchDoc(url);
@@ -665,32 +673,27 @@
    * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
    * @returns {Promise<Array<string>>}
    */
-  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300 } = {}) {
+  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300} = {}) {
     if (!author) throw new Error("author обязателен");
     if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
 
     const forumsParam = forums.join(",");
     const basePath = "/search.php";
-    const keywordsRaw = String(keywords ?? "").trim();
 
     const buildSearchUrl = (p) => {
-      const u = new URL(basePath, location.origin);
-      const encodeWord = (word) =>
-        (typeof window.encodeForSearch === 'function'
-          ? window.encodeForSearch(word)
-          : encodeURIComponent(String(word ?? '')));
 
-      const params = new URLSearchParams({
-        action: "search",
-        author: encodeWord(author.trim()),
-        forums: forumsParam,
-        sort_dir: "DESC",
-        show_as: "topics",
-        p: String(p)
-      });
-      u.search = params.toString();
-      console.log("[scrapeTopicFirstPostLinks] search params:", u.search);
-      return u.toString();
+      const params = [
+        ['action', 'search'],
+        ['author', encodeForSearch(author.trim())],
+        ['forums', forumsParam],
+        ['sort_dir', 'DESC'],
+        ['show_as', 'topics'],
+        ['p', String(p)]
+      ];
+
+      const query = params.map(([k, v]) => `${k}=${v}`).join('&');
+      console.log("[scrapeTopicFirstPostLinks] search params:", `?${query}`);
+      return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
     async function getDoc(url) {

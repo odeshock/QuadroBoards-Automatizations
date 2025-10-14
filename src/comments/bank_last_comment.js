@@ -50,7 +50,7 @@
     const li = document.createElement('li');
     li.id = 'pa-bank-link';
     li.innerHTML = `
-      <span>Банковские операции:</span>
+      <span>Банковская операция:</span>
       <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
     `;
 
@@ -112,7 +112,7 @@
           ? window.SITE_URL.trim().replace(/\/$/, '')
           : location.origin.replace(/\/$/, '');
         const href = `${siteBase}/viewtopic.php?${posts[0].src}`;
-        setLink(anchor, href);
+        setLink(slot, href, posts[0].date_text || posts[0].text || 'Последняя операция');
       } else {
         setEmpty(anchor);
       }

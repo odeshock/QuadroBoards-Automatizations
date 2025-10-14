@@ -809,9 +809,8 @@
       const date_text = a[2]?.innerText?.trim() || "";
 
       // --- дата из атрибута data-posted (всегда в секундах)
-      const date_ts = null;
       const postedRaw = post.getAttribute("data-posted");
-      date_ts = Number(postedRaw);
+      const date_ts = Number(postedRaw);
 
       // --- контент поста
       const contentEl = post.querySelector(".post-content");

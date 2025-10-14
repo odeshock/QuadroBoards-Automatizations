@@ -1779,6 +1779,7 @@ export function renderLog(log) {
       const confirmed = await showConfirmModal('Вы уверены, что хотите очистить все операции?');
       if (confirmed) {
         submissionGroups.length = 0;
+        // frozenDiscounts НЕ сбрасываются - продолжаем работать в режиме backup
         renderLog(log);
       }
     });

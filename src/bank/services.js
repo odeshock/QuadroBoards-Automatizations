@@ -36,6 +36,19 @@ export const submissionGroups = [];
 export let groupSeq = 0;
 export let entrySeq = 0;
 
+// Замороженный список скидок для работы с backup
+// - null = используем текущие autoDiscounts (обычный режим)
+// - array = используем замороженные скидки (режим backup - редактирование существующей операции)
+// frozenDiscounts действует всё время редактирования backup и НЕ сбрасывается до нажатия "Купить"
+export let frozenDiscounts = null;
+
+// Функция для сброса замороженных скидок
+// Вызывается после успешной отправки операции (нажатие "Купить")
+export function resetFrozenDiscounts() {
+  frozenDiscounts = null;
+  console.log('❄️➡️🔓 Замороженные скидки сброшены, возврат к обычному режиму');
+}
+
 export const buildGroupKey = ({ templateSelector = '', giftId = '' }) => {
   // Для подарков используем templateSelector + giftId
   if (giftId) {
@@ -69,12 +82,16 @@ export function restoreFromBackup(backupData) {
   // Очищаем текущие операции
   submissionGroups.length = 0;
 
-  // Собираем ID корректировок и скидок из backup для проверки дубликатов
+  // Собираем ID корректировок из backup для проверки дубликатов
   const backupAdjustmentIds = new Set();
-  const backupDiscountIds = new Set();
 
-  // Восстанавливаем каждую операцию из backup (включая корректировки и скидки)
+  // Восстанавливаем каждую операцию из backup (КРОМЕ СКИДОК - они будут пересчитаны)
   backupData.fullData.forEach((operation) => {
+    // Пропускаем скидки - они будут пересчитаны на основе исторических данных
+    if (operation.type === 'discount') {
+      console.log('🔄 Пропущена скидка из backup (будет пересчитана):', operation.title);
+      return;
+    }
     // Создаём группу
     const group = {
       id: `group-${incrementGroupSeq()}`,
@@ -117,15 +134,8 @@ export function restoreFromBackup(backupData) {
       giftId: group.giftId || ''
     });
 
-    // Восстанавливаем специальные флаги для скидок и корректировок
-    if (operation.type === 'discount') {
-      group.isDiscount = true;
-      // Собираем ID скидок из backup
-      operation.entries.forEach((entry) => {
-        const discountId = entry.key.split('_').pop();
-        if (discountId) backupDiscountIds.add(discountId);
-      });
-    } else if (operation.type === 'adjustment') {
+    // Восстанавливаем специальные флаги для корректировок
+    if (operation.type === 'adjustment') {
       group.isPriceAdjustment = true;
       // Собираем ID корректировок из backup
       operation.entries.forEach((entry) => {
@@ -239,67 +249,30 @@ export function restoreFromBackup(backupData) {
   // Если были, считаем разницу
   newAdjustmentsCount = backupAdjustmentGroup ? (currentAdjustments.length > 0 ? 1 : 0) : currentAdjustments.length;
 
-  // Получаем timestamp из backup'а
+  // Получаем timestamp из backup'а для определения исторически активных скидок
   const backupTimestamp = backupData.timestamp;
 
   if (backupTimestamp) {
-    // Проверяем, какие скидки были активны на момент backup'а
-    const historicallyActiveDiscounts = autoDiscounts.filter(discount => {
-      // Пропускаем скидки, которые уже есть в backup'е
-      if (backupDiscountIds.has(discount.id)) return false;
+    console.log(`📅 Backup timestamp: ${backupTimestamp}`);
+
+    // Находим ВСЕ скидки из autoDiscounts, которые были активны на момент backup'а
+    frozenDiscounts = autoDiscounts.filter(discount => {
       // Проверяем, была ли скидка активна на момент backup'а
       return wasDiscountActiveAt(discount, backupTimestamp);
     });
 
-    // Применяем исторически активные скидки
-    if (historicallyActiveDiscounts.length > 0) {
-      console.log(`Найдено ${historicallyActiveDiscounts.length} скидок, которые были активны на момент backup'а`);
+    console.log(`❄️ Заморожено ${frozenDiscounts.length} скидок, активных на момент backup'а:`, frozenDiscounts.map(d => d.id));
 
-      historicallyActiveDiscounts.forEach(discount => {
-        // Применяем каждую историческую скидку вручную
-        const entries = [];
-        const totalItems = submissionGroups
-          .filter(g => !g.isDiscount && !g.isPriceAdjustment)
-          .reduce((sum, g) => sum + g.entries.length, 0);
+    // Применяем все исторически активные скидки
+    updateAutoDiscounts();
 
-        if (totalItems === 0) return;
+    const appliedDiscounts = submissionGroups.filter(g => g.isDiscount);
+    historicalDiscountsCount = appliedDiscounts.length;
 
-        const calculation = calculateDiscountForRule(discount, submissionGroups);
-
-        if (calculation && calculation.discount > 0) {
-          entries.push({
-            id: incrementEntrySeq(),
-            template_id: `auto-discount-${discount.id}`,
-            data: {
-              discount_id: discount.id,
-              discount_title: discount.title,
-              discount_type: discount.type,
-              total_items: totalItems,
-              discount_amount: calculation.discount,
-              calculation,
-              startDate: discount.startDate,
-              expiresAt: discount.expiresAt || null
-            },
-            multiplier: 1
-          });
-
-          const discountGroup = {
-            id: incrementGroupSeq(),
-            key: `auto-discount-${discount.id}`,
-            templateSelector: '',
-            title: discount.title,
-            price: -calculation.discount,
-            bonus: 0,
-            amountLabel: 'Скидка',
-            entries: entries,
-            isDiscount: true
-          };
-
-          submissionGroups.push(discountGroup);
-          historicalDiscountsCount++;
-        }
-      });
-    }
+    console.log(`✅ Применено ${historicalDiscountsCount} исторических скидок`);
+  } else {
+    console.warn('⚠️ Backup не содержит timestamp, скидки будут применены из текущих правил');
+    frozenDiscounts = null;
   }
 
   if (newAdjustmentsCount > 0 || historicalDiscountsCount > 0) {
@@ -647,8 +620,13 @@ export function updateAutoDiscounts() {
   const entries = [];
   let totalDiscount = 0;
 
+  // Используем frozenDiscounts если он установлен (режим backup), иначе autoDiscounts
+  const discountsToApply = frozenDiscounts !== null ? frozenDiscounts : autoDiscounts;
+
+  console.log(`🔍 Применяем скидки из ${frozenDiscounts !== null ? 'замороженного списка' : 'текущих правил'} (${discountsToApply.length} правил)`);
+
   // Проходим по всем правилам скидок
-  autoDiscounts.forEach(rule => {
+  discountsToApply.forEach(rule => {
     let { id, title, forms, type, discountValue, condition, startDate, expiresAt } = rule;
 
     // Проверяем обязательное поле startDate

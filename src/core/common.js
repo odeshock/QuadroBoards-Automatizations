@@ -878,4 +878,4 @@
       return finalArr;
     }
   };
-}
+});

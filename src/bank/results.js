@@ -636,6 +636,77 @@ export function renderLog(log) {
   updateAutoDiscounts();
 
   log.innerHTML = '';
+
+  // Добавляем кнопку выбора купонов в начало
+  const couponButton = document.createElement('div');
+  couponButton.className = 'coupon-selector';
+  couponButton.style.marginBottom = '16px';
+  couponButton.style.padding = '12px';
+  couponButton.style.border = '1px dashed var(--border-color, #e5e7eb)';
+  couponButton.style.borderRadius = '8px';
+  couponButton.style.cursor = 'pointer';
+  couponButton.style.display = 'flex';
+  couponButton.style.alignItems = 'center';
+  couponButton.style.justifyContent = 'space-between';
+  couponButton.style.transition = 'all 0.2s';
+
+  couponButton.addEventListener('mouseenter', () => {
+    couponButton.style.borderColor = 'var(--primary, #3b82f6)';
+    couponButton.style.backgroundColor = 'var(--bg-hover, #f9fafb)';
+  });
+
+  couponButton.addEventListener('mouseleave', () => {
+    couponButton.style.borderColor = 'var(--border-color, #e5e7eb)';
+    couponButton.style.backgroundColor = 'transparent';
+  });
+
+  const couponText = document.createElement('span');
+  couponText.style.fontSize = '0.875rem';
+  couponText.style.fontWeight = '500';
+  couponText.textContent = '🎟️ Купоны';
+
+  const couponAction = document.createElement('span');
+  couponAction.style.fontSize = '0.75rem';
+  couponAction.style.color = 'var(--text-muted, #6b7280)';
+  couponAction.textContent = 'выбрать/использовать →';
+
+  couponButton.appendChild(couponText);
+  couponButton.appendChild(couponAction);
+
+  // Добавляем обработчик клика для открытия модального окна
+  couponButton.addEventListener('click', () => {
+    // Импортируем необходимые функции
+    import('./modal/index.js').then(({ openModal }) => {
+      const backdrop = document.getElementById('backdrop');
+      const modalTitle = document.getElementById('modal-title');
+      const modalFields = document.getElementById('modal-fields');
+      const modalAmount = document.getElementById('modal-amount');
+      const modalAmountLabel = document.getElementById('modal-amount-label');
+      const btnSubmit = document.getElementById('btn-submit');
+      const form = document.getElementById('modal-form');
+
+      openModal({
+        backdrop,
+        modalTitle,
+        modalFields,
+        modalAmount,
+        modalAmountLabel,
+        btnSubmit,
+        form,
+        counterWatcher: null,
+        config: {
+          templateSelector: '#personal-coupon',
+          title: 'Купоны',
+          amount: '',
+          kind: 'income',
+          amountLabel: 'Скидка'
+        }
+      });
+    });
+  });
+
+  log.appendChild(couponButton);
+
   if (!submissionGroups.length) {
     const empty = document.createElement('div');
     empty.className = 'log-empty';

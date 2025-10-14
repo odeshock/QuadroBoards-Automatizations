@@ -779,7 +779,6 @@ injectTemplates();
 // Рендерим списки
 renderIncomeList();
 renderExpenseList();
-renderPersonalCoupons();
 renderGiftsList();
 renderDesignLists();
 

@@ -51,10 +51,7 @@
     li.id = 'pa-lastpost-link';
     li.innerHTML = `
       <span>Последний пост:</span>
-      <strong>
-        <a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a>
-        <small></small>
-      </strong>
+      <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
     `;
 
     const after = right.querySelector('#pa-last-visit');
@@ -68,48 +65,40 @@
   }
 
   function setEmpty(slot, reason) {
-    const anchor = slot.querySelector('a');
-    const note = slot.querySelector('small');
     const text = 'Не найден';
     anchor.classList.add('is-empty');
     anchor.href = '#';
     anchor.title = reason || text;
     anchor.textContent = text;
-    if (note) note.textContent = '';
   }
 
   function setLink(slot, href, dateText) {
-    const anchor = slot.querySelector('a');
-    const note = slot.querySelector('small');
     anchor.classList.remove('is-empty');
     anchor.href = href;
     anchor.textContent = dateText || 'Последний пост';
-    if (note) note.textContent = '';
   }
 
   ready(async () => {
-    const slot = insertSlot();
-    if (!slot) return;
+    const anchor = insertSlot();
+    if (!anchor) return;
 
     const hasScrape = await ensureScrapePosts();
     if (!hasScrape) {
-      setEmpty(slot, 'нет доступа к поиску');
+      setEmpty(anchor, 'нет доступа к поиску');
       return;
     }
 
     if (!window.UserLogin) {
-      setEmpty(slot, 'нет данных пользователя');
+      setEmpty(anchor, 'нет данных пользователя');
       return;
     }
 
-    const forums = Array.isArray(window.EPS_FORUM_INFO)
-      ? window.EPS_FORUM_INFO.map(item => item && item.id).filter(Boolean)
-      : [];
-
-    if (!forums.length) {
-      setEmpty(slot, 'нет данных о форумах');
-      return;
-    }
+    const forumsRaw = window.BANK_FORUMS;
+    const forums = Array.isArray(forumsRaw)
+      ? forumsRaw
+      : typeof forumsRaw === 'string' && forumsRaw.trim()
+        ? forumsRaw.split(',').map(id => id.trim()).filter(Boolean)
+        : [];
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {

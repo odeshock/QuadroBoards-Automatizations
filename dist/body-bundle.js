@@ -3557,6 +3557,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
     }
     return $li.find("a");
   }
+  console.log("загрузка");
   function setEmpty($a, reason) {
     var text = "Не найдена";
     $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);

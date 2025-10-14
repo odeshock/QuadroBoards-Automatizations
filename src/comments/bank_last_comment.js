@@ -55,7 +55,7 @@
     }
     return false;
   }
-  console.log('aga!');
+  console.log(typeof scrapePosts);
   $(async function () {
     var $slot = insertSlot();
     if (!$slot || !$slot.length) return;

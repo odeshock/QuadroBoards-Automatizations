@@ -3572,7 +3572,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
     }
     return false;
   }
-  console.log('aga!');
+  console.log(typeof scrapePosts);
   $(async function () {
     var $slot = insertSlot();
     if (!$slot || !$slot.length) return;

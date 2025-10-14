@@ -25,7 +25,6 @@
   function insertSlot() {
     var $right = $(PROFILE_RIGHT_SEL);
     if (!$right.length) return null;
-    var scope = FORUM_IDS.length ? ` (разделы ${FORUM_IDS.join(",")})` : "";
     var $li = $(`
       <li id="pa-bank-link">
         <span>Банковские операции:</span>
@@ -40,7 +39,6 @@
     }
     return $li.find("a");
   }
-  console.log("загрузка");
   function setEmpty($a, reason) {
     var text = "Не найдена";
     $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
@@ -49,15 +47,21 @@
     $a.removeClass("is-empty").attr({ href }).text("Последняя");
   }
 
+  async function ensureScrapePosts(timeoutMs = 8000, intervalMs = 250) {
+    const started = Date.now();
+    while (Date.now() - started <= timeoutMs) {
+      if (typeof window.scrapePosts === 'function') return true;
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    return false;
+  }
+
   $(async function () {
     var $slot = insertSlot();
-    console.log('prewft')
     if (!$slot || !$slot.length) return;
 
-    if (typeof window.scrapePosts !== "function") {
-      setEmpty($slot, "нет доступа к поиску");
-      return;
-    }
+    const hasScrape = await ensureScrapePosts();
+    if (!hasScrape) { setEmpty($slot, "нет доступа к поиску"); return; }
 
     if (!window.UserLogin || !window.SITE_URL) {
       setEmpty($slot, "нет данных пользователя");
@@ -65,7 +69,6 @@
     }
 
     var forums = Array.isArray(window.BANK_FORUMS) ? window.BANK_FORUMS : [];
-    console.log('wtf');
 
     try {
       var posts = await window.scrapePosts(
@@ -77,8 +80,6 @@
           keywords: "ДОХОДЫ OR РАСХОДЫ AND ИТОГО"
         }
       );
-
-      console.log(posts);
 
       if (Array.isArray(posts) && posts.length && posts[0]?.src) {
         var href = String(window.SITE_URL || "").replace(/\/$/, "") + "/viewtopic.php?" + posts[0].src;

@@ -441,247 +441,28 @@
     };
   };
 
-  /* ---------- encode - упрощённое кодирование для поиска ---------- */
-  /**
-   * Кодирует строку для поисковых запросов
-   * @param {string} text - Текст для кодирования
-   * @returns {string}
-   */
-  
-  window.encodeForSearch = function encodeForSearch(text) {
-    let out = '';
-    for (const ch of text) {
-      const cp = ch.codePointAt(0);
 
-      let b = null;
+  window.encodeForSearch = function encodeWin1251(text) {
+    let out = '';
+    for (const ch of String(text)) {
+      const cp = ch.codePointAt(0);
+      let b;
       if (cp <= 0x7F) {
-        // ASCII совпадает в UTF-8 и CP1251
-        b = cp;
-      } else if (cp >= 0x0410 && cp <= 0x044F) {
-        // Кириллица А(0x0410)…я(0x044F) -> 0xC0…0xFF
+        b = cp; // ASCII
+      } else if (cp >= 0x0410 && cp <= 0x044F) { // А..я
         b = 0xC0 + (cp - 0x0410);
-      } else if (cp === 0x0401) {        // Ё
+      } else if (cp === 0x0401) { // Ё
         b = 0xA8;
-      } else if (cp === 0x0451) {        // ё
+      } else if (cp === 0x0451) { // ё
         b = 0xB8;
       } else {
-        // Здесь можно:
-        // 1) кинуть ошибку,
-        // 2) заменить на '?',
-        // 3) добавить маппинг для нужных тебе символов.
-        // Я выберу '?':
         b = 0x3F; // '?'
       }
-
       out += (b === 0x20) ? '+' : '%' + b.toString(16).toUpperCase().padStart(2, '0');
     }
     return out;
-  }
-
-
-
-  /* ---------- scrapePosts - парсинг постов автора ---------- */
-  /**
-   * Парсит посты автора из результатов поиска
-   * @param {string} author - Имя автора (обязательно)
-   * @param {Array<string>|string} forums - Список ID форумов (обязательно)
-   * @param {Object} [options]
-   * @param {boolean} [options.stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
-   * @param {string} [options.last_src=""] - Пост-граница; сам пост не обрабатываем
-   * @param {string} [options.text_prefix=""] - Начало названия поста для фильтрации
-   * @param {number} [options.maxPages=999]
-   * @param {number} [options.delayMs=300]
-   * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
-   * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
-   */
-  window.scrapePosts = async function scrapePosts(
-    author,
-    forums,
-    { stopOnFirstNonEmpty = false, last_src = "", title_prefix = "", maxPages = 999, delayMs = 300, keywords = "" } = {}
-  ) {
-    if (!author) throw new Error("author обязателен");
-    if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
-    const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
-    const keywordsRaw = String(keywords ?? "").trim();
-    const titlePrefixLC = String(title_prefix || "").trim().toLowerCase();
-
-    const buildUrl = (p) => {
-      const params = [
-        ['action', 'search'],
-        ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''], // можно убрать пару, если пусто
-        ['author', encodeForSearch(author.trim())],
-        ['forum', forumsParam],            // <— было forums
-        ['search_in', '0'],
-        ['sort_by', '0'],
-        ['sort_dir', 'DESC'],
-        ['show_as', 'posts'],
-        ['search', encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
-        ['p', String(p)]
-      ].filter(([_, v]) => v !== ''); // не отправляем пустые
-
-      const query = params.map(([k, v]) => `${k}=${v}`).join('&');
-      console.log("[scrapePosts] search params:", `?${query}`);
-      return new URL(`/search.php?${query}`, location.origin).toString();
-    };
-
-
-    async function getDoc(url) {
-      if (window.FMV?.fetchDoc) return await window.FMV.fetchDoc(url);
-      if (typeof fetchCP1251Doc === "function") return await fetchCP1251Doc(url);
-      if (typeof fetchHtml === "function") {
-        const html = await fetchHtml(url);
-        return new DOMParser().parseFromString(html, "text/html");
-      }
-      const res = await fetch(url, { credentials: "include" });
-      const html = await res.text();
-      return new DOMParser().parseFromString(html, "text/html");
-    }
-    const hash = (s) => { let h=0; for (const c of s) { h=((h<<5)-h)+c.charCodeAt(0); h|=0; } return h; };
-
-    // ---------- HTML → чистый текст ----------
-    const htmlToMultilineText = (html = "") => {
-      const tmp = document.createElement("div");
-      tmp.innerHTML = html;
-
-      // скрытые цитаты -> только blockquote
-      tmp.querySelectorAll(".quote-box.hide-box").forEach(box => {
-        const bq = box.querySelector("blockquote");
-        if (bq) { const repl = document.createElement("div"); repl.innerHTML = bq.innerHTML; box.replaceWith(repl); }
-      });
-      // убрать шапки цитат
-      tmp.querySelectorAll("cite").forEach(n => n.remove());
-      // code-box -> только текст из <pre>
-      tmp.querySelectorAll(".code-box").forEach(box => {
-        const pre = box.querySelector("pre"); const codeText = pre ? pre.textContent : "";
-        const repl = document.createElement("div"); repl.textContent = codeText || ""; box.replaceWith(repl);
-      });
-      // служебные/скрытые
-      tmp.querySelectorAll(".custom_tag, .hidden_tag, characters, location, order").forEach(n => n.remove());
-      // script type="text/html" -> парсим и соблюдаем <p>/<br>
-      tmp.querySelectorAll('script[type="text/html"]').forEach(s => {
-        const innerTmp = document.createElement("div"); innerTmp.innerHTML = s.textContent || "";
-        innerTmp.querySelectorAll("p, br").forEach(el => el.insertAdjacentText("afterend", "\n"));
-        let t = (innerTmp.textContent || "").replace(/\u00A0/g, " ").replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n");
-        s.insertAdjacentText("beforebegin", t ? `\n${t}\n` : ""); s.remove();
-      });
-      // переносы для блочных
-      const blockTags = ["ADDRESS","ARTICLE","ASIDE","BLOCKQUOTE","DIV","DL","DT","DD","FIELDSET","FIGCAPTION","FIGURE","FOOTER","FORM","H1","H2","H3","H4","H5","H6","HEADER","HR","LI","MAIN","NAV","OL","P","PRE","SECTION","TABLE","THEAD","TBODY","TFOOT","TR","UL","BR"];
-      tmp.querySelectorAll(blockTags.join(",")).forEach(el => { if (el.tagName==="BR") el.insertAdjacentText("beforebegin","\n"); else el.insertAdjacentText("afterend","\n"); });
-
-      // нормализация
-      let t = (tmp.textContent || "").replace(/\u00A0/g," ");
-      t = t.replace(/\[\/?indent\]/gi,"").replace(/\[\/?float(?:=[^\]]+)?\]/gi,"").replace(/\[DiceFM[^\]]*?\]/gi,"");
-      t = t.replace(/[ \t]+\n/g,"\n").replace(/\n[ \t]+/g,"\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n");
-
-      const out=[]; for (const raw of t.split("\n")) { const line = raw.trim(); if (line==="") { if (out.length && out[out.length-1] !== "") out.push(""); } else out.push(line); }
-      return out.join("\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n").replace(/^\n+|\n+$/g,"").trim();
-    };
-    const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
-
-    // ----- извлечение одного поста -----
-    const extractOne = (post) => {
-      const span = post.querySelector("h3 > span");
-      const a = span ? span.querySelectorAll("a") : [];
-      // title в НИЖНЕМ регистре (как ты просила)
-      const title = (a[1]?.textContent?.trim() || "").toLowerCase();
-      const src   = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
-      const contentEl = post.querySelector(".post-content");
-      let html = contentEl?.innerHTML?.trim() || "";
-      html = expandBBHtmlToText(html);
-      const text = htmlToMultilineText(html);
-      return { title, src, text, html, symbols_num: text.length };
-    };
-
-    // ----- фильтрация по title_prefix -----
-    const titleMatchesPrefix = (t) => {
-      if (!titlePrefixLC) return true;            // пустой префикс -> пропускаем всё
-      return t.startsWith(titlePrefixLC);         // строго "начинается с"
-    };
-
-    // ----- список постов с применением фильтра по заголовку -----
-    const extractPosts = (doc) => {
-      const all = [...doc.querySelectorAll(".post")].map(extractOne);
-      // ВАЖНО: last_src и пр. применяются только к отфильтрованным постам
-      return all.filter(p => titleMatchesPrefix(p.title));
-    };
-    const pageSignature = (items) => hash(items.map(i=>i.src).join("\n"));
-
-    // ---------- режим A: первый непустой ДО last_src ----------
-    async function findFirstNonEmptyBeforeLastSrc() {
-      const doc1 = await getDoc(buildUrl(1)); const posts1 = extractPosts(doc1);
-      if (!posts1.length) return finalize([]);
-      const baseSig = pageSignature(posts1);
-
-      for (const post of posts1) {
-        if (last_src && post.src === last_src) return finalize([]);
-        if (post.symbols_num > 0) return finalize([post]);
-      }
-      await FMV.sleep(delayMs);
-
-      for (let p=2; p<=maxPages; p++) {
-        const doc = await getDoc(buildUrl(p)); const posts = extractPosts(doc);
-        if (!posts.length) break;
-        if (pageSignature(posts) === baseSig) break;
-        for (const post of posts) {
-          if (last_src && post.src === last_src) return finalize([]);
-          if (post.symbols_num > 0) return finalize([post]);
-        }
-        await FMV.sleep(delayMs);
-      }
-      return finalize([]);
-    }
-
-    // ---------- режим B: собрать ВСЕ ДО last_src (или всё, если он не задан) ----------
-    async function collectAllBeforeLastSrc() {
-      const acc = [];
-
-      const doc1 = await getDoc(buildUrl(1)); const posts1 = extractPosts(doc1);
-      if (!posts1.length) return finalize([]);
-      const baseSig = pageSignature(posts1);
-
-      const pushUntilBorder = (list) => {
-        for (const post of list) {
-          if (last_src && post.src === last_src) return true; // встретили границу -> прекращаем набор
-          acc.push(post);
-        }
-        return false;
-      };
-
-      if (pushUntilBorder(posts1)) return finalize(acc);
-      await FMV.sleep(delayMs);
-
-      for (let p=2; p<=maxPages; p++) {
-        const doc = await getDoc(buildUrl(p)); const posts = extractPosts(doc);
-        if (!posts.length) break;
-        if (pageSignature(posts) === baseSig) break;
-        if (pushUntilBorder(posts)) return finalize(acc);
-        await FMV.sleep(delayMs);
-      }
-      return finalize(acc);
-    }
-
-    // ------ запуск нужного режима ------
-    if (stopOnFirstNonEmpty) {
-      return await findFirstNonEmptyBeforeLastSrc();
-    } else {
-      return await collectAllBeforeLastSrc();
-    }
-
-    // ------ финализация: reverse + вывод ------
-    function finalize(arr) {
-      const finalArr = arr.slice().reverse();
-      try {
-        console.table(finalArr.map(r => ({
-          title: r.title,
-          src: r.src,
-          symbols_num: r.symbols_num,
-          textPreview: r.text.slice(0,120).replace(/\s+/g," ")
-        })));
-      } catch { console.log(finalArr); }
-      window.__scrapedPosts = finalArr;
-      return finalArr;
-    }
   };
+
 
   /* ---------- scrapeTopicFirstPostLinks - парсинг первых постов топиков ---------- */
   /**
@@ -691,27 +472,30 @@
    * @param {Object} [options]
    * @param {number} [options.maxPages=999]
    * @param {number} [options.delayMs=300]
-   * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
-   * @returns {Promise<Array<string>>}
+   * @returns {Promise<Array<string>>} список ссылок вида ...viewtopic.php?pid=K#pK
    */
-  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300} = {}) {
+  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(
+    author,
+    forums,
+    { maxPages = 999, delayMs = 300 } = {}
+  ) {
     if (!author) throw new Error("author обязателен");
     if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
 
     const forumsParam = forums.join(",");
     const basePath = "/search.php";
+    const targetAuthor = author;
 
     const buildSearchUrl = (p) => {
-
+      // используем старый «совместимый» формат: forum=, show_as=topics
       const params = [
-        ['action', 'search'],
-        ['author', encodeForSearch(author.trim())],
-        ['forums', forumsParam],
+        ['action',   'search'],
+        ['author',   encodeForSearch(targetAuthor.trim())],
+        ['forum',    forumsParam],
         ['sort_dir', 'DESC'],
-        ['show_as', 'topics'],
-        ['p', String(p)]
+        ['show_as',  'topics'],
+        ['p',        String(p)],
       ];
-
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
       console.log("[scrapeTopicFirstPostLinks] search params:", `?${query}`);
       return new URL(`${basePath}?${query}`, location.origin).toString();
@@ -801,7 +585,7 @@
     const links1 = extractTopicPageLinks(doc1);
     const sig1 = hash(links1.join("\n"));
     const topics = [...links1];
-    await FMV.sleep(delayMs);
+    await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
 
     for (let p = 2; p <= maxPages; p++) {
       const doc = await getDoc(buildSearchUrl(p));
@@ -809,7 +593,7 @@
       const sig = hash(links.join("\n"));
       if (sig === sig1) break;
       topics.push(...links);
-      await FMV.sleep(delayMs);
+      await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
     }
 
     const uniqTopics = [...new Set(topics)];
@@ -821,7 +605,7 @@
         const doc = await getDoc(topicUrl);
         const perm = findFirstPostPermalink(doc, topicUrl);
         if (perm) {
-          // преобразуем в формат с pid=K#pK
+          // -> формат pid=K#pK
           const m = perm.match(/#p(\d+)/);
           if (m) {
             const pid = m[1];
@@ -834,15 +618,249 @@
           }
         }
       } catch {}
-      await FMV.sleep(delayMs);
+      await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
     }
 
     window.__scrapedTopicFirstPosts = firstPostLinks;
     return firstPostLinks;
   };
 
-})();
+  /* ---------- scrapePosts - парсинг постов автора ---------- */
+  /**
+   * Парсит посты автора из результатов поиска
+   * @param {string} author - Имя автора (обязательно)
+   * @param {Array<string>|string} forums - Список ID форумов (обязательно)
+   * @param {Object} [options]
+   * @param {boolean} [options.stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
+   * @param {string}  [options.last_src=""] - Пост-граница; сам пост не обрабатываем
+   * @param {string}  [options.title_prefix=""] - Начало названия поста для фильтрации
+   * @param {number}  [options.maxPages=999]
+   * @param {number}  [options.delayMs=300]
+   * @param {string}  [options.keywords=""] - Дополнительные ключевые слова для поиска
+   * @param {boolean} [options.comments_only=false] - Если true, исключаем первые посты топиков
+   * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
+   */
+  window.scrapePosts = async function scrapePosts(
+    author,
+    forums,
+    {
+      stopOnFirstNonEmpty = false,
+      last_src = "",
+      title_prefix = "",
+      maxPages = 999,
+      delayMs = 300,
+      keywords = "",
+      comments_only = false,
+    } = {}
+  ) {
+    if (!author) throw new Error("author обязателен");
+    if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
 
+    const forumsParam   = Array.isArray(forums) ? forums.join(",") : String(forums);
+    const keywordsRaw   = String(keywords ?? "").trim();
+    const titlePrefixLC = String(title_prefix || "").trim().toLocaleLowerCase('ru');
+
+    const basePath = "/search.php";
+
+    // --- нормализация ссылки поста к ключу вида "pid=K#pK" (для сравнения/исключения)
+    function toPidHashFormat(hrefAbs) {
+      try {
+        const u = new URL(hrefAbs, location.href);
+        const mHash = u.hash && u.hash.match(/^#p(\d+)$/);
+        if (mHash) {
+          const pid = mHash[1];
+          return `pid=${pid}#p${pid}`;
+        }
+        const pid = u.searchParams.get('pid');
+        if (pid) return `pid=${pid}#p${pid}`;
+        const p = u.searchParams.get('p');
+        if (p) return `pid=${p}#p${p}`;
+        return u.toString();
+      } catch {
+        return hrefAbs;
+      }
+    }
+
+    // --- извлечь "сырые" src для сигнатуры (без фильтров)
+    function extractRawSrcs(doc) {
+      const out = [];
+      for (const post of doc.querySelectorAll('.post')) {
+        const span = post.querySelector('h3 > span');
+        const a = span ? span.querySelectorAll('a') : [];
+        const href = a[2]?.getAttribute('href');
+        if (href) out.push(new URL(href, location.href).href);
+      }
+      return out;
+    }
+
+    const hash = (s) => { let h=0; for (const c of s) { h=((h<<5)-h)+c.charCodeAt(0); h|=0; } return h; };
+    const pageSignature = (items) => hash(items.join("\n"));
+
+    const buildUrl = (p) => {
+      const params = [
+        ['action',   'search'],
+        ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],
+        ['author',   encodeForSearch(author.trim())],
+        ['forum',    forumsParam],
+        ['search_in','0'],
+        ['sort_by',  '0'],
+        ['sort_dir', 'DESC'],
+        ['show_as',  'posts'],
+        ['search',   encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
+        ['p',        String(p)]
+      ].filter(([_, v]) => v !== '');
+
+      const query = params.map(([k, v]) => `${k}=${v}`).join('&');
+      console.log("[scrapePosts] search params:", `?${query}`);
+      return new URL(`${basePath}?${query}`, location.origin).toString();
+    };
+
+    async function getDoc(url) {
+      if (window.FMV?.fetchDoc) return await window.FMV.fetchDoc(url);
+      if (typeof fetchCP1251Doc === "function") return await fetchCP1251Doc(url);
+      if (typeof fetchHtml === "function") {
+        const html = await fetchHtml(url);
+        return new DOMParser().parseFromString(html, "text/html");
+      }
+      const res = await fetch(url, { credentials: "include" });
+      const html = await res.text();
+      return new DOMParser().parseFromString(html, "text/html");
+    }
+
+    // ---------- HTML → чистый текст ----------
+    const htmlToMultilineText = (html = "") => {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+
+      // скрытые цитаты -> только blockquote
+      tmp.querySelectorAll(".quote-box.hide-box").forEach(box => {
+        const bq = box.querySelector("blockquote");
+        if (bq) { const repl = document.createElement("div"); repl.innerHTML = bq.innerHTML; box.replaceWith(repl); }
+      });
+      // убрать шапки цитат
+      tmp.querySelectorAll("cite").forEach(n => n.remove());
+      // code-box -> только текст из <pre>
+      tmp.querySelectorAll(".code-box").forEach(box => {
+        const pre = box.querySelector("pre"); const codeText = pre ? pre.textContent : "";
+        const repl = document.createElement("div"); repl.textContent = codeText || ""; box.replaceWith(repl);
+      });
+      // служебные/скрытые
+      tmp.querySelectorAll(".custom_tag, .hidden_tag, characters, location, order").forEach(n => n.remove());
+      // script type="text/html" -> парсим и соблюдаем <p>/<br>
+      tmp.querySelectorAll('script[type="text/html"]').forEach(s => {
+        const innerTmp = document.createElement("div"); innerTmp.innerHTML = s.textContent || "";
+        innerTmp.querySelectorAll("p, br").forEach(el => el.insertAdjacentText("afterend", "\n"));
+        let t = (innerTmp.textContent || "").replace(/\u00A0/g, " ").replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n");
+        s.insertAdjacentText("beforebegin", t ? `\n${t}\n` : ""); s.remove();
+      });
+      // переносы для блочных
+      const blockTags = ["ADDRESS","ARTICLE","ASIDE","BLOCKQUOTE","DIV","DL","DT","DD","FIELDSET","FIGCAPTION","FIGURE","FOOTER","FORM","H1","H2","H3","H4","H5","H6","HEADER","HR","LI","MAIN","NAV","OL","P","PRE","SECTION","TABLE","THEAD","TBODY","TFOOT","TR","UL","BR"];
+      tmp.querySelectorAll(blockTags.join(",")).forEach(el => { if (el.tagName==="BR") el.insertAdjacentText("beforebegin","\n"); else el.insertAdjacentText("afterend","\n"); });
+
+      // нормализация
+      let t = (tmp.textContent || "").replace(/\u00A0/g," ");
+      t = t.replace(/\[\/?indent\]/gi,"").replace(/\[\/?float(?:=[^\]]+)?\]/gi,"").replace(/\[DiceFM[^\]]*?\]/gi,"");
+      t = t.replace(/[ \t]+\n/g,"\n").replace(/\n[ \t]+/g,"\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n");
+
+      const out=[]; for (const raw of t.split("\n")) { const line = raw.trim(); if (line==="") { if (out.length && out[out.length-1] !== "") out.push(""); } else out.push(line); }
+      return out.join("\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n").replace(/^\n+|\n+$/g,"").trim();
+    };
+    const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
+
+    // ----- извлечение одного поста -----
+    const extractOne = (post) => {
+      const span = post.querySelector("h3 > span");
+      const a = span ? span.querySelectorAll("a") : [];
+      // title в нижнем регистре для сопоставления
+      const title = (a[1]?.textContent?.trim() || "").toLocaleLowerCase('ru');
+      const rawHref = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
+      const src     = rawHref ? toPidHashFormat(rawHref) : "";
+      const contentEl = post.querySelector(".post-content");
+      let html = contentEl?.innerHTML?.trim() || "";
+      html = expandBBHtmlToText(html);
+      const text = htmlToMultilineText(html);
+      return { title, src, text, html, symbols_num: text.length };
+    };
+
+    // ----- фильтрация по title_prefix -----
+    const titleMatchesPrefix = (t) => {
+      if (!titlePrefixLC) return true;
+      return t.startsWith(titlePrefixLC);
+    };
+
+    // предварительно соберём Set ссылок первых постов (для comments_only)
+    let excludeFirstPosts = new Set();
+    if (comments_only && typeof window.scrapeTopicFirstPostLinks === 'function') {
+      try {
+        const forumsArr = Array.isArray(forums) ? forums : [forums];
+        const firstLinks = await window.scrapeTopicFirstPostLinks(author, forumsArr, { maxPages, delayMs });
+        excludeFirstPosts = new Set(firstLinks.map(toPidHashFormat));
+      } catch (e) {
+        console.warn('[scrapePosts] cannot preload first-post links:', e);
+      }
+    }
+
+    // ----- список постов с применением фильтров -----
+    const extractPosts = (doc) => {
+      const all = [...doc.querySelectorAll(".post")].map(extractOne);
+      let list = all.filter(p => titleMatchesPrefix(p.title));
+      if (comments_only && excludeFirstPosts.size) {
+        list = list.filter(p => !excludeFirstPosts.has(p.src));
+      }
+      return list;
+    };
+
+
+    const lastSrcKey = last_src ? toPidHashFormat(last_src) : "";
+
+    async function collectUpTo(maxResults) {
+      const acc = [];
+
+      const doc1 = await getDoc(buildUrl(1));
+      const baseSig = pageSignature(extractRawSrcs(doc1));
+
+      for (let p = 1; p <= maxPages; p++) {
+        const doc   = (p === 1) ? doc1 : await getDoc(buildUrl(p));
+        const posts = extractPosts(doc);                 // уже отфильтрованные (prefix, comments_only, exclude)
+        const sig   = pageSignature(extractRawSrcs(doc));
+        if (p > 1 && sig === baseSig) break;            // повтор страницы — стоп
+
+        for (const post of posts) {
+          if (lastSrcKey && post.src === lastSrcKey) {
+            return finalize(acc);                       // граница — отдаём то, что есть (или [])
+          }
+          if (post.symbols_num > 0) {
+            acc.push(post);
+            if (acc.length >= maxResults) {
+              return finalize(acc);                     // набрали нужное кол-во
+            }
+          }
+        }
+        await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
+      }
+      return finalize(acc);
+    }
+
+    // Вместо двух режимов:
+    const wanted = stopOnFirstNonEmpty ? 1 : Number.POSITIVE_INFINITY;
+    return await collectUpTo(wanted);
+
+    // ------ финализация: reverse + вывод ------
+    function finalize(arr) {
+      const finalArr = arr.slice().reverse();
+      try {
+        console.table(finalArr.map(r => ({
+          title: r.title,
+          src: r.src,
+          symbols_num: r.symbols_num,
+          textPreview: r.text.slice(0,120).replace(/\s+/g," ")
+        })));
+      } catch { console.log(finalArr); }
+      window.__scrapedPosts = finalArr;
+      return finalArr;
+    }
+  };
+});
 /* MODULE 2: common_users.js (FMV.fetchUsers) */
 // ===== FMV.fetchUsers - обёртка вокруг window.scrapeUsers =====
 (function () {

@@ -479,9 +479,10 @@
    * Парсит посты автора из результатов поиска
    * @param {string} author - Имя автора (обязательно)
    * @param {Array<string>|string} forums - Список ID форумов (обязательно)
-   * @param {boolean} [stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
-   * @param {string} [last_src=""] - Пост-граница; сам пост не обрабатываем
    * @param {Object} [options]
+   * @param {boolean} [options.stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
+   * @param {string} [options.last_src=""] - Пост-граница; сам пост не обрабатываем
+   * @param {string} [options.text_prefix=""] - Начало названия поста для фильтрации
    * @param {number} [options.maxPages=999]
    * @param {number} [options.delayMs=300]
    * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
@@ -490,13 +491,13 @@
   window.scrapePosts = async function scrapePosts(
     author,
     forums,
-    { stopOnFirstNonEmpty = false, last_src = "", maxPages = 999, delayMs = 300, keywords = "" } = {}
+    { stopOnFirstNonEmpty = false, last_src = "", title_prefix = "", maxPages = 999, delayMs = 300, keywords = "" } = {}
   ) {
     if (!author) throw new Error("author обязателен");
     if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
-    const basePath    = "/search.php";
     const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
     const keywordsRaw = String(keywords ?? "").trim();
+    const titlePrefixLC = String(title_prefix || "").trim().toLowerCase();
 
     const buildUrl = (p) => {
       const params = [
@@ -571,10 +572,12 @@
     };
     const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
 
+    // ----- извлечение одного поста -----
     const extractOne = (post) => {
       const span = post.querySelector("h3 > span");
       const a = span ? span.querySelectorAll("a") : [];
-      const title = a[1]?.textContent?.trim() || "";
+      // title в НИЖНЕМ регистре (как ты просила)
+      const title = (a[1]?.textContent?.trim() || "").toLowerCase();
       const src   = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
       const contentEl = post.querySelector(".post-content");
       let html = contentEl?.innerHTML?.trim() || "";
@@ -582,7 +585,19 @@
       const text = htmlToMultilineText(html);
       return { title, src, text, html, symbols_num: text.length };
     };
-    const extractPosts = (doc) => [...doc.querySelectorAll(".post")].map(extractOne);
+
+    // ----- фильтрация по title_prefix -----
+    const titleMatchesPrefix = (t) => {
+      if (!titlePrefixLC) return true;            // пустой префикс -> пропускаем всё
+      return t.startsWith(titlePrefixLC);         // строго "начинается с"
+    };
+
+    // ----- список постов с применением фильтра по заголовку -----
+    const extractPosts = (doc) => {
+      const all = [...doc.querySelectorAll(".post")].map(extractOne);
+      // ВАЖНО: last_src и пр. применяются только к отфильтрованным постам
+      return all.filter(p => titleMatchesPrefix(p.title));
+    };
     const pageSignature = (items) => hash(items.map(i=>i.src).join("\n"));
 
     // ---------- режим A: первый непустой ДО last_src ----------

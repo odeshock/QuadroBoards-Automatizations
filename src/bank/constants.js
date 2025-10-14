@@ -92,6 +92,7 @@ export const FORM_BG_PRESENT = 'form-bg-present';
 
 // Системные
 export const FORM_GIFT_DISCOUNT = '#gift-discount';
+export const FORM_PERSONAL_COUPON = '#personal-coupon';
 
 // ============================================================================
 // ГРУППЫ СЕЛЕКТОРОВ
@@ -246,6 +247,8 @@ export const TEXT_MESSAGES = {
 
   // Заголовки
   AUTO_DISCOUNTS_TITLE: 'Автоматические скидки',
+  PERSONAL_COUPONS_TITLE: 'Купоны',
+  PERSONAL_COUPONS_LABEL: 'Купон',
   CUSTOM_GIFT_TITLE: 'Индивидуальный подарок',
   CUSTOM_ICON_TITLE: 'Индивидуальная иконка',
   CUSTOM_BADGE_TITLE: 'Индивидуальная плашка',

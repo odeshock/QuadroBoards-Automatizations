@@ -49,6 +49,10 @@ export function resetFrozenDiscounts() {
   console.log('❄️➡️🔓 Замороженные скидки сброшены, возврат к обычному режиму');
 }
 
+// Выбранные персональные купоны
+// Массив ID купонов, которые пользователь выбрал для применения
+export const selectedPersonalCoupons = [];
+
 export const buildGroupKey = ({ templateSelector = '', giftId = '' }) => {
   // Для подарков используем templateSelector + giftId
   if (giftId) {
@@ -948,4 +952,50 @@ export function updateAutoPriceAdjustments() {
   } else if (adjustmentGroupIndex !== -1) {
     submissionGroups.splice(adjustmentGroupIndex, 1);
   }
+}
+
+// ============================================================================
+// ПЕРСОНАЛЬНЫЕ КУПОНЫ
+// ============================================================================
+
+/**
+ * Получает активные персональные купоны из window.PERSONAL_DISCOUNTS
+ * Фильтрует по expiresAt (купоны, которые еще не истекли или без даты истечения)
+ * @returns {Array} - массив активных купонов
+ */
+export function getActivePersonalCoupons() {
+  if (typeof window.PERSONAL_DISCOUNTS === 'undefined' || !Array.isArray(window.PERSONAL_DISCOUNTS)) {
+    return [];
+  }
+
+  return window.PERSONAL_DISCOUNTS.filter(coupon => {
+    // Если нет expiresAt, купон активен
+    if (!coupon.expiresAt) return true;
+
+    // Проверяем, не истек ли купон (аналогично isDiscountExpired)
+    const now = new Date();
+    const expiryDateString = `${coupon.expiresAt}T23:59:59`;
+    const expiryDate = new Date(expiryDateString);
+
+    // Московское время = UTC+3
+    const moscowOffset = 3 * 60;
+    const localOffset = now.getTimezoneOffset();
+    const moscowTime = new Date(now.getTime() + (moscowOffset + localOffset) * 60 * 1000);
+
+    return moscowTime < expiryDate; // Купон активен если еще не истек
+  });
+}
+
+/**
+ * Применяет персональные купоны к операциям
+ * Вызывается после операций, но ДО корректировок
+ * Порядок применения: 1) item 2) fixed 3) adjustments 4) percent
+ */
+export function updatePersonalCoupons() {
+  // TODO: Реализовать в следующей сессии
+  // 1. Получить активные купоны
+  // 2. Фильтровать по selectedPersonalCoupons
+  // 3. Применить в порядке: item -> fixed -> adjustments -> percent
+  // 4. Создать группу с entries для каждого примененного купона
+  console.log('🎫 updatePersonalCoupons: функция будет реализована в следующей сессии');
 }

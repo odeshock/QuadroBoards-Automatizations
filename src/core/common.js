@@ -441,12 +441,27 @@
    * @param {string} text - Текст для кодирования
    * @returns {string}
    */
+  // window.encodeForSearch = function encodeForSearch(text) {
+  //   return String(text ?? '')
+  //     .split('')
+  //     .map(ch => (/[A-Za-z0-9'`~_]/.test(ch) ? ch : encodeURIComponent(ch)))
+  //     .join('');
+  // };
+
   window.encodeForSearch = function encodeForSearch(text) {
-    return String(text ?? '')
-      .split('')
-      .map(ch => (/[A-Za-z0-9'`~_]/.test(ch) ? ch : encodeURIComponent(ch)))
-      .join('');
-  };
+  // создаём текстовый encoder для Windows-1251
+  const encoder = new TextEncoder('windows-1251', { NONSTANDARD_allowLegacyEncoding: true });
+  const bytes = encoder.encode(text);
+
+  // преобразуем байты в URL-кодировку (%XX)
+  return Array.from(bytes)
+    .map(b => {
+      // пробел → '+', всё остальное в %HEX
+      return b === 0x20 ? '+' : '%' + b.toString(16).toUpperCase().padStart(2, '0');
+    })
+    .join('');
+}
+
 
   /* ---------- scrapePosts - парсинг постов автора ---------- */
   /**
@@ -464,9 +479,7 @@
   window.scrapePosts = async function scrapePosts(
     author,
     forums,
-    stopOnFirstNonEmpty = false,
-    last_src = "",
-    { maxPages = 999, delayMs = 300, keywords = "" } = {}
+    { stopOnFirstNonEmpty = false, last_src = "", maxPages = 999, delayMs = 300, keywords = "" } = {}
   ) {
     if (!author) throw new Error("author обязателен");
     if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
@@ -483,23 +496,17 @@
 
       const params = new URLSearchParams({
         action: "search",
-        author: String(author ?? '')
-          .trim()
-          .split(/\s+/)
-          .map(encodeWord)
-          .join(' '),
+        author: encodeWord(author.trim()),
         forums: forumsParam,
         sort_dir: "DESC",
         p: String(p)
       });
       if (keywordsRaw) {
-        const encodedKeywords = keywordsRaw
-          .split(/\s+/)
-          .map(word => (word === "OR" || word === "AND") ? word : encodeWord(word))
-          .join(" ");
+        const encodedKeywords = encodeWord(keywords().trim())
         params.set("keywords", encodedKeywords);
       }
       u.search = params.toString();
+      console.log("[scrapePosts] search params:", u.search);
       return u.toString();
     };
 
@@ -658,7 +665,7 @@
    * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
    * @returns {Promise<Array<string>>}
    */
-  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300, keywords = "" } = {}) {
+  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300 } = {}) {
     if (!author) throw new Error("author обязателен");
     if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
 
@@ -675,24 +682,14 @@
 
       const params = new URLSearchParams({
         action: "search",
-        author: String(author ?? '')
-          .trim()
-          .split(/\s+/)
-          .map(encodeWord)
-          .join(' '),
+        author: encodeWord(author.trim()),
         forums: forumsParam,
         sort_dir: "DESC",
         show_as: "topics",
         p: String(p)
       });
-      if (keywordsRaw) {
-        const encodedKeywords = keywordsRaw
-          .split(/\s+/)
-          .map(word => (word === "OR" || word === "AND") ? word : encodeWord(word))
-          .join(" ");
-        params.set("keywords", encodedKeywords);
-      }
       u.search = params.toString();
+      console.log("[scrapeTopicFirstPostLinks] search params:", u.search);
       return u.toString();
     };
 

@@ -55,7 +55,7 @@
     }
     return false;
   }
-
+  console.log('aga!');
   $(async function () {
     var $slot = insertSlot();
     if (!$slot || !$slot.length) return;
@@ -69,7 +69,7 @@
     }
 
     var forums = Array.isArray(window.BANK_FORUMS) ? window.BANK_FORUMS : [];
-
+    console.log('ny vot');
     try {
       var posts = await window.scrapePosts(
         window.UserLogin,
@@ -87,6 +87,7 @@
       } else {
         setEmpty($slot);
       }
+      console.log("i gde");
     } catch (err) {
       console.error("[bank_last_comment] scrapePosts failed", err);
       setEmpty($slot, "ошибка поиска");

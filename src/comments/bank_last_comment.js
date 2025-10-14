@@ -76,6 +76,8 @@
         }
       );
 
+      console.log(posts);
+
       if (Array.isArray(posts) && posts.length && posts[0]?.src) {
         var href = String(window.SITE_URL || "").replace(/\/$/, "") + "/viewtopic.php?" + posts[0].src;
         setLink($slot, href);

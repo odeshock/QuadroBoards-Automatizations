@@ -2,7 +2,7 @@
 // app.js — Основная точка входа
 // ============================================================================
 
-import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup } from './services.js';
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup, getActivePersonalCoupons, selectedPersonalCoupons } from './services.js';
 import { openModal, closeModal } from './modal/index.js';
 import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
@@ -18,6 +18,7 @@ import {
   FORM_BADGE_CUSTOM,
   FORM_BG_PRESENT,
   FORM_BG_CUSTOM,
+  FORM_PERSONAL_COUPON,
   toSelector
 } from './constants.js';
 import { parseNumericAmount } from './utils.js';
@@ -441,6 +442,27 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
+  // Специальная обработка для формы купонов
+  const isCouponForm = templateSelector === toSelector(FORM_PERSONAL_COUPON);
+  if (isCouponForm) {
+    // Получаем выбранные купоны из чекбоксов
+    const selectedCouponIds = [];
+    formData.forEach((value, key) => {
+      if (key.startsWith('coupon_') && value) {
+        selectedCouponIds.push(value);
+      }
+    });
+
+    // Обновляем глобальный массив выбранных купонов
+    selectedPersonalCoupons.length = 0; // Очищаем массив
+    selectedPersonalCoupons.push(...selectedCouponIds);
+
+    // Закрываем модалку и пересчитываем купоны
+    handleCloseModal();
+    renderLog(log);
+    return;
+  }
+
   // amount используется только для отображения в UI
   const displayAmount = form.dataset.amount || '';
 
@@ -607,6 +629,61 @@ function renderExpenseList() {
   });
 }
 
+function renderPersonalCoupons() {
+  // Создаём отдельную панель для купонов
+  const grid = document.querySelector('#tab-bank .grid');
+  if (!grid) return;
+
+  // Создаём панель купонов
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  panel.setAttribute('aria-labelledby', 'coupons-title');
+
+  const header = document.createElement('header');
+  const title = document.createElement('h2');
+  title.id = 'coupons-title';
+  title.textContent = 'Купоны';
+  header.appendChild(title);
+
+  const list = document.createElement('div');
+  list.className = 'list';
+  list.setAttribute('role', 'list');
+
+  // Создаём кнопку купонов
+  const div = document.createElement('div');
+  div.className = 'item coupon-item';
+  div.setAttribute('role', 'listitem');
+
+  const btn = document.createElement('button');
+  btn.className = 'btn-add btn-coupon';
+  btn.setAttribute('data-form', toSelector(FORM_PERSONAL_COUPON));
+  btn.setAttribute('data-kind', 'income');
+  btn.setAttribute('data-amount', '');
+  btn.setAttribute('data-title', 'Купоны');
+  btn.textContent = '🎟️'; // иконка билета/купона
+  btn.title = 'Выбрать купоны';
+
+  // Создаём структуру элемента
+  const titleDiv = document.createElement('div');
+  titleDiv.className = 'title';
+  titleDiv.textContent = 'Мои купоны';
+
+  const priceDiv = document.createElement('div');
+  priceDiv.className = 'price';
+  priceDiv.textContent = 'выбрать/использовать';
+
+  div.appendChild(titleDiv);
+  div.appendChild(priceDiv);
+  div.appendChild(btn);
+
+  list.appendChild(div);
+  panel.appendChild(header);
+  panel.appendChild(list);
+
+  // Вставляем панель купонов после панели расходов
+  grid.appendChild(panel);
+}
+
 function renderGiftsList() {
   const container = document.querySelector('#tab-gifts .gift-grid');
   if (!container) return;
@@ -702,6 +779,7 @@ injectTemplates();
 // Рендерим списки
 renderIncomeList();
 renderExpenseList();
+renderPersonalCoupons();
 renderGiftsList();
 renderDesignLists();
 

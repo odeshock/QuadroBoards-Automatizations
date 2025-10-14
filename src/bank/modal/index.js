@@ -57,6 +57,10 @@ import {
   handleBannerForms
 } from './bannerForms.js';
 
+import {
+  handlePersonalCouponsForm
+} from './personalCouponsForms.js';
+
 export function openModal({
   backdrop,
   modalTitle,
@@ -183,6 +187,12 @@ export function openModal({
   // Открываем backdrop СРАЗУ после установки контента
   backdrop.setAttribute('open', '');
   backdrop.removeAttribute('aria-hidden');
+
+// === PERSONAL COUPONS: персональные купоны ===
+const personalCouponsResult = handlePersonalCouponsForm({ template, modalFields, btnSubmit });
+if (personalCouponsResult.handled) {
+  return { counterWatcher };
+}
 
 // === BANNER: баннеры Рено и Маяк ===
 const bannerResult = handleBannerForms({ template, modalFields, btnSubmit, counterWatcher, data });

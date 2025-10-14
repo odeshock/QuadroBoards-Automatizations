@@ -441,52 +441,89 @@
     };
   };
 
-  /* ---------- encodeWithSep - кодирование для поиска ---------- */
+  /* ---------- encode - упрощённое кодирование для поиска ---------- */
   /**
-   * Кодирует текст для поисковых запросов
+   * Кодирует строку для поисковых запросов
    * @param {string} text - Текст для кодирования
-   * @param {boolean} [with_and=false] - Использовать +AND+ вместо +
    * @returns {string}
    */
-  window.encodeWithSep = function encodeWithSep(text, with_and = false) {
-    const words = text.trim().split(/\s+/);
+  
+  window.encodeForSearch = function encodeForSearch(text) {
+    let out = '';
+    for (const ch of text) {
+      const cp = ch.codePointAt(0);
 
-    // Кодируем каждый символ, кроме безопасных
-    const encodedWords = words.map(w =>
-      w.split('').map(ch => {
-        // оставляем только латиницу, цифры, апостроф, обратную кавычку, тильду и подчёркивание
-        // дефис НЕ включаем, чтобы он стал %2D
-        if (/[A-Za-z0-9'`~_]/.test(ch)) return ch;
-        return encodeURIComponent(ch);
-      }).join('')
-    );
+      let b = null;
+      if (cp <= 0x7F) {
+        // ASCII совпадает в UTF-8 и CP1251
+        b = cp;
+      } else if (cp >= 0x0410 && cp <= 0x044F) {
+        // Кириллица А(0x0410)…я(0x044F) -> 0xC0…0xFF
+        b = 0xC0 + (cp - 0x0410);
+      } else if (cp === 0x0401) {        // Ё
+        b = 0xA8;
+      } else if (cp === 0x0451) {        // ё
+        b = 0xB8;
+      } else {
+        // Здесь можно:
+        // 1) кинуть ошибку,
+        // 2) заменить на '?',
+        // 3) добавить маппинг для нужных тебе символов.
+        // Я выберу '?':
+        b = 0x3F; // '?'
+      }
 
-    const merger = with_and ? '+AND+' : '+';
-    return encodedWords.join(merger);
-  };
+      out += (b === 0x20) ? '+' : '%' + b.toString(16).toUpperCase().padStart(2, '0');
+    }
+    return out;
+  }
+
+
 
   /* ---------- scrapePosts - парсинг постов автора ---------- */
   /**
    * Парсит посты автора из результатов поиска
    * @param {string} author - Имя автора (обязательно)
    * @param {Array<string>|string} forums - Список ID форумов (обязательно)
-   * @param {boolean} [stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
-   * @param {string} [last_src=""] - Пост-граница; сам пост не обрабатываем
    * @param {Object} [options]
+   * @param {boolean} [options.stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
+   * @param {string} [options.last_src=""] - Пост-граница; сам пост не обрабатываем
+   * @param {string} [options.text_prefix=""] - Начало названия поста для фильтрации
    * @param {number} [options.maxPages=999]
    * @param {number} [options.delayMs=300]
+   * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
    * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
    */
-  window.scrapePosts = async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src = "", { maxPages = 999, delayMs = 300 } = {}) {
+  window.scrapePosts = async function scrapePosts(
+    author,
+    forums,
+    { stopOnFirstNonEmpty = false, last_src = "", title_prefix = "", maxPages = 999, delayMs = 300, keywords = "" } = {}
+  ) {
     if (!author) throw new Error("author обязателен");
     if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
-    const basePath    = "/search.php";
     const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
+    const keywordsRaw = String(keywords ?? "").trim();
+    const titlePrefixLC = String(title_prefix || "").trim().toLowerCase();
+
     const buildUrl = (p) => {
-      const u = new URL(basePath, location.origin);
-      u.search = new URLSearchParams({ action:"search", author:window.encodeWithSep(author), forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
-      return u.toString();
+      const params = [
+        ['action', 'search'],
+        ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''], // можно убрать пару, если пусто
+        ['author', encodeForSearch(author.trim())],
+        ['forum', forumsParam],            // <— было forums
+        ['search_in', '0'],
+        ['sort_by', '0'],
+        ['sort_dir', 'DESC'],
+        ['show_as', 'posts'],
+        ['search', encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
+        ['p', String(p)]
+      ].filter(([_, v]) => v !== ''); // не отправляем пустые
+
+      const query = params.map(([k, v]) => `${k}=${v}`).join('&');
+      console.log("[scrapePosts] search params:", `?${query}`);
+      return new URL(`/search.php?${query}`, location.origin).toString();
     };
+
 
     async function getDoc(url) {
       if (window.FMV?.fetchDoc) return await window.FMV.fetchDoc(url);
@@ -541,10 +578,12 @@
     };
     const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
 
+    // ----- извлечение одного поста -----
     const extractOne = (post) => {
       const span = post.querySelector("h3 > span");
       const a = span ? span.querySelectorAll("a") : [];
-      const title = a[1]?.textContent?.trim() || "";
+      // title в НИЖНЕМ регистре (как ты просила)
+      const title = (a[1]?.textContent?.trim() || "").toLowerCase();
       const src   = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
       const contentEl = post.querySelector(".post-content");
       let html = contentEl?.innerHTML?.trim() || "";
@@ -552,7 +591,19 @@
       const text = htmlToMultilineText(html);
       return { title, src, text, html, symbols_num: text.length };
     };
-    const extractPosts = (doc) => [...doc.querySelectorAll(".post")].map(extractOne);
+
+    // ----- фильтрация по title_prefix -----
+    const titleMatchesPrefix = (t) => {
+      if (!titlePrefixLC) return true;            // пустой префикс -> пропускаем всё
+      return t.startsWith(titlePrefixLC);         // строго "начинается с"
+    };
+
+    // ----- список постов с применением фильтра по заголовку -----
+    const extractPosts = (doc) => {
+      const all = [...doc.querySelectorAll(".post")].map(extractOne);
+      // ВАЖНО: last_src и пр. применяются только к отфильтрованным постам
+      return all.filter(p => titleMatchesPrefix(p.title));
+    };
     const pageSignature = (items) => hash(items.map(i=>i.src).join("\n"));
 
     // ---------- режим A: первый непустой ДО last_src ----------
@@ -640,9 +691,10 @@
    * @param {Object} [options]
    * @param {number} [options.maxPages=999]
    * @param {number} [options.delayMs=300]
+   * @param {string} [options.keywords=""] - Дополнительные ключевые слова для поиска
    * @returns {Promise<Array<string>>}
    */
-  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300 } = {}) {
+  window.scrapeTopicFirstPostLinks = async function scrapeTopicFirstPostLinks(author, forums, { maxPages = 999, delayMs = 300} = {}) {
     if (!author) throw new Error("author обязателен");
     if (!Array.isArray(forums) || forums.length === 0) throw new Error("forums обязателен и должен быть массивом");
 
@@ -650,12 +702,19 @@
     const basePath = "/search.php";
 
     const buildSearchUrl = (p) => {
-      const u = new URL(basePath, location.origin);
-      u.search = new URLSearchParams({
-        action: "search", author:window.encodeWithSep(author), forums: forumsParam,
-        sort_dir: "DESC", show_as: "topics", p: String(p)
-      }).toString();
-      return u.toString();
+
+      const params = [
+        ['action', 'search'],
+        ['author', encodeForSearch(author.trim())],
+        ['forums', forumsParam],
+        ['sort_dir', 'DESC'],
+        ['show_as', 'topics'],
+        ['p', String(p)]
+      ];
+
+      const query = params.map(([k, v]) => `${k}=${v}`).join('&');
+      console.log("[scrapeTopicFirstPostLinks] search params:", `?${query}`);
+      return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
     async function getDoc(url) {

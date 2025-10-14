@@ -23,7 +23,8 @@ import {
   FORM_GIFT_CUSTOM, FORM_GIFT_PRESENT,
   FORM_ICON_CUSTOM, FORM_ICON_PRESENT,
   FORM_BADGE_CUSTOM, FORM_BADGE_PRESENT,
-  FORM_BG_CUSTOM, FORM_BG_PRESENT
+  FORM_BG_CUSTOM, FORM_BG_PRESENT,
+  FORM_PERSONAL_COUPON
 } from './constants.js';
 
 // Вспомогательные функции для создания шаблонов
@@ -206,7 +207,10 @@ export const formTemplates = {
 
   // ОФОРМЛЕНИЕ - Фоны
   [FORM_BG_CUSTOM]: waitingTemplate(TEXT_MESSAGES.DESIGN_INFO),
-  [FORM_BG_PRESENT]: waitingTemplate('')
+  [FORM_BG_PRESENT]: waitingTemplate(''),
+
+  // КУПОНЫ
+  [FORM_PERSONAL_COUPON]: waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT)
 };
 
 // Список форм с data-info атрибутом

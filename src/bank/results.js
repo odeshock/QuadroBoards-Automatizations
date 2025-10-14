@@ -13,7 +13,8 @@ import {
   submissionGroups,
   formatEntryKey,
   updateAutoDiscounts,
-  updateAutoPriceAdjustments
+  updateAutoPriceAdjustments,
+  updatePersonalCoupons
 } from './services.js';
 
 import {
@@ -115,7 +116,7 @@ function buildFullOperationsData() {
     const operation = {
       title: group.title,
       form_id: group.templateSelector?.replace('#', '') || '',
-      type: group.isDiscount ? 'discount' : (group.isPriceAdjustment ? 'adjustment' : 'operation'),
+      type: group.isDiscount ? 'discount' : (group.isPriceAdjustment ? 'adjustment' : (group.isPersonalCoupon ? 'coupon' : 'operation')),
       entries: []
     };
 
@@ -126,8 +127,8 @@ function buildFullOperationsData() {
         multiplier: entry.multiplier
       };
 
-      // Для скидок и корректировок сохраняем template_id (содержит ID правила)
-      if (group.isDiscount || group.isPriceAdjustment) {
+      // Для скидок, корректировок и купонов сохраняем template_id (содержит ID правила/купона)
+      if (group.isDiscount || group.isPriceAdjustment || group.isPersonalCoupon) {
         entryData.template_id = entry.template_id;
       }
 
@@ -622,9 +623,16 @@ function updateButtonStates() {
 // ============================================================================
 
 export function renderLog(log) {
-  // Порядок применения: 1) Персональные купоны 2) Корректировки 3) Автоматические скидки
-  // updatePersonalCoupons(); // TODO: раскомментировать после реализации
+  // Порядок применения:
+  // 1) Персональные купоны (item)
+  // 2) Корректировки цен
+  // 3) Персональные купоны (fixed)
+  // 4) Персональные купоны (percent - после корректировок и fixed)
+  // 5) Автоматические скидки
+  updatePersonalCoupons('item');
   updateAutoPriceAdjustments();
+  updatePersonalCoupons('fixed');
+  updatePersonalCoupons('percent');
   updateAutoDiscounts();
 
   log.innerHTML = '';
@@ -638,21 +646,78 @@ export function renderLog(log) {
     return;
   }
 
-  // Сортируем группы: сначала операции, потом корректировки, потом скидки
+  // Сортируем группы: сначала операции, потом купоны, потом корректировки, потом скидки
   const sortedGroups = [...submissionGroups].sort((a, b) => {
     const aIsDiscount = a.isDiscount || a.templateSelector === '#gift-discount';
     const bIsDiscount = b.isDiscount || b.templateSelector === '#gift-discount';
     const aIsAdjustment = a.isPriceAdjustment || a.templateSelector === '#price-adjustment';
     const bIsAdjustment = b.isPriceAdjustment || b.templateSelector === '#price-adjustment';
+    const aIsPersonalCoupon = a.isPersonalCoupon || a.templateSelector === '#personal-coupon';
+    const bIsPersonalCoupon = b.isPersonalCoupon || b.templateSelector === '#personal-coupon';
 
-    // Сначала обычные операции (0), потом корректировки (1), потом скидки (2)
-    const aOrder = aIsDiscount ? 2 : (aIsAdjustment ? 1 : 0);
-    const bOrder = bIsDiscount ? 2 : (bIsAdjustment ? 1 : 0);
+    // Сначала обычные операции (0), потом купоны (1), потом корректировки (2), потом скидки (3)
+    const aOrder = aIsDiscount ? 3 : (aIsAdjustment ? 2 : (aIsPersonalCoupon ? 1 : 0));
+    const bOrder = bIsDiscount ? 3 : (bIsAdjustment ? 2 : (bIsPersonalCoupon ? 1 : 0));
 
     return aOrder - bOrder;
   });
 
   sortedGroups.forEach((group, index) => {
+    // Добавляем разделители для купонов, корректировок и скидок
+    const isPersonalCoupon = group.isPersonalCoupon || group.templateSelector === '#personal-coupon';
+    const isAdjustment = group.isPriceAdjustment || group.templateSelector === '#price-adjustment';
+    const isDiscount = group.isDiscount || group.templateSelector === '#gift-discount';
+
+    const prevGroup = index > 0 ? sortedGroups[index - 1] : null;
+    const prevIsPersonalCoupon = prevGroup ? (prevGroup.isPersonalCoupon || prevGroup.templateSelector === '#personal-coupon') : false;
+    const prevIsAdjustment = prevGroup ? (prevGroup.isPriceAdjustment || prevGroup.templateSelector === '#price-adjustment') : false;
+    const prevIsDiscount = prevGroup ? (prevGroup.isDiscount || prevGroup.templateSelector === '#gift-discount') : false;
+
+    // Разделитель перед первым купоном
+    if (isPersonalCoupon && !prevIsPersonalCoupon) {
+      const separator = document.createElement('div');
+      separator.className = 'section-separator coupons-separator';
+      separator.style.marginTop = '24px';
+      separator.style.marginBottom = '12px';
+      separator.style.paddingTop = '12px';
+      separator.style.borderTop = '2px solid var(--border-color, #e5e7eb)';
+      separator.style.fontSize = '0.875rem';
+      separator.style.fontWeight = '600';
+      separator.style.color = 'var(--text-muted, #6b7280)';
+      separator.textContent = '🎟️ Купоны';
+      log.appendChild(separator);
+    }
+
+    // Разделитель перед первой корректировкой
+    if (isAdjustment && !prevIsAdjustment) {
+      const separator = document.createElement('div');
+      separator.className = 'section-separator adjustments-separator';
+      separator.style.marginTop = '24px';
+      separator.style.marginBottom = '12px';
+      separator.style.paddingTop = '12px';
+      separator.style.borderTop = '2px solid var(--border-color, #e5e7eb)';
+      separator.style.fontSize = '0.875rem';
+      separator.style.fontWeight = '600';
+      separator.style.color = 'var(--text-muted, #6b7280)';
+      separator.textContent = '🔧 Корректировки';
+      log.appendChild(separator);
+    }
+
+    // Разделитель перед первой скидкой
+    if (isDiscount && !prevIsDiscount) {
+      const separator = document.createElement('div');
+      separator.className = 'section-separator discounts-separator';
+      separator.style.marginTop = '24px';
+      separator.style.marginBottom = '12px';
+      separator.style.paddingTop = '12px';
+      separator.style.borderTop = '2px solid var(--border-color, #e5e7eb)';
+      separator.style.fontSize = '0.875rem';
+      separator.style.fontWeight = '600';
+      separator.style.color = 'var(--text-muted, #6b7280)';
+      separator.textContent = '💰 Автоматические скидки';
+      log.appendChild(separator);
+    }
+
     const entryEl = document.createElement('div');
     entryEl.className = 'entry';
     entryEl.dataset.groupId = group.id;
@@ -984,8 +1049,8 @@ export function renderLog(log) {
       }
     }
 
-    // Для скидок и корректировок не показываем "Записей: X"
-    if (group.entries.length > 1 && !group.isDiscount && !group.isPriceAdjustment) {
+    // Для скидок, корректировок и купонов не показываем "Записей: X"
+    if (group.entries.length > 1 && !group.isDiscount && !group.isPriceAdjustment && !group.isPersonalCoupon) {
       const countMeta = document.createElement('span');
       countMeta.className = 'entry-meta';
       if (totalEntryMultiplier > group.entries.length) {
@@ -996,8 +1061,8 @@ export function renderLog(log) {
       header.appendChild(countMeta);
     }
 
-    // Добавляем кнопки в заголовок для каждой записи (кроме скидок и корректировок)
-    if (!group.isDiscount && !group.isPriceAdjustment) {
+    // Добавляем кнопки в заголовок для каждой записи (кроме скидок, корректировок и купонов)
+    if (!group.isDiscount && !group.isPriceAdjustment && !group.isPersonalCoupon) {
       group.entries.forEach((item) => {
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
@@ -1093,6 +1158,35 @@ export function renderLog(log) {
 
         const calculation = document.createElement('span');
         calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.adjustment_amount || 0)}`;
+
+        li.append(label, calculation);
+        list.appendChild(li);
+      });
+
+      itemEl.appendChild(list);
+      itemsWrap.appendChild(itemEl);
+      entryEl.appendChild(itemsWrap);
+      log.appendChild(entryEl);
+      return;
+    }
+
+    // Для персональных купонов: собираем все в один общий список
+    if (group.isPersonalCoupon) {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'entry-item';
+
+      const list = document.createElement('ol');
+      list.className = 'entry-list';
+
+      group.entries.forEach((item) => {
+        const dataObj = item.data || {};
+        const li = document.createElement('li');
+
+        const label = document.createElement('strong');
+        label.textContent = `${dataObj.coupon_title || 'Купон'}: `;
+
+        const calculation = document.createElement('span');
+        calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.coupon_amount || 0)}`;
 
         li.append(label, calculation);
         list.appendChild(li);

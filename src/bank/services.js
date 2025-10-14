@@ -6,7 +6,9 @@ import { counterPrefixMap } from './config.js';
 import {
   REGEX,
   TEXT_MESSAGES,
-  FORM_GIFT_DISCOUNT
+  FORM_GIFT_DISCOUNT,
+  FORM_PERSONAL_COUPON,
+  toSelector
 } from './constants.js';
 import {
   pad2,
@@ -987,15 +989,306 @@ export function getActivePersonalCoupons() {
 }
 
 /**
- * Применяет персональные купоны к операциям
- * Вызывается после операций, но ДО корректировок
- * Порядок применения: 1) item 2) fixed 3) adjustments 4) percent
+ * Подсчитывает количество товаров/получателей для формы
+ * @param {string} formId - ID формы (без #)
+ * @returns {number} - количество
  */
-export function updatePersonalCoupons() {
-  // TODO: Реализовать в следующей сессии
-  // 1. Получить активные купоны
-  // 2. Фильтровать по selectedPersonalCoupons
-  // 3. Применить в порядке: item -> fixed -> adjustments -> percent
-  // 4. Создать группу с entries для каждого примененного купона
-  console.log('🎫 updatePersonalCoupons: функция будет реализована в следующей сессии');
+export function countItemsForForm(formId) {
+  const formSelector = toSelector(formId);
+  let totalItems = 0;
+
+  submissionGroups.forEach(group => {
+    if (group.templateSelector === formSelector && !group.isDiscount && !group.isPriceAdjustment && !group.isPersonalCoupon) {
+      group.entries.forEach(entry => {
+        const dataObj = entry.data || {};
+
+        // Подсчёт получателей
+        const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
+        const recipientCount = recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
+
+        // Подсчёт через quantity
+        const quantityKeys = Object.keys(dataObj).filter(k => /^quantity_\d+$/.test(k));
+        let totalQuantity = 0;
+        quantityKeys.forEach(key => {
+          const idx = key.match(/^quantity_(\d+)$/)[1];
+          const recipientKey = `recipient_${idx}`;
+          if (String(dataObj[recipientKey] || '').trim()) {
+            totalQuantity += Number(dataObj[key]) || 0;
+          }
+        });
+
+        if (totalQuantity === 0 && dataObj.quantity) {
+          totalQuantity = Number(dataObj.quantity) || 0;
+        }
+
+        const items = totalQuantity > 0 ? totalQuantity : recipientCount;
+        const multiplier = Number(entry.multiplier) || 1;
+        totalItems += items * multiplier;
+      });
+    }
+  });
+
+  return totalItems;
+}
+
+/**
+ * Получает стоимость операций для формы (до применения купонов)
+ * @param {string} formId - ID формы (без #)
+ * @returns {number} - стоимость
+ */
+export function getCostForForm(formId) {
+  const formSelector = toSelector(formId);
+  let totalCost = 0;
+
+  submissionGroups.forEach(group => {
+    if (group.templateSelector === formSelector && !group.isDiscount && !group.isPriceAdjustment && !group.isPersonalCoupon) {
+      totalCost += calculateGroupCost(group);
+    }
+  });
+
+  return totalCost;
+}
+
+/**
+ * Применяет персональные купоны к операциям
+ * Разделено на 3 фазы:
+ * - Фаза 1 (item): вызывается ДО корректировок
+ * - Фаза 2 (fixed): вызывается ПОСЛЕ корректировок, ДО percent
+ * - Фаза 3 (percent): вызывается ПОСЛЕ корректировок и fixed
+ *
+ * @param {string} phase - 'item', 'fixed' или 'percent'
+ */
+export function updatePersonalCoupons(phase = 'item') {
+  // Если нет выбранных купонов, выходим
+  if (selectedPersonalCoupons.length === 0) {
+    return;
+  }
+
+  // Получаем активные купоны
+  const activeCoupons = getActivePersonalCoupons();
+
+  // Фильтруем только выбранные
+  const selectedCoupons = activeCoupons.filter(c => selectedPersonalCoupons.includes(c.id));
+
+  if (selectedCoupons.length === 0) {
+    return;
+  }
+
+  // Находим существующую группу купонов
+  const existingCouponIndex = submissionGroups.findIndex(g => g.isPersonalCoupon);
+  let entries = [];
+  let totalDiscount = 0;
+
+  // Если группа существует, берем её entries
+  if (existingCouponIndex !== -1) {
+    const existingGroup = submissionGroups[existingCouponIndex];
+    entries = [...existingGroup.entries];
+    totalDiscount = existingGroup.price || 0;
+  }
+
+  if (phase === 'item') {
+    // ФАЗА 1: item купоны (ДО корректировок)
+
+    // Удаляем старые entries для item (если группа уже существовала), сохраняем fixed и percent
+    entries = entries.filter(e => e.data.coupon_type !== 'item');
+    totalDiscount = entries.reduce((sum, e) => sum + e.data.discount_amount, 0);
+
+    // Временное хранилище для отслеживания оставшихся товаров по формам
+    const remainingItems = {};
+
+    // Применяем купоны типа "item"
+    const itemCoupons = selectedCoupons.filter(c => c.type === 'item');
+    itemCoupons.forEach(coupon => {
+      const formId = coupon.form;
+      const itemCount = countItemsForForm(formId);
+
+      // Инициализируем remainingItems для формы
+      if (!remainingItems[formId]) {
+        remainingItems[formId] = itemCount;
+      }
+
+      if (remainingItems[formId] >= coupon.value) {
+        // Вычисляем цену купона (price за каждые value товаров)
+        // Находим группу для получения price
+        const formSelector = toSelector(formId);
+        const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
+
+        if (formGroup) {
+          const price = Number(formGroup.price) || 0;
+          const discount = price * coupon.value;
+
+          remainingItems[formId] -= coupon.value;
+          totalDiscount += discount;
+
+          entries.push({
+            id: `entry-${incrementEntrySeq()}`,
+            template_id: `personal-coupon-${coupon.id}`,
+            data: {
+              coupon_id: coupon.id,
+              coupon_title: coupon.title,
+              coupon_type: coupon.type,
+              form: formId,
+              discount_amount: discount,
+              calculation: `${price} × ${coupon.value}`
+            },
+            multiplier: 1
+          });
+        }
+      }
+    });
+
+  } else if (phase === 'fixed') {
+    // ФАЗА 2: fixed купоны (ПОСЛЕ корректировок, ДО percent)
+
+    // Удаляем старые entries для fixed (если группа уже существовала), сохраняем item и percent
+    entries = entries.filter(e => e.data.coupon_type !== 'fixed');
+    totalDiscount = entries.reduce((sum, e) => sum + e.data.discount_amount, 0);
+
+    // Временное хранилище для отслеживания оставшейся стоимости по формам (после item купонов и корректировок)
+    const remainingCost = {};
+
+    // Применяем купоны типа "fixed" (фиксированная сумма)
+    const fixedCoupons = selectedCoupons.filter(c => c.type === 'fixed');
+    fixedCoupons.forEach(coupon => {
+      const formId = coupon.form;
+      const formSelector = toSelector(formId);
+      let formCost = getCostForForm(formId);
+
+      // Инициализируем remainingCost для формы
+      if (!remainingCost[formId]) {
+        // Вычитаем примененные item купоны
+        const itemDiscountForForm = entries
+          .filter(e => e.data.form === formId && e.data.coupon_type === 'item')
+          .reduce((sum, e) => sum + e.data.discount_amount, 0);
+        formCost -= itemDiscountForForm;
+
+        // Вычитаем корректировки для этой формы
+        const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+        if (adjustmentGroup) {
+          adjustmentGroup.entries.forEach(entry => {
+            const adjustmentForm = entry.data?.form;
+            if (adjustmentForm === formSelector) {
+              const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+              formCost -= adjustmentAmount;
+            }
+          });
+        }
+
+        remainingCost[formId] = formCost;
+      }
+
+      if (remainingCost[formId] > 0) {
+        // Применяем скидку, но не больше оставшейся стоимости
+        const discount = Math.min(coupon.value, remainingCost[formId]);
+
+        remainingCost[formId] -= discount;
+        totalDiscount += discount;
+
+        entries.push({
+          id: `entry-${incrementEntrySeq()}`,
+          template_id: `personal-coupon-${coupon.id}`,
+          data: {
+            coupon_id: coupon.id,
+            coupon_title: coupon.title,
+            coupon_type: coupon.type,
+            form: formId,
+            discount_amount: discount,
+            calculation: String(discount)
+          },
+          multiplier: 1
+        });
+      }
+    });
+
+  } else if (phase === 'percent') {
+    // ФАЗА 2: percent купоны (ПОСЛЕ корректировок)
+
+    // Удаляем старые entries для percent (если они были)
+    entries = entries.filter(e => e.data.coupon_type !== 'percent');
+    totalDiscount = entries.reduce((sum, e) => sum + e.data.discount_amount, 0);
+
+    // Применяем купоны типа "percent" (процентная скидка)
+    const percentCoupons = selectedCoupons.filter(c => c.type === 'percent');
+    percentCoupons.forEach(coupon => {
+      const formId = coupon.form;
+      const formSelector = toSelector(formId);
+
+      // Получаем стоимость формы
+      let formCost = getCostForForm(formId);
+
+      // Вычитаем примененные item и fixed купоны
+      const itemAndFixedDiscounts = entries
+        .filter(e => e.data.form === formId && (e.data.coupon_type === 'item' || e.data.coupon_type === 'fixed'))
+        .reduce((sum, e) => sum + e.data.discount_amount, 0);
+
+      formCost -= itemAndFixedDiscounts;
+
+      // Вычитаем корректировки для этой формы
+      const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+      if (adjustmentGroup) {
+        adjustmentGroup.entries.forEach(entry => {
+          const adjustmentForm = entry.data?.form;
+          if (adjustmentForm === formSelector) {
+            const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+            formCost -= adjustmentAmount;
+          }
+        });
+      }
+
+      if (formCost > 0) {
+        let percentValue = coupon.value;
+        if (percentValue > 100) percentValue = 100;
+
+        const discount = Math.ceil(formCost * (percentValue / 100));
+
+        totalDiscount += discount;
+
+        entries.push({
+          id: `entry-${incrementEntrySeq()}`,
+          template_id: `personal-coupon-${coupon.id}`,
+          data: {
+            coupon_id: coupon.id,
+            coupon_title: coupon.title,
+            coupon_type: coupon.type,
+            form: formId,
+            discount_amount: discount,
+            calculation: `${formatNumber(formCost)} × ${percentValue}%`
+          },
+          multiplier: 1
+        });
+      }
+    });
+  }
+
+  // Создаем или обновляем группу с купонами
+  if (entries.length > 0) {
+    if (existingCouponIndex !== -1) {
+      // Обновляем существующую группу
+      const group = submissionGroups[existingCouponIndex];
+      group.price = totalDiscount;
+      group.entries = entries;
+      console.log(`🎫 Обновлена группа купонов (${phase}):`, entries.length, 'на сумму:', totalDiscount);
+    } else {
+      // Создаем новую группу
+      const couponGroup = {
+        id: `group-${incrementGroupSeq()}`,
+        key: FORM_PERSONAL_COUPON,
+        templateSelector: FORM_PERSONAL_COUPON,
+        title: TEXT_MESSAGES.PERSONAL_COUPONS_TITLE,
+        price: totalDiscount,
+        bonus: 0,
+        amountLabel: TEXT_MESSAGES.PERSONAL_COUPONS_LABEL,
+        kind: 'income',
+        entries,
+        isPersonalCoupon: true
+      };
+
+      submissionGroups.push(couponGroup);
+      console.log(`🎫 Создана группа купонов (${phase}):`, entries.length, 'на сумму:', totalDiscount);
+    }
+  } else if (existingCouponIndex !== -1) {
+    // Если купонов нет, удаляем группу
+    submissionGroups.splice(existingCouponIndex, 1);
+    console.log('🎫 Группа купонов удалена (нет активных купонов)');
+  }
 }

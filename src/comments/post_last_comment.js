@@ -64,7 +64,7 @@
     return li;
   }
 
-  function setEmpty(slot, reason) {
+  function setEmpty(reason) {
     const text = 'Не найден';
     anchor.classList.add('is-empty');
     anchor.href = '#';
@@ -72,7 +72,7 @@
     anchor.textContent = text;
   }
 
-  function setLink(slot, href, dateText) {
+  function setLink(href, dateText) {
     anchor.classList.remove('is-empty');
     anchor.href = href;
     anchor.textContent = dateText || 'Последний пост';

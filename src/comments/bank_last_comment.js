@@ -51,6 +51,7 @@
 
   $(async function () {
     var $slot = insertSlot();
+    console.log('prewft')
     if (!$slot || !$slot.length) return;
 
     if (typeof window.scrapePosts !== "function") {
@@ -64,6 +65,7 @@
     }
 
     var forums = Array.isArray(window.BANK_FORUMS) ? window.BANK_FORUMS : [];
+    console.log('wtf');
 
     try {
       var posts = await window.scrapePosts(

@@ -498,8 +498,8 @@
         ['search_in','0'],
         ['sort_by',  '0'],
         ['sort_dir', 'DESC'],
-        ['show_as',  'posts'],
-        ['search',   encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
+        ['show_as',  'topics'],
+        ['search',   encodeForSearch('Отправить')],
         ['p',        String(p)]
       ].filter(([_, v]) => v !== '');
 
@@ -650,8 +650,9 @@
    * @param {number}  [options.delayMs=300]
    * @param {string}  [options.keywords=""] - Дополнительные ключевые слова для поиска
    * @param {boolean} [options.comments_only=false] - Если true, исключаем первые посты топиков
-   * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
-   */
+  * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number,date_ts:number|null,date_iso:string|null}>>}
+  */
+
   window.scrapePosts = async function scrapePosts(
     author,
     forums,
@@ -792,19 +793,43 @@
     const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
 
     // ----- извлечение одного поста -----
+    // ----- извлечение одного поста -----
     const extractOne = (post) => {
       const span = post.querySelector("h3 > span");
       const a = span ? span.querySelectorAll("a") : [];
+
       // title в нижнем регистре для сопоставления
       const title = (a[1]?.textContent?.trim() || "").toLocaleLowerCase('ru');
+
+      // ссылка на сам пост
       const rawHref = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
       const src     = rawHref ? toPidHashFormat(rawHref) : "";
+
+      // текст из ссылки — это дата в читаемом виде
+      const date_text = a[2]?.innerText?.trim() || "";
+
+      // --- дата из атрибута data-posted (всегда в секундах)
+      const date_ts = null;
+      const postedRaw = post.getAttribute("data-posted");
+      date_ts = Number(postedRaw);
+
+      // --- контент поста
       const contentEl = post.querySelector(".post-content");
       let html = contentEl?.innerHTML?.trim() || "";
       html = expandBBHtmlToText(html);
       const text = htmlToMultilineText(html);
-      return { title, src, text, html, symbols_num: text.length };
+
+      return {
+        title,
+        src,
+        text,
+        html,
+        symbols_num: text.length,
+        date_ts,
+        date_text,
+      };
     };
+
 
     // ----- фильтрация по title_prefix -----
     const titleMatchesPrefix = (t) => {
@@ -893,7 +918,8 @@
           title: r.title,
           src: r.src,
           symbols_num: r.symbols_num,
-          textPreview: r.text.slice(0,120).replace(/\s+/g," ")
+          textPreview: r.text.slice(0,120).replace(/\s+/g," "),
+          date: r.date_ts
         })));
       } catch { console.log(finalArr); }
       window.__scrapedPosts = finalArr;

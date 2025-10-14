@@ -22,23 +22,30 @@
       pointer-events:none;cursor:default;opacity:.8;
     }`).appendTo(document.head || document.documentElement);
   console.log('fff');
-  function insertSlot() {
-    var $right = $(PROFILE_RIGHT_SEL);
+  async function waitForElement(selector, timeoutMs = 8000, intervalMs = 200) {
+    const started = Date.now();
+    while (Date.now() - started <= timeoutMs) {
+      const $el = jQuery(selector);
+      if ($el.length) return $el;
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return jQuery(); // пустая коллекция
+  }
+
+  async function insertSlotAsync() {
+    const $right = await waitForElement("#viewprofile #profile-right");
     if (!$right.length) return null;
-    var $li = $(`
+    const $li = jQuery(`
       <li id="pa-bank-link">
         <span>Банковские операции:</span>
         <strong><a href="#" target="_blank" rel="nofollow noopener" class="is-empty">Загрузка…</a></strong>
       </li>
     `);
-    var $after = $right.find('#pa-last-visit');
-    if ($after.length) {
-      $li.insertAfter($after);
-    } else {
-      $right.append($li);
-    }
+    const $after = $right.find('#pa-last-visit');
+    if ($after.length) $li.insertAfter($after); else $right.append($li);
     return $li.find("a");
   }
+
   function setEmpty($a, reason) {
     var text = "Не найдена";
     $a.addClass("is-empty").attr({ href:"#", title: reason || text }).text(text);
@@ -57,8 +64,11 @@
   }
   console.log(typeof scrapePosts);
   $(async function () {
-    var $slot = insertSlot();
-    if (!$slot || !$slot.length) return;
+    var $slot = await insertSlotAsync();
+    if (!$slot || !$slot.length) {
+      console.warn('[bank_last_comment] profile-right не появился');
+      return;
+    }
 
     const hasScrape = await ensureScrapePosts();
     if (!hasScrape) { setEmpty($slot, "нет доступа к поиску"); return; }

@@ -469,16 +469,36 @@
    * @param {Object} [options]
    * @param {number} [options.maxPages=999]
    * @param {number} [options.delayMs=300]
+   * @param {string[]} [options.keywords=[]] - Дополнительные ключевые слова для поиска
+   * @param {boolean} [options.keywords_with_and=false] - Склеивать ключевые слова через AND
    * @returns {Promise<Array<{title:string,src:string,text:string,html:string,symbols_num:number}>>}
    */
-  window.scrapePosts = async function scrapePosts(author, forums, stopOnFirstNonEmpty = false, last_src = "", { maxPages = 999, delayMs = 300 } = {}) {
+  window.scrapePosts = async function scrapePosts(
+    author,
+    forums,
+    stopOnFirstNonEmpty = false,
+    last_src = "",
+    { maxPages = 999, delayMs = 300, keywords = [], keywords_with_and = false } = {}
+  ) {
     if (!author) throw new Error("author обязателен");
     if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
     const basePath    = "/search.php";
     const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
+    const keywordsJoined = (Array.isArray(keywords) ? keywords.join(" ") : String(keywords || "")).trim();
+
     const buildUrl = (p) => {
       const u = new URL(basePath, location.origin);
-      u.search = new URLSearchParams({ action:"search", author:window.encodeWithSep(author), forums:forumsParam, sort_dir:"DESC", p:String(p) }).toString();
+      const params = new URLSearchParams({
+        action: "search",
+        author: window.encodeWithSep(author),
+        forums: forumsParam,
+        sort_dir: "DESC",
+        p: String(p)
+      });
+      if (keywordsJoined) {
+        params.set("keywords", window.encodeWithSep(keywordsJoined, Boolean(keywords_with_and)));
+      }
+      u.search = params.toString();
       return u.toString();
     };
 

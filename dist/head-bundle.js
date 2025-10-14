@@ -727,6 +727,18 @@
       return new DOMParser().parseFromString(html, "text/html");
     }
 
+    // помощник: детект служебной страницы "Информация / ничего не найдено"
+    function isNoResultsPage(doc) {
+      const title = (doc.querySelector('title')?.textContent || '').trim();
+      if (title === 'Информация') {
+        const info = doc.querySelector('#pun-main .info .container');
+        if (info && /ничего не найдено/i.test(info.textContent)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     // ---------- HTML → чистый текст ----------
     const htmlToMultilineText = (html = "") => {
       const tmp = document.createElement("div");
@@ -817,29 +829,45 @@
       const acc = [];
 
       const doc1 = await getDoc(buildUrl(1));
-      const baseSig = pageSignature(extractRawSrcs(doc1));
+      // СТОП 0: сразу выходим, если это «Информация / ничего не найдено»
+      if (isNoResultsPage(doc1)) return finalize(acc);
+
+      let prevSig = null;
 
       for (let p = 1; p <= maxPages; p++) {
         const doc   = (p === 1) ? doc1 : await getDoc(buildUrl(p));
-        const posts = extractPosts(doc);                 // уже отфильтрованные (prefix, comments_only, exclude)
-        const sig   = pageSignature(extractRawSrcs(doc));
-        if (p > 1 && sig === baseSig) break;            // повтор страницы — стоп
+
+        // СТОП 1: служебная страница "Информация / ничего не найдено"
+        if (isNoResultsPage(doc)) return finalize(acc);
+
+        const posts = extractPosts(doc); // уже отфильтрованные (prefix, comments_only)
+        const raw   = extractRawSrcs(doc);           // «сырые» ссылки
+        const sig   = pageSignature(raw);
+
+        // СТОП 2: пустая страница по DOM (нет постов и «сырых» ссылок)
+        if (!raw.length && !doc.querySelector('.post')) return finalize(acc);
+
+        // СТОП 3: повтор предыдущей страницы (сервер вернул ту же)
+        if (prevSig !== null && sig === prevSig) return finalize(acc);
+        prevSig = sig;
+
+        // (опционально) СТОП 4: повтор базовой страницы
+        // if (p > 1 && sig === baseSig) return finalize(acc);
 
         for (const post of posts) {
-          if (lastSrcKey && post.src === lastSrcKey) {
-            return finalize(acc);                       // граница — отдаём то, что есть (или [])
-          }
+          if (lastSrcKey && post.src === lastSrcKey) return finalize(acc);
           if (post.symbols_num > 0) {
             acc.push(post);
-            if (acc.length >= maxResults) {
-              return finalize(acc);                     // набрали нужное кол-во
-            }
+            if (acc.length >= maxResults) return finalize(acc);
           }
         }
+
         await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
       }
+
       return finalize(acc);
     }
+
 
     // Вместо двух режимов:
     const wanted = stopOnFirstNonEmpty ? 1 : Number.POSITIVE_INFINITY;

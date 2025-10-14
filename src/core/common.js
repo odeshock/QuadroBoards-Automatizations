@@ -804,64 +804,40 @@
       return list;
     };
 
-    // ---------- режим A: первый непустой ДО last_src ----------
-    async function findFirstNonEmptyBeforeLastSrc() {
-      const doc1 = await getDoc(buildUrl(1));
-      const posts1 = extractPosts(doc1);
-      const baseSig = pageSignature(extractRawSrcs(doc1)); // сигнатура по «сырым» ссылкам
 
-      // перебираем страницы, начиная с 1-й
-      for (let p = 1; p <= maxPages; p++) {
-        const doc = (p === 1) ? doc1 : await getDoc(buildUrl(p));
-        const posts = extractPosts(doc);
-        const sig = pageSignature(extractRawSrcs(doc));
-        if (p > 1 && sig === baseSig) break;
+    const lastSrcKey = last_src ? toPidHashFormat(last_src) : "";
 
-        for (const post of posts) {
-          if (last_src && post.src === last_src) return finalize([]);
-          if (post.symbols_num > 0) return finalize([post]);
-        }
-        await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
-      }
-      return finalize([]);
-    }
-
-    // ---------- режим B: собрать ВСЕ ДО last_src (или всё, если он не задан) ----------
-    async function collectAllBeforeLastSrc() {
+    async function collectUpTo(maxResults) {
       const acc = [];
 
       const doc1 = await getDoc(buildUrl(1));
-      const posts1 = extractPosts(doc1);
       const baseSig = pageSignature(extractRawSrcs(doc1));
 
-      const pushUntilBorder = (list) => {
-        for (const post of list) {
-          if (last_src && post.src === last_src) return true; // граница -> прекращаем набор
-          acc.push(post);
+      for (let p = 1; p <= maxPages; p++) {
+        const doc   = (p === 1) ? doc1 : await getDoc(buildUrl(p));
+        const posts = extractPosts(doc);                 // уже отфильтрованные (prefix, comments_only, exclude)
+        const sig   = pageSignature(extractRawSrcs(doc));
+        if (p > 1 && sig === baseSig) break;            // повтор страницы — стоп
+
+        for (const post of posts) {
+          if (lastSrcKey && post.src === lastSrcKey) {
+            return finalize(acc);                       // граница — отдаём то, что есть (или [])
+          }
+          if (post.symbols_num > 0) {
+            acc.push(post);
+            if (acc.length >= maxResults) {
+              return finalize(acc);                     // набрали нужное кол-во
+            }
+          }
         }
-        return false;
-      };
-
-      if (pushUntilBorder(posts1)) return finalize(acc);
-      await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
-
-      for (let p=2; p<=maxPages; p++) {
-        const doc = await getDoc(buildUrl(p));
-        const posts = extractPosts(doc);
-        const sig = pageSignature(extractRawSrcs(doc));
-        if (sig === baseSig) break;
-        if (pushUntilBorder(posts)) return finalize(acc);
         await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
       }
       return finalize(acc);
     }
 
-    // ------ запуск нужного режима ------
-    if (stopOnFirstNonEmpty) {
-      return await findFirstNonEmptyBeforeLastSrc();
-    } else {
-      return await collectAllBeforeLastSrc();
-    }
+    // Вместо двух режимов:
+    const wanted = stopOnFirstNonEmpty ? 1 : Number.POSITIVE_INFINITY;
+    return await collectUpTo(wanted);
 
     // ------ финализация: reverse + вывод ------
     function finalize(arr) {

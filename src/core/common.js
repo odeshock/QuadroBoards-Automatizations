@@ -854,4 +854,4 @@
       return finalArr;
     }
   };
-});
+})();

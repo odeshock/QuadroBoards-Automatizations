@@ -860,7 +860,7 @@
       return finalArr;
     }
   };
-});
+})();
 /* MODULE 2: common_users.js (FMV.fetchUsers) */
 // ===== FMV.fetchUsers - обёртка вокруг window.scrapeUsers =====
 (function () {

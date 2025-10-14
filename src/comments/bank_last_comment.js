@@ -13,6 +13,7 @@
   // запуск строго на /profile.php?id=...
   if (!/\/profile\.php$/i.test(location.pathname)) return;
   if (!/[?&]id=\d+/.test(location.search)) return;
+  console.log("на месте");
 
   // оформление «пустого» состояния
   $("<style>").text(`

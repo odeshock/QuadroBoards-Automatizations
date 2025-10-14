@@ -3581,20 +3581,21 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
   }
   console.log(typeof scrapePosts);
   $(async function () {
+    console.log("aaaa");
     var $slot = await insertSlotAsync();
     if (!$slot || !$slot.length) {
       console.warn('[bank_last_comment] profile-right не появился');
       return;
     }
-
+    console.log("aaaa1");
     const hasScrape = await ensureScrapePosts();
     if (!hasScrape) { setEmpty($slot, "нет доступа к поиску"); return; }
-
+    console.log("aaaa2");
     if (!window.UserLogin || !window.SITE_URL) {
       setEmpty($slot, "нет данных пользователя");
       return;
     }
-
+    console.log("aaaa2");
     var forums = Array.isArray(window.BANK_FORUMS) ? window.BANK_FORUMS : [];
     console.log('ny vot');
     try {

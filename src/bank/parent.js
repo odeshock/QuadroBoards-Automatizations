@@ -220,7 +220,7 @@ function formatBankText(data) {
         const src = it?.src ?? "";
         const text = it?.text ?? "";
         const symbols = it?.symbols_num ?? "";
-        lines.push(`${idx}. [url=${src}]${text}[/url] — ${symbols} символов`);
+        lines.push(`${idx}. ${src} — ${symbols} символов`);
         idx++;
       }
     }
@@ -237,7 +237,7 @@ function formatBankText(data) {
       for (const it of pickArray(obj.flyer_links_json ?? obj.flyerLinksJson)) {
         const src = it?.src ?? "";
         const text = it?.text ?? "";
-        lines.push(`${idx}. [url=${src}]${text}[/url]`);
+        lines.push(`${idx}. ${src}`);
         idx++;
       }
     }
@@ -578,7 +578,33 @@ function decodeJSON(code) {
 }
 
 // Ищет в живом DOM (по умолчанию — во всём документе)
-function getBlockquoteTextAfterPersonalPost(root = document, label) {
+function getBlockquoteTextAfterPersonalPost(
+  root,
+  label,
+  mode = ''
+) {
+  // helper для блока "last_value"
+  function extractLastValue(r = root) {
+    const target = Array.from(r.querySelectorAll('strong'))
+      .find(s => s.textContent.trim().startsWith('Условно округленное значение:'));
+    if (!target) return null;
+
+    const parts = [];
+    // собираем текстовые/элементные узлы после <strong> до следующего <strong> в том же родителе
+    for (let n = target.nextSibling; n; n = n.nextSibling) {
+      if (n.nodeType === Node.ELEMENT_NODE && n.tagName?.toLowerCase() === 'strong') break;
+      if (n.nodeType === Node.TEXT_NODE) parts.push(n.nodeValue);
+      else if (n.nodeType === Node.ELEMENT_NODE) parts.push(n.textContent);
+    }
+    const val = parts.join(' ').replace(/\s+/g, ' ').trim();
+    return val || null;
+  }
+
+  // режим "last_value" не зависит от "Каждый личный пост"
+  if (mode === 'last_value') {
+    return extractLastValue(root);
+  }
+
   // ищем <p>, внутри которого есть <strong> с нужным текстом
   const pWithLabel = Array.from(root.querySelectorAll('p > strong'))
     .map(s => s.closest('p'))
@@ -587,20 +613,31 @@ function getBlockquoteTextAfterPersonalPost(root = document, label) {
   if (!pWithLabel) return null;
 
   // идём по соседям до следующего <p>, ищем первый blockquote
+  let blockquote = null;
   for (let el = pWithLabel.nextElementSibling; el; el = el.nextElementSibling) {
-    if (el.tagName?.toLowerCase() === 'p') break;
-    const bq = el.matches('blockquote') ? el : el.querySelector?.('blockquote');
-    if (bq) return bq.innerHTML.trim();
+    if (el.tagName?.toLowerCase() === 'p') break; // дошли до следующего параграфа — стоп
+    const bq = el.matches?.('blockquote') ? el : el.querySelector?.('blockquote');
+    if (bq) { blockquote = bq; break; }
   }
 
-  return null;
+  if (!blockquote) return null;
+
+  // режимы возврата
+  if (mode === 'link') {
+    return Array.from(blockquote.querySelectorAll('a'))
+      .map(a => a.getAttribute('href'))
+      .filter(Boolean);
+  }
+
+  // режим по умолчанию — как было
+  return blockquote.innerHTML.trim();
 }
 
 
-function getBlockquoteTextFromHtml(html, label) {
+function getBlockquoteTextFromHtml(html, label, mode = '') {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  return getBlockquoteTextAfterPersonalPost(doc, label);
+  return getBlockquoteTextAfterPersonalPost(doc, label, mode);
 }
 
 

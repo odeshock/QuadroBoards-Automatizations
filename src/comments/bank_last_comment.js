@@ -93,12 +93,7 @@
       return;
     }
 
-    const forumsRaw = window.BANK_FORUMS;
-    const forums = Array.isArray(forumsRaw)
-      ? forumsRaw
-      : typeof forumsRaw === 'string' && forumsRaw.trim()
-        ? forumsRaw.split(',').map(id => id.trim()).filter(Boolean)
-        : [];
+    const forums = window.FORUMS_IDS?.Bank || [0];
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {

@@ -3610,12 +3610,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
       return;
     }
 
-    const forumsRaw = window.BANK_FORUMS;
-    const forums = Array.isArray(forumsRaw)
-      ? forumsRaw
-      : typeof forumsRaw === 'string' && forumsRaw.trim()
-        ? forumsRaw.split(',').map(id => id.trim()).filter(Boolean)
-        : [];
+    const forums = window.FORUMS_IDS?.Bank || [0];
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {
@@ -3799,7 +3794,7 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
       return;
     }
 
-    const forums = EPS_FORUM_INFO.map(item => item.id);
+    const forums = window.FORUMS_IDS?.Episode || [0];
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {

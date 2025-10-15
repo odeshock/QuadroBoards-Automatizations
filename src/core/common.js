@@ -652,7 +652,7 @@
     forums,
     {
       stopOnFirstNonEmpty = false,
-      last_src = "",
+      last_src = [],
       title_prefix = "",
       maxPages = 999,
       delayMs = 300,
@@ -666,6 +666,10 @@
     const forumsParam   = Array.isArray(forums) ? forums.join(",") : String(forums);
     const keywordsRaw   = String(keywords ?? "").trim();
     const titlePrefixLC = String(title_prefix || "").trim().toLocaleLowerCase('ru');
+
+    // Приводим last_src к массиву строк
+    const lastSrcArr = Array.isArray(last_src) ? last_src : [last_src].filter(Boolean);
+    const lastSrcKeys = new Set(lastSrcArr.map(toPidHashFormat));
 
     const basePath = "/search.php";
 
@@ -903,7 +907,10 @@
         // if (p > 1 && sig === baseSig) return finalize(acc);
 
         for (const post of posts) {
-          if (lastSrcKey && post.src === lastSrcKey) return finalize(acc);
+          if (lastSrcKeys.size && lastSrcKeys.has(post.src)) {
+            console.log(`[scrapePosts] найден last_src: ${post.src}, остановка`);
+            return finalize(acc);
+          }
           if (post.symbols_num > 0) {
             acc.push(post);
             if (acc.length >= maxResults) return finalize(acc);

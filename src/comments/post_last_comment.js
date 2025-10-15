@@ -93,7 +93,7 @@
       return;
     }
 
-    const forums = EPS_FORUM_INFO.map(item => item.id);
+    const forums = window.FORUMS_IDS?.Episode || [0];
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {

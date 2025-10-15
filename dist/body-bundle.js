@@ -3767,7 +3767,7 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
       right.appendChild(li);
     }
 
-    return li;
+    return li.querySelector('a');
   }
 
   function setEmpty(anchor, reason) {

@@ -845,12 +845,30 @@
     // ----- список постов с применением фильтров -----
     const extractPosts = (doc) => {
       const all = [...doc.querySelectorAll(".post")].map(extractOne);
-      let list = all.filter(p => titleMatchesPrefix(p.title));
-      if (comments_only && excludeFirstPosts.size) {
-        list = list.filter(p => !excludeFirstPosts.has(p.src));
+
+      console.groupCollapsed(`[scrapePosts] Найдено ${all.length} постов на странице`);
+      for (const p of all) {
+        console.log("→", p.title, "| символов:", p.symbols_num, "| src:", p.src);
       }
+      console.groupEnd();
+
+      let list = all.filter(p => titleMatchesPrefix(p.title));
+
+      console.groupCollapsed(`[scrapePosts] После фильтрации title_prefix='${title_prefix}' → ${list.length} постов`);
+      for (const p of list) {
+        console.log("✓", p.title, "| символов:", p.symbols_num, "| src:", p.src);
+      }
+      console.groupEnd();
+
+      if (comments_only && excludeFirstPosts.size) {
+        const before = list.length;
+        list = list.filter(p => !excludeFirstPosts.has(p.src));
+        console.log(`[scrapePosts] comments_only: исключено ${before - list.length} первых постов тем`);
+      }
+
       return list;
     };
+
 
 
     const lastSrcKey = last_src ? toPidHashFormat(last_src) : "";

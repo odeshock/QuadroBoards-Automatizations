@@ -61,7 +61,7 @@
       right.appendChild(li);
     }
 
-    return li;
+    return li.querySelector('a');
   }
 
   function setEmpty(anchor, reason) {

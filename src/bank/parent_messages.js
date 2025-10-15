@@ -314,6 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
         { retries: 4, baseDelay: 900, maxDelay: 9000, timeoutMs: 20000 },
         "fetchProfileInfo"
       );
+      console.log(BankProfileInfo.date);
 
       // последовательно (ретраи уже внутри getLastValue), плюс пауза между вызовами
       const msg100_old = await getLastValue(0, { label: BankLabel.message100 });
@@ -326,6 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between getLastValue (pos100_old)");
 
       const month_old  = await getLastValue(BankProfileInfo.date, { label: BankLabel.month, is_month: true });
+      console.log(month_old);
 
       queueMessage(iframeReadyP, () => ({
         type: BankPostMessagesType.profile_info,

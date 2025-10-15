@@ -93,7 +93,10 @@
       return;
     }
 
-    const forums = window.FORUMS_IDS?.Episode || [0];
+    const forums = [
+      ...(window.FORUMS_IDS?.PersonalPosts || [10000]),
+      ...(window.FORUMS_IDS?.PlotPosts || [10000])
+    ];
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {

@@ -861,7 +861,7 @@ export function renderLog(log) {
       meta.className = 'entry-meta';
 
       // Определяем тип операции: доход (+) или расход (-)
-      const isIncome = group.isDiscount || group.templateSelector?.includes('income');
+      const isIncome = group.isDiscount || group.isPersonalCoupon || group.isPriceAdjustment || group.templateSelector?.includes('income');
       const prefix = isIncome ? '+ ' : '− ';
       const color = isIncome ? '#22c55e' : '#ef4444';
 
@@ -1003,7 +1003,7 @@ export function renderLog(log) {
           const amount = Number(item.data?.discount_amount) || 0;
           totalDiscount += amount;
         });
-        meta.innerHTML = `Экономия: <span style="color: #22c55e">+ ${formatNumber(totalDiscount)}</span>`;
+        meta.innerHTML = `Скидка: <span style="color: #22c55e">+ ${formatNumber(totalDiscount)}</span>`;
         header.appendChild(meta);
       } else if (
         group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||
@@ -1732,7 +1732,19 @@ export function renderLog(log) {
         return;
       }
 
-      const isIncome = group.isDiscount || group.templateSelector?.includes('income');
+      const isIncome = group.isDiscount || group.isPersonalCoupon || group.isPriceAdjustment || group.templateSelector?.includes('income');
+
+      // Логируем для купонов, корректировок и скидок
+      if (group.isPersonalCoupon || group.isPriceAdjustment || group.isDiscount) {
+        console.log(`💰 Подсчёт итога для ${group.title}:`, {
+          templateSelector: group.templateSelector,
+          amount: group.amount,
+          price: group.price,
+          isIncome,
+          entries: group.entries.length
+        });
+      }
+
       const m = String(group.amount).match(/^\s*(\d+)\s*\+\s*x\s*(\d+)\s*$/i);
 
       if (m || group.mode === 'price_per_item_w_bonus') {
@@ -1831,15 +1843,17 @@ export function renderLog(log) {
           const amount = Number(item.data?.discount_amount) || 0;
           totalDiscount += amount;
         });
+        console.log(`   → Добавляем автоскидку к итогу: +${totalDiscount}`);
         totalSum += totalDiscount;
       } else if (group.isPriceAdjustment) {
-        // Корректировки цен: вычитаем из итога (это расход)
+        // Корректировки цен: прибавляем к итогу (это доход = уменьшение расходов)
         let totalAdjustment = 0;
         group.entries.forEach((item) => {
           const amount = Number(item.data?.adjustment_amount) || 0;
           totalAdjustment += amount;
         });
-        totalSum -= totalAdjustment;
+        console.log(`   → Добавляем корректировку к итогу: +${totalAdjustment}`);
+        totalSum += totalAdjustment;
       } else if (
         group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||
         group.templateSelector === toSelector(FORM_GIFT_CUSTOM) ||
@@ -1884,6 +1898,11 @@ export function renderLog(log) {
         const price = group.price !== null && group.price !== undefined ? Number(group.price) : null;
         const bonus = group.bonus !== null && group.bonus !== undefined ? Number(group.bonus) : null;
 
+        // Логируем для купонов, корректировок и скидок
+        if (group.isPersonalCoupon || group.isPriceAdjustment || group.isDiscount) {
+          console.log(`   → mode: ${mode}, price: ${price}, bonus: ${bonus}`);
+        }
+
         if (mode && price !== null) {
           if (mode === 'price_per_item') {
             let totalQuantity = 0;
@@ -1910,6 +1929,12 @@ export function renderLog(log) {
           }
         } else {
           const amountNumber = parseNumericAmount(group.amount);
+
+          // Логируем для купонов, корректировок и скидок
+          if (group.isPersonalCoupon || group.isPriceAdjustment || group.isDiscount) {
+            console.log(`   → parseNumericAmount(${group.amount}):`, amountNumber);
+          }
+
           if (amountNumber !== null) {
             const totalEntryMultiplier = group.entries.reduce((sum, item) => {
               const raw = item && typeof item.multiplier !== 'undefined' ? item.multiplier : null;
@@ -1919,6 +1944,12 @@ export function renderLog(log) {
             }, 0);
             const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
             const total = amountNumber * multiplier;
+
+            // Логируем для купонов, корректировок и скидок
+            if (group.isPersonalCoupon || group.isPriceAdjustment || group.isDiscount) {
+              console.log(`   → Добавляем к итогу: ${isIncome ? '+' : '-'}${total} (amountNumber: ${amountNumber}, multiplier: ${multiplier})`);
+            }
+
             totalSum += isIncome ? total : -total;
           }
         }

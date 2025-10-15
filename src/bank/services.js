@@ -869,41 +869,9 @@ export function updateAutoPriceAdjustments() {
     const oldPrice = Number(targetGroups[0].price) || 0;
     if (oldPrice === 0) return;
 
-    // Подсчитываем общее количество элементов во ВСЕХ операциях данной формы
-    let totalItems = 0;
-    targetGroups.forEach(targetGroup => {
-      targetGroup.entries.forEach(entry => {
-      const dataObj = entry.data || {};
-
-      // Для постов подсчитываем количество постов из JSON
-      const personalPostsJson = dataObj.personal_posts_json;
-      const plotPostsJson = dataObj.plot_posts_json;
-
-      if (personalPostsJson) {
-        try {
-          const posts = JSON.parse(personalPostsJson);
-          if (Array.isArray(posts)) {
-            totalItems += posts.length;
-          }
-        } catch (_) {}
-      }
-
-      if (plotPostsJson) {
-        try {
-          const posts = JSON.parse(plotPostsJson);
-          if (Array.isArray(posts)) {
-            totalItems += posts.length;
-          }
-        } catch (_) {}
-      }
-
-      // Для других форм подсчитываем получателей
-      if (!personalPostsJson && !plotPostsJson) {
-        const recipientKeys = Object.keys(dataObj).filter(k => REGEX.RECIPIENT.test(k));
-        totalItems += recipientKeys.filter(key => String(dataObj[key] || '').trim()).length;
-      }
-      });
-    });
+    // Подсчитываем эффективное количество элементов (с учётом item купонов)
+    const formId = form.replace('#', '');
+    let totalItems = countEffectiveItemsForForm(formId);
 
     // Проверяем условие применения: itemCount >= batchSize
     if (totalItems < batchSize) return;
@@ -1071,6 +1039,26 @@ export function getCostForForm(formId) {
   });
 
   return totalCost;
+}
+
+/**
+ * Подсчитывает эффективное количество товаров для формы с учётом item купонов
+ * @param {string} formId - ID формы (без #)
+ * @returns {number} - количество товаров после вычета купонов типа item
+ */
+export function countEffectiveItemsForForm(formId) {
+  let totalItems = countItemsForForm(formId);
+
+  // Вычитаем товары, использованные item купонами
+  const activeCoupons = getActivePersonalCoupons();
+  const selectedCoupons = activeCoupons.filter(c => selectedPersonalCoupons.includes(c.id));
+  const itemCoupons = selectedCoupons.filter(c => c.type === 'item' && c.form === formId);
+
+  itemCoupons.forEach(coupon => {
+    totalItems -= coupon.value;
+  });
+
+  return Math.max(0, totalItems);
 }
 
 /**
@@ -1298,8 +1286,11 @@ export function updatePersonalCoupons(phase = 'item') {
       // Обновляем существующую группу
       const group = submissionGroups[existingCouponIndex];
       group.price = totalDiscount;
+      group.amount = totalDiscount;
+      group.amountLabel = 'Скидка';
       group.entries = entries;
-      console.log(`🎫 Обновлена группа купонов (${phase}):`, entries.length, 'на сумму:', totalDiscount);
+      console.log(`🎫 Обновлена группа купонов (${phase}):`, entries.length, 'entries, totalDiscount:', totalDiscount);
+      console.log('   Entries:', entries.map(e => `${e.data.coupon_title} (${e.data.coupon_type}): ${e.data.discount_amount}`));
     } else {
       // Создаем новую группу
       const couponGroup = {
@@ -1308,15 +1299,17 @@ export function updatePersonalCoupons(phase = 'item') {
         templateSelector: FORM_PERSONAL_COUPON,
         title: TEXT_MESSAGES.PERSONAL_COUPONS_TITLE,
         price: totalDiscount,
+        amount: totalDiscount,
         bonus: 0,
-        amountLabel: TEXT_MESSAGES.PERSONAL_COUPONS_LABEL,
+        amountLabel: 'Скидка',
         kind: 'income',
         entries,
         isPersonalCoupon: true
       };
 
       submissionGroups.push(couponGroup);
-      console.log(`🎫 Создана группа купонов (${phase}):`, entries.length, 'на сумму:', totalDiscount);
+      console.log(`🎫 Создана группа купонов (${phase}):`, entries.length, 'entries, totalDiscount:', totalDiscount);
+      console.log('   Entries:', entries.map(e => `${e.data.coupon_title} (${e.data.coupon_type}): ${e.data.discount_amount}`));
     }
   } else if (existingCouponIndex !== -1) {
     // Если купонов нет, удаляем группу

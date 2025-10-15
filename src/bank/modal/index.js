@@ -181,6 +181,10 @@ export function openModal({
   const isInfo = template.hasAttribute('data-info');
   btnSubmit.style.display = isInfo ? 'none' : '';
 
+  // Сбрасываем состояние кнопки при открытии модального окна
+  // (может быть установлен disabled в других формах, например купонах)
+  btnSubmit.disabled = false;
+
   counterWatcher = cleanupCounterWatcher(counterWatcher, modalFields, form);
   modalFields.innerHTML = template.innerHTML;
 

@@ -87,13 +87,7 @@ const BankPostMessagesType = {
   users_list: "USERS_LIST",
 };
 
-const _origScrapePosts = window.scrapePosts?.bind(window);
-if (typeof _origScrapePosts === "function") {
-  window.scrapePosts = async (...args) => {
-    await preScrapeBarrier;            // ← гарантированная суммарная задержка до всех scrapePosts
-    return _origScrapePosts(...args);  // ← дальше — как было, со всеми retry/timeout
-  };
-}
+
 
 /* =============== сервис: дата, готовность iframe =============== */
 function getBankToday() {
@@ -220,6 +214,14 @@ async function getLastValue(default_value, { label, is_month = false }) {
       { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
       "scrapePosts(personal_seed)"
     );
+
+    const _origScrapePosts = window.scrapePosts?.bind(window);
+    if (typeof _origScrapePosts === "function") {
+      window.scrapePosts = async (...args) => {
+        await preScrapeBarrier;            // ← гарантированная суммарная задержка до всех scrapePosts
+        return _origScrapePosts(...args);  // ← дальше — как было, со всеми retry/timeout
+      };
+    }
 
     const first = Array.isArray(seed) ? seed[0] : null;
     const posts_html = (first && typeof first.html === "string") ? first.html : "";

@@ -77,6 +77,7 @@ tabButtons.forEach((btn) => {
 // ============================================================================
 
 function handleOpenModal(config) {
+  console.log('🚀 handleOpenModal вызвана с config:', config);
   counterWatcher = openModal({
     backdrop,
     modalTitle,
@@ -88,6 +89,7 @@ function handleOpenModal(config) {
     counterWatcher,
     config
   });
+  console.log('✨ openModal завершена, counterWatcher:', counterWatcher);
 }
 
 function handleCloseModal() {
@@ -114,8 +116,16 @@ document.addEventListener('click', (e) => {
   const btn = e.target.closest('.btn-add');
   if (!btn) return;
 
+  console.log('🔘 Клик на btn-add:', btn);
+  console.log('Атрибуты кнопки:', {
+    form: btn.getAttribute('data-form'),
+    kind: btn.getAttribute('data-kind'),
+    title: btn.getAttribute('data-title')
+  });
+
   // Проверка доступа
   if (btn.disabled) {
+    console.log('❌ Кнопка disabled');
     e.preventDefault();
     return;
   }
@@ -128,13 +138,18 @@ document.addEventListener('click', (e) => {
   const titleText = overrideTitle || (row ? row.textContent.trim() : 'Пункт');
   const amountLabel = kind === 'expense' ? 'Стоимость' : 'Начисление';
 
+  console.log('📝 Данные для модалки:', { selector, kind, titleText, amountLabel });
+
   // Дополнительная проверка доступа (по ID формы)
   // Убираем # для сравнения с константами
   const selectorWithoutHash = selector ? selector.replace('#', '') : '';
   if (!isItemAllowedForAdmin(selectorWithoutHash)) {
+    console.log('❌ Доступ запрещён для формы:', selectorWithoutHash);
     e.preventDefault();
     return;
   }
+
+  console.log('✅ Проверки пройдены, открываем модалку...');
 
   // Дополнительные данные для подарков
   const giftId = btn.getAttribute('data-gift-id');
@@ -176,7 +191,11 @@ document.addEventListener('click', (e) => {
   const key = buildGroupKey(meta);
   const existingGroup = submissionGroups.find((group) => group.key === key);
 
+  console.log('🔑 Group key:', key);
+  console.log('📦 Existing group:', existingGroup);
+
   if (existingGroup && existingGroup.entries.length) {
+    console.log('📂 Открываем существующую группу с данными');
     const lastEntry = existingGroup.entries[existingGroup.entries.length - 1];
     handleOpenModal({
       ...meta,
@@ -185,8 +204,10 @@ document.addEventListener('click', (e) => {
       groupId: existingGroup.id
     });
   } else {
+    console.log('🆕 Открываем новую форму');
     handleOpenModal(meta);
   }
+  console.log('🎬 handleOpenModal вызвана');
 });
 
 // Кнопка закрытия

@@ -231,7 +231,8 @@ export function injectTemplates() {
 
   Object.entries(formTemplates).forEach(([id, html]) => {
     const section = document.createElement('section');
-    section.id = id;
+    // Убираем '#' из id при установке, т.к. константы содержат селектор с решеткой
+    section.id = id.replace('#', '');
     if (infoForms.includes(id)) {
       section.setAttribute('data-info', '');
     }

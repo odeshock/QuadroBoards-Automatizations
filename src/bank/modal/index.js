@@ -72,6 +72,8 @@ export function openModal({
   counterWatcher,
   config
 }) {
+  console.log('🚪 openModal вызван с config:', config);
+
   const {
     templateSelector,
     title,
@@ -88,8 +90,14 @@ export function openModal({
     mode = null
   } = config;
 
+  console.log('🔍 Ищем template:', templateSelector);
   const template = document.querySelector(templateSelector);
-  if (!template) return { counterWatcher };
+  console.log('📄 Template найден:', template);
+
+  if (!template) {
+    console.log('❌ Template не найден, выходим');
+    return { counterWatcher };
+  }
 
   let resolvedTitle = title || 'Пункт';
 
@@ -184,13 +192,18 @@ export function openModal({
   counterWatcher = cleanupCounterWatcher(counterWatcher, modalFields, form);
   modalFields.innerHTML = template.innerHTML;
 
+  console.log('🎭 Открываем backdrop...');
   // Открываем backdrop СРАЗУ после установки контента
   backdrop.setAttribute('open', '');
   backdrop.removeAttribute('aria-hidden');
+  console.log('✅ Backdrop открыт, атрибуты:', { open: backdrop.hasAttribute('open'), ariaHidden: backdrop.getAttribute('aria-hidden') });
 
 // === PERSONAL COUPONS: персональные купоны ===
+console.log('🎟️ Вызываем handlePersonalCouponsForm...');
 const personalCouponsResult = handlePersonalCouponsForm({ template, modalFields, btnSubmit });
+console.log('📋 Результат handlePersonalCouponsForm:', personalCouponsResult);
 if (personalCouponsResult.handled) {
+  console.log('✅ Купоны обработаны, выходим из openModal');
   return { counterWatcher };
 }
 

@@ -670,42 +670,38 @@ export function renderLog(log) {
   couponAction.style.color = 'var(--text-muted, #6b7280)';
   couponAction.textContent = 'выбрать/использовать →';
 
+  // Создаём скрытую кнопку для использования существующего обработчика
+  const hiddenBtn = document.createElement('button');
+  hiddenBtn.className = 'btn-add';
+  hiddenBtn.style.display = 'none';
+  hiddenBtn.setAttribute('data-form', '#personal-coupon');
+  hiddenBtn.setAttribute('data-kind', 'income');
+  hiddenBtn.setAttribute('data-amount', '');
+  hiddenBtn.setAttribute('data-title', 'Купоны');
+
   couponButton.appendChild(couponText);
   couponButton.appendChild(couponAction);
+  couponButton.appendChild(hiddenBtn);
 
-  // Добавляем обработчик клика для открытия модального окна
-  couponButton.addEventListener('click', () => {
-    // Импортируем необходимые функции
-    import('./modal/index.js').then(({ openModal }) => {
-      const backdrop = document.getElementById('backdrop');
-      const modalTitle = document.getElementById('modal-title');
-      const modalFields = document.getElementById('modal-fields');
-      const modalAmount = document.getElementById('modal-amount');
-      const modalAmountLabel = document.getElementById('modal-amount-label');
-      const btnSubmit = document.getElementById('btn-submit');
-      const form = document.getElementById('modal-form');
-
-      openModal({
-        backdrop,
-        modalTitle,
-        modalFields,
-        modalAmount,
-        modalAmountLabel,
-        btnSubmit,
-        form,
-        counterWatcher: null,
-        config: {
-          templateSelector: '#personal-coupon',
-          title: 'Купоны',
-          amount: '',
-          kind: 'income',
-          amountLabel: 'Скидка'
-        }
-      });
+  // При клике на div, кликаем на скрытую кнопку
+  couponButton.addEventListener('click', (e) => {
+    console.log('🎟️ Клик на кнопку купонов');
+    console.log('Target:', e.target);
+    console.log('Hidden button:', hiddenBtn);
+    console.log('Hidden button attributes:', {
+      form: hiddenBtn.getAttribute('data-form'),
+      kind: hiddenBtn.getAttribute('data-kind'),
+      title: hiddenBtn.getAttribute('data-title')
     });
+
+    if (e.target !== hiddenBtn) {
+      console.log('Кликаем на скрытую кнопку...');
+      hiddenBtn.click();
+    }
   });
 
   log.appendChild(couponButton);
+  console.log('✅ Кнопка купонов добавлена в лог');
 
   if (!submissionGroups.length) {
     const empty = document.createElement('div');

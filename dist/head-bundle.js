@@ -815,8 +815,8 @@
       // --- контент поста
       const contentEl = post.querySelector(".post-content");
       let html = contentEl?.innerHTML?.trim() || "";
-      html = expandBBHtmlToText(html);
-      const text = htmlToMultilineText(html);
+      const html_bb = expandBBHtmlToText(html);
+      const text = htmlToMultilineText(html_bb);
 
       return {
         title,
@@ -930,11 +930,13 @@
     // ------ финализация: reverse + вывод ------
     function finalize(arr) {
       const finalArr = arr.slice().reverse();
+      console.log(finalArr);
       try {
         console.table(finalArr.map(r => ({
           title: r.title,
           src: r.src,
           symbols_num: r.symbols_num,
+          html: r.html,
           textPreview: r.text.slice(0,120).replace(/\s+/g," "),
           date: r.date_ts
         })));

@@ -43,5 +43,8 @@ cat src/bank/parent.js >> dist/head-bundle.js
 echo "/* MODULE 8: bank/parent_messages.js */" >> dist/head-bundle.js
 cat src/bank/parent_messages.js >> dist/head-bundle.js
 
+echo "/* MODULE 8: utilities/text/profile_fields_as_html.js */" >> dist/head-bundle.js
+cat utilities/text/profile_fields_as_html.js >> dist/head-bundle.js
+
 echo "✅ head-bundle.js created!"
 ls -lh dist/head-bundle.js

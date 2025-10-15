@@ -754,7 +754,7 @@
     const pageSignature = (items) => hash(items.join("\n"));
 
     const buildUrl = (p) => {
-      console.log("[scrapePosts] keywords:", `?${keywordsRaw}`);
+      console.log("[scrapePosts] keywords:", `${keywordsRaw}`);
       const params = [
         ['action',   'search'],
         ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],

@@ -5,8 +5,6 @@
     // не трогаем форму редактирования доп. полей
     if (/\/profile\.php\b/.test(location.pathname) && /section=fields/.test(location.search)) return;
 
-    console.log('to html запущен');
-
     const suffixes = normalize(fields);
     if (!suffixes.length) return;
 

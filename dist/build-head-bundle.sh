@@ -9,6 +9,11 @@ cat > dist/head-bundle.js << 'HEADER'
 HEADER
 
 echo "" >> dist/head-bundle.js
+echo "/* MODULE 0: src/consts_from_form.js */" >> dist/head-bundle.js
+cat src/consts_from_form.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "" >> dist/head-bundle.js
 echo "/* MODULE 1: common.js */" >> dist/head-bundle.js
 cat src/core/common.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js

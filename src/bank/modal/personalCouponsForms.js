@@ -26,6 +26,12 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
 
   clearErrorMessage(modalFields);
 
+  // Убираем "Пожалуйста, подождите..."
+  const mutedNote = modalFields.querySelector('.muted-note');
+  if (mutedNote) {
+    mutedNote.remove();
+  }
+
   // Получаем активные купоны
   const activeCoupons = getActivePersonalCoupons();
 
@@ -46,43 +52,25 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
   activeCoupons.forEach((coupon, index) => {
     const couponBlock = document.createElement('div');
     couponBlock.className = 'coupon-block';
-    couponBlock.style.border = '1px solid var(--border-color, #e5e7eb)';
+    couponBlock.style.border = '2px solid var(--border-color, #e5e7eb)';
     couponBlock.style.borderRadius = '8px';
     couponBlock.style.padding = '12px';
+    couponBlock.style.cursor = 'pointer';
+    couponBlock.style.transition = 'all 0.2s';
     couponBlock.dataset.couponId = coupon.id;
+    couponBlock.dataset.selected = 'false';
+
+    // Если купон уже был выбран ранее, отмечаем его
+    if (selectedPersonalCoupons.includes(coupon.id)) {
+      couponBlock.dataset.selected = 'true';
+      couponBlock.style.borderColor = 'var(--primary, #3b82f6)';
+      couponBlock.style.backgroundColor = 'var(--bg-hover, #f9fafb)';
+    }
 
     // Вставляем HTML блок купона
     const htmlContainer = document.createElement('div');
     htmlContainer.innerHTML = coupon.html || '';
     couponBlock.appendChild(htmlContainer);
-
-    // Добавляем чекбокс для выбора
-    const checkboxContainer = document.createElement('div');
-    checkboxContainer.style.marginTop = '8px';
-    checkboxContainer.style.display = 'flex';
-    checkboxContainer.style.alignItems = 'center';
-    checkboxContainer.style.gap = '8px';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `coupon-${coupon.id}`;
-    checkbox.name = `coupon_${index}`;
-    checkbox.value = coupon.id;
-    checkbox.dataset.couponId = coupon.id;
-
-    // Если купон уже был выбран ранее, отмечаем его
-    if (selectedPersonalCoupons.includes(coupon.id)) {
-      checkbox.checked = true;
-    }
-
-    const label = document.createElement('label');
-    label.htmlFor = `coupon-${coupon.id}`;
-    label.textContent = 'Использовать этот купон';
-    label.style.cursor = 'pointer';
-
-    checkboxContainer.appendChild(checkbox);
-    checkboxContainer.appendChild(label);
-    couponBlock.appendChild(checkboxContainer);
 
     // Контейнер для сообщений об ошибках валидации
     const errorContainer = document.createElement('div');
@@ -95,18 +83,47 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
 
     couponsContainer.appendChild(couponBlock);
 
-    // Добавляем слушатель для валидации при изменении чекбокса
-    checkbox.addEventListener('change', () => {
-      validateCoupon(coupon, checkbox, errorContainer, btnSubmit);
+    // Добавляем слушатель для клика по купону
+    couponBlock.addEventListener('click', () => {
+      const isSelected = couponBlock.dataset.selected === 'true';
+
+      // Переключаем состояние
+      couponBlock.dataset.selected = isSelected ? 'false' : 'true';
+
+      if (couponBlock.dataset.selected === 'true') {
+        couponBlock.style.borderColor = 'var(--primary, #3b82f6)';
+        couponBlock.style.backgroundColor = 'var(--bg-hover, #f9fafb)';
+      } else {
+        couponBlock.style.borderColor = 'var(--border-color, #e5e7eb)';
+        couponBlock.style.backgroundColor = '';
+      }
+
+      // Валидация и обновление всех купонов
+      validateCoupon(coupon, couponBlock, errorContainer, btnSubmit);
       updateAllValidations();
+    });
+
+    // Hover эффект
+    couponBlock.addEventListener('mouseenter', () => {
+      if (couponBlock.dataset.selected !== 'true') {
+        couponBlock.style.borderColor = 'var(--primary, #3b82f6)';
+      }
+    });
+
+    couponBlock.addEventListener('mouseleave', () => {
+      if (couponBlock.dataset.selected !== 'true') {
+        couponBlock.style.borderColor = 'var(--border-color, #e5e7eb)';
+      }
     });
   });
 
   modalFields.appendChild(couponsContainer);
 
   // Функция валидации одного купона
-  function validateCoupon(coupon, checkbox, errorContainer, btnSubmit) {
-    if (!checkbox.checked) {
+  function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit) {
+    const isSelected = couponBlock.dataset.selected === 'true';
+
+    if (!isSelected) {
       errorContainer.style.display = 'none';
       errorContainer.textContent = '';
       return true; // Невыбранный купон не валидируем
@@ -162,19 +179,19 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
   // Функция для проверки всех выбранных купонов
   function updateAllValidations() {
     let allValid = true;
-    const checkboxes = modalFields.querySelectorAll('input[type="checkbox"][data-coupon-id]');
+    const couponBlocks = modalFields.querySelectorAll('.coupon-block');
 
     // Сначала валидируем каждый купон индивидуально
-    checkboxes.forEach((checkbox) => {
-      if (!checkbox.checked) return;
+    couponBlocks.forEach((couponBlock) => {
+      const isSelected = couponBlock.dataset.selected === 'true';
+      if (!isSelected) return;
 
-      const couponId = checkbox.dataset.couponId;
+      const couponId = couponBlock.dataset.couponId;
       const coupon = activeCoupons.find(c => c.id === couponId);
-      const couponBlock = checkbox.closest('.coupon-block');
-      const errorContainer = couponBlock?.querySelector('.coupon-error');
+      const errorContainer = couponBlock.querySelector('.coupon-error');
 
       if (coupon && errorContainer) {
-        const isValid = validateCoupon(coupon, checkbox, errorContainer, btnSubmit);
+        const isValid = validateCoupon(coupon, couponBlock, errorContainer, btnSubmit);
         if (!isValid) {
           allValid = false;
         }
@@ -183,10 +200,11 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
 
     // Проверяем, что выбран не более одного процентного купона для каждой формы
     const selectedPercentCoupons = {};
-    checkboxes.forEach((checkbox) => {
-      if (!checkbox.checked) return;
+    couponBlocks.forEach((couponBlock) => {
+      const isSelected = couponBlock.dataset.selected === 'true';
+      if (!isSelected) return;
 
-      const couponId = checkbox.dataset.couponId;
+      const couponId = couponBlock.dataset.couponId;
       const coupon = activeCoupons.find(c => c.id === couponId);
 
       if (coupon && coupon.type === 'percent') {
@@ -194,7 +212,7 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
         if (!selectedPercentCoupons[formId]) {
           selectedPercentCoupons[formId] = [];
         }
-        selectedPercentCoupons[formId].push({ coupon, checkbox });
+        selectedPercentCoupons[formId].push({ coupon, couponBlock });
       }
     });
 
@@ -203,9 +221,8 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
       const coupons = selectedPercentCoupons[formId];
       if (coupons.length > 1) {
         allValid = false;
-        coupons.forEach(({ coupon, checkbox }) => {
-          const couponBlock = checkbox.closest('.coupon-block');
-          const errorContainer = couponBlock?.querySelector('.coupon-error');
+        coupons.forEach(({ coupon, couponBlock }) => {
+          const errorContainer = couponBlock.querySelector('.coupon-error');
           if (errorContainer) {
             errorContainer.textContent = `Можно использовать только один процентный купон для формы "${formId}".`;
             errorContainer.style.display = 'block';
@@ -213,9 +230,8 @@ export function handlePersonalCouponsForm({ template, modalFields, btnSubmit }) 
         });
       } else {
         // Убираем ошибку о дубликатах, если она была
-        coupons.forEach(({ checkbox }) => {
-          const couponBlock = checkbox.closest('.coupon-block');
-          const errorContainer = couponBlock?.querySelector('.coupon-error');
+        coupons.forEach(({ couponBlock }) => {
+          const errorContainer = couponBlock.querySelector('.coupon-error');
           if (errorContainer && errorContainer.textContent.includes('Можно использовать только один процентный купон')) {
             errorContainer.style.display = 'none';
             errorContainer.textContent = '';

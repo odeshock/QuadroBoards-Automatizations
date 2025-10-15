@@ -685,23 +685,12 @@ export function renderLog(log) {
 
   // При клике на div, кликаем на скрытую кнопку
   couponButton.addEventListener('click', (e) => {
-    console.log('🎟️ Клик на кнопку купонов');
-    console.log('Target:', e.target);
-    console.log('Hidden button:', hiddenBtn);
-    console.log('Hidden button attributes:', {
-      form: hiddenBtn.getAttribute('data-form'),
-      kind: hiddenBtn.getAttribute('data-kind'),
-      title: hiddenBtn.getAttribute('data-title')
-    });
-
     if (e.target !== hiddenBtn) {
-      console.log('Кликаем на скрытую кнопку...');
       hiddenBtn.click();
     }
   });
 
   log.appendChild(couponButton);
-  console.log('✅ Кнопка купонов добавлена в лог');
 
   if (!submissionGroups.length) {
     const empty = document.createElement('div');

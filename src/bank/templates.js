@@ -210,7 +210,10 @@ export const formTemplates = {
   [FORM_BG_PRESENT]: waitingTemplate(''),
 
   // КУПОНЫ
-  [FORM_PERSONAL_COUPON]: waitingTemplate(TEXT_MESSAGES.PLEASE_WAIT)
+  [FORM_PERSONAL_COUPON]: infoWithNote(
+    'Сначала добавьте операцию, потом используйте купон.<br><br><strong>Процентные скидки</strong> для каждого вида операции можно использовать за транзакцию <strong>лишь раз</strong>.',
+    TEXT_MESSAGES.PLEASE_WAIT
+  )
 };
 
 // Список форм с data-info атрибутом

@@ -2,7 +2,7 @@
 // app.js — Основная точка входа
 // ============================================================================
 
-import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup, getActivePersonalCoupons, selectedPersonalCoupons } from './services.js';
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup } from './services.js';
 import { openModal, closeModal } from './modal/index.js';
 import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
@@ -21,7 +21,6 @@ import {
   FORM_PERSONAL_COUPON,
   toSelector
 } from './constants.js';
-import { parseNumericAmount } from './utils.js';
 
 // ============================================================================
 // DOM REFERENCES
@@ -77,7 +76,6 @@ tabButtons.forEach((btn) => {
 // ============================================================================
 
 function handleOpenModal(config) {
-  console.log('🚀 handleOpenModal вызвана с config:', config);
   counterWatcher = openModal({
     backdrop,
     modalTitle,
@@ -89,7 +87,6 @@ function handleOpenModal(config) {
     counterWatcher,
     config
   });
-  console.log('✨ openModal завершена, counterWatcher:', counterWatcher);
 }
 
 function handleCloseModal() {
@@ -116,16 +113,8 @@ document.addEventListener('click', (e) => {
   const btn = e.target.closest('.btn-add');
   if (!btn) return;
 
-  console.log('🔘 Клик на btn-add:', btn);
-  console.log('Атрибуты кнопки:', {
-    form: btn.getAttribute('data-form'),
-    kind: btn.getAttribute('data-kind'),
-    title: btn.getAttribute('data-title')
-  });
-
   // Проверка доступа
   if (btn.disabled) {
-    console.log('❌ Кнопка disabled');
     e.preventDefault();
     return;
   }
@@ -138,18 +127,13 @@ document.addEventListener('click', (e) => {
   const titleText = overrideTitle || (row ? row.textContent.trim() : 'Пункт');
   const amountLabel = kind === 'expense' ? 'Стоимость' : 'Начисление';
 
-  console.log('📝 Данные для модалки:', { selector, kind, titleText, amountLabel });
-
   // Дополнительная проверка доступа (по ID формы)
   // Убираем # для сравнения с константами
   const selectorWithoutHash = selector ? selector.replace('#', '') : '';
   if (!isItemAllowedForAdmin(selectorWithoutHash)) {
-    console.log('❌ Доступ запрещён для формы:', selectorWithoutHash);
     e.preventDefault();
     return;
   }
-
-  console.log('✅ Проверки пройдены, открываем модалку...');
 
   // Дополнительные данные для подарков
   const giftId = btn.getAttribute('data-gift-id');
@@ -191,11 +175,7 @@ document.addEventListener('click', (e) => {
   const key = buildGroupKey(meta);
   const existingGroup = submissionGroups.find((group) => group.key === key);
 
-  console.log('🔑 Group key:', key);
-  console.log('📦 Existing group:', existingGroup);
-
   if (existingGroup && existingGroup.entries.length) {
-    console.log('📂 Открываем существующую группу с данными');
     const lastEntry = existingGroup.entries[existingGroup.entries.length - 1];
     handleOpenModal({
       ...meta,
@@ -204,10 +184,8 @@ document.addEventListener('click', (e) => {
       groupId: existingGroup.id
     });
   } else {
-    console.log('🆕 Открываем новую форму');
     handleOpenModal(meta);
   }
-  console.log('🎬 handleOpenModal вызвана');
 });
 
 // Кнопка закрытия
@@ -648,61 +626,6 @@ function renderExpenseList() {
     div.appendChild(btn);
     container.appendChild(div);
   });
-}
-
-function renderPersonalCoupons() {
-  // Создаём отдельную панель для купонов
-  const grid = document.querySelector('#tab-bank .grid');
-  if (!grid) return;
-
-  // Создаём панель купонов
-  const panel = document.createElement('section');
-  panel.className = 'panel';
-  panel.setAttribute('aria-labelledby', 'coupons-title');
-
-  const header = document.createElement('header');
-  const title = document.createElement('h2');
-  title.id = 'coupons-title';
-  title.textContent = 'Купоны';
-  header.appendChild(title);
-
-  const list = document.createElement('div');
-  list.className = 'list';
-  list.setAttribute('role', 'list');
-
-  // Создаём кнопку купонов
-  const div = document.createElement('div');
-  div.className = 'item coupon-item';
-  div.setAttribute('role', 'listitem');
-
-  const btn = document.createElement('button');
-  btn.className = 'btn-add btn-coupon';
-  btn.setAttribute('data-form', toSelector(FORM_PERSONAL_COUPON));
-  btn.setAttribute('data-kind', 'income');
-  btn.setAttribute('data-amount', '');
-  btn.setAttribute('data-title', 'Купоны');
-  btn.textContent = '🎟️'; // иконка билета/купона
-  btn.title = 'Выбрать купоны';
-
-  // Создаём структуру элемента
-  const titleDiv = document.createElement('div');
-  titleDiv.className = 'title';
-  titleDiv.textContent = 'Мои купоны';
-
-  const priceDiv = document.createElement('div');
-  priceDiv.className = 'price';
-  priceDiv.textContent = 'выбрать/использовать';
-
-  div.appendChild(titleDiv);
-  div.appendChild(priceDiv);
-  div.appendChild(btn);
-
-  list.appendChild(div);
-  panel.appendChild(header);
-  panel.appendChild(list);
-
-  // Вставляем панель купонов после панели расходов
-  grid.appendChild(panel);
 }
 
 function renderGiftsList() {

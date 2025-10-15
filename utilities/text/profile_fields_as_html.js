@@ -3,6 +3,7 @@
   // Рендерит указанные доп. поля как HTML (по номерам)
   window.renderExtraFieldsAsHTML = function renderExtraFieldsAsHTML(fields) {
     console.log('to html запущен');
+    
     // не трогаем форму редактирования доп. полей
     if (/\/profile\.php\b/.test(location.pathname) && /section=fields/.test(location.search)) return;
 

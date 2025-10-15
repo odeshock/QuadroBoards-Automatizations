@@ -2913,10 +2913,12 @@ async function getLastValue(default_value, {label, is_month = false }) {
 
     const first = Array.isArray(seed) ? seed[0] : null;
     const posts_html = (first && typeof first.html === "string") ? first.html : "";
+    console.log('posts_html:', posts_html)
 
     const rawLinks = posts_html
       ? getBlockquoteTextFromHtml(posts_html, label, 'last_value')
       : null;
+    console.log('rawLinks:', rawLinks)
 
     let last_value;
 
@@ -2996,7 +2998,7 @@ document.addEventListener("DOMContentLoaded", () => {
         { retries: 4, baseDelay: 900, maxDelay: 9000, timeoutMs: 20000 },
         "fetchProfileInfo"
       );
-      console.log(BankProfileInfo.date);
+      console.log('BankProfileInfo.date', BankProfileInfo.date);
 
       // последовательно (ретраи уже внутри getLastValue), плюс пауза между вызовами
       const msg100_old = await getLastValue(0, { label: BankLabel.message100 });
@@ -3009,7 +3011,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between getLastValue (pos100_old)");
 
       const month_old  = await getLastValue(BankProfileInfo.date, { label: BankLabel.month, is_month: true });
-      console.log(month_old);
+      console.log('month_old:', month_old);
 
       queueMessage(iframeReadyP, () => ({
         type: BankPostMessagesType.profile_info,

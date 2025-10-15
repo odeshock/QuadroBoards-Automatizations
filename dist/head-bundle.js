@@ -2769,14 +2769,6 @@ const BankPostMessagesType = {
   users_list: "USERS_LIST",
 };
 
-// === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
-const preScrapeBarrier = (async () => {
-  console.log("🟨 [WAIT] pre-scrape barrier: 15000ms");
-  await delay(15000);
-  console.log("🟢 [GO]   pre-scrape barrier passed");
-  return true;
-})();
-
 const _origScrapePosts = window.scrapePosts?.bind(window);
 if (typeof _origScrapePosts === "function") {
   window.scrapePosts = async (...args) => {
@@ -2942,6 +2934,15 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!headTitle.startsWith("Гринготтс")) {
     return;
   }
+
+  // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
+  const preScrapeBarrier = (async () => {
+    console.log("🟨 [WAIT] pre-scrape barrier: 15000ms");
+    await delay(15000);
+    console.log("🟢 [GO]   pre-scrape barrier passed");
+    return true;
+  })();
+
   const textArea = document.querySelector('textarea[name="req_message"]');
   const iframeReadyP = waitForIframeReady(IFRAME_ORIGIN);
 

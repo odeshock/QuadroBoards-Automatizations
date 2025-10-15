@@ -2914,7 +2914,8 @@ async function getLastValue(default_value, {label, is_month = false }) {
     const first = Array.isArray(seed) ? seed[0] : null;
     const posts_html = (first && typeof first.html === "string") ? first.html : "";
     console.log('posts_html:', posts_html)
-
+    console.log('label', label);
+    
     const rawLinks = posts_html
       ? getBlockquoteTextFromHtml(posts_html, label, 'last_value')
       : null;

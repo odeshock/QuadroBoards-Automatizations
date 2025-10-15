@@ -1936,13 +1936,18 @@ export function renderLog(log) {
           }
 
           if (amountNumber !== null) {
-            const totalEntryMultiplier = group.entries.reduce((sum, item) => {
-              const raw = item && typeof item.multiplier !== 'undefined' ? item.multiplier : null;
-              const numeric = typeof raw === 'string' ? Number.parseFloat(raw) : raw;
-              const value = Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
-              return sum + value;
-            }, 0);
-            const multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+            // Для купонов, корректировок и автоскидок multiplier всегда 1
+            // (amount уже содержит итоговую сумму всех entries)
+            let multiplier = 1;
+            if (!group.isPersonalCoupon && !group.isPriceAdjustment && !group.isDiscount) {
+              const totalEntryMultiplier = group.entries.reduce((sum, item) => {
+                const raw = item && typeof item.multiplier !== 'undefined' ? item.multiplier : null;
+                const numeric = typeof raw === 'string' ? Number.parseFloat(raw) : raw;
+                const value = Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+                return sum + value;
+              }, 0);
+              multiplier = totalEntryMultiplier > 0 ? totalEntryMultiplier : 1;
+            }
             const total = amountNumber * multiplier;
 
             // Логируем для купонов, корректировок и скидок

@@ -441,23 +441,69 @@
     };
   };
 
-
+  // drop-in замена
   window.encodeForSearch = function encodeWin1251(text) {
+    // Нормализуем форму Юникода, чтобы не ловить странные составные символы
+    text = String(text).normalize('NFC');
+
+    // Доп. соответствия для CP1251 (частая пунктуация и символы)
+    const CP1251_PUNCT = new Map([
+      [0x00A0, 0xA0], // NBSP
+      [0x00AB, 0xAB], // «
+      [0x00BB, 0xBB], // »
+      [0x2026, 0x85], // …
+      [0x2013, 0x96], // – en dash
+      [0x2014, 0x97], // — em dash
+      [0x2018, 0x91], // ‘
+      [0x2019, 0x92], // ’
+      [0x201C, 0x93], // “
+      [0x201D, 0x94], // ”
+      [0x00B7, 0xB7], // ·
+      [0x2116, 0xB9], // №
+      [0x00A9, 0xA9], // ©
+      [0x00AE, 0xAE], // ®
+      [0x2122, 0x99], // ™
+    ]);
+
+    // Доп. кириллица CP1251 за пределами русского алфавита
+    const CP1251_EXTRA = new Map([
+      [0x0404, 0xAA], // Є
+      [0x0454, 0xBA], // є
+      [0x0406, 0xB2], // І
+      [0x0456, 0xB3], // і
+      [0x0407, 0xAF], // Ї
+      [0x0457, 0xBF], // ї
+      [0x0490, 0xA5], // Ґ
+      [0x0491, 0xB4], // ґ
+    ]);
+
     let out = '';
-    for (const ch of String(text)) {
+    for (const ch of text) {
       const cp = ch.codePointAt(0);
       let b;
+
       if (cp <= 0x7F) {
-        b = cp; // ASCII
-      } else if (cp >= 0x0410 && cp <= 0x044F) { // А..я
+        // ASCII
+        b = cp;
+      } else if (cp >= 0x0410 && cp <= 0x044F) {
+        // А..я
         b = 0xC0 + (cp - 0x0410);
       } else if (cp === 0x0401) { // Ё
         b = 0xA8;
       } else if (cp === 0x0451) { // ё
         b = 0xB8;
+      } else if (CP1251_EXTRA.has(cp)) {
+        b = CP1251_EXTRA.get(cp);
+      } else if (CP1251_PUNCT.has(cp)) {
+        b = CP1251_PUNCT.get(cp);
+      } else if (cp === 0x2010 || cp === 0x2212 || cp === 0x002D) {
+        // все виды «минуса/дефиса» → ASCII '-'
+        b = 0x2D;
       } else {
+        // неизвестное → вопрос: можно заменить на пробел, если хочешь не «мусорить» %3F
         b = 0x3F; // '?'
       }
+
       out += (b === 0x20) ? '+' : '%' + b.toString(16).toUpperCase().padStart(2, '0');
     }
     return out;

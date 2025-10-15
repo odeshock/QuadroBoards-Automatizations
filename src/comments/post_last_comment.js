@@ -111,13 +111,13 @@
           ? window.SITE_URL.trim().replace(/\/$/, '')
           : location.origin.replace(/\/$/, '');
         const href = `${base}/viewtopic.php?${posts[0].src}`;
-        setLink(slot, href, posts[0].date_text || posts[0].text || 'Последний пост');
+        setLink(anchor, href, posts[0].date_text || posts[0].text || 'Последний пост');
       } else {
-        setEmpty(slot);
+        setEmpty(anchor);
       }
     } catch (error) {
       console.error('[post_last_comment] scrapePosts failed', error);
-      setEmpty(slot, 'ошибка поиска');
+      setEmpty(anchor, 'ошибка поиска');
     }
   });
 })();

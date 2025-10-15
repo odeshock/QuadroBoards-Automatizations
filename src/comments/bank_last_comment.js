@@ -112,7 +112,7 @@
           ? window.SITE_URL.trim().replace(/\/$/, '')
           : location.origin.replace(/\/$/, '');
         const href = `${siteBase}/viewtopic.php?${posts[0].src}`;
-        setLink(slot, href, posts[0].date_text || posts[0].text || 'Последняя операция');
+        setLink(anchor, href, posts[0].date_text || posts[0].text || 'Последняя операция');
       } else {
         setEmpty(anchor);
       }

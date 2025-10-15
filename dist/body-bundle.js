@@ -3629,7 +3629,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
           ? window.SITE_URL.trim().replace(/\/$/, '')
           : location.origin.replace(/\/$/, '');
         const href = `${siteBase}/viewtopic.php?${posts[0].src}`;
-        setLink(slot, href, posts[0].date_text || posts[0].text || 'Последняя операция');
+        setLink(anchor, href, posts[0].date_text || posts[0].text || 'Последняя операция');
       } else {
         setEmpty(anchor);
       }
@@ -3817,13 +3817,13 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
           ? window.SITE_URL.trim().replace(/\/$/, '')
           : location.origin.replace(/\/$/, '');
         const href = `${base}/viewtopic.php?${posts[0].src}`;
-        setLink(slot, href, posts[0].date_text || posts[0].text || 'Последний пост');
+        setLink(anchor, href, posts[0].date_text || posts[0].text || 'Последний пост');
       } else {
-        setEmpty(slot);
+        setEmpty(anchor);
       }
     } catch (error) {
       console.error('[post_last_comment] scrapePosts failed', error);
-      setEmpty(slot, 'ошибка поиска');
+      setEmpty(anchor, 'ошибка поиска');
     }
   });
 })();

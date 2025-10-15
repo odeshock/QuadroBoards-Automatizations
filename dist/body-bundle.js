@@ -3,6 +3,467 @@
  * @version 1.0.0
  */
 
+/* ДАЙСЫ utilities/gamification/dices.js */
+// ===== DiceFM (ES5): детерминированно; порядок учитывается только среди одинаковых; причина не влияет =====
+
+// --- утилиты
+function dfm_escape(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function dfm_insertAtCaret(el, text) {
+  el.focus();
+  var a = (typeof el.selectionStart === "number") ? el.selectionStart : el.value.length;
+  var b = (typeof el.selectionEnd === "number") ? el.selectionEnd : el.value.length;
+  el.value = el.value.slice(0, a) + text + el.value.slice(b);
+  el.selectionStart = el.selectionEnd = a + text.length;
+  try {
+    el.dispatchEvent(new Event("input", {
+      bubbles: true
+    }));
+  } catch (e) {}
+}
+
+// --- FNV-1a 32-bit hash
+function dfm_hash32(str) {
+  var h = 0x811c9dc5,
+    i, c;
+  for (i = 0; i < str.length; i++) {
+    c = str.charCodeAt(i);
+    h ^= c;
+    h = (h >>> 0) * 0x01000193;
+  }
+  return h >>> 0;
+}
+// --- xorshift32 ПСГ
+function dfm_prng(seed) {
+  var x = (seed >>> 0) || 0x9e3779b9;
+  return function() {
+    x ^= (x << 13);
+    x ^= (x >>> 17);
+    x ^= (x << 5);
+    x >>>= 0;
+    return x / 4294967296;
+  };
+}
+
+function dfm_rng_int(prng, min, max) {
+  var r = prng();
+  return min + Math.floor(r * (max - min + 1));
+}
+
+function dfm_roll_det(n, s, seed) {
+  var prng = dfm_prng(seed),
+    out = [],
+    i;
+  for (i = 0; i < n; i++) out.push(dfm_rng_int(prng, 1, s));
+  return out;
+}
+
+// --- канон (для сида причина игнорируется)
+function dfm_canon(n, k, b) {
+  var cN = String(parseInt(n, 10));
+  var cK = String(parseInt(k, 10));
+  var cB = parseInt(b, 10);
+  cB = (cB >= 0 ? ("+" + cB) : ("" + cB));
+  return cN + ":" + cK + ":" + cB;
+}
+
+// --- сид: пост + канон + индекс внутри группы одинаковых тегов
+function dfm_makeSeed(postEl, canonStr, groupIndex) {
+  var postIdStr = postEl && postEl.id ? postEl.id : "";
+  var postIdNum = (postIdStr.match(/\d+/) || [0])[0];
+  var posted = postEl ? (postEl.getAttribute("data-posted") || "0") : "0";
+  return dfm_hash32("DiceFM|" + postIdNum + "|" + posted + "|" + canonStr + "|" + groupIndex);
+}
+
+// --- вставка тега [DiceFM N:K:+B:Причина?] (финальный ":" обязателен)
+function dfm_attach() {
+  var btn = document.getElementById("dicefm-btn"); // ← НИКАКИХ поисков/созданий submit
+  var field = document.getElementById("main-reply");
+  if (!btn || !field) return;
+
+  btn.addEventListener("click", function() {
+    var cStr = prompt("Сколько дайсов бросаем?", "1");
+    if (cStr === null) return;
+    var c = parseInt(cStr, 10);
+    if (!(c >= 1 && c <= 100)) {
+      alert("Значение должно быть в пределах [1;100]");
+      return;
+    }
+
+    var sStr = prompt("Сколько граней у каждого дайса?", "6");
+    if (sStr === null) return;
+    var s = parseInt(sStr, 10);
+    if (!(s >= 2 && s <= 100000)) {
+      alert("Значение должно быть в пределах [2;100000]");
+      return;
+    }
+
+    var bStr = prompt("Есть ли бонус/штраф?", "+0");
+    if (bStr === null) return;
+    bStr = (bStr || "").trim();
+    if (!/^[+-]?\d+$/.test(bStr)) {
+      alert("Нужен формат +1 или -1");
+      return;
+    }
+    var b = parseInt(bStr, 10);
+    if (Math.abs(b) > 100000) {
+      alert("Абсолютное значение должно быть не больше 100000");
+      return;
+    }
+    var bOut = (b >= 0 ? ("+" + b) : ("" + b));
+
+    var reason = prompt("Причина броска (опционально)", "") || "";
+    reason = reason.replace(/\]/g, " ").replace(/\s+/g, " ").trim();
+
+    var tag = "[DiceFM " + c + ":" + s + ":" + bOut + ":" + (reason ? reason : "") + "]";
+    dfm_insertAtCaret(field, tag);
+  });
+}
+
+// --- рендер одного тега → HTML (бонус/штраф — ВНЕ скобок; заголовок NdK)
+function dfm_render(n, k, b, reason, seed) {
+  var c = parseInt(n, 10),
+    s = parseInt(k, 10),
+    bonus = parseInt(b, 10);
+  if (!(c >= 1 && c <= 100) || !(s >= 2 && s <= 100000) || !(Math.abs(bonus) <= 100000)) throw new Error("Проблема с данными");
+
+  var rolls = dfm_roll_det(c, s, seed),
+    i, base = 0,
+    list = "";
+  for (i = 0; i < rolls.length; i++) {
+    base += rolls[i];
+    list += (i ? "+" : "") + rolls[i];
+  }
+  var total = base + bonus;
+  var outside = bonus === 0 ? "" : (bonus > 0 ? "+" + bonus : "" + bonus);
+  var resultExpr = "(" + list + ")" + outside + "=" + total;
+
+  var header = '<b>Бросок ' + c + 'd' + s + (bonus === 0 ? '' : (bonus > 0 ? ' с бонусом ' + bonus : ' со штрафом ' + bonus)) + '</b>';
+  var reasonHTML = reason ? "<br><em>" + dfm_escape(reason) + "</em>" : "";
+
+  return '<div class="quote-box"><blockquote style="text-align:left"><p>' +
+    header +
+    reasonHTML +
+    '<br><br><b>Результат:</b> ' + resultExpr +
+    '</p></blockquote></div>';
+}
+
+// --- замена тегов (строго двоеточия, финальный ":" обязателен).
+// Порядок учитывается ТОЛЬКО внутри группы одинаковых N:K:+B.
+function dfm_replace(postContentEl) {
+  if (!postContentEl) return;
+  var postEl = postContentEl.closest ? postContentEl.closest(".post") : null;
+  var before = postContentEl.innerHTML;
+
+  // счётчики по группе канона
+  var counters = {}; // { "N:K:+B": nextIndex }
+
+  var after = before.replace(
+    /\[(?:DiceFM)\s+(\d+)\s*:\s*(\d+)\s*:\s*([+-]?\d+)\s*:\s*(?:"([^"]*)"|([^\]]*))\s*\]/gi,
+    function(match, n, k, b, reasonQ, reasonU) {
+      try {
+        var reason = ((reasonQ != null ? reasonQ : reasonU) || "").replace(/\s+/g, " ").trim();
+        var canon = dfm_canon(n, k, b);
+        var idx = (counters[canon] || 0); // 0 для первого такого тега, 1 для второго и т.д.
+        counters[canon] = idx + 1;
+
+        var seed = dfm_makeSeed(postEl, canon, idx);
+        return dfm_render(n, k, b, reason, seed);
+      } catch (e) {
+        return match;
+      }
+    }
+  );
+
+  if (after !== before) postContentEl.innerHTML = after;
+}
+
+// --- init
+function dfm_init() {
+  if (typeof FORUM !== "undefined" && !FORUM.topic) return;
+  var list = document.querySelectorAll ? document.querySelectorAll(".post-content") : [];
+  for (var i = 0; i < list.length; i++) dfm_replace(list[i]);
+}
+
+// --- старт
+if (window.jQuery) {
+  jQuery(function() {
+    dfm_attach();
+    dfm_init();
+  });
+  jQuery(document).on('pun_post', function() {
+    dfm_init();
+  });
+  jQuery(document).on('pun_edit', function() {
+    dfm_init();
+  });
+} else {
+  if (document.addEventListener) document.addEventListener("DOMContentLoaded", function() {
+    dfm_attach();
+    dfm_init();
+  });
+}
+
+/* ЗАМЕНА ДЕФИСОВ utilities/text/hyphens_replacing.js */
+/* ----------------------------------------------------------- */
+/* ЗАМЕНА ДЕФИСОВ, КОРОТКИХ ТИРЕ, МИНУСОВ НА ДЛИННОЕ ТИРЕ
+   если:
+   — стоит в начале строки+пробел
+   — если отделено пробелами с двух сторон */
+/* ----------------------------------------------------------- */
+
+$.fn.fixDashes = function() {
+  // расширенные пробелы + BOM/ZWJ/ZWNJ
+  var SPACE_CLASS = '[\\s\\u00A0\\u202F\\u2009\\u2002-\\u2008\\u200A\\u200B\\uFEFF\\u200C\\u200D]';
+  var SPACE_RE = new RegExp(SPACE_CLASS);
+  var ONLY_SPACES_RE = new RegExp('^' + SPACE_CLASS + '*$');
+
+  function isSpace(ch) {
+    return !!ch && SPACE_RE.test(ch);
+  }
+
+  function isBlankText(s) {
+    return !s || ONLY_SPACES_RE.test(s);
+  }
+
+  function isDashish(ch) {
+    return ch === '-' || ch === '\u2212' || (ch && ch >= '\u2010' && ch <= '\u2015');
+  }
+
+  // локальные правила
+  var RE_BETWEEN = new RegExp('(' + SPACE_CLASS + ')(?:-|[\\u2010-\\u2015]|\\u2212)(?=' + SPACE_CLASS + ')', 'g');
+  // быстрый тест хвоста: ... ␠(dash)[␠]*
+  var LEFT_TAIL_HINT = new RegExp(SPACE_CLASS + '(?:-|[\\u2010-\\u2015]|\\u2212)' + SPACE_CLASS + '*$');
+
+  // блочные элементы — границы
+  var BLOCK = {
+    'ADDRESS': 1,
+    'ARTICLE': 1,
+    'ASIDE': 1,
+    'BLOCKQUOTE': 1,
+    'DIV': 1,
+    'DL': 1,
+    'DT': 1,
+    'DD': 1,
+    'FIELDSET': 1,
+    'FIGCAPTION': 1,
+    'FIGURE': 1,
+    'FOOTER': 1,
+    'FORM': 1,
+    'H1': 1,
+    'H2': 1,
+    'H3': 1,
+    'H4': 1,
+    'H5': 1,
+    'H6': 1,
+    'HEADER': 1,
+    'HR': 1,
+    'LI': 1,
+    'MAIN': 1,
+    'NAV': 1,
+    'OL': 1,
+    'P': 1,
+    'PRE': 1,
+    'SECTION': 1,
+    'TABLE': 1,
+    'THEAD': 1,
+    'TBODY': 1,
+    'TFOOT': 1,
+    'TR': 1,
+    'TD': 1,
+    'TH': 1,
+    'UL': 1
+  };
+  var SKIP_TAG = {
+    'SCRIPT': 1,
+    'STYLE': 1,
+    'CODE': 1,
+    'PRE': 1,
+    'KBD': 1,
+    'SAMP': 1
+  };
+
+  function lastNonSpaceIdx(s) {
+    for (var i = s.length - 1; i >= 0; i--)
+      if (!isSpace(s.charAt(i))) return i;
+    return -1;
+  }
+
+  function firstNonSpaceIdx(s) {
+    for (var i = 0; i < s.length; i++)
+      if (!isSpace(s.charAt(i))) return i;
+    return -1;
+  }
+
+  function firstTextDesc(node) {
+    var stack = [node],
+      n, c;
+    while (stack.length) {
+      n = stack.shift();
+      for (c = n.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 3 && !isBlankText(c.nodeValue)) return c;
+        if (c.nodeType === 1) {
+          var tag = c.nodeName.toUpperCase();
+          if (SKIP_TAG[tag]) continue;
+          stack.push(c);
+        }
+      }
+    }
+    return null;
+  }
+
+  function inQuoteBox(el) {
+    for (var n = el; n; n = n.parentNode) {
+      if (n.nodeType !== 1) continue;
+      var cls = n.className || '';
+      if (typeof cls === 'string' &&
+        cls.indexOf('quote-box') !== -1 &&
+        cls.indexOf('spoiler-box') !== -1 &&
+        cls.indexOf('media-box') !== -1) return true;
+    }
+    return false;
+  }
+
+  function tryBoundary(prevText, rightText) {
+    if (!prevText || !rightText) return;
+    var a = prevText.nodeValue;
+    if (!LEFT_TAIL_HINT.test(a)) return; // быстрый отсев
+
+    var ia = lastNonSpaceIdx(a);
+    if (ia === -1) return;
+    var a_last = a.charAt(ia);
+    var a_prev = ia > 0 ? a.charAt(ia - 1) : '';
+    if (!(isDashish(a_last) && isSpace(a_prev))) return;
+
+    var b = rightText.nodeValue;
+    if (!(b.length && isSpace(b.charAt(0)))) return;
+
+    prevText.nodeValue = a.slice(0, ia) + '—' + a.slice(ia + 1);
+  }
+
+  // обработка script[type="text/html"] в .quote-box.spoiler-box.media-box как HTML
+  function processScriptTemplate(scriptEl, processBlockFn) {
+    try {
+      var type = (scriptEl.getAttribute('type') || '').toLowerCase();
+      if (type !== 'text/html') return;
+
+      var src = scriptEl.text || scriptEl.textContent || '';
+      if (!src) return;
+
+      var tmp = document.createElement('div');
+      tmp.innerHTML = src; // распарсили
+      processBlockFn(tmp); // применили правила
+      var out = tmp.innerHTML; // собрали
+
+      scriptEl.text = out; // для старых IE
+      scriptEl.textContent = out;
+    } catch (e) {
+      /* noop */
+    }
+  }
+
+  function processBlock(root) {
+    var prevText = null; // предыдущий НЕпустой текст-узел
+    var gapHasSpace = false; // между prev и текущим были «пустые» ноды с пробелами
+
+    (function walk(node) {
+      for (var child = node.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 3) {
+          var t = child.nodeValue;
+
+          if (isBlankText(t)) {
+            if (prevText) gapHasSpace = true;
+            continue;
+          }
+
+          // === локальные замены ===
+          // между пробелами: " ␠(dash)␠ " → " ␠—␠ "
+          t = t.replace(RE_BETWEEN, '$1—');
+
+          // в начале текст-ноды с учётом ведущих пробелов: "^␠*(dash)␠"
+          // только если слева реально граница (начало блока) или пробел
+          var allowLeading = (!prevText) || gapHasSpace ||
+            (prevText && prevText.nodeValue.length &&
+              isSpace(prevText.nodeValue.charAt(prevText.nodeValue.length - 1)));
+          var i0 = firstNonSpaceIdx(t);
+          if (allowLeading && i0 !== -1 && isDashish(t.charAt(i0))) {
+            var after = (i0 + 1 < t.length) ? t.charAt(i0 + 1) : '';
+            if (isSpace(after)) {
+              t = t.slice(0, i0) + '—' + t.slice(i0 + 1);
+            }
+          }
+          child.nodeValue = t;
+
+          // === межузловая граница: prevText ... | child ===
+          if (prevText) {
+            var a = prevText.nodeValue;
+            var rightStartsWithSpace = t.length && isSpace(t.charAt(0));
+            if (LEFT_TAIL_HINT.test(a)) {
+              var ia = lastNonSpaceIdx(a);
+              if (ia !== -1) {
+                var a_last = a.charAt(ia);
+                var a_prev = ia > 0 ? a.charAt(ia - 1) : '';
+                if (isDashish(a_last) && isSpace(a_prev) && (rightStartsWithSpace || gapHasSpace)) {
+                  prevText.nodeValue = a.slice(0, ia) + '—' + a.slice(ia + 1);
+                }
+              }
+            }
+          }
+
+          prevText = child;
+          gapHasSpace = false; // сброс
+        } else if (child.nodeType === 1) {
+          var tag = child.nodeName.toUpperCase();
+
+          // особый случай: обрабатываем шаблоны внутри quote-box
+          if (tag === 'SCRIPT' && inQuoteBox(child)) {
+            processScriptTemplate(child, processBlock);
+            prevText = null;
+            gapHasSpace = false;
+            continue;
+          }
+
+          if (SKIP_TAG[tag]) {
+            prevText = null;
+            gapHasSpace = false;
+            continue;
+          }
+          if (tag === 'BR') {
+            prevText = null;
+            gapHasSpace = false;
+            continue;
+          }
+
+          if (BLOCK[tag] && child !== root) {
+            processBlock(child); // отдельный блок — свой проход
+            prevText = null;
+            gapHasSpace = false;
+          } else {
+            // попытка склейки на границе prevText | первый текст внутри inline-узла
+            if (prevText) {
+              var firstT = firstTextDesc(child);
+              if (firstT) tryBoundary(prevText, firstT);
+            }
+            walk(child);
+          }
+        }
+      }
+    })(root);
+  }
+
+  return this.each(function() {
+    processBlock(this);
+  });
+};
+
+// запуск
+$(function() {
+  $('.post-content').fixDashes();
+});
+
 /* UI Components */
 (() => {
   const ready = new Promise(res => {

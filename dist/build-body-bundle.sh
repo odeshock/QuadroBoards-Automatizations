@@ -9,6 +9,14 @@ cat > dist/body-bundle.js << 'HEADER'
 HEADER
 
 echo "" >> dist/body-bundle.js
+echo "/* ДАЙСЫ utilities/gamification/dices.js */" >> dist/body-bundle.js
+cat utilities/gamification/dices.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
+echo "/* ЗАМЕНА ДЕФИСОВ utilities/text/hyphens_replacing.js */" >> dist/body-bundle.js
+cat utilities/text/hyphens_replacing.js >> dist/body-bundle.js
+
+echo "" >> dist/body-bundle.js
 echo "/* UI Components */" >> dist/body-bundle.js
 cat src/ui/*.js >> dist/body-bundle.js
 

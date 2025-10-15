@@ -2577,6 +2577,7 @@ window.encodeJSON = encodeJSON;
 window.decodeJSON = decodeJSON;
 window.getBlockquoteTextAfterPersonalPost = getBlockquoteTextAfterPersonalPost;
 window.getBlockquoteTextFromHtml = getBlockquoteTextFromHtml;
+
 /* MODULE 8: bank/parent_messages.js */
 /* =============== базовые утилиты: delay + timeout + retry с логами =============== */
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
@@ -3047,6 +3048,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   })();
 });
+
 /* MODULE 8: utilities/text/profile_fields_as_html.js */
 (function () {
   // === ПУБЛИЧНАЯ ФУНКЦИЯ ==========================================

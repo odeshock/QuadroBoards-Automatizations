@@ -2454,7 +2454,33 @@ function decodeJSON(code) {
   return JSON.parse(json);
 }
 
+// Ищет в живом DOM (по умолчанию — во всём документе)
+function getBlockquoteTextAfterPersonalPost(root = document, label) {
+  // находим <p>, внутри которого есть <strong> с нужным текстом
+  const pWithLabel = Array.from(root.querySelectorAll('p > strong'))
+    .map(s => s.closest('p'))
+    .find(p => p && p.querySelector('strong')?.textContent?.trim().includes(label));
+
+  if (!pWithLabel) return null;
+
+  // идём по соседям до следующего <p>, по пути ищем первый <blockquote>
+  for (let el = pWithLabel.nextElementSibling; el; el = el.nextElementSibling) {
+    if (el.tagName?.toLowerCase() === 'p') break; // дошли до следующего параграфа — стоп
+    const bq = el.matches?.('blockquote') ? el : el.querySelector?.('blockquote');
+    if (bq) return bq.innerText.trim();
+  }
+
+  return null; // если не нашли
+}
+
+function getBlockquoteTextFromHtml(html, label) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return getBlockquoteTextAfterPersonalPost(doc, label);
+}
+
 
 window.formatBankText = formatBankText;
 window.encodeJSON = encodeJSON;
 window.decodeJSON = decodeJSON;
+window.getBlockquoteTextAfterPersonalPost = getBlockquoteTextAfterPersonalPost;
+window.getBlockquoteTextFromHtml = getBlockquoteTextFromHtml;

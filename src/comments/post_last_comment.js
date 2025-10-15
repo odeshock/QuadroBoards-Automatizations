@@ -106,7 +106,7 @@
           ? window.SITE_URL.trim().replace(/\/$/, '')
           : location.origin.replace(/\/$/, '');
         const href = `${base}/viewtopic.php?${posts[0].src}`;
-        setLink(anchor, href, posts[0].date_text || posts[0].text || 'Последний пост');
+        setLink(anchor, href, posts[0].date_text || 'Последний пост');
       } else {
         setEmpty(anchor);
       }

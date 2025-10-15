@@ -6334,9 +6334,9 @@ async function collectChronoByUser(opts = {}) {
     }
 
     // /edit.php?topicpost=1 (редактирование первого поста) — только если есть FMV-теги
-    if (/\/edit\.php$/i.test(path) && q.get('topicpost') === '1') {
-      attachToPage({ strip:true, showOnlyIfCast:true });
-    }
+    // if (/\/edit\.php$/i.test(path) && q.get('topicpost') === '1') {
+    //   attachToPage({ strip:true, showOnlyIfCast:true });
+    // }
 
     // /post.php?action=post&fid=8 — создание, UI всегда (с очисткой textarea)
     if (/\/post\.php$/i.test(path) && q.get('action') === 'post') {
@@ -6352,7 +6352,9 @@ async function collectChronoByUser(opts = {}) {
 
     // /edit.php?id=N&action=edit — только если есть любые FMV-теги
     if (/\/edit\.php$/i.test(path) && q.has('id') && document.querySelector('input[name="firstpost"]')) {
-      attachToPage({ strip:true, showOnlyIfCast:false });
+      const fid = +(q.get('fid')||0);
+      const allowed = (window.CHRONO_CHECK?.ForumID || []).map(Number);
+       if (allowed.includes(fid)) attachToPage({ strip:true, showOnlyIfCast:false });
     }
   });
 

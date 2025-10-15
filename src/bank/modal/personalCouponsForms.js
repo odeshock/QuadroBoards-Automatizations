@@ -208,8 +208,12 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
       errorMessage = `В корзине нет операций типа "${coupon.form}".`;
       isValid = false;
     } else if (costInCart < coupon.value) {
-      errorMessage = `Недостаточная сумма. Нужно: ${coupon.value}, в корзине: ${costInCart}.`;
-      isValid = false;
+      // Купон применяется частично - показываем предупреждение, но не блокируем
+      errorMessage = `⚠️ Купон применён частично: будет использовано ${costInCart} из ${coupon.value}.`;
+      errorContainer.style.color = '#f59e0b'; // Orange warning color
+      errorContainer.style.display = 'block';
+      errorContainer.textContent = errorMessage;
+      return true; // Валидация пройдена
     }
   } else if (coupon.type === 'percent') {
     const costInCart = getCostForForm(coupon.form);
@@ -220,11 +224,13 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
   }
 
   if (!isValid) {
+    errorContainer.style.color = 'var(--danger, #ef4444)'; // Red error color
     errorContainer.textContent = errorMessage;
     errorContainer.style.display = 'block';
   } else {
     errorContainer.style.display = 'none';
     errorContainer.textContent = '';
+    errorContainer.style.color = 'var(--danger, #ef4444)'; // Reset to default
   }
 
   return isValid;

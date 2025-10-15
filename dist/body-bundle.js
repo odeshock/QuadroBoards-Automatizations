@@ -3799,12 +3799,7 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
       return;
     }
 
-    const forumsRaw = window.BANK_FORUMS;
-    const forums = Array.isArray(forumsRaw)
-      ? forumsRaw
-      : typeof forumsRaw === 'string' && forumsRaw.trim()
-        ? forumsRaw.split(',').map(id => id.trim()).filter(Boolean)
-        : [];
+    const forums = EPS_FORUM_INFO.map(item => item.id);
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {

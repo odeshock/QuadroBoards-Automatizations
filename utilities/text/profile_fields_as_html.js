@@ -95,9 +95,9 @@
   };
 
   // === АВТОЗАПУСК ОТ ГЛОБАЛЬНОГО МАССИВА ==========================
-  // Если window.FIELDS_W_HTML существует и это непустой список — запускаем.
+  // Если window.FIELDS_WITH_HTML существует и это непустой список — запускаем.
   // Если не существует — считаем пустым и ничего не делаем.
-  const _raw = window.FIELDS_W_HTML;
+  const _raw = window.FIELDS_WITH_HTML;
   const _list =
     Array.isArray(_raw) ? _raw :
     (typeof _raw === 'string' && _raw.trim() ? [_raw.trim()] : []);

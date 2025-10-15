@@ -500,9 +500,12 @@
 
     // /edit.php?id=N&action=edit — только если есть любые FMV-теги
     if (/\/edit\.php$/i.test(path) && q.has('id') && document.querySelector('input[name="firstpost"]')) {
-      const fid = +(q.get('fid')||0);
-      const allowed = (window.CHRONO_CHECK?.ForumID || []).map(Number);
+      const link = document.querySelector('.container.crumbs a:nth-of-type(2)');
+      if (link && link.href.includes('/viewforum.php?id=') && link.href.split('/viewforum.php?id=').length >= 2) {
+        const fid = Number(links.href.split('/viewforum.php?id=')[1]);
+        const allowed = (window.CHRONO_CHECK?.ForumID || []).map(Number);
        if (allowed.includes(fid)) attachToPage({ strip:true, showOnlyIfCast:false });
+      }
     }
   });
 

@@ -600,11 +600,6 @@ function getBlockquoteTextAfterPersonalPost(
     return val || null;
   }
 
-  // режим "last_value" не зависит от "Каждый личный пост"
-  if (mode === 'last_value') {
-    return extractLastValue(root);
-  }
-
   // ищем <p>, внутри которого есть <strong> с нужным текстом
   const pWithLabel = Array.from(root.querySelectorAll('p > strong'))
     .map(s => s.closest('p'))
@@ -621,6 +616,11 @@ function getBlockquoteTextAfterPersonalPost(
   }
 
   if (!blockquote) return null;
+
+  // режим "last_value" не зависит от "Каждый личный пост"
+  if (mode === 'last_value') {
+    return extractLastValue(blockquote);
+  }
 
   // режимы возврата
   if (mode === 'link') {

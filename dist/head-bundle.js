@@ -2578,7 +2578,7 @@ window.decodeJSON = decodeJSON;
 window.getBlockquoteTextAfterPersonalPost = getBlockquoteTextAfterPersonalPost;
 window.getBlockquoteTextFromHtml = getBlockquoteTextFromHtml;
 
-/* MODULE 8: bank/parent_messages.js */
+/* MODULE 9: bank/parent_messages.js */
 /* =============== базовые утилиты: delay + timeout + retry с логами =============== */
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -3049,11 +3049,12 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
 });
 
-/* MODULE 8: utilities/text/profile_fields_as_html.js */
+/* MODULE 10: utilities/text/profile_fields_as_html.js */
 (function () {
   // === ПУБЛИЧНАЯ ФУНКЦИЯ ==========================================
   // Рендерит указанные доп. поля как HTML (по номерам)
   window.renderExtraFieldsAsHTML = function renderExtraFieldsAsHTML(fields) {
+    console.log('to html запущен');
     // не трогаем форму редактирования доп. полей
     if (/\/profile\.php\b/.test(location.pathname) && /section=fields/.test(location.search)) return;
 

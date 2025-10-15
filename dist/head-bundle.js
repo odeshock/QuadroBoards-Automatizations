@@ -2456,25 +2456,27 @@ function decodeJSON(code) {
 
 // Ищет в живом DOM (по умолчанию — во всём документе)
 function getBlockquoteTextAfterPersonalPost(root = document, label) {
-  // находим <p>, внутри которого есть <strong> с нужным текстом
+  // ищем <p>, внутри которого есть <strong> с нужным текстом
   const pWithLabel = Array.from(root.querySelectorAll('p > strong'))
     .map(s => s.closest('p'))
-    .find(p => p && p.querySelector('strong')?.textContent?.trim().includes(label));
+    .find(p => p && p.querySelector('strong')?.textContent?.includes(label));
 
   if (!pWithLabel) return null;
 
-  // идём по соседям до следующего <p>, по пути ищем первый <blockquote>
+  // идём по соседям до следующего <p>, ищем первый blockquote
   for (let el = pWithLabel.nextElementSibling; el; el = el.nextElementSibling) {
-    if (el.tagName?.toLowerCase() === 'p') break; // дошли до следующего параграфа — стоп
-    const bq = el.matches?.('blockquote') ? el : el.querySelector?.('blockquote');
-    if (bq) return bq.innerText.trim();
+    if (el.tagName?.toLowerCase() === 'p') break;
+    const bq = el.matches('blockquote') ? el : el.querySelector?.('blockquote');
+    if (bq) return bq.innerHTML.trim();
   }
 
-  return null; // если не нашли
+  return null;
 }
 
+
 function getBlockquoteTextFromHtml(html, label) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
   return getBlockquoteTextAfterPersonalPost(doc, label);
 }
 

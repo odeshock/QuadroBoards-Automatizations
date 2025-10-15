@@ -564,6 +564,18 @@ function calculateDiscountForRule(rule, groups) {
     operationTotal += Math.abs(groupCost);
   });
 
+  // Вычитаем персональные купоны для этих форм (если есть)
+  const couponGroup = groups.find(g => g.isPersonalCoupon);
+  if (couponGroup) {
+    couponGroup.entries.forEach(entry => {
+      const couponForm = entry.data?.form;
+      if (matchingGroups.some(g => g.templateSelector === toSelector(couponForm))) {
+        const discountAmount = Number(entry.data?.discount_amount) || 0;
+        operationTotal -= discountAmount;
+      }
+    });
+  }
+
   // Вычитаем корректировки для этих форм (если есть)
   const adjustmentGroup = groups.find(g => g.isPriceAdjustment);
   if (adjustmentGroup) {
@@ -693,6 +705,18 @@ export function updateAutoDiscounts() {
       const groupCost = calculateGroupCost(group);
       operationTotal += Math.abs(groupCost);
     });
+
+    // Вычитаем персональные купоны для этих форм (если есть)
+    const couponGroup = submissionGroups.find(g => g.isPersonalCoupon);
+    if (couponGroup) {
+      couponGroup.entries.forEach(entry => {
+        const couponForm = entry.data?.form;
+        if (matchingGroups.some(g => g.templateSelector === toSelector(couponForm))) {
+          const discountAmount = Number(entry.data?.discount_amount) || 0;
+          operationTotal -= discountAmount;
+        }
+      });
+    }
 
     // Вычитаем корректировки для этих форм (если есть)
     const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
@@ -1059,8 +1083,15 @@ export function getCostForForm(formId) {
  * @param {string} phase - 'item', 'fixed' или 'percent'
  */
 export function updatePersonalCoupons(phase = 'item') {
-  // Если нет выбранных купонов, выходим
+  // Находим существующую группу купонов
+  const existingCouponIndex = submissionGroups.findIndex(g => g.isPersonalCoupon);
+
+  // Если нет выбранных купонов, удаляем группу (если она есть) и выходим
   if (selectedPersonalCoupons.length === 0) {
+    if (existingCouponIndex !== -1) {
+      submissionGroups.splice(existingCouponIndex, 1);
+      console.log('🎫 Группа купонов удалена (нет выбранных купонов)');
+    }
     return;
   }
 
@@ -1071,11 +1102,12 @@ export function updatePersonalCoupons(phase = 'item') {
   const selectedCoupons = activeCoupons.filter(c => selectedPersonalCoupons.includes(c.id));
 
   if (selectedCoupons.length === 0) {
+    if (existingCouponIndex !== -1) {
+      submissionGroups.splice(existingCouponIndex, 1);
+      console.log('🎫 Группа купонов удалена (нет валидных выбранных купонов)');
+    }
     return;
   }
-
-  // Находим существующую группу купонов
-  const existingCouponIndex = submissionGroups.findIndex(g => g.isPersonalCoupon);
   let entries = [];
   let totalDiscount = 0;
 
@@ -1290,5 +1322,55 @@ export function updatePersonalCoupons(phase = 'item') {
     // Если купонов нет, удаляем группу
     submissionGroups.splice(existingCouponIndex, 1);
     console.log('🎫 Группа купонов удалена (нет активных купонов)');
+  }
+}
+
+/**
+ * Проверяет и удаляет невалидные купоны из selectedPersonalCoupons
+ * Купон становится невалидным, если в корзине больше нет операций для его формы
+ * или если не выполняются условия применения (недостаточно товаров/суммы)
+ */
+export function cleanupInvalidCoupons() {
+  if (selectedPersonalCoupons.length === 0) return;
+
+  const activeCoupons = getActivePersonalCoupons();
+  const invalidCouponIds = [];
+
+  selectedPersonalCoupons.forEach(couponId => {
+    const coupon = activeCoupons.find(c => c.id === couponId);
+
+    if (!coupon) {
+      // Купон больше не активен (истек или удален)
+      invalidCouponIds.push(couponId);
+      return;
+    }
+
+    let isValid = false;
+
+    if (coupon.type === 'item') {
+      const itemsInCart = countItemsForForm(coupon.form);
+      isValid = itemsInCart >= coupon.value;
+    } else if (coupon.type === 'fixed') {
+      const costInCart = getCostForForm(coupon.form);
+      isValid = costInCart > 0;
+    } else if (coupon.type === 'percent') {
+      const costInCart = getCostForForm(coupon.form);
+      isValid = costInCart > 0;
+    }
+
+    if (!isValid) {
+      invalidCouponIds.push(couponId);
+    }
+  });
+
+  // Удаляем невалидные купоны
+  if (invalidCouponIds.length > 0) {
+    invalidCouponIds.forEach(couponId => {
+      const index = selectedPersonalCoupons.indexOf(couponId);
+      if (index > -1) {
+        selectedPersonalCoupons.splice(index, 1);
+        console.log(`🎫❌ Купон ${couponId} автоматически снят (условия не выполняются)`);
+      }
+    });
   }
 }

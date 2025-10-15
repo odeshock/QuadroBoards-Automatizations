@@ -14,7 +14,8 @@ import {
   formatEntryKey,
   updateAutoDiscounts,
   updateAutoPriceAdjustments,
-  updatePersonalCoupons
+  updatePersonalCoupons,
+  cleanupInvalidCoupons
 } from './services.js';
 
 import {
@@ -623,6 +624,9 @@ function updateButtonStates() {
 // ============================================================================
 
 export function renderLog(log) {
+  // Сначала проверяем и удаляем невалидные купоны
+  cleanupInvalidCoupons();
+
   // Порядок применения:
   // 1) Персональные купоны (item)
   // 2) Корректировки цен
@@ -849,7 +853,10 @@ export function renderLog(log) {
     // Для topup/ams amount может быть null, но нужно показать entry-meta
     const isTopupOrAms = group.templateSelector === toSelector(FORM_INCOME_TOPUP) || group.templateSelector === toSelector(FORM_INCOME_AMS);
 
-    if (group.amount || isTopupOrAms) {
+    // Для купонов, корректировок и скидок тоже показываем meta даже если amount отсутствует
+    const needsMeta = group.amount || isTopupOrAms || group.isPersonalCoupon || group.isPriceAdjustment || group.isDiscount;
+
+    if (needsMeta) {
       const meta = document.createElement('span');
       meta.className = 'entry-meta';
 
@@ -988,6 +995,15 @@ export function renderLog(log) {
           totalAdjustment += amount;
         });
         meta.innerHTML = `${group.amountLabel}: <span style="color: #22c55e">+ ${formatNumber(totalAdjustment)}</span>`;
+        header.appendChild(meta);
+      } else if (group.isPersonalCoupon) {
+        // Купоны: сумма всех discount_amount
+        let totalDiscount = 0;
+        group.entries.forEach((item) => {
+          const amount = Number(item.data?.discount_amount) || 0;
+          totalDiscount += amount;
+        });
+        meta.innerHTML = `Экономия: <span style="color: #22c55e">+ ${formatNumber(totalDiscount)}</span>`;
         header.appendChild(meta);
       } else if (
         group.templateSelector === toSelector(FORM_GIFT_PRESENT) ||
@@ -1242,7 +1258,7 @@ export function renderLog(log) {
         label.textContent = `${dataObj.coupon_title || 'Купон'}: `;
 
         const calculation = document.createElement('span');
-        calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.coupon_amount || 0)}`;
+        calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.discount_amount || 0)}`;
 
         li.append(label, calculation);
         list.appendChild(li);

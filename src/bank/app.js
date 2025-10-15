@@ -2,7 +2,7 @@
 // app.js — Основная точка входа
 // ============================================================================
 
-import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup } from './services.js';
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup, selectedPersonalCoupons } from './services.js';
 import { openModal, closeModal } from './modal/index.js';
 import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
@@ -444,11 +444,13 @@ form.addEventListener('submit', (e) => {
   // Специальная обработка для формы купонов
   const isCouponForm = templateSelector === toSelector(FORM_PERSONAL_COUPON);
   if (isCouponForm) {
-    // Получаем выбранные купоны из чекбоксов
+    // Получаем выбранные купоны из кликабельных блоков
     const selectedCouponIds = [];
-    formData.forEach((value, key) => {
-      if (key.startsWith('coupon_') && value) {
-        selectedCouponIds.push(value);
+    const selectedBlocks = modalFields.querySelectorAll('.coupon-block[data-selected="true"]');
+    selectedBlocks.forEach(block => {
+      const couponId = block.dataset.couponId;
+      if (couponId) {
+        selectedCouponIds.push(couponId);
       }
     });
 

@@ -64,18 +64,18 @@
     return li;
   }
 
-  function setEmpty(reason) {
-    const text = 'Не найден';
+  function setEmpty(anchor, reason) {
+    const text = 'Не найдена';
     anchor.classList.add('is-empty');
     anchor.href = '#';
     anchor.title = reason || text;
     anchor.textContent = text;
   }
 
-  function setLink(href, dateText) {
+  function setLink(anchor, href, date_text) {
     anchor.classList.remove('is-empty');
     anchor.href = href;
-    anchor.textContent = dateText || 'Последний пост';
+    anchor.textContent = date_text || 'Последняя';
   }
 
   ready(async () => {

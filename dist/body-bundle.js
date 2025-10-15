@@ -3621,7 +3621,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
       const posts = await window.scrapePosts(window.UserLogin, forums, {
         title_prefix: 'Гринготтс',
         stopOnFirstNonEmpty: true,
-        keywords: 'ДОХОДЫ OR РАСХОДЫ AND ИТОГО'
+        keywords: 'ИТОГО'
       });
 
       if (Array.isArray(posts) && posts.length && posts[0]?.src) {

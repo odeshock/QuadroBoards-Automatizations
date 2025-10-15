@@ -2681,6 +2681,7 @@ window.getBlockquoteTextFromHtml = getBlockquoteTextFromHtml;
 
 /* MODULE 9: bank/parent_messages.js */
 /* =============== базовые утилиты: delay + timeout + retry с логами =============== */
+let preScrapeBarrier = Promise.resolve(true);
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function withTimeout(promise, ms, label = "request") {
@@ -2900,7 +2901,7 @@ async function getLastValue(default_value, { label, is_month = false }) {
     const _origScrapePosts = window.scrapePosts?.bind(window);
     if (typeof _origScrapePosts === "function") {
       window.scrapePosts = async (...args) => {
-        await preScrapeBarrier;            // ← гарантированная суммарная задержка до всех scrapePosts
+        await (window.preScrapeBarrier ?? preScrapeBarrier ?? Promise.resolve()); // ← гарантированная суммарная задержка до всех scrapePosts
         return _origScrapePosts(...args);  // ← дальше — как было, со всеми retry/timeout
       };
     }
@@ -2938,12 +2939,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
-  const preScrapeBarrier = (async () => {
+  preScrapeBarrier = (async () => {
     console.log("🟨 [WAIT] pre-scrape barrier: 15000ms");
     await delay(15000);
     console.log("🟢 [GO]   pre-scrape barrier passed");
     return true;
   })();
+  window.preScrapeBarrier = preScrapeBarrier;
 
   const textArea = document.querySelector('textarea[name="req_message"]');
   const iframeReadyP = waitForIframeReady(IFRAME_ORIGIN);

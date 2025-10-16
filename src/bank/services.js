@@ -264,8 +264,10 @@ export function restoreFromBackup(backupData) {
       group.isPriceAdjustment = true;
       // Собираем ID корректировок из backup
       operation.entries.forEach((entry) => {
-        const adjustmentId = entry.key.split('_').pop();
-        if (adjustmentId) backupAdjustmentIds.add(adjustmentId);
+        if (entry.key && typeof entry.key === 'string') {
+          const adjustmentId = entry.key.split('_').pop();
+          if (adjustmentId) backupAdjustmentIds.add(adjustmentId);
+        }
       });
     }
 

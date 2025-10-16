@@ -1133,18 +1133,23 @@ textarea {
 }
 
 .system_entry {
-  background-color: green !important;
+  border-color: #71b4ff !important;
+  background: #dbeaff !important;
 }
 
 .coupon-selector {
   margin-bottom: 16px;
   padding: 12px;
-  border-color: var(--border-color, #e5e7eb);
+  border-color: #71b4ff !important;
+  background: #dbeaff !important;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   transition: 0.2s;
-  background-color: green;
+}
+
+.admin_edit {
+  background: rgb(73, 73, 73) I !important;
 }

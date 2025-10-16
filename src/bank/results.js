@@ -16,7 +16,8 @@ import {
   updateAutoDiscounts,
   updateAutoPriceAdjustments,
   updatePersonalCoupons,
-  cleanupInvalidCoupons
+  cleanupInvalidCoupons,
+  showNotification
 } from './services.js';
 
 import {
@@ -645,15 +646,6 @@ export function renderLog(log) {
   // Добавляем кнопку выбора купонов в начало
   const couponButton = document.createElement('div');
   couponButton.className = 'coupon-selector';
-  couponButton.style.marginBottom = '16px';
-  couponButton.style.padding = '12px';
-  couponButton.style.border = '1px dashed var(--border-color, #e5e7eb)';
-  couponButton.style.borderRadius = '8px';
-  couponButton.style.cursor = 'pointer';
-  couponButton.style.display = 'flex';
-  couponButton.style.alignItems = 'center';
-  couponButton.style.justifyContent = 'space-between';
-  couponButton.style.transition = 'all 0.2s';
 
   couponButton.addEventListener('mouseenter', () => {
     couponButton.style.borderColor = 'var(--primary, #3b82f6)';
@@ -1956,6 +1948,20 @@ export function renderLog(log) {
     totalText.innerHTML = `<strong>ИТОГО:</strong> <span style="color: ${totalColor}">${totalPrefix}${formatNumber(Math.abs(totalSum))}</span>`;
     summaryPanel.appendChild(totalText);
 
+    // Показываем "ВАШ СЧЁТ" с расчётом итогового баланса
+    const currentBank = typeof window.CURRENT_BANK === 'number' && Number.isFinite(window.CURRENT_BANK)
+      ? window.CURRENT_BANK
+      : 0;
+    const finalBalance = currentBank + totalSum;
+    const balanceColor = finalBalance >= 0 ? '#22c55e' : '#ef4444';
+
+    const balanceText = document.createElement('div');
+    balanceText.className = 'summary-balance';
+    balanceText.style.marginTop = '8px';
+    const operationSign = totalSum >= 0 ? '+' : '−';
+    balanceText.innerHTML = `<strong>ВАШ СЧЁТ:</strong> ${formatNumber(currentBank)} ${operationSign} ${formatNumber(Math.abs(totalSum))} = <span style="color: ${balanceColor}; font-weight: bold;">${formatNumber(finalBalance)}</span>`;
+    summaryPanel.appendChild(balanceText);
+
     // Кнопки
     const buttonsWrap = document.createElement('div');
     buttonsWrap.className = 'summary-buttons';
@@ -1980,6 +1986,17 @@ export function renderLog(log) {
     buyBtn.id = 'buy-button';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
+      // Проверяем баланс перед отправкой
+      const currentBank = typeof window.CURRENT_BANK === 'number' && Number.isFinite(window.CURRENT_BANK)
+        ? window.CURRENT_BANK
+        : 0;
+      const finalBalance = currentBank + totalSum;
+
+      if (finalBalance < 0) {
+        showNotification('Ваш счёт не может становиться отрицательным.');
+        return;
+      }
+
       // Получаем текущий timestamp в секундах
       const timestamp = Math.floor(Date.now() / 1000);
 

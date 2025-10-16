@@ -241,18 +241,18 @@ export const autoDiscounts = [
       type: 'none' // Всегда работает
     }
   },
-  {
-    id: 'global-50-percent-discount',
-    title: 'Скидка 50% на инд. иконки',
-    forms: [toSelector(FORM_ICON_CUSTOM)], // Применяется ко всем расходам (kind === 'expense')
-    type: 'percent',
-    discountValue: 50, // 75% скидка
-    startDate: '2024-01-01', // ОБЯЗАТЕЛЬНО: начинает действовать с 00:00 по Москве (формат YYYY-MM-DD)
-    // expiresAt: '2025-10-10', // Опционально: действует до конца указанной даты по Москве
-    condition: {
-      type: 'none' // Всегда работает
-    }
-  },
+  // {
+  //   id: 'global-50-percent-discount',
+  //   title: 'Скидка 50% на инд. иконки',
+  //   forms: [toSelector(FORM_ICON_CUSTOM)], // Применяется ко всем расходам (kind === 'expense')
+  //   type: 'percent',
+  //   discountValue: 50, // 75% скидка
+  //   startDate: '2024-01-01', // ОБЯЗАТЕЛЬНО: начинает действовать с 00:00 по Москве (формат YYYY-MM-DD)
+  //   // expiresAt: '2025-10-10', // Опционально: действует до конца указанной даты по Москве
+  //   condition: {
+  //     type: 'none' // Всегда работает
+  //   }
+  // },
 
 
   // Можно добавить больше правил скидок здесь

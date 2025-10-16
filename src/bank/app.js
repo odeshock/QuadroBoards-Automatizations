@@ -23,6 +23,74 @@ import {
 } from './constants.js';
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Проверяет, должна ли группа логироваться
+ * @param {Object} group - группа из submissionGroups
+ * @returns {boolean} - true если группа должна логироваться
+ */
+function shouldLogGroup(group) {
+  if (!group) return false;
+  // Не логируем автоскидки, корректировки и персональные купоны
+  if (group.isDiscount || group.isPriceAdjustment || group.isPersonalCoupon) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Форматирует entry для отображения в логе изменений
+ * @param {Object} entry - объект entry из submissionGroups
+ * @returns {string} - отформатированная строка с деталями
+ */
+function formatEntryForLog(entry) {
+  if (!entry || !entry.data) return '';
+
+  const data = entry.data;
+  const details = [];
+
+  // Получатели
+  const recipients = Object.keys(data)
+    .filter(key => key.startsWith('recipient_') && data[key])
+    .map(key => {
+      const userId = data[key];
+      const user = window.USERS_LIST?.find(u => String(u.id) === String(userId));
+      return user ? user.name : `ID:${userId}`;
+    });
+
+  if (recipients.length > 0) {
+    details.push(`получатели: ${recipients.join(', ')}`);
+  }
+
+  // Количество (multiplier)
+  if (entry.multiplier && entry.multiplier !== 1) {
+    details.push(`количество: ${entry.multiplier}`);
+  }
+
+  // URL поля
+  const urls = Object.keys(data)
+    .filter(key => key.startsWith('url_') && data[key])
+    .map(key => data[key]);
+
+  if (urls.length > 0) {
+    details.push(`ссылки: ${urls.join(', ')}`);
+  }
+
+  // Прочие поля (исключая служебные)
+  const otherFields = Object.keys(data)
+    .filter(key => !key.startsWith('recipient_') && !key.startsWith('url_') && data[key])
+    .map(key => `${key}: ${data[key]}`);
+
+  if (otherFields.length > 0) {
+    details.push(otherFields.join(', '));
+  }
+
+  return details.length > 0 ? ` (${details.join('; ')})` : '';
+}
+
+// ============================================================================
 // DOM REFERENCES
 // ============================================================================
 
@@ -255,13 +323,18 @@ log.addEventListener('click', async (e) => {
       const deletedEntry = group.entries[entryIndex];
       const entryDetails = formatEntryForLog(deletedEntry);
       group.entries.splice(entryIndex, 1);
-      addEditLog(`Удалён item из операции: ${group.title}${entryDetails}`);
+
+      if (shouldLogGroup(group)) {
+        addEditLog(`Удалён item из операции: ${group.title}${entryDetails}`);
+      }
 
       if (!group.entries.length) {
         const groupIndex = submissionGroups.findIndex((item) => item.id === groupId);
         if (groupIndex !== -1) {
           submissionGroups.splice(groupIndex, 1);
-          addEditLog(`Удалена операция: ${group.title}`);
+          if (shouldLogGroup(group)) {
+            addEditLog(`Удалена операция: ${group.title}`);
+          }
         }
       }
 
@@ -313,14 +386,22 @@ form.addEventListener('submit', (e) => {
       if (originGroup) {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
+          const deletedEntry = originGroup.entries[idx];
+          const entryDetails = formatEntryForLog(deletedEntry);
           originGroup.entries.splice(idx, 1);
-          addEditLog(`Удалён item из операции: ${originGroup.title}`);
+
+          if (shouldLogGroup(originGroup)) {
+            addEditLog(`Удалён item из операции: ${originGroup.title}${entryDetails}`);
+          }
+
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
             if (groupIndex !== -1) {
               submissionGroups.splice(groupIndex, 1);
-              addEditLog(`Удалена операция: ${originGroup.title}`);
+              if (shouldLogGroup(originGroup)) {
+                addEditLog(`Удалена операция: ${originGroup.title}`);
+              }
             }
           }
         }
@@ -359,14 +440,22 @@ form.addEventListener('submit', (e) => {
       if (originGroup) {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
+          const deletedEntry = originGroup.entries[idx];
+          const entryDetails = formatEntryForLog(deletedEntry);
           originGroup.entries.splice(idx, 1);
-          addEditLog(`Удалён item из операции: ${originGroup.title}`);
+
+          if (shouldLogGroup(originGroup)) {
+            addEditLog(`Удалён item из операции: ${originGroup.title}${entryDetails}`);
+          }
+
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
             if (groupIndex !== -1) {
               submissionGroups.splice(groupIndex, 1);
-              addEditLog(`Удалена операция: ${originGroup.title}`);
+              if (shouldLogGroup(originGroup)) {
+                addEditLog(`Удалена операция: ${originGroup.title}`);
+              }
             }
           }
         }
@@ -403,14 +492,22 @@ form.addEventListener('submit', (e) => {
       if (originGroup) {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
+          const deletedEntry = originGroup.entries[idx];
+          const entryDetails = formatEntryForLog(deletedEntry);
           originGroup.entries.splice(idx, 1);
-          addEditLog(`Удалён item из операции: ${originGroup.title}`);
+
+          if (shouldLogGroup(originGroup)) {
+            addEditLog(`Удалён item из операции: ${originGroup.title}${entryDetails}`);
+          }
+
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
             if (groupIndex !== -1) {
               submissionGroups.splice(groupIndex, 1);
-              addEditLog(`Удалена операция: ${originGroup.title}`);
+              if (shouldLogGroup(originGroup)) {
+                addEditLog(`Удалена операция: ${originGroup.title}`);
+              }
             }
           }
         }
@@ -445,14 +542,22 @@ form.addEventListener('submit', (e) => {
       if (originGroup) {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
+          const deletedEntry = originGroup.entries[idx];
+          const entryDetails = formatEntryForLog(deletedEntry);
           originGroup.entries.splice(idx, 1);
-          addEditLog(`Удалён item из операции: ${originGroup.title}`);
+
+          if (shouldLogGroup(originGroup)) {
+            addEditLog(`Удалён item из операции: ${originGroup.title}${entryDetails}`);
+          }
+
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
             if (groupIndex !== -1) {
               submissionGroups.splice(groupIndex, 1);
-              addEditLog(`Удалена операция: ${originGroup.title}`);
+              if (shouldLogGroup(originGroup)) {
+                addEditLog(`Удалена операция: ${originGroup.title}`);
+              }
             }
           }
         }
@@ -493,7 +598,8 @@ form.addEventListener('submit', (e) => {
     // Найдём добавленные купоны
     selectedCouponIds.forEach(id => {
       if (!previousCoupons.includes(id)) {
-        const coupon = activeCoupons.find(c => c.id === id);
+        // Ищем в активных купонах, если не нашли - ищем во всех купонах
+        const coupon = activeCoupons.find(c => c.id === id) || window.PERSONAL_DISCOUNTS?.find(c => c.id === id);
         if (coupon) {
           addEditLog(`Добавлен купон: ${coupon.title}`);
         }
@@ -503,7 +609,8 @@ form.addEventListener('submit', (e) => {
     // Найдём удалённые купоны
     previousCoupons.forEach(id => {
       if (!selectedCouponIds.includes(id)) {
-        const coupon = activeCoupons.find(c => c.id === id);
+        // Ищем в активных купонах, если не нашли - ищем во всех купонах
+        const coupon = activeCoupons.find(c => c.id === id) || window.PERSONAL_DISCOUNTS?.find(c => c.id === id);
         if (coupon) {
           addEditLog(`Удалён купон: ${coupon.title}`);
         }
@@ -593,13 +700,16 @@ form.addEventListener('submit', (e) => {
   entryRecord.template_id = meta.templateSelector?.replace('#', '') || '';
 
   const isNewEntry = !editingEntryId;
+  const entryDetails = formatEntryForLog(entryRecord);
   group.entries.push(entryRecord);
 
   // Логирование изменений
-  if (isNewEntry) {
-    addEditLog(`Добавлен item в операцию: ${group.title}`);
-  } else {
-    addEditLog(`Изменён item в операции: ${group.title}`);
+  if (shouldLogGroup(group)) {
+    if (isNewEntry) {
+      addEditLog(`Добавлен item в операцию: ${group.title}${entryDetails}`);
+    } else {
+      addEditLog(`Изменён item в операции: ${group.title}${entryDetails}`);
+    }
   }
 
   renderLog(log);

@@ -142,6 +142,11 @@ export function addEditLog(message) {
       const currentText = editLogsField.value;
       const newText = currentText ? `${currentText}\n${message}` : message;
       editLogsField.value = newText;
+
+      // Обновляем массив editLogs из textarea (синхронизация)
+      editLogs.length = 0;
+      editLogs.push(...newText.split('\n'));
+
       console.log('📝 Лог изменения (добавлен в textarea):', message);
     } else {
       // Если textarea ещё не создана, добавляем в массив

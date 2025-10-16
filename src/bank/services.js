@@ -31,6 +31,95 @@ export {
 };
 
 // ============================================================================
+// УВЕДОМЛЕНИЯ
+// ============================================================================
+
+/**
+ * Показывает временное всплывающее уведомление
+ * @param {string} message - Текст сообщения
+ * @param {number} duration - Длительность показа в мс (по умолчанию 3000)
+ */
+export function showNotification(message, duration = 3000) {
+  // Создаём контейнер для уведомлений если его ещё нет
+  let container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 400px;
+    `;
+    document.body.appendChild(container);
+  }
+
+  // Создаём элемент уведомления
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    background: #333;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 14px;
+    line-height: 1.4;
+    animation: slideIn 0.3s ease-out;
+    opacity: 0;
+    transform: translateX(100%);
+  `;
+  notification.textContent = message;
+
+  // Добавляем CSS анимацию если её ещё нет
+  if (!document.getElementById('notification-styles')) {
+    const style = document.createElement('style');
+    style.id = 'notification-styles';
+    style.textContent = `
+      @keyframes slideIn {
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      @keyframes slideOut {
+        from {
+          opacity: 1;
+          transform: translateX(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  container.appendChild(notification);
+
+  // Анимация появления
+  requestAnimationFrame(() => {
+    notification.style.animation = 'slideIn 0.3s ease-out forwards';
+  });
+
+  // Удаление через duration мс
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-in forwards';
+    setTimeout(() => {
+      notification.remove();
+      // Удаляем контейнер если он пустой
+      if (container.children.length === 0) {
+        container.remove();
+      }
+    }, 300);
+  }, duration);
+}
+
+// ============================================================================
 // УПРАВЛЕНИЕ ДАННЫМИ — хранение групп и записей
 // ============================================================================
 
@@ -1425,7 +1514,18 @@ export function cleanupInvalidCoupons() {
       const index = selectedPersonalCoupons.indexOf(couponId);
       if (index > -1) {
         selectedPersonalCoupons.splice(index, 1);
+
+        // Находим название купона для уведомления
+        const coupon = activeCoupons.find(c => c.id === couponId);
+        const couponTitle = coupon ? coupon.title : `ID: ${couponId}`;
+
         console.log(`🎫❌ Купон ${couponId} автоматически снят (условия не выполняются)`);
+
+        // Показываем уведомление пользователю
+        showNotification(
+          `Купон "${couponTitle}" автоматически снят, т.к. условия для его применения больше не выполняются`,
+          4000 // 4 секунды
+        );
       }
     });
   }

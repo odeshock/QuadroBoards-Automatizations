@@ -1135,3 +1135,16 @@ textarea {
 .system-info {
   background-color: green;
 }
+
+.coupon-selector {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-color: var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: 0.2s;
+  background-color: green;
+}

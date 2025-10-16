@@ -1952,6 +1952,9 @@ export function renderLog(log) {
         IS_ADMIN: window.IS_ADMIN,
         USERS_LIST: window.USERS_LIST,
 
+        // Персональные купоны
+        PERSONAL_DISCOUNTS: window.PERSONAL_DISCOUNTS,
+
         // Посты
         PERSONAL_POSTS: window.PERSONAL_POSTS,
         PLOT_POSTS: window.PLOT_POSTS,

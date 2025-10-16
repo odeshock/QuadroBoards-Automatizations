@@ -148,27 +148,19 @@
       details.appendChild(pre);
     }
 
+    // собираем wrap
+    wrap.appendChild(btn);
+    if (status) wrap.appendChild(status);
+    if (link) wrap.appendChild(link);
+    if (details) wrap.appendChild(details);
+
+    container.appendChild(br);
+
     // вставка по order
     const siblings = Array.from(container.querySelectorAll('div[data-order]'));
     const next = siblings.find(el => Number(el.dataset.order) > Number(order));
-
-    if (siblings.length === 0) {
-      // первая кнопка — без переносов
-      container.appendChild(wrap);
-    } else if (next) {
-      // вставляем в середину: wrap, потом <br> — между этой и next
-      const frag = document.createDocumentFragment();
-      frag.appendChild(wrap);
-      frag.appendChild(br);
-      container.insertBefore(frag, next);
-    } else {
-      // вставляем в конец: <br>, потом wrap — между предыдущей и этой
-      const frag = document.createDocumentFragment();
-      frag.appendChild(br);
-      frag.appendChild(wrap);
-      container.appendChild(frag);
-    }
-
+    if (next) container.insertBefore(wrap, next);
+    else container.appendChild(wrap);
 
     // helpers
     const setStatus = (text, color = '#555') => {

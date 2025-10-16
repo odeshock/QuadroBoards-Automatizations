@@ -754,6 +754,13 @@ function checkAndRestoreBackup() {
       .then((confirmed) => {
         if (confirmed) {
           try {
+            // Переименовываем кнопку "Купить" в "Редактировать"
+            const buyBtn = document.querySelector('.button.primary');
+            if (buyBtn && buyBtn.textContent === 'Купить') {
+              buyBtn.textContent = 'Редактировать';
+              console.log('✅ Кнопка переименована в "Редактировать"');
+            }
+
             restoreFromBackup(backupData);
             renderLog(log);
 

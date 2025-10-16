@@ -667,7 +667,7 @@ export function renderLog(log) {
   const couponText = document.createElement('span');
   couponText.style.fontSize = '0.875rem';
   couponText.style.fontWeight = '500';
-  couponText.textContent = '🎟️ Купоны';
+  couponText.textContent = '🎟️ Не забудьте использовать свои купоны';
 
   const couponAction = document.createElement('span');
   couponAction.style.fontSize = '0.75rem';

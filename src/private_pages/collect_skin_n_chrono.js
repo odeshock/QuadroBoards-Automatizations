@@ -4,7 +4,7 @@
   const INFO_TEXT = 'Ссылка, по которой Вы пришли, неверная или устаревшая.';
   const DEFAULT_CHARSET = 'windows-1251';
   const REDIR_SKIN_RE = /<!--\s*main:\s*usr(\d+)_skin\s*-->/i;
-  const CHARACTER_SELECTOR = '.character[data-id]';
+  const CHARACTER_SELECTOR = '.modal-script[data-id]';
   const SKIN_TARGET_SEL = '.skin_info';
   const CHRONO_TARGET_SEL = '.chrono_info';
   const DEBUG = false;
@@ -91,7 +91,7 @@
     const N = charEl.getAttribute('data-id')?.trim();
     if (!N) return;
 
-    await Promise.all([ loadSkin(N, scope), loadChrono(N, scope) ]);
+    await Promise.all([loadSkin(N, scope), loadChrono(N, scope)]);
   }
 
   // ручной запуск

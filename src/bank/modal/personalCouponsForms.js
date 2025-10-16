@@ -110,6 +110,11 @@ function renderCoupons(activeCoupons, modalFields, btnSubmit) {
         couponBlock.style.borderColor = 'var(--border-color, #e5e7eb)';
       }
     });
+
+    // Валидируем купон при рендеринге, чтобы показать предупреждения/ошибки сразу
+    if (selectedPersonalCoupons.includes(coupon.id)) {
+      validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCoupons, modalFields);
+    }
   });
 
   modalFields.appendChild(couponsContainer);
@@ -140,37 +145,76 @@ function updateCouponDiscount(activeCoupons, modalFields, modalAmount) {
   let totalDiscount = 0;
   const selectedBlocks = modalFields.querySelectorAll('.coupon-block[data-selected="true"]');
 
+  // Группируем купоны по формам для правильного расчета с учетом порядка применения
+  const couponsByForm = {};
+
   selectedBlocks.forEach(block => {
     const couponId = block.dataset.couponId;
     const coupon = activeCoupons.find(c => c.id === couponId);
-
     if (!coupon) return;
 
-    // Вычисляем скидку для каждого типа купона
-    if (coupon.type === 'item') {
-      const itemsInCart = countItemsForForm(coupon.form);
+    if (!couponsByForm[coupon.form]) {
+      couponsByForm[coupon.form] = {
+        item: [],
+        fixed: [],
+        percent: []
+      };
+    }
+    couponsByForm[coupon.form][coupon.type].push(coupon);
+  });
+
+  // Обрабатываем купоны для каждой формы в правильном порядке
+  Object.keys(couponsByForm).forEach(formId => {
+    const coupons = couponsByForm[formId];
+    let remainingCost = getCostForForm(formId);
+
+    // 1. Применяем item купоны
+    coupons.item.forEach(coupon => {
+      const itemsInCart = countItemsForForm(formId);
       if (itemsInCart >= coupon.value) {
-        // Находим группу для получения price
-        const formSelector = '#' + coupon.form;
+        const formSelector = '#' + formId;
         const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
         if (formGroup) {
           const price = Number(formGroup.price) || 0;
-          totalDiscount += price * coupon.value;
+          const discount = price * coupon.value;
+          totalDiscount += discount;
+          remainingCost -= discount;
         }
       }
-    } else if (coupon.type === 'fixed') {
-      const costInCart = getCostForForm(coupon.form);
-      if (costInCart > 0) {
-        totalDiscount += Math.min(coupon.value, costInCart);
+    });
+
+    // Вычитаем корректировки для этой формы (они применяются после item купонов, но до fixed)
+    const formSelector = '#' + formId;
+    const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+    if (adjustmentGroup) {
+      adjustmentGroup.entries.forEach(entry => {
+        const adjustmentForm = entry.data?.form;
+        if (adjustmentForm === formSelector) {
+          const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+          remainingCost -= adjustmentAmount;
+        }
+      });
+    }
+
+    // 2. Применяем fixed купоны
+    coupons.fixed.forEach(coupon => {
+      if (remainingCost > 0) {
+        const discount = Math.min(coupon.value, remainingCost);
+        totalDiscount += discount;
+        remainingCost -= discount;
       }
-    } else if (coupon.type === 'percent') {
-      const costInCart = getCostForForm(coupon.form);
-      if (costInCart > 0) {
+    });
+
+    // 3. Применяем percent купоны
+    coupons.percent.forEach(coupon => {
+      if (remainingCost > 0) {
         let percentValue = coupon.value;
         if (percentValue > 100) percentValue = 100;
-        totalDiscount += Math.ceil(costInCart * (percentValue / 100));
+        const discount = Math.ceil(remainingCost * (percentValue / 100));
+        totalDiscount += discount;
+        remainingCost -= discount;
       }
-    }
+    });
   });
 
   if (modalAmount) {
@@ -203,22 +247,122 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
       isValid = false;
     }
   } else if (coupon.type === 'fixed') {
-    const costInCart = getCostForForm(coupon.form);
-    if (costInCart === 0) {
-      errorMessage = `В корзине нет операций типа "${coupon.form}".`;
+    let costInCart = getCostForForm(coupon.form);
+
+    // Находим текущий блок купона в DOM
+    const currentBlock = Array.from(modalFields.querySelectorAll('.coupon-block')).find(
+      block => block.dataset.couponId === coupon.id
+    );
+
+    // Вычитаем скидки от других выбранных купонов (кроме текущего)
+    const selectedBlocks = modalFields.querySelectorAll('.coupon-block[data-selected="true"]');
+    selectedBlocks.forEach(block => {
+      const otherCouponId = block.dataset.couponId;
+      if (otherCouponId !== coupon.id) {
+        const otherCoupon = activeCoupons.find(c => c.id === otherCouponId);
+        if (otherCoupon && otherCoupon.form === coupon.form) {
+          // Вычисляем скидку от другого купона
+          if (otherCoupon.type === 'item') {
+            const itemsInCart = countItemsForForm(otherCoupon.form);
+            if (itemsInCart >= otherCoupon.value) {
+              const formSelector = '#' + otherCoupon.form;
+              const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
+              if (formGroup) {
+                const price = Number(formGroup.price) || 0;
+                costInCart -= price * otherCoupon.value;
+              }
+            }
+          } else if (otherCoupon.type === 'fixed') {
+            // Для fixed купонов вычитаем только те, которые идут РАНЬШЕ в DOM
+            // (они были выбраны раньше и применяются первыми)
+            const allBlocks = Array.from(modalFields.querySelectorAll('.coupon-block'));
+            const otherBlockIndex = allBlocks.indexOf(block);
+            const currentBlockIndex = allBlocks.indexOf(currentBlock);
+
+            if (otherBlockIndex < currentBlockIndex) {
+              // Этот купон применяется раньше текущего
+              const discount = Math.min(otherCoupon.value, costInCart);
+              costInCart -= discount;
+            }
+          }
+          // Percent купоны применяются ПОСЛЕ fixed, поэтому не вычитаем их при проверке fixed купона
+        }
+      }
+    });
+
+    // Вычитаем корректировки для этой формы (они применяются после item купонов, но до fixed)
+    const formSelector = '#' + coupon.form;
+    const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+    if (adjustmentGroup) {
+      adjustmentGroup.entries.forEach(entry => {
+        const adjustmentForm = entry.data?.form;
+        if (adjustmentForm === formSelector) {
+          const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+          costInCart -= adjustmentAmount;
+        }
+      });
+    }
+
+    if (costInCart <= 0) {
+      errorMessage = `В корзине недостаточно средств после применения других купонов.`;
       isValid = false;
-    } else if (costInCart < coupon.value) {
-      // Купон применяется частично - показываем предупреждение, но не блокируем
-      errorMessage = `⚠️ Купон применён частично: будет использовано ${costInCart} из ${coupon.value}.`;
-      errorContainer.style.color = '#f59e0b'; // Orange warning color
-      errorContainer.style.display = 'block';
-      errorContainer.textContent = errorMessage;
-      return true; // Валидация пройдена
+    } else {
+      // Вычисляем фактически применяемую скидку
+      const actualDiscount = Math.min(coupon.value, costInCart);
+
+      // Показываем предупреждение только если купон применяется НЕ полностью
+      if (actualDiscount < coupon.value) {
+        errorMessage = `⚠️ Купон применён частично: будет использовано ${actualDiscount} из ${coupon.value}.`;
+        errorContainer.style.color = '#f59e0b'; // Orange warning color
+        errorContainer.style.display = 'block';
+        errorContainer.textContent = errorMessage;
+        return true; // Валидация пройдена
+      }
     }
   } else if (coupon.type === 'percent') {
-    const costInCart = getCostForForm(coupon.form);
-    if (costInCart === 0) {
-      errorMessage = `В корзине нет операций типа "${coupon.form}".`;
+    let costInCart = getCostForForm(coupon.form);
+
+    // Вычитаем скидки от других выбранных купонов которые применяются РАНЬШЕ percent (item и fixed)
+    const selectedBlocks = modalFields.querySelectorAll('.coupon-block[data-selected="true"]');
+    selectedBlocks.forEach(block => {
+      const otherCouponId = block.dataset.couponId;
+      if (otherCouponId !== coupon.id) {
+        const otherCoupon = activeCoupons.find(c => c.id === otherCouponId);
+        if (otherCoupon && otherCoupon.form === coupon.form) {
+          // Вычисляем скидку от другого купона (только item и fixed)
+          if (otherCoupon.type === 'item') {
+            const itemsInCart = countItemsForForm(otherCoupon.form);
+            if (itemsInCart >= otherCoupon.value) {
+              const formSelector = '#' + otherCoupon.form;
+              const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
+              if (formGroup) {
+                const price = Number(formGroup.price) || 0;
+                costInCart -= price * otherCoupon.value;
+              }
+            }
+          } else if (otherCoupon.type === 'fixed') {
+            costInCart -= Math.min(otherCoupon.value, costInCart);
+          }
+          // Другие percent купоны не вычитаем (они применяются параллельно)
+        }
+      }
+    });
+
+    // Вычитаем корректировки для этой формы
+    const formSelector = '#' + coupon.form;
+    const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+    if (adjustmentGroup) {
+      adjustmentGroup.entries.forEach(entry => {
+        const adjustmentForm = entry.data?.form;
+        if (adjustmentForm === formSelector) {
+          const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+          costInCart -= adjustmentAmount;
+        }
+      });
+    }
+
+    if (costInCart <= 0) {
+      errorMessage = `В корзине недостаточно средств после применения других купонов.`;
       isValid = false;
     }
   }

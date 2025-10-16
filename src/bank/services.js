@@ -1174,12 +1174,17 @@ export function updatePersonalCoupons(phase = 'item') {
       const formSelector = toSelector(formId);
       let formCost = getCostForForm(formId);
 
+      console.log(`🎫 FIXED купон "${coupon.title}" (value: ${coupon.value})`);
+      console.log(`   → Базовая стоимость формы: ${formCost}`);
+
       // Инициализируем remainingCost для формы
       if (!remainingCost[formId]) {
         // Вычитаем примененные item купоны
         const itemDiscountForForm = entries
           .filter(e => e.data.form === formId && e.data.coupon_type === 'item')
           .reduce((sum, e) => sum + e.data.discount_amount, 0);
+
+        console.log(`   → Item скидки для формы: ${itemDiscountForForm}`);
         formCost -= itemDiscountForForm;
 
         // Вычитаем корректировки для этой формы
@@ -1189,17 +1194,23 @@ export function updatePersonalCoupons(phase = 'item') {
             const adjustmentForm = entry.data?.form;
             if (adjustmentForm === formSelector) {
               const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+              console.log(`   → Корректировка для формы: ${adjustmentAmount}`);
               formCost -= adjustmentAmount;
             }
           });
         }
 
+        console.log(`   → Оставшаяся стоимость после вычетов: ${formCost}`);
         remainingCost[formId] = formCost;
+      } else {
+        console.log(`   → Используем сохранённую оставшуюся стоимость: ${remainingCost[formId]}`);
       }
 
       if (remainingCost[formId] > 0) {
         // Применяем скидку, но не больше оставшейся стоимости
         const discount = Math.min(coupon.value, remainingCost[formId]);
+
+        console.log(`   → Применяем скидку: ${discount} (min из ${coupon.value} и ${remainingCost[formId]})`);
 
         remainingCost[formId] -= discount;
         totalDiscount += discount;
@@ -1329,36 +1340,88 @@ export function cleanupInvalidCoupons() {
   const activeCoupons = getActivePersonalCoupons();
   const invalidCouponIds = [];
 
+  // Группируем купоны по формам для проверки с учетом порядка применения
+  const couponsByForm = {};
   selectedPersonalCoupons.forEach(couponId => {
     const coupon = activeCoupons.find(c => c.id === couponId);
-
     if (!coupon) {
-      // Купон больше не активен (истек или удален)
       invalidCouponIds.push(couponId);
       return;
     }
 
-    let isValid = false;
+    if (!couponsByForm[coupon.form]) {
+      couponsByForm[coupon.form] = {
+        item: [],
+        fixed: [],
+        percent: []
+      };
+    }
+    couponsByForm[coupon.form][coupon.type].push(coupon);
+  });
 
-    if (coupon.type === 'item') {
-      const itemsInCart = countItemsForForm(coupon.form);
-      isValid = itemsInCart >= coupon.value;
-    } else if (coupon.type === 'fixed') {
-      const costInCart = getCostForForm(coupon.form);
-      isValid = costInCart > 0;
-    } else if (coupon.type === 'percent') {
-      const costInCart = getCostForForm(coupon.form);
-      isValid = costInCart > 0;
+  // Проверяем купоны для каждой формы в правильном порядке
+  Object.keys(couponsByForm).forEach(formId => {
+    const coupons = couponsByForm[formId];
+    let remainingCost = getCostForForm(formId);
+
+    // 1. Проверяем и применяем item купоны
+    coupons.item.forEach(coupon => {
+      const itemsInCart = countItemsForForm(formId);
+      if (itemsInCart < coupon.value) {
+        invalidCouponIds.push(coupon.id);
+      } else {
+        // Вычитаем стоимость item купона из остатка
+        const formSelector = '#' + formId;
+        const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
+        if (formGroup) {
+          const price = Number(formGroup.price) || 0;
+          remainingCost -= price * coupon.value;
+        }
+      }
+    });
+
+    // Вычитаем корректировки
+    const formSelector = '#' + formId;
+    const adjustmentGroup = submissionGroups.find(g => g.isPriceAdjustment);
+    if (adjustmentGroup) {
+      adjustmentGroup.entries.forEach(entry => {
+        const adjustmentForm = entry.data?.form;
+        if (adjustmentForm === formSelector) {
+          const adjustmentAmount = Number(entry.data?.adjustment_amount) || 0;
+          remainingCost -= adjustmentAmount;
+        }
+      });
     }
 
-    if (!isValid) {
-      invalidCouponIds.push(couponId);
-    }
+    // 2. Проверяем fixed купоны (каждый последующий уменьшает остаток)
+    coupons.fixed.forEach(coupon => {
+      if (remainingCost <= 0) {
+        invalidCouponIds.push(coupon.id);
+      } else {
+        // Вычитаем скидку этого купона из остатка
+        const discount = Math.min(coupon.value, remainingCost);
+        remainingCost -= discount;
+      }
+    });
+
+    // 3. Проверяем percent купоны
+    coupons.percent.forEach(coupon => {
+      if (remainingCost <= 0) {
+        invalidCouponIds.push(coupon.id);
+      } else {
+        let percentValue = coupon.value;
+        if (percentValue > 100) percentValue = 100;
+        const discount = Math.ceil(remainingCost * (percentValue / 100));
+        remainingCost -= discount;
+      }
+    });
   });
 
   // Удаляем невалидные купоны
   if (invalidCouponIds.length > 0) {
-    invalidCouponIds.forEach(couponId => {
+    // Удаляем дубликаты
+    const uniqueInvalidIds = [...new Set(invalidCouponIds)];
+    uniqueInvalidIds.forEach(couponId => {
       const index = selectedPersonalCoupons.indexOf(couponId);
       if (index > -1) {
         selectedPersonalCoupons.splice(index, 1);

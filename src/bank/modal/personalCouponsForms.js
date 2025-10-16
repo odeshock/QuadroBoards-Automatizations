@@ -364,6 +364,28 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
     if (costInCart <= 0) {
       errorMessage = `В корзине недостаточно средств после применения других купонов.`;
       isValid = false;
+    } else {
+      // Проверяем, что для этой формы выбран только один percent купон
+      const selectedBlocks = modalFields.querySelectorAll('.coupon-block[data-selected="true"]');
+      let percentCouponsForThisForm = 0;
+
+      selectedBlocks.forEach(block => {
+        const otherCouponId = block.dataset.couponId;
+        const otherCoupon = activeCoupons.find(c => c.id === otherCouponId);
+        if (otherCoupon && otherCoupon.type === 'percent' && otherCoupon.form === coupon.form) {
+          percentCouponsForThisForm++;
+        }
+      });
+
+      if (percentCouponsForThisForm > 1) {
+        // Получаем название формы для сообщения
+        const formSelector = '#' + coupon.form;
+        const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
+        const formTitle = formGroup ? formGroup.title : coupon.form;
+
+        errorMessage = `Для формы '${formTitle}' уже выбран процентный купон.`;
+        isValid = false;
+      }
     }
   }
 

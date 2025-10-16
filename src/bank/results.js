@@ -2027,8 +2027,6 @@ export function renderLog(log) {
 
         // Комментарий (для будущих функций)
         COMMENT_ID: window.COMMENT_ID,
-        COMMENT_AUTHOR_ID: window.COMMENT_AUTHOR_ID,
-        COMMENT_AUTHOR_NAME: window.COMMENT_AUTHOR_NAME,
         CURRENT_BANK: window.CURRENT_BANK,
 
         // Конфигурация

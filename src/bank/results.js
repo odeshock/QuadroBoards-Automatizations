@@ -723,60 +723,6 @@ export function renderLog(log) {
   });
 
   sortedGroups.forEach((group, index) => {
-    // Добавляем разделители для купонов, корректировок и скидок
-    const isPersonalCoupon = group.isPersonalCoupon || group.templateSelector === '#personal-coupon';
-    const isAdjustment = group.isPriceAdjustment || group.templateSelector === '#price-adjustment';
-    const isDiscount = group.isDiscount || group.templateSelector === '#gift-discount';
-
-    const prevGroup = index > 0 ? sortedGroups[index - 1] : null;
-    const prevIsPersonalCoupon = prevGroup ? (prevGroup.isPersonalCoupon || prevGroup.templateSelector === '#personal-coupon') : false;
-    const prevIsAdjustment = prevGroup ? (prevGroup.isPriceAdjustment || prevGroup.templateSelector === '#price-adjustment') : false;
-    const prevIsDiscount = prevGroup ? (prevGroup.isDiscount || prevGroup.templateSelector === '#gift-discount') : false;
-
-    // Разделитель перед первым купоном
-    if (isPersonalCoupon && !prevIsPersonalCoupon) {
-      const separator = document.createElement('div');
-      separator.className = 'section-separator coupons-separator';
-      separator.style.marginTop = '24px';
-      separator.style.marginBottom = '12px';
-      separator.style.paddingTop = '12px';
-      separator.style.borderTop = '2px solid var(--border-color, #e5e7eb)';
-      separator.style.fontSize = '0.875rem';
-      separator.style.fontWeight = '600';
-      separator.style.color = 'var(--text-muted, #6b7280)';
-      separator.textContent = '🎟️ Купоны';
-      log.appendChild(separator);
-    }
-
-    // Разделитель перед первой корректировкой
-    if (isAdjustment && !prevIsAdjustment) {
-      const separator = document.createElement('div');
-      separator.className = 'section-separator adjustments-separator';
-      separator.style.marginTop = '24px';
-      separator.style.marginBottom = '12px';
-      separator.style.paddingTop = '12px';
-      separator.style.borderTop = '2px solid var(--border-color, #e5e7eb)';
-      separator.style.fontSize = '0.875rem';
-      separator.style.fontWeight = '600';
-      separator.style.color = 'var(--text-muted, #6b7280)';
-      separator.textContent = '🔧 Корректировки';
-      log.appendChild(separator);
-    }
-
-    // Разделитель перед первой скидкой
-    if (isDiscount && !prevIsDiscount) {
-      const separator = document.createElement('div');
-      separator.className = 'section-separator discounts-separator';
-      separator.style.marginTop = '24px';
-      separator.style.marginBottom = '12px';
-      separator.style.paddingTop = '12px';
-      separator.style.borderTop = '2px solid var(--border-color, #e5e7eb)';
-      separator.style.fontSize = '0.875rem';
-      separator.style.fontWeight = '600';
-      separator.style.color = 'var(--text-muted, #6b7280)';
-      separator.textContent = '💰 Автоматические скидки';
-      log.appendChild(separator);
-    }
 
     const entryEl = document.createElement('div');
     entryEl.className = 'entry';
@@ -893,7 +839,7 @@ export function renderLog(log) {
                   return s + Math.floor(Math.max(0, n) / 1000);
                 }, 0);
               }
-            } catch (_) {}
+            } catch (_) { }
           }
           // сюжетные посты — кап 3к на пост
           const rawPlot = item?.data?.plot_posts_json;
@@ -913,7 +859,7 @@ export function renderLog(log) {
                   return s + Math.min(k, 3);
                 }, 0);
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         });
 
@@ -1332,7 +1278,7 @@ export function renderLog(log) {
             itemsWrap.appendChild(itemEl);
             return;
           }
-        } catch(_) {}
+        } catch (_) { }
       }
 
       // личные посты
@@ -1359,7 +1305,7 @@ export function renderLog(log) {
             removeTitleIfEmpty();
             return;
           }
-        } catch(_) {}
+        } catch (_) { }
       }
 
       // сюжетные посты
@@ -1386,7 +1332,7 @@ export function renderLog(log) {
             removeTitleIfEmpty();
             return;
           }
-        } catch(_) {}
+        } catch (_) { }
       }
 
       // ===== Определяем тип формы для правильного рендеринга =====
@@ -1494,7 +1440,7 @@ export function renderLog(log) {
           const itemEl = document.createElement('div');
           itemEl.className = 'entry-item';
           itemEl.style.flexDirection = 'row';
-          
+
           let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
 
           // Для group2Templates (Активист, Постописец, Пост) показываем price
@@ -1613,8 +1559,8 @@ export function renderLog(log) {
       // ===== Скидка на подарки =====
       // (скидки и корректировки уже отрисованы выше в едином списке, этот блок больше не нужен)
       const isDiscount = group.isDiscount || (item.template_id === 'gift-discount') ||
-                         (item.template_id === 'gift-discount-regular') ||
-                         (item.template_id === 'gift-discount-custom');
+        (item.template_id === 'gift-discount-regular') ||
+        (item.template_id === 'gift-discount-custom');
       const isAdjustment = group.isPriceAdjustment || item.template_id?.startsWith('auto-adjustment-');
 
       // ===== остальные поля =====
@@ -1770,7 +1716,7 @@ export function renderLog(log) {
                   return s + Math.floor(Math.max(0, n) / 1000);
                 }, 0);
               }
-            } catch (_) {}
+            } catch (_) { }
           }
           const rawPlot = item?.data?.plot_posts_json;
           if (rawPlot) {
@@ -1789,7 +1735,7 @@ export function renderLog(log) {
                   return s + Math.min(k, 3);
                 }, 0);
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         });
 

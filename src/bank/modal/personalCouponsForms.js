@@ -19,9 +19,54 @@ import {
 } from '../constants.js';
 
 import {
+  incomeItems,
+  expenseItems,
+  giftItems,
+  iconItems,
+  badgeItems,
+  backgroundItems
+} from '../data.js';
+
+import {
   showErrorMessage,
   clearErrorMessage
 } from './helpers.js';
+
+/**
+ * Получает человекочитаемое название формы по её ID
+ * @param {string} formId - ID формы (например, "form-gift-custom")
+ * @returns {string} - Человекочитаемое название или ID формы, если не найдено
+ */
+function getFormTitle(formId) {
+  // Убираем # если есть
+  const cleanFormId = formId.replace('#', '');
+
+  // Маппинг для форм без явного поля form (подарки, иконки, плашки, фоны)
+  const specialFormTitles = {
+    'form-gift-present': 'Подарок из коллекции',
+    'form-gift-custom': 'Индивидуальный подарок',
+    'form-icon-present': 'Иконка из коллекции',
+    'form-icon-custom': 'Индивидуальная иконка',
+    'form-badge-present': 'Плашка из коллекции',
+    'form-badge-custom': 'Индивидуальная плашка',
+    'form-bg-present': 'Фон из коллекции',
+    'form-bg-custom': 'Индивидуальный фон'
+  };
+
+  // Проверяем специальные формы
+  if (specialFormTitles[cleanFormId]) {
+    return specialFormTitles[cleanFormId];
+  }
+
+  // Ищем в обычных массивах (incomeItems, expenseItems)
+  const allItems = [
+    ...incomeItems,
+    ...expenseItems
+  ];
+
+  const item = allItems.find(i => i.form === cleanFormId || i.form === `#${cleanFormId}`);
+  return item ? item.title : formId;
+}
 
 /**
  * Функция для рендеринга купонов
@@ -239,11 +284,9 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
 
   if (coupon.type === 'item') {
     const itemsInCart = countItemsForForm(coupon.form);
-    if (itemsInCart === 0) {
-      errorMessage = `В корзине нет операций типа "${coupon.form}".`;
-      isValid = false;
-    } else if (itemsInCart < coupon.value) {
-      errorMessage = `Недостаточно позиций. Нужно: ${coupon.value}, в корзине: ${itemsInCart}.`;
+    if (itemsInCart === 0 || itemsInCart < coupon.value) {
+      const formTitle = getFormTitle(coupon.form);
+      errorMessage = `В корзине не хватает объектов вида "${formTitle}", чтобы применить скидку.`;
       isValid = false;
     }
   } else if (coupon.type === 'fixed') {
@@ -304,7 +347,8 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
     }
 
     if (costInCart <= 0) {
-      errorMessage = `В корзине недостаточно средств после применения других купонов.`;
+      const formTitle = getFormTitle(coupon.form);
+      errorMessage = `В корзине недостаточно оплачиваемых объектов вида "${formTitle}", чтобы применить скидку — Вы уже обнулили их стоимость другими купонами, этот использовать ни к чему :)`;
       isValid = false;
     } else {
       // Вычисляем фактически применяемую скидку
@@ -312,7 +356,8 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
 
       // Показываем предупреждение только если купон применяется НЕ полностью
       if (actualDiscount < coupon.value) {
-        errorMessage = `⚠️ Купон применён частично: будет использовано ${actualDiscount} из ${coupon.value}.`;
+        const formTitle = getFormTitle(coupon.form);
+        errorMessage = `⚠️ Купон применён частично, потому что в корзине не хватает оплачиваемых объектов вида "${formTitle}", чтобы использовать всю сумму доступной скидки. Сейчас будет использовано ${actualDiscount} из ${coupon.value} — лучше добавить в корзину ещё таких покупок ;)`;
         errorContainer.style.color = '#f59e0b'; // Orange warning color
         errorContainer.style.display = 'block';
         errorContainer.textContent = errorMessage;
@@ -362,7 +407,8 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
     }
 
     if (costInCart <= 0) {
-      errorMessage = `В корзине недостаточно средств после применения других купонов.`;
+      const formTitle = getFormTitle(coupon.form);
+      errorMessage = `В корзине недостаточно оплачиваемых объектов вида "${formTitle}", чтобы применить скидку — Вы уже обнулили их стоимость другими купонами, этот использовать ни к чему :)`;
       isValid = false;
     } else {
       // Проверяем, что для этой формы выбран только один percent купон
@@ -381,9 +427,9 @@ function validateCoupon(coupon, couponBlock, errorContainer, btnSubmit, activeCo
         // Получаем название формы для сообщения
         const formSelector = '#' + coupon.form;
         const formGroup = submissionGroups.find(g => g.templateSelector === formSelector && !g.isDiscount && !g.isPriceAdjustment && !g.isPersonalCoupon);
-        const formTitle = formGroup ? formGroup.title : coupon.form;
+        const formTitle = formGroup ? formGroup.title : getFormTitle(coupon.form);
 
-        errorMessage = `Для формы '${formTitle}' уже выбран процентный купон.`;
+        errorMessage = `Для объектов вида "${formTitle}" уже выбран процентный купон. Оставьте только один.`;
         isValid = false;
       }
     }

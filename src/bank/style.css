@@ -1133,7 +1133,7 @@ textarea {
 }
 
 .system_entry {
-  background-color: green;
+  background-color: green !important;
 }
 
 .coupon-selector {

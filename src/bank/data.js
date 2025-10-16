@@ -19,6 +19,7 @@ import {
   FORM_EXP_BONUS1M1, FORM_EXP_BONUS2M1, FORM_EXP_BONUS1M3, FORM_EXP_BONUS2M3,
   FORM_EXP_THIRDCHAR, FORM_EXP_CHANGECHAR, FORM_EXP_REFUSE, FORM_EXP_CLEAN, FORM_EXP_TRANSFER,
   FORM_GIFT_PRESENT, FORM_GIFT_CUSTOM,
+  FORM_ICON_CUSTOM,
   CALC_MODES,
   toSelector
 } from './constants.js';
@@ -240,6 +241,18 @@ export const autoDiscounts = [
       type: 'none' // Всегда работает
     }
   },
+  {
+    id: 'global-50-percent-discount',
+    title: 'Скидка 50% на инд. иконки',
+    forms: [toSelector(FORM_ICON_CUSTOM)], // Применяется ко всем расходам (kind === 'expense')
+    type: 'percent',
+    discountValue: 50, // 75% скидка
+    startDate: '2024-01-01', // ОБЯЗАТЕЛЬНО: начинает действовать с 00:00 по Москве (формат YYYY-MM-DD)
+    // expiresAt: '2025-10-10', // Опционально: действует до конца указанной даты по Москве
+    condition: {
+      type: 'none' // Всегда работает
+    }
+  },
 
 
   // Можно добавить больше правил скидок здесь
@@ -325,7 +338,7 @@ export const autoPriceAdjustments = [
     id: 'gift-collection-5-discount',
     title: 'Пересчёт за 5 подарков из коллекции',
     form: toSelector(FORM_GIFT_PRESENT),
-    batchSize: 5, 
+    batchSize: 5,
     newPrice: itemDiscountPrices.gift.collection.per5
   },
   {

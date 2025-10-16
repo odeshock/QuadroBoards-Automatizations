@@ -207,8 +207,24 @@ export function restoreFromBackup(backupData) {
   window.IS_ADMIN_TO_EDIT = window.IS_ADMIN_TO_EDIT;
   console.log('💾 IS_ADMIN_TO_EDIT сохранён:', window.IS_ADMIN_TO_EDIT);
 
-  // Очищаем логи изменений
+  // Если IS_ADMIN_TO_EDIT === true, добавляем класс admin_edit к .bank_html
+  if (window.IS_ADMIN_TO_EDIT === true) {
+    const bankHtml = document.querySelector('.bank_html');
+    if (bankHtml) {
+      bankHtml.classList.add('admin_edit');
+      console.log('✅ Класс admin_edit добавлен к .bank_html');
+    }
+  }
+
+  // Очищаем и загружаем логи изменений из backup
   editLogs.length = 0;
+  if (backupData.editLogs) {
+    const logs = typeof backupData.editLogs === 'string'
+      ? backupData.editLogs.split('\n').filter(line => line.trim())
+      : [];
+    editLogs.push(...logs);
+    console.log('📝 Логи изменений загружены из backup:', editLogs.length, 'записей');
+  }
 
   // Восстанавливаем переменные окружения из backup (кроме исключений)
   if (backupData.environment) {

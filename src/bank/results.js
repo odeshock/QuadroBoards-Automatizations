@@ -723,10 +723,22 @@ export function renderLog(log) {
     return aOrder - bOrder;
   });
 
+  // Счетчик для обычных операций (без системных)
+  let regularOperationIndex = 0;
+
   sortedGroups.forEach((group, index) => {
 
     const entryEl = document.createElement('div');
     entryEl.className = 'entry';
+
+    // Добавляем класс system_entry для купонов, автоскидок и корректировок
+    const isSystemEntry = group.isPersonalCoupon || group.isDiscount || group.isPriceAdjustment;
+    if (isSystemEntry) {
+      entryEl.classList.add('system_entry');
+    } else {
+      regularOperationIndex++;
+    }
+
     entryEl.dataset.groupId = group.id;
     // Сохраняем form_id для передачи в операции
     if (group.templateSelector) {
@@ -779,12 +791,19 @@ export function renderLog(log) {
           itemTitle = isCustom ? 'Индивидуальный подарок' : `Подарок из коллекции (#${giftId})`;
         }
 
-        title.textContent = `#${index + 1} · ${itemTitle}`;
+        title.textContent = `#${regularOperationIndex} · ${itemTitle}`;
       } else {
-        title.textContent = `#${index + 1} · ${group.title}`;
+        title.textContent = `#${regularOperationIndex} · ${group.title}`;
       }
     } else {
-      title.textContent = `#${index + 1} · ${group.title}`;
+      // Для купонов, автоскидок и корректировок убираем нумерацию
+      if (isSystemEntry) {
+        // Заменяем "Купоны" на "Использованные купоны"
+        const displayTitle = group.isPersonalCoupon ? 'Использованные купоны' : group.title;
+        title.textContent = displayTitle;
+      } else {
+        title.textContent = `#${regularOperationIndex} · ${group.title}`;
+      }
     }
 
     header.appendChild(headerActions);

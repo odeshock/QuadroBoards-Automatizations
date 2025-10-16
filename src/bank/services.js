@@ -174,6 +174,42 @@ export function restoreFromBackup(backupData) {
 
   console.log('🔄 Начало восстановления из backup:', backupData);
 
+  // Восстанавливаем переменные окружения из backup (кроме исключений)
+  if (backupData.environment) {
+    console.log('🌍 Восстановление переменных окружения...');
+    const env = backupData.environment;
+
+    // Список переменных, которые НЕ восстанавливаем (оставляем текущие значения)
+    const skipVariables = [
+      'USERS_LIST',
+      'ALLOWED_PARENTS',
+      'BASE_URL',
+      'BACKUP_DATA',
+      'COMMENT_ID',
+      'COMMENT_AUTHOR_ID',
+      'COMMENT_AUTHOR_NAME',
+      'CURRENT_BANK'
+    ];
+
+    // Восстанавливаем все остальные переменные
+    Object.keys(env).forEach(key => {
+      if (skipVariables.includes(key)) {
+        console.log(`  ⏭️ Пропущена переменная ${key} (оставляем текущее значение)`);
+        return;
+      }
+
+      let value = env[key];
+
+      // Преобразуем строку "undefined" в реальный undefined
+      if (value === 'undefined') {
+        value = undefined;
+      }
+
+      window[key] = value;
+      console.log(`  ✅ ${key} = ${value === undefined ? 'undefined' : JSON.stringify(value)}`);
+    });
+  }
+
   // Очищаем текущие операции
   submissionGroups.length = 0;
 

@@ -756,11 +756,20 @@ function checkAndRestoreBackup() {
           try {
             restoreFromBackup(backupData);
             renderLog(log);
+
+            // Если было редактирование (BACKUP_DATA был указан), присваиваем COMMENT_ID
+            if (typeof window.NEW_COMMENT_ID !== 'undefined') {
+              window.COMMENT_ID = window.NEW_COMMENT_ID;
+              console.log('✅ COMMENT_ID присвоен из NEW_COMMENT_ID:', window.COMMENT_ID);
+            }
+
             console.log('Операции успешно восстановлены из backup');
           } catch (error) {
             console.error('Ошибка при восстановлении операций:', error);
             alert('Ошибка при восстановлении данных. Обратитесь в Приемную.');
           }
+        } else {
+          console.log('❌ Редактирование отменено, COMMENT_ID не изменён');
         }
       });
   }

@@ -201,6 +201,17 @@ discount = {
       "name": "Имя Пользователя"
     }
   ],
+  "PERSONAL_DISCOUNTS": [
+    {
+      "id": "coupon-1",
+      "type": "item",
+      "form": "form-gift-present",
+      "value": 2,
+      "title": "Скидка на 2 подарка",
+      "html": "<div>HTML блок купона</div>",
+      "expiresAt": "2025-12-31T23:59:59+03:00"
+    }
+  ],
   "PERSONAL_POSTS": [
     {
       "src": "https://...",
@@ -214,28 +225,99 @@ discount = {
   "FIRST_POST_MISSED_FLAG": false,
   "BANNER_RENO_FLAG": false,
   "BANNER_MAYAK_FLAG": false,
+  "COMMENT_ID": "12345",
+  "CURRENT_BANK": 1000,
   "ALLOWED_PARENTS": ["https://example.com"],
-  "BASE_URL": "https://example.com"
+  "BASE_URL": "https://example.com",
+  "MSG100_OLD": 5,
+  "MSG100_NEW": 10,
+  "REP100_OLD": 3,
+  "REP100_NEW": 7,
+  "POS100_OLD": 2,
+  "POS100_NEW": 4,
+  "MONTH_OLD": 1,
+  "MONTH_NEW": 2,
+  "BACKUP_DATA": undefined
 }
 ```
 
 ### Описание полей
 
+#### Пользователь
 | Поле | Тип | Описание |
 |------|-----|----------|
 | `USER_ID` | string | ID текущего пользователя |
 | `USER_NAME` | string | Имя текущего пользователя |
 | `IS_ADMIN` | boolean | Является ли пользователь администратором |
-| `USERS_LIST` | array | Список всех пользователей форума |
+| `USERS_LIST` | array | Список всех пользователей форума (объекты с `id` и `name`) |
+
+#### Купоны
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `PERSONAL_DISCOUNTS` | array | Список персональных купонов пользователя |
+
+#### Посты
+| Поле | Тип | Описание |
+|------|-----|----------|
 | `PERSONAL_POSTS` | array | Список личных постов пользователя |
 | `PLOT_POSTS` | array | Список сюжетных постов пользователя |
 | `ADS_POSTS` | array | Список рекламных постов |
+
+#### Флаги
+| Поле | Тип | Описание |
+|------|-----|----------|
 | `FIRST_POST_FLAG` | boolean | Флаг получения первого поста |
 | `FIRST_POST_MISSED_FLAG` | boolean | Флаг пропущенного первого поста |
 | `BANNER_RENO_FLAG` | boolean | Флаг баннера на Рено |
 | `BANNER_MAYAK_FLAG` | boolean | Флаг баннера на Маяке |
+
+#### Комментарий и баланс
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `COMMENT_ID` | string | ID комментария с операцией |
+| `CURRENT_BANK` | number | Текущий баланс пользователя |
+
+#### Конфигурация
+| Поле | Тип | Описание |
+|------|-----|----------|
 | `ALLOWED_PARENTS` | array | Разрешённые родительские домены |
 | `BASE_URL` | string | Базовый URL форума |
+
+#### Счётчики (опционально)
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `MSG100_OLD` | number\|undefined | Старое значение счётчика сообщений (сотни) |
+| `MSG100_NEW` | number\|undefined | Новое значение счётчика сообщений (сотни) |
+| `REP100_OLD` | number\|undefined | Старое значение счётчика репутации (сотни) |
+| `REP100_NEW` | number\|undefined | Новое значение счётчика репутации (сотни) |
+| `POS100_OLD` | number\|undefined | Старое значение счётчика постов (сотни) |
+| `POS100_NEW` | number\|undefined | Новое значение счётчика постов (сотни) |
+| `MONTH_OLD` | number\|undefined | Старое значение счётчика месяцев |
+| `MONTH_NEW` | number\|undefined | Новое значение счётчика месяцев |
+
+#### Служебные
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `BACKUP_DATA` | object\|undefined | Данные backup (обычно `undefined` при сохранении) |
+
+### Восстановление переменных из backup
+
+При загрузке операций из `window.BACKUP_DATA` большинство переменных окружения восстанавливаются из JSON.
+
+**Переменные, которые НЕ восстанавливаются** (используются текущие значения из окружения):
+- `USERS_LIST` — всегда используется актуальный список пользователей
+- `ALLOWED_PARENTS` — всегда используются текущие разрешённые домены
+- `BASE_URL` — всегда используется текущий URL форума
+- `BACKUP_DATA` — не восстанавливается для предотвращения зацикливания
+- `COMMENT_ID` — всегда используется ID текущего комментария
+
+**Все остальные переменные восстанавливаются из backup**, включая:
+- `USER_ID`, `USER_NAME`, `IS_ADMIN`
+- `CURRENT_BANK` — восстанавливается баланс на момент создания backup
+- `PERSONAL_DISCOUNTS` — восстанавливаются купоны пользователя
+- Флаги: `FIRST_POST_FLAG`, `FIRST_POST_MISSED_FLAG`, `BANNER_RENO_FLAG`, `BANNER_MAYAK_FLAG`
+- Посты: `PERSONAL_POSTS`, `PLOT_POSTS`, `ADS_POSTS`
+- Счётчики: `MSG100_OLD`, `MSG100_NEW`, `REP100_OLD`, `REP100_NEW`, `POS100_OLD`, `POS100_NEW`, `MONTH_OLD`, `MONTH_NEW`
 
 ---
 
@@ -746,10 +828,18 @@ oldPrice × (itemCount ÷ batchSize) × batchSize - newPrice × (itemCount ÷ ba
 {
   "type": "PURCHASE",
   "totalSum": 150,
+  "timestamp": "2025-01-15T12:34:56.789Z",
   "environment": {
     "USER_ID": "123",
     "USER_NAME": "Игрок",
-    "IS_ADMIN": false
+    "IS_ADMIN": false,
+    "PERSONAL_DISCOUNTS": [...],
+    "PERSONAL_POSTS": [...],
+    "PLOT_POSTS": [...],
+    "ADS_POSTS": [...],
+    "FIRST_POST_FLAG": false,
+    "COMMENT_ID": "12345",
+    "CURRENT_BANK": 1000
   },
   "fullData": [
     {

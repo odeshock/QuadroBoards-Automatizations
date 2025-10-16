@@ -550,24 +550,31 @@ form.addEventListener('submit', (e) => {
 // ============================================================================
 
 function initializeAccessControl() {
-  if (typeof window.IS_ADMIN === 'undefined' || !window.IS_ADMIN) {
-    return; // Для обычных пользователей ничего не делаем
-  }
-
-  // Для администраторов блокируем недоступные кнопки
+  // Сначала разблокируем все кнопки
   document.querySelectorAll('.btn-add').forEach((btn) => {
-    const formId = btn.getAttribute('data-form');
-    // Убираем # для сравнения с константами
-    const formIdWithoutHash = formId ? formId.replace('#', '') : '';
-
-    if (!ADMIN_ALLOWED_ITEMS.includes(formIdWithoutHash)) {
-      btn.disabled = true;
-      btn.classList.add('btn-disabled');
-      btn.style.opacity = '0.3';
-      btn.style.cursor = 'not-allowed';
-      btn.title = TEXT_MESSAGES.ADMIN_RESTRICTED;
-    }
+    btn.disabled = false;
+    btn.classList.remove('btn-disabled');
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    btn.title = '';
   });
+
+  // Если администратор, блокируем недоступные кнопки
+  if (typeof window.IS_ADMIN !== 'undefined' && window.IS_ADMIN) {
+    document.querySelectorAll('.btn-add').forEach((btn) => {
+      const formId = btn.getAttribute('data-form');
+      // Убираем # для сравнения с константами
+      const formIdWithoutHash = formId ? formId.replace('#', '') : '';
+
+      if (!ADMIN_ALLOWED_ITEMS.includes(formIdWithoutHash)) {
+        btn.disabled = true;
+        btn.classList.add('btn-disabled');
+        btn.style.opacity = '0.3';
+        btn.style.cursor = 'not-allowed';
+        btn.title = TEXT_MESSAGES.ADMIN_RESTRICTED;
+      }
+    });
+  }
 }
 
 // ============================================================================
@@ -754,15 +761,21 @@ function checkAndRestoreBackup() {
       .then((confirmed) => {
         if (confirmed) {
           try {
-            // Переименовываем кнопку "Купить" в "Редактировать"
-            const buyBtn = document.querySelector('.button.primary');
-            if (buyBtn && buyBtn.textContent === 'Купить') {
-              buyBtn.textContent = 'Редактировать';
-              console.log('✅ Кнопка переименована в "Редактировать"');
-            }
-
             restoreFromBackup(backupData);
             renderLog(log);
+
+            // Переименовываем кнопку "Купить" в "Редактировать" ПОСЛЕ renderLog
+            const buyBtn = document.getElementById('buy-button');
+            if (buyBtn) {
+              buyBtn.textContent = 'Редактировать';
+              console.log('✅ Кнопка переименована в "Редактировать"');
+            } else {
+              console.error('❌ Кнопка #buy-button не найдена');
+            }
+
+            // Обновляем контроль доступа после изменения IS_ADMIN
+            initializeAccessControl();
+            console.log('✅ Контроль доступа обновлён (IS_ADMIN:', window.IS_ADMIN, ')');
 
             // Если было редактирование (BACKUP_DATA был указан), присваиваем COMMENT_ID
             if (typeof window.NEW_COMMENT_ID !== 'undefined') {

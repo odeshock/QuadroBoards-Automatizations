@@ -1936,6 +1936,7 @@ export function renderLog(log) {
     const buyBtn = document.createElement('button');
     buyBtn.type = 'button';
     buyBtn.className = 'button primary';
+    buyBtn.id = 'buy-button';
     buyBtn.textContent = 'Купить';
     buyBtn.addEventListener('click', () => {
       // Получаем текущий timestamp в секундах

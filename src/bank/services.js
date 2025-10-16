@@ -177,6 +177,9 @@ export function restoreFromBackup(backupData) {
   // Очищаем текущие операции
   submissionGroups.length = 0;
 
+  // Очищаем выбранные купоны (будут восстановлены из backup)
+  selectedPersonalCoupons.length = 0;
+
   // Собираем ID корректировок из backup для проверки дубликатов
   const backupAdjustmentIds = new Set();
 
@@ -187,6 +190,33 @@ export function restoreFromBackup(backupData) {
       console.log('🔄 Пропущена скидка из backup (будет пересчитана):', operation.title);
       return;
     }
+
+    // Восстанавливаем персональные купоны
+    if (operation.type === 'coupon') {
+      console.log('🎫 Восстановление купонов из backup:', operation);
+      // Извлекаем ID купонов из entries
+      operation.entries.forEach((entry) => {
+        const couponId = entry.data?.coupon_id;
+        if (couponId) {
+          // Проверяем, что купон всё ещё активен
+          const activeCoupons = getActivePersonalCoupons();
+          const coupon = activeCoupons.find(c => c.id === couponId);
+
+          if (coupon) {
+            // Добавляем купон в список выбранных (если ещё не добавлен)
+            if (!selectedPersonalCoupons.includes(couponId)) {
+              selectedPersonalCoupons.push(couponId);
+              console.log(`✅ Купон "${coupon.title}" (ID: ${couponId}) восстановлен`);
+            }
+          } else {
+            console.log(`⚠️ Купон с ID ${couponId} больше недоступен (истёк или удалён)`);
+          }
+        }
+      });
+      // Не создаём группу для купонов - они будут пересозданы через updatePersonalCoupons
+      return;
+    }
+
     // Создаём группу
     const group = {
       id: `group-${incrementGroupSeq()}`,
@@ -343,6 +373,15 @@ export function restoreFromBackup(backupData) {
   // Если корректировок не было в backup, считаем все новыми
   // Если были, считаем разницу
   newAdjustmentsCount = backupAdjustmentGroup ? (currentAdjustments.length > 0 ? 1 : 0) : currentAdjustments.length;
+
+  // Применяем восстановленные персональные купоны (все 3 фазы)
+  if (selectedPersonalCoupons.length > 0) {
+    console.log(`🎫 Применяем восстановленные купоны (${selectedPersonalCoupons.length} шт.)`);
+    updatePersonalCoupons('item');   // Фаза 1: item купоны (до корректировок уже применены)
+    updatePersonalCoupons('fixed');  // Фаза 2: fixed купоны (после корректировок)
+    updatePersonalCoupons('percent'); // Фаза 3: percent купоны (после корректировок и fixed)
+    console.log(`✅ Купоны применены`);
+  }
 
   // Получаем timestamp из backup'а для определения исторически активных скидок
   const backupTimestamp = backupData.timestamp;

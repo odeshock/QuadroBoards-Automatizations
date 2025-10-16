@@ -11,6 +11,7 @@ import {
   formatNumber,
   parseNumericAmount,
   submissionGroups,
+  editLogs,
   formatEntryKey,
   updateAutoDiscounts,
   updateAutoPriceAdjustments,
@@ -1908,6 +1909,27 @@ export function renderLog(log) {
     });
 
     // Создаем содержимое панели
+
+    // Поле для логов изменений (только если IS_ADMIN_TO_EDIT === true и есть логи)
+    if (typeof window.IS_ADMIN_TO_EDIT !== 'undefined' && window.IS_ADMIN_TO_EDIT === true && editLogs.length > 0) {
+      const editLogsField = document.createElement('textarea');
+      editLogsField.id = 'edit-logs-field';
+      editLogsField.style.cssText = `
+        width: 100%;
+        min-height: 100px;
+        margin-bottom: 16px;
+        padding: 12px;
+        font-family: monospace;
+        font-size: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        resize: vertical;
+      `;
+      editLogsField.value = editLogs.join('\n');
+      editLogsField.placeholder = 'Логи изменений операции...';
+      summaryPanel.appendChild(editLogsField);
+    }
+
     const totalText = document.createElement('div');
     totalText.className = 'summary-total';
     const totalColor = totalSum >= 0 ? '#22c55e' : '#ef4444';
@@ -2004,13 +2026,21 @@ export function renderLog(log) {
       }, 2));
       console.log('\n======================');
 
+      // Получаем логи изменений из текстового поля (если оно есть)
+      let editLogsText = null;
+      const editLogsField = document.getElementById('edit-logs-field');
+      if (editLogsField) {
+        editLogsText = editLogsField.value;
+      }
+
       // Формируем полный объект для сохранения
       const purchaseData = {
         type: "PURCHASE",
         timestamp: timestamp,
         fullData: fullData,
         environment: environment,
-        totalSum: totalSum
+        totalSum: totalSum,
+        editLogs: editLogsText // Добавляем логи изменений
       };
 
       // Отправляем сообщение родительскому окну с операциями

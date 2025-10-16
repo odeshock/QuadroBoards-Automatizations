@@ -127,6 +127,30 @@ export const submissionGroups = [];
 export let groupSeq = 0;
 export let entrySeq = 0;
 
+// Логи изменений для админов (при редактировании операций)
+export const editLogs = [];
+
+/**
+ * Добавляет запись в лог изменений (только если IS_ADMIN_TO_EDIT === true)
+ * @param {string} message - сообщение для лога
+ */
+export function addEditLog(message) {
+  if (typeof window.IS_ADMIN_TO_EDIT !== 'undefined' && window.IS_ADMIN_TO_EDIT === true) {
+    // Если textarea существует, читаем из неё (чтобы сохранить ручные изменения)
+    const editLogsField = document.getElementById('edit-logs-field');
+    if (editLogsField) {
+      const currentText = editLogsField.value;
+      const newText = currentText ? `${currentText}\n${message}` : message;
+      editLogsField.value = newText;
+      console.log('📝 Лог изменения (добавлен в textarea):', message);
+    } else {
+      // Если textarea ещё не создана, добавляем в массив
+      editLogs.push(message);
+      console.log('📝 Лог изменения (добавлен в массив):', message);
+    }
+  }
+}
+
 // Замороженный список скидок для работы с backup
 // - null = используем текущие autoDiscounts (обычный режим)
 // - array = используем замороженные скидки (режим backup - редактирование существующей операции)
@@ -173,6 +197,13 @@ export function restoreFromBackup(backupData) {
   }
 
   console.log('🔄 Начало восстановления из backup:', backupData);
+
+  // Сохраняем текущий IS_ADMIN_TO_EDIT до загрузки ENVIRONMENT
+  window.IS_ADMIN_TO_EDIT = window.IS_ADMIN_TO_EDIT;
+  console.log('💾 IS_ADMIN_TO_EDIT сохранён:', window.IS_ADMIN_TO_EDIT);
+
+  // Очищаем логи изменений
+  editLogs.length = 0;
 
   // Восстанавливаем переменные окружения из backup (кроме исключений)
   if (backupData.environment) {
@@ -645,7 +676,8 @@ function isDiscountExpired(expiresAt) {
 function wasDiscountActiveAt(discount, timestamp) {
   if (!timestamp) return false;
 
-  const ts = new Date(timestamp);
+  // timestamp в секундах (Unix timestamp), конвертируем в миллисекунды
+  const ts = new Date(timestamp * 1000);
 
   // Проверяем startDate
   if (discount.startDate) {

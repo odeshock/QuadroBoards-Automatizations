@@ -2,7 +2,7 @@
 // app.js — Основная точка входа
 // ============================================================================
 
-import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup, selectedPersonalCoupons } from './services.js';
+import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, restoreFromBackup, selectedPersonalCoupons, addEditLog } from './services.js';
 import { openModal, closeModal } from './modal/index.js';
 import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
@@ -252,10 +252,17 @@ log.addEventListener('click', async (e) => {
 
     const entryIndex = group.entries.findIndex((item) => item.id === entryId);
     if (entryIndex !== -1) {
+      const deletedEntry = group.entries[entryIndex];
+      const entryDetails = formatEntryForLog(deletedEntry);
       group.entries.splice(entryIndex, 1);
+      addEditLog(`Удалён item из операции: ${group.title}${entryDetails}`);
+
       if (!group.entries.length) {
         const groupIndex = submissionGroups.findIndex((item) => item.id === groupId);
-        if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+        if (groupIndex !== -1) {
+          submissionGroups.splice(groupIndex, 1);
+          addEditLog(`Удалена операция: ${group.title}`);
+        }
       }
 
       renderLog(log);
@@ -307,10 +314,14 @@ form.addEventListener('submit', (e) => {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
           originGroup.entries.splice(idx, 1);
+          addEditLog(`Удалён item из операции: ${originGroup.title}`);
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
-            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+            if (groupIndex !== -1) {
+              submissionGroups.splice(groupIndex, 1);
+              addEditLog(`Удалена операция: ${originGroup.title}`);
+            }
           }
         }
       }
@@ -349,10 +360,14 @@ form.addEventListener('submit', (e) => {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
           originGroup.entries.splice(idx, 1);
+          addEditLog(`Удалён item из операции: ${originGroup.title}`);
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
-            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+            if (groupIndex !== -1) {
+              submissionGroups.splice(groupIndex, 1);
+              addEditLog(`Удалена операция: ${originGroup.title}`);
+            }
           }
         }
       }
@@ -389,10 +404,14 @@ form.addEventListener('submit', (e) => {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
           originGroup.entries.splice(idx, 1);
+          addEditLog(`Удалён item из операции: ${originGroup.title}`);
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
-            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+            if (groupIndex !== -1) {
+              submissionGroups.splice(groupIndex, 1);
+              addEditLog(`Удалена операция: ${originGroup.title}`);
+            }
           }
         }
       }
@@ -427,10 +446,14 @@ form.addEventListener('submit', (e) => {
         const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
         if (idx !== -1) {
           originGroup.entries.splice(idx, 1);
+          addEditLog(`Удалён item из операции: ${originGroup.title}`);
           // Если группа стала пустой - удаляем её
           if (!originGroup.entries.length) {
             const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
-            if (groupIndex !== -1) submissionGroups.splice(groupIndex, 1);
+            if (groupIndex !== -1) {
+              submissionGroups.splice(groupIndex, 1);
+              addEditLog(`Удалена операция: ${originGroup.title}`);
+            }
           }
         }
       }
@@ -455,8 +478,37 @@ form.addEventListener('submit', (e) => {
     });
 
     // Обновляем глобальный массив выбранных купонов
+    const previousCoupons = [...selectedPersonalCoupons]; // Сохраняем предыдущие купоны
     selectedPersonalCoupons.length = 0; // Очищаем массив
     selectedPersonalCoupons.push(...selectedCouponIds);
+
+    // Логирование изменений купонов
+    const activeCoupons = window.PERSONAL_DISCOUNTS?.filter(d => {
+      const now = Date.now();
+      const start = d.startDate ? new Date(d.startDate).getTime() : 0;
+      const expires = d.expiresAt ? new Date(d.expiresAt).getTime() : Infinity;
+      return now >= start && now < expires;
+    }) || [];
+
+    // Найдём добавленные купоны
+    selectedCouponIds.forEach(id => {
+      if (!previousCoupons.includes(id)) {
+        const coupon = activeCoupons.find(c => c.id === id);
+        if (coupon) {
+          addEditLog(`Добавлен купон: ${coupon.title}`);
+        }
+      }
+    });
+
+    // Найдём удалённые купоны
+    previousCoupons.forEach(id => {
+      if (!selectedCouponIds.includes(id)) {
+        const coupon = activeCoupons.find(c => c.id === id);
+        if (coupon) {
+          addEditLog(`Удалён купон: ${coupon.title}`);
+        }
+      }
+    });
 
     // Закрываем модалку и пересчитываем купоны
     handleCloseModal();
@@ -539,7 +591,16 @@ form.addEventListener('submit', (e) => {
   entryRecord.data = obj;
   entryRecord.multiplier = normalizedMultiplier;
   entryRecord.template_id = meta.templateSelector?.replace('#', '') || '';
+
+  const isNewEntry = !editingEntryId;
   group.entries.push(entryRecord);
+
+  // Логирование изменений
+  if (isNewEntry) {
+    addEditLog(`Добавлен item в операцию: ${group.title}`);
+  } else {
+    addEditLog(`Изменён item в операции: ${group.title}`);
+  }
 
   renderLog(log);
   handleCloseModal();

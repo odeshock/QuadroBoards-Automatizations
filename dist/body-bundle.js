@@ -689,13 +689,17 @@ $(function() {
     if (link) wrap.appendChild(link);
     if (details) wrap.appendChild(details);
 
-    container.appendChild(br);
-
     // вставка по order
     const siblings = Array.from(container.querySelectorAll('div[data-order]'));
     const next = siblings.find(el => Number(el.dataset.order) > Number(order));
-    if (next) container.insertBefore(wrap, next);
-    else container.appendChild(wrap);
+
+    // добавляем <br> и сам wrap как пару, чтобы они всегда шли вместе
+    const pair = document.createDocumentFragment();
+    pair.appendChild(br);
+    pair.appendChild(wrap);
+
+    if (next) container.insertBefore(pair, next);
+    else container.appendChild(pair);
 
     // helpers
     const setStatus = (text, color = '#555') => {

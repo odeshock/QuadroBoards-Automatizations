@@ -22,10 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!post || post.classList.contains("topicpost")) return;
 
             // Ищем ID профиля (N)
-            const profileLink = container.querySelector('.post-links a[href*="profile.php?id="]');
-            if (!profileLink) return;
-            const profileUrl = new URL(profileLink.href);
-            const N = Number(profileUrl.searchParams.get("id"));
+            const profileLink = container.querySelector('.pl-email.profile a');
+            if (profileLink) {
+                const profileUrl = new URL(profileLink.href);
+                const N = Number(profileUrl.searchParams.get("id"));
+            }
+            else {
+                const N = 0;
+            }
 
             // Ищем K — число в теге <bank_data>
             const bankData = container.querySelector("bank_data");

@@ -2043,7 +2043,7 @@ function formatBankText(data) {
     BASE_URL = window.SITE_URL.trim().replace(/\/+$/, "");
   }
 
-  // -1) САМЫЕ-ПЕРВЫЕ (без amount): списки получателей с ценой item.price
+  // 1) Админские основные
   const earliestIds = [
     "form-income-anketa",
     "form-income-akcion",
@@ -2054,19 +2054,19 @@ function formatBankText(data) {
     "form-income-activist",
   ];
 
-  // -0.5) сразу после earliestIds (без amount): пополнения/АМС
+  // 2) Пополнения от админов
   const topupAmsIds = ["form-income-topup", "form-income-ams"];
 
-  // 0) самые-первые: "первый пост" (без quote)
+  // 3) Первый пост
   const firstPostIds = ["form-income-firstpost"];
 
-  // 1) посты
+  // 4) Личный и сюжетные посты
   const postIds = ["form-income-personalpost", "form-income-plotpost"];
 
-  // 2) флаеры
+  // 5) Флаеры
   const flyerIds = ["form-income-flyer"];
 
-  // 3) первые после постов/флаеров
+  // 6) Каждые 100/месяц
   const firstIds = [
     "form-income-100msgs",
     "form-income-100pos",
@@ -2074,7 +2074,7 @@ function formatBankText(data) {
     "form-income-month",
   ];
 
-  // 4) income (общий случай — нумерованный список значений data)
+  // 7) Нумерованный список ссылок
   const incomeIds = [
     "form-income-needrequest",
     "form-income-contest",
@@ -2086,10 +2086,10 @@ function formatBankText(data) {
     "form-income-rpgtop",
   ];
 
-  // 5) баннеры
+  // 8) Баннеры
   const bannerIds = ["form-income-banner-mayak", "form-income-banner-reno"];
 
-  // 6) exp (обычные — количество)
+  // 9) Выкупы
   const expIds = [
     "form-exp-face-1m",
     "form-exp-face-3m",
@@ -2105,13 +2105,13 @@ function formatBankText(data) {
     "form-exp-need-1m",
   ];
 
-  // 7) самые последние (группы)
-  const thirdCharIds  = ["form-exp-thirdchar"];
+  // 10) Необычные расходы
+  const thirdCharIds = ["form-exp-thirdchar"];
   const changeCharIds = ["form-exp-changechar"];
-  const refuseIds     = ["form-exp-refuse"];
-  const transferIds   = ["form-exp-transfer"];
+  const refuseIds = ["form-exp-refuse"];
+  const transferIds = ["form-exp-transfer"];
 
-  // 8) самые последние (финальные EXP)
+  // 11) Маска/бонусы/спасительный билет
   const finalExpIds = [
     "form-exp-mask",
     "form-exp-bonus1d1",
@@ -2125,7 +2125,7 @@ function formatBankText(data) {
     "form-exp-clean",
   ];
 
-  // 9) САМЫЕ-САМЫЕ ПОСЛЕДНИЕ: иконки/бейджи/фоны/подарки
+  // 12) Оформление
   const giftLikeIds = [
     "form-icon-custom",
     "form-icon-present",
@@ -2137,10 +2137,13 @@ function formatBankText(data) {
     "form-gift-present",
   ];
 
-  // 10) ПОЗДНЕЕ ВСЕХ: пересчёт цены
+  // 13) Корректировки
   const priceAdjustmentIds = ["price-adjustment"];
 
-  // 11) САМОЕ-САМОЕ ПОСЛЕДНЕЕ: скидки на подарки (с amount в заголовке)
+  // 14) Примененные купоны
+  const personalCoupons = ["personal-coupon"];
+
+  // 15) Автоматические скидки
   const giftDiscountIds = ["gift-discount"];
 
   // Итоговый порядок
@@ -2161,6 +2164,7 @@ function formatBankText(data) {
     ...finalExpIds,
     ...giftLikeIds,
     ...priceAdjustmentIds,
+    ...personalCoupons,
     ...giftDiscountIds,
   ];
 
@@ -2295,7 +2299,7 @@ function formatBankText(data) {
     const lines = [];
     for (const e of entries) {
       const q = e?.data?.quantity;
-      if (q !== undefined && q!== null) lines.push(`[b]Количество[/b]: ${q}`);
+      if (q !== undefined && q !== null) lines.push(`[b]Количество[/b]: ${q}`);
     }
     return lines;
   };
@@ -2399,8 +2403,8 @@ function formatBankText(data) {
       const recipientKeys = Object.keys(obj).filter(k => k.startsWith("recipient_"));
       recipientKeys.forEach((key, i) => {
         const suffix = key.split("_")[1];
-        const rec  = obj[`recipient_${suffix}`];
-        const qty  = obj[`quantity_${suffix}`];
+        const rec = obj[`recipient_${suffix}`];
+        const qty = obj[`quantity_${suffix}`];
         const from = obj[`from_${suffix}`];
         const wish = obj[`wish_${suffix}`];
         const hasFrom = nonEmpty(from);
@@ -2432,7 +2436,7 @@ function formatBankText(data) {
       const recipientKeys = Object.keys(obj).filter(k => k.startsWith("recipient_"));
       recipientKeys.forEach((key, i) => {
         const suffix = key.split("_")[1];
-        const rec   = obj[`recipient_${suffix}`];
+        const rec = obj[`recipient_${suffix}`];
         const fromV = obj[`from_${suffix}`];
         const wishV = obj[`wish_${suffix}`];
         const dataV = obj[`gift_data_${suffix}`];
@@ -2466,9 +2470,26 @@ function formatBankText(data) {
       const d = e?.data; if (!d) { idx++; continue; }
       const pack = Array.isArray(d) ? d : [d];
       for (const item of pack) {
-        const t  = item?.adjustment_title ?? "";
+        const t = item?.adjustment_title ?? "";
         const aa = item?.adjustment_amount ?? "";
         lines.push(`${idx}. [b]${t}:[/b] -${aa}`);
+      }
+      idx++;
+    }
+    return lines;
+  };
+
+  const entriesPersonalCouponsLines = (entries) => {
+    if (!Array.isArray(entries)) return [];
+    const lines = [];
+    let idx = 1;
+    for (const e of entries) {
+      const d = e?.data; if (!d) { idx++; continue; }
+      const pack = Array.isArray(d) ? d : [d];
+      for (const item of pack) {
+        const t = item?.coupon_title ?? "";
+        const da = item?.discount_amount ?? "";
+        lines.push(`${idx}. [b]${t}:[/b] ${da}`);
       }
       idx++;
     }
@@ -2483,7 +2504,7 @@ function formatBankText(data) {
       const d = e?.data; if (!d) { idx++; continue; }
       const pack = Array.isArray(d) ? d : [d];
       for (const item of pack) {
-        const t  = item?.discount_title ?? "";
+        const t = item?.discount_title ?? "";
         const da = item?.discount_amount ?? "";
         lines.push(`${idx}. [b]${t}:[/b] ${da}`);
       }
@@ -2513,7 +2534,7 @@ function formatBankText(data) {
     ...finalExpIds, ...giftLikeIds, ...priceAdjustmentIds
   ]);
 
-  const hasIncomeGroup  = items.some(it => incomeSet.has(it.form_id));
+  const hasIncomeGroup = items.some(it => incomeSet.has(it.form_id));
   const firstExpenseIdx = items.findIndex(it => expenseSet.has(it.form_id));
   const hasExpenseGroup = firstExpenseIdx !== -1;
 
@@ -2570,6 +2591,8 @@ function formatBankText(data) {
       rendered = formatBlock(title, amountLike, entriesGiftLikeLines(item.entries));
     } else if (priceAdjustmentIds.includes(item.form_id)) {
       rendered = formatBlockNoAmount(title, entriesPriceAdjustmentLines(item.entries));
+    } else if (personalCoupons.includes(item.form_id)) {
+      endered = formatBlock(title, amountLike, entriesPersonalCouponsLines(item.entries));
     } else if (giftDiscountIds.includes(item.form_id)) {
       rendered = formatBlock(title, amountLike, entriesGiftDiscountLines(item.entries));
     } else {
@@ -2583,9 +2606,28 @@ function formatBankText(data) {
   let result = blocks.join("\n\n");
 
   if (typeof data.totalSum !== "undefined" && data.totalSum !== null && data.totalSum !== "") {
+    let current_bank = (data.environment.CURRENT_BANK !== "" &&
+      data.environment.CURRENT_BANK !== null &&
+      data.environment.CURRENT_BANK !== "undefined" &&
+      data.environment.CURRENT_BANK !== undefined) ? Number(data.environment.CURRENT_BANK) : 0;
+    let total_sum = Number(data.totalSum);
+    const new_bank = current_bank - total_sum;
     const clr = Number(data.totalSum) < 0 ? "red" : "green";
     const sign = Number(data.totalSum) > 0 ? "+" : "";
-    result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${sign}${data.totalSum}[/color][/align][/size][/quote]`;
+    result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${sign}${data.totalSum}[/color]\n[b]ВАШ СЧЁТ:[/b] ${new_bank}[/align][/size][/quote]`;
+  }
+
+  if (
+    data.environment.COMMENT_ID !== "" &&
+    data.environment.COMMENT_ID !== null &&
+    data.environment.COMMENT_ID !== "undefined" &&
+    data.environment.COMMENT_ID !== undefined &&
+    data.editLogs !== "" &&
+    data.editLogs !== null &&
+    data.editLogs !== "undefined" &&
+    data.editLogs !== undefined
+  ) {
+    result += `\n\n[hide=9999999999][b]Комментарий администратора:[/b]\n${editLogs}[/hide]`;
   }
 
   return result;

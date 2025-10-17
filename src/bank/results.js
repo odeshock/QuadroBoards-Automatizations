@@ -1278,396 +1278,411 @@ export function renderLog(log) {
     // Обычные операции
     else {
       group.entries.forEach((item, itemIndex) => {
-      const itemEl = document.createElement('div');
-      itemEl.className = 'entry-item';
-      itemEl.dataset.entryId = item.id;
-      itemEl.dataset.groupId = group.id;
+        const itemEl = document.createElement('div');
+        itemEl.className = 'entry-item';
+        itemEl.dataset.entryId = item.id;
+        itemEl.dataset.groupId = group.id;
 
-      // ID шаблона формы
-      const tid = item.template_id;
+        // ID шаблона формы
+        const tid = item.template_id;
 
-      // Определяем формы, требующие визуального разделения
-      const isBonusMaskClean = SPECIAL_EXPENSE_FORMS.includes(toSelector(tid));
+        // Определяем формы, требующие визуального разделения
+        const isBonusMaskClean = SPECIAL_EXPENSE_FORMS.includes(toSelector(tid));
 
-      // header у записи (если нужен заголовок для нескольких записей)
-      // Для скидок не показываем "Запись X"
-      const itemTitle = document.createElement('div');
-      itemTitle.className = 'entry-item-title';
-      const baseTitle = (group.entries.length > 1 && !group.isDiscount) ? `Запись ${itemIndex + 1}` : '';
-      if (baseTitle) {
-        itemTitle.textContent = baseTitle;
-        itemEl.appendChild(itemTitle);
-      }
-
-      const removeTitleIfEmpty = () => {
-        const hasData = itemEl.querySelector('.entry-list li');
-        if (!hasData && itemTitle && itemTitle.textContent.trim() === 'Данные') {
-          itemTitle.remove();
+        // header у записи (если нужен заголовок для нескольких записей)
+        // Для скидок не показываем "Запись X"
+        const itemTitle = document.createElement('div');
+        itemTitle.className = 'entry-item-title';
+        const baseTitle = (group.entries.length > 1 && !group.isDiscount) ? `Запись ${itemIndex + 1}` : '';
+        if (baseTitle) {
+          itemTitle.textContent = baseTitle;
+          itemEl.appendChild(itemTitle);
         }
-      };
 
-      // список данных
-      const list = document.createElement('ol');
-
-      // Добавляем класс separated для форм с комментариями/получателями
-      const needsSeparation = isBonusMaskClean || tid === FORM_INCOME_AMS || (tid && (tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift')));
-      list.className = needsSeparation ? 'entry-list separated' : 'entry-list';
-
-      // ===== спец-рендеры =====
-      // листовка
-      if (item.data && item.data.flyer_links_json) {
-        try {
-          const links = JSON.parse(item.data.flyer_links_json);
-          if (Array.isArray(links) && links.length) {
-            const list = document.createElement('ol');
-            const removeTitleIfEmpty = () => {
-              if (list.children.length === 0 && itemTitle && itemTitle.textContent.trim() === 'Данные') {
-                itemTitle.remove();
-              }
-            };
-            list.className = 'entry-list';
-            links.forEach(({ src, text }) => {
-              if (!src) return;
-              const li = document.createElement('li');
-              const a = document.createElement('a');
-              a.href = src; a.textContent = text || src;
-              a.target = '_blank'; a.rel = 'noopener noreferrer';
-              li.appendChild(a); list.appendChild(li);
-            });
-            itemEl.appendChild(list);
-            itemsWrap.appendChild(itemEl);
-            return;
+        const removeTitleIfEmpty = () => {
+          const hasData = itemEl.querySelector('.entry-list li');
+          if (!hasData && itemTitle && itemTitle.textContent.trim() === 'Данные') {
+            itemTitle.remove();
           }
-        } catch (_) { }
-      }
+        };
 
-      // личные посты
-      if (item.data && item.data.personal_posts_json) {
-        try {
-          const items = JSON.parse(item.data.personal_posts_json);
-          if (Array.isArray(items) && items.length) {
-            const list = document.createElement('ol');
-            list.className = 'entry-list';
-            items.forEach(({ src, text, symbols_num }) => {
-              if (!src) return;
-              const li = document.createElement('li');
-              const a = document.createElement('a');
-              a.href = src;
-              a.textContent = text || src;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              li.appendChild(a);
-              li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
-              list.appendChild(li);
-            });
-            itemEl.appendChild(list);
-            itemsWrap.appendChild(itemEl);
-            removeTitleIfEmpty();
-            return;
-          }
-        } catch (_) { }
-      }
+        // список данных
+        const list = document.createElement('ol');
 
-      // сюжетные посты
-      if (item.data && item.data.plot_posts_json) {
-        try {
-          const items = JSON.parse(item.data.plot_posts_json);
-          if (Array.isArray(items) && items.length) {
-            const list = document.createElement('ol');
-            list.className = 'entry-list';
-            items.forEach(({ src, text, symbols_num }) => {
-              if (!src) return;
-              const li = document.createElement('li');
-              const a = document.createElement('a');
-              a.href = src;
-              a.textContent = text || src;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              li.appendChild(a);
-              li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
-              list.appendChild(li);
-            });
-            itemEl.appendChild(list);
-            itemsWrap.appendChild(itemEl);
-            removeTitleIfEmpty();
-            return;
-          }
-        } catch (_) { }
-      }
+        // Добавляем класс separated для форм с комментариями/получателями
+        const needsSeparation = isBonusMaskClean || tid === FORM_INCOME_AMS || (tid && (tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift')));
+        list.className = needsSeparation ? 'entry-list separated' : 'entry-list';
 
-      // ===== Определяем тип формы для правильного рендеринга =====
-      // Используем импортированные константы вместо локальных массивов
-
-      // ===== ГРУППА 1: Формы с получателями в списке =====
-      if (RECIPIENT_LIST_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const idxs = Object.keys(dataObj)
-          .map(k => k.match(/^recipient_(\d+)$/))
-          .filter(Boolean)
-          .map(m => m[1])
-          .sort((a, b) => Number(a) - Number(b));
-
-        // Определяем, запрашивается ли FROM (от кого) для этой формы
-        const hasFromField = isBonusMaskClean || (tid && (tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift')));
-
-        idxs.forEach((idx) => {
-          const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
-          if (!rid) return;
-
-          const user = window.USERS_LIST?.find(u => String(u.id) === rid);
-          const userName = user ? user.name : '';
-          const userId = user ? user.id : rid;
-
-          // Получаем данные
-          const from = String(dataObj[`from_${idx}`] ?? '').trim();
-          const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
-          const giftData = String(dataObj[`gift_data_${idx}`] ?? '').trim();
-          const quantity = dataObj[`quantity_${idx}`] || dataObj[`amount_${idx}`] || '';
-
-          const li = document.createElement('li');
-
-          // NAME с ссылкой
-          let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
-
-          // NUM_INFO: показываем либо quantity, либо price (для админ-форм начислений)
-          // adminRecipientForms заменены на ADMIN_RECIPIENT_FORMS
-          const showPrice = ADMIN_RECIPIENT_FORMS.includes(toSelector(tid)) && !quantity;
-          const isTopupOrAms = toSelector(tid) === FORM_INCOME_TOPUP || toSelector(tid) === FORM_INCOME_AMS;
-
-          if (showPrice && group.price) {
-            // Для админ-форм начислений показываем price рядом с именем
-            htmlContent += ` — ${formatNumber(group.price)}`;
-          } else if (quantity) {
-            // Для всех форм с quantity показываем количество
-            const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
-            if (qtyNum !== null) {
-              htmlContent += ` — ${formatNumber(qtyNum)}`;
-            } else if (String(quantity).trim()) {
-              htmlContent += ` — ${String(quantity).trim()}`;
+        // ===== спец-рендеры =====
+        // листовка
+        if (item.data && item.data.flyer_links_json) {
+          try {
+            const links = JSON.parse(item.data.flyer_links_json);
+            if (Array.isArray(links) && links.length) {
+              const list = document.createElement('ol');
+              const removeTitleIfEmpty = () => {
+                if (list.children.length === 0 && itemTitle && itemTitle.textContent.trim() === 'Данные') {
+                  itemTitle.remove();
+                }
+              };
+              list.className = 'entry-list';
+              links.forEach(({ src, text }) => {
+                if (!src) return;
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = src; a.textContent = text || src;
+                a.target = '_blank'; a.rel = 'noopener noreferrer';
+                li.appendChild(a); list.appendChild(li);
+              });
+              itemEl.appendChild(list);
+              itemsWrap.appendChild(itemEl);
+              return;
             }
-          }
+          } catch (_) { }
+        }
 
-          // COM_INFO
-          if (hasFromField && from && comment) {
-            // Есть и "От кого" и "Комментарий"
-            htmlContent += `<br><br><strong>${from}: </strong>${comment}`;
-          } else if (hasFromField && from && !comment) {
-            // Есть только "От кого" без комментария - выводим без двоеточия
-            htmlContent += `<br><br><strong>${from}</strong>`;
-          } else if (hasFromField && !from && comment) {
-            // Для форм с полем "От кого": если оно не заполнено, а комментарий есть - просто текст
-            htmlContent += `<br><br>${comment}`;
-          } else if (!hasFromField && comment) {
-            // Для форм БЕЗ поля "От кого" - выводим с меткой "Комментарий:"
-            htmlContent += `<br><br><strong>Комментарий: </strong>${comment}`;
-          }
+        // личные посты
+        if (item.data && item.data.personal_posts_json) {
+          try {
+            const items = JSON.parse(item.data.personal_posts_json);
+            if (Array.isArray(items) && items.length) {
+              const list = document.createElement('ol');
+              list.className = 'entry-list';
+              items.forEach(({ src, text, symbols_num }) => {
+                if (!src) return;
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = src;
+                a.textContent = text || src;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                li.appendChild(a);
+                li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
+                list.appendChild(li);
+              });
+              itemEl.appendChild(list);
+              itemsWrap.appendChild(itemEl);
+              removeTitleIfEmpty();
+              return;
+            }
+          } catch (_) { }
+        }
 
-          // DATA_INFO
-          if (giftData) {
-            const formattedData = giftData.replace(/\n/g, '<br>');
-            htmlContent += `<br><br><strong>Данные:</strong><br>${formattedData}`;
-          }
+        // сюжетные посты
+        if (item.data && item.data.plot_posts_json) {
+          try {
+            const items = JSON.parse(item.data.plot_posts_json);
+            if (Array.isArray(items) && items.length) {
+              const list = document.createElement('ol');
+              list.className = 'entry-list';
+              items.forEach(({ src, text, symbols_num }) => {
+                if (!src) return;
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = src;
+                a.textContent = text || src;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                li.appendChild(a);
+                li.appendChild(document.createTextNode(` [${symbols_num} символов]`));
+                list.appendChild(li);
+              });
+              itemEl.appendChild(list);
+              itemsWrap.appendChild(itemEl);
+              removeTitleIfEmpty();
+              return;
+            }
+          } catch (_) { }
+        }
 
-          li.innerHTML = htmlContent;
-          list.appendChild(li);
-        });
-      }
+        // ===== Определяем тип формы для правильного рендеринга =====
+        // Используем импортированные константы вместо локальных массивов
 
-      // ===== ГРУППА 2: Активист/Постописец/Пост полумесяца (без li) =====
-      if (DIRECT_RENDER_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const idxs = Object.keys(dataObj)
-          .map(k => k.match(/^recipient_(\d+)$/))
-          .filter(Boolean)
-          .map(m => m[1])
-          .sort((a, b) => Number(a) - Number(b));
+        // ===== ГРУППА 1: Формы с получателями в списке =====
+        if (RECIPIENT_LIST_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1])
+            .sort((a, b) => Number(a) - Number(b));
 
-        const hasFromField = false;
+          // Определяем, запрашивается ли FROM (от кого) для этой формы
+          const hasFromField = isBonusMaskClean || (tid && (tid.includes('icon') || tid.includes('badge') || tid.includes('bg') || tid.includes('gift')));
 
-        idxs.forEach((idx) => {
-          const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
-          if (!rid) return;
+          idxs.forEach((idx) => {
+            const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
+            if (!rid) return;
 
-          const user = window.USERS_LIST?.find(u => String(u.id) === rid);
-          const userName = user ? user.name : '';
-          const userId = user ? user.id : rid;
+            const user = window.USERS_LIST?.find(u => String(u.id) === rid);
+            const userName = user ? user.name : '';
+            const userId = user ? user.id : rid;
 
-          const from = String(dataObj[`from_${idx}`] ?? '').trim();
-          const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
-          const giftData = String(dataObj[`gift_data_${idx}`] ?? '').trim();
-          const quantity = dataObj[`quantity_${idx}`] || dataObj[`amount_${idx}`] || '';
+            // Получаем данные
+            const from = String(dataObj[`from_${idx}`] ?? '').trim();
+            const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
+            const giftData = String(dataObj[`gift_data_${idx}`] ?? '').trim();
+            const quantity = dataObj[`quantity_${idx}`] || dataObj[`amount_${idx}`] || '';
+
+            const li = document.createElement('li');
+
+            // NAME с ссылкой
+            let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
+
+            // NUM_INFO: показываем либо quantity, либо price (для админ-форм начислений)
+            // adminRecipientForms заменены на ADMIN_RECIPIENT_FORMS
+            const showPrice = ADMIN_RECIPIENT_FORMS.includes(toSelector(tid)) && !quantity;
+            const isTopupOrAms = toSelector(tid) === FORM_INCOME_TOPUP || toSelector(tid) === FORM_INCOME_AMS;
+
+            if (showPrice && group.price) {
+              // Для админ-форм начислений показываем price рядом с именем
+              htmlContent += ` — ${formatNumber(group.price)}`;
+            } else if (quantity) {
+              // Для всех форм с quantity показываем количество
+              const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
+              if (qtyNum !== null) {
+                htmlContent += ` — ${formatNumber(qtyNum)}`;
+              } else if (String(quantity).trim()) {
+                htmlContent += ` — ${String(quantity).trim()}`;
+              }
+            }
+
+            // COM_INFO
+            if (hasFromField && from && comment) {
+              // Есть и "От кого" и "Комментарий"
+              htmlContent += `<br><br><strong>${from}: </strong>${comment}`;
+            } else if (hasFromField && from && !comment) {
+              // Есть только "От кого" без комментария - выводим без двоеточия
+              htmlContent += `<br><br><strong>${from}</strong>`;
+            } else if (hasFromField && !from && comment) {
+              // Для форм с полем "От кого": если оно не заполнено, а комментарий есть - просто текст
+              htmlContent += `<br><br>${comment}`;
+            } else if (!hasFromField && comment) {
+              // Для форм БЕЗ поля "От кого" - выводим с меткой "Комментарий:"
+              htmlContent += `<br><br><strong>Комментарий: </strong>${comment}`;
+            }
+
+            // DATA_INFO
+            if (giftData) {
+              const formattedData = giftData.replace(/\n/g, '<br>');
+              htmlContent += `<br><br><strong>Данные:</strong><br>${formattedData}`;
+            }
+
+            li.innerHTML = htmlContent;
+            list.appendChild(li);
+          });
+        }
+
+        // ===== ГРУППА 2: Активист/Постописец/Пост полумесяца (без li) =====
+        if (DIRECT_RENDER_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const idxs = Object.keys(dataObj)
+            .map(k => k.match(/^recipient_(\d+)$/))
+            .filter(Boolean)
+            .map(m => m[1])
+            .sort((a, b) => Number(a) - Number(b));
+
+          const hasFromField = false;
+
+          idxs.forEach((idx) => {
+            const rid = String(dataObj[`recipient_${idx}`] ?? '').trim();
+            if (!rid) return;
+
+            const user = window.USERS_LIST?.find(u => String(u.id) === rid);
+            const userName = user ? user.name : '';
+            const userId = user ? user.id : rid;
+
+            const from = String(dataObj[`from_${idx}`] ?? '').trim();
+            const comment = String(dataObj[`wish_${idx}`] || dataObj[`comment_${idx}`] || '').trim();
+            const giftData = String(dataObj[`gift_data_${idx}`] ?? '').trim();
+            const quantity = dataObj[`quantity_${idx}`] || dataObj[`amount_${idx}`] || '';
+
+            const itemEl = document.createElement('div');
+            itemEl.className = 'entry-item';
+            itemEl.style.flexDirection = 'row';
+
+            let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
+
+            // Для group2Templates (Активист, Постописец, Пост) показываем price
+            if (!quantity && group.price) {
+              htmlContent += ` — ${formatNumber(group.price)}`;
+            } else if (quantity) {
+              const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
+              if (qtyNum !== null) {
+                htmlContent += ` — ${formatNumber(qtyNum)}`;
+              } else if (String(quantity).trim()) {
+                htmlContent += ` — ${String(quantity).trim()}`;
+              }
+            }
+
+            if (comment) {
+              const comLabel = (hasFromField && from) ? `<strong>${from}: </strong>` : (hasFromField ? '' : '<strong>Комментарий: </strong>');
+              htmlContent += `<br><br>${comLabel}${comment}`;
+            }
+
+            if (giftData) {
+              const formattedData = giftData.replace(/\n/g, '<br>');
+              htmlContent += `<br><br><strong>Данные:</strong><br>${formattedData}`;
+            }
+
+            itemEl.innerHTML = htmlContent;
+            itemsWrap.appendChild(itemEl);
+          });
+          removeTitleIfEmpty();
+          return;
+        }
+
+        // ===== ГРУППА 3: Выкупы (только количество) =====
+        if (BUYOUT_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const quantity = dataObj.quantity || '';
 
           const itemEl = document.createElement('div');
           itemEl.className = 'entry-item';
-          itemEl.style.flexDirection = 'row';
-
-          let htmlContent = `<strong><a target="_blank" href="${BASE_URL}/profile.php?id=${userId}">${userName}</a></strong>`;
-
-          // Для group2Templates (Активист, Постописец, Пост) показываем price
-          if (!quantity && group.price) {
-            htmlContent += ` — ${formatNumber(group.price)}`;
-          } else if (quantity) {
-            const qtyNum = typeof quantity === 'number' ? quantity : parseNumericAmount(String(quantity));
-            if (qtyNum !== null) {
-              htmlContent += ` — ${formatNumber(qtyNum)}`;
-            } else if (String(quantity).trim()) {
-              htmlContent += ` — ${String(quantity).trim()}`;
-            }
-          }
-
-          if (comment) {
-            const comLabel = (hasFromField && from) ? `<strong>${from}: </strong>` : (hasFromField ? '' : '<strong>Комментарий: </strong>');
-            htmlContent += `<br><br>${comLabel}${comment}`;
-          }
-
-          if (giftData) {
-            const formattedData = giftData.replace(/\n/g, '<br>');
-            htmlContent += `<br><br><strong>Данные:</strong><br>${formattedData}`;
-          }
-
-          itemEl.innerHTML = htmlContent;
+          itemEl.style.display = 'block'; // Переопределяем flex на block для правильного отображения
+          itemEl.innerHTML = `<strong>Количество</strong> — ${quantity}`;
           itemsWrap.appendChild(itemEl);
-        });
-        removeTitleIfEmpty();
-        return;
-      }
-
-      // ===== ГРУППА 3: Выкупы (только количество) =====
-      if (BUYOUT_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const quantity = dataObj.quantity || '';
-
-        const itemEl = document.createElement('div');
-        itemEl.className = 'entry-item';
-        itemEl.style.display = 'block'; // Переопределяем flex на block для правильного отображения
-        itemEl.innerHTML = `<strong>Количество</strong> — ${quantity}`;
-        itemsWrap.appendChild(itemEl);
-        removeTitleIfEmpty();
-        return;
-      }
-
-      // ===== ГРУППА 4: Ссылки в li =====
-      if (URL_FIELD_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const url = dataObj.url || '';
-
-        if (url) {
-          const li = document.createElement('li');
-          li.innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
-          list.appendChild(li);
+          removeTitleIfEmpty();
+          return;
         }
-      }
 
-      // ===== ГРУППА 5: Ссылки без li =====
-      if (BANNER_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const url = dataObj.url || '';
+        // ===== ГРУППА 4: Ссылки в li =====
+        if (URL_FIELD_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const url = dataObj.url || '';
 
-        const itemEl = document.createElement('div');
-        itemEl.className = 'entry-item';
-        itemEl.innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
-        itemsWrap.appendChild(itemEl);
-        removeTitleIfEmpty();
-        return;
-      }
-
-      // ===== ГРУППА 6: Текстовые поля =====
-      if (CHARACTER_CHANGE_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const text = dataObj.text || dataObj.name || dataObj.reason || '';
-
-        const itemEl = document.createElement('div');
-        itemEl.className = 'entry-item';
-        itemEl.textContent = text;
-        itemsWrap.appendChild(itemEl);
-        removeTitleIfEmpty();
-        return;
-      }
-
-      // ===== ГРУППА 7: Отказ от персонажа =====
-      if (REFUSE_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const comment = (dataObj.comment || '').replace(/\n/g, '<br>');
-
-        const itemEl = document.createElement('div');
-        itemEl.className = 'entry-item';
-        itemEl.innerHTML = `<strong>Комментарий: </strong>${comment}`;
-        itemsWrap.appendChild(itemEl);
-        removeTitleIfEmpty();
-        return;
-      }
-
-      // ===== ГРУППА 8: Ключ-значение без li =====
-      if (COUNTER_FORMS.includes(toSelector(tid))) {
-        const dataObj = item.data || {};
-        const itemEl = document.createElement('div');
-        itemEl.className = 'entry-item';
-        itemEl.style.display = 'block'; // Переопределяем flex на block для правильного отображения
-
-        const lines = [];
-        Object.entries(dataObj).forEach(([key, value]) => {
-          if (value === undefined || value === null || String(value).trim() === '') return;
-          lines.push(`<strong>${formatEntryKey(key)}</strong> — ${String(value).trim()}`);
-        });
-
-        itemEl.innerHTML = lines.join('<br>');
-        itemsWrap.appendChild(itemEl);
-        removeTitleIfEmpty();
-        return;
-      }
-
-      // ===== Скидка на подарки =====
-      // (скидки и корректировки уже отрисованы выше в едином списке, этот блок больше не нужен)
-      const isDiscount = group.isDiscount || (item.template_id === 'gift-discount') ||
-        (item.template_id === 'gift-discount-regular') ||
-        (item.template_id === 'gift-discount-custom');
-      const isAdjustment = group.isPriceAdjustment || item.template_id?.startsWith('auto-adjustment-');
-
-      // ===== остальные поля =====
-      // Для скидок и корректировок пропускаем вывод всех остальных полей (они уже показаны в виде расчёта выше)
-      if (!isDiscount && !isAdjustment) {
-        Object.entries(item.data || {}).forEach(([key, value]) => {
-          // Группа 1: все поля уже отрисованы
-          if (RECIPIENT_LIST_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
-
-          // Группа 2: все поля уже отрисованы
-          if (DIRECT_RENDER_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
-
-          // Группа 3: quantity уже отрисован
-          if (BUYOUT_FORMS.includes(toSelector(tid)) && key === 'quantity') return;
-
-          // Группа 4: url уже отрисован
-          if (URL_FIELD_FORMS.includes(toSelector(tid)) && key === 'url') return;
-
-          // Группа 5: url уже отрисован
-          if (BANNER_FORMS.includes(toSelector(tid)) && key === 'url') return;
-
-          // Группа 6: text/name/reason уже отрисованы
-          if (CHARACTER_CHANGE_FORMS.includes(toSelector(tid)) && (key === 'text' || key === 'name' || key === 'reason')) return;
-
-          // Группа 7: comment уже отрисован
-          if (REFUSE_FORMS.includes(toSelector(tid)) && key === 'comment') return;
-
-          // Группа 8: все поля уже отрисованы
-          if (COUNTER_FORMS.includes(toSelector(tid))) return;
-
-          // пустые значения не выводим (чтобы не было "— —")
-          if (value === undefined || value === null || String(value).trim() === '') return;
-
-          const raw = typeof value === 'string' ? value.trim() : value;
-
-          // Для reason (Отказ от персонажа, Смена персонажа) - выводим напрямую с переносами, без нумерации
-          if (key === 'reason') {
-            const div = document.createElement('div');
-            div.style.whiteSpace = 'pre-wrap';
-            div.textContent = raw;
-            list.appendChild(div);
-            return;
+          if (url) {
+            const li = document.createElement('li');
+            li.innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+            list.appendChild(li);
           }
+        }
 
-          // Для link в "Третий персонаж" - выводим ссылку напрямую, без <li>
-          const isThirdChar = toSelector(item.template_id) === FORM_EXP_THIRDCHAR;
-          if (isThirdChar && key === 'link') {
+        // ===== ГРУППА 5: Ссылки без li =====
+        if (BANNER_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const url = dataObj.url || '';
+
+          const itemEl = document.createElement('div');
+          itemEl.className = 'entry-item';
+          itemEl.innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+          itemsWrap.appendChild(itemEl);
+          removeTitleIfEmpty();
+          return;
+        }
+
+        // ===== ГРУППА 6: Текстовые поля =====
+        if (CHARACTER_CHANGE_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const text = dataObj.text || dataObj.name || dataObj.reason || '';
+
+          const itemEl = document.createElement('div');
+          itemEl.className = 'entry-item';
+          itemEl.textContent = text;
+          itemsWrap.appendChild(itemEl);
+          removeTitleIfEmpty();
+          return;
+        }
+
+        // ===== ГРУППА 7: Отказ от персонажа =====
+        if (REFUSE_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const comment = (dataObj.comment || '').replace(/\n/g, '<br>');
+
+          const itemEl = document.createElement('div');
+          itemEl.className = 'entry-item';
+          itemEl.innerHTML = `<strong>Комментарий: </strong>${comment}`;
+          itemsWrap.appendChild(itemEl);
+          removeTitleIfEmpty();
+          return;
+        }
+
+        // ===== ГРУППА 8: Ключ-значение без li =====
+        if (COUNTER_FORMS.includes(toSelector(tid))) {
+          const dataObj = item.data || {};
+          const itemEl = document.createElement('div');
+          itemEl.className = 'entry-item';
+          itemEl.style.display = 'block'; // Переопределяем flex на block для правильного отображения
+
+          const lines = [];
+          Object.entries(dataObj).forEach(([key, value]) => {
+            if (value === undefined || value === null || String(value).trim() === '') return;
+            lines.push(`<strong>${formatEntryKey(key)}</strong> — ${String(value).trim()}`);
+          });
+
+          itemEl.innerHTML = lines.join('<br>');
+          itemsWrap.appendChild(itemEl);
+          removeTitleIfEmpty();
+          return;
+        }
+
+        // ===== Скидка на подарки =====
+        // (скидки и корректировки уже отрисованы выше в едином списке, этот блок больше не нужен)
+        const isDiscount = group.isDiscount || (item.template_id === 'gift-discount') ||
+          (item.template_id === 'gift-discount-regular') ||
+          (item.template_id === 'gift-discount-custom');
+        const isAdjustment = group.isPriceAdjustment || item.template_id?.startsWith('auto-adjustment-');
+
+        // ===== остальные поля =====
+        // Для скидок и корректировок пропускаем вывод всех остальных полей (они уже показаны в виде расчёта выше)
+        if (!isDiscount && !isAdjustment) {
+          Object.entries(item.data || {}).forEach(([key, value]) => {
+            // Группа 1: все поля уже отрисованы
+            if (RECIPIENT_LIST_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+
+            // Группа 2: все поля уже отрисованы
+            if (DIRECT_RENDER_FORMS.includes(toSelector(tid)) && (/^recipient_\d+$/.test(key) || /^from_\d+$/.test(key) || /^wish_\d+$/.test(key) || /^comment_\d+$/.test(key) || /^quantity_\d+$/.test(key) || /^amount_\d+$/.test(key) || /^gift_id_\d+$/.test(key) || /^gift_icon_\d+$/.test(key) || /^gift_data_\d+$/.test(key))) return;
+
+            // Группа 3: quantity уже отрисован
+            if (BUYOUT_FORMS.includes(toSelector(tid)) && key === 'quantity') return;
+
+            // Группа 4: url уже отрисован
+            if (URL_FIELD_FORMS.includes(toSelector(tid)) && key === 'url') return;
+
+            // Группа 5: url уже отрисован
+            if (BANNER_FORMS.includes(toSelector(tid)) && key === 'url') return;
+
+            // Группа 6: text/name/reason уже отрисованы
+            if (CHARACTER_CHANGE_FORMS.includes(toSelector(tid)) && (key === 'text' || key === 'name' || key === 'reason')) return;
+
+            // Группа 7: comment уже отрисован
+            if (REFUSE_FORMS.includes(toSelector(tid)) && key === 'comment') return;
+
+            // Группа 8: все поля уже отрисованы
+            if (COUNTER_FORMS.includes(toSelector(tid))) return;
+
+            // пустые значения не выводим (чтобы не было "— —")
+            if (value === undefined || value === null || String(value).trim() === '') return;
+
+            const raw = typeof value === 'string' ? value.trim() : value;
+
+            // Для reason (Отказ от персонажа, Смена персонажа) - выводим напрямую с переносами, без нумерации
+            if (key === 'reason') {
+              const div = document.createElement('div');
+              div.style.whiteSpace = 'pre-wrap';
+              div.textContent = raw;
+              list.appendChild(div);
+              return;
+            }
+
+            // Для link в "Третий персонаж" - выводим ссылку напрямую, без <li>
+            const isThirdChar = toSelector(item.template_id) === FORM_EXP_THIRDCHAR;
+            if (isThirdChar && key === 'link') {
+              const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
+              if (isUrl) {
+                const link = document.createElement('a');
+                link.href = raw;
+                link.textContent = raw;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                list.appendChild(link);
+                return;
+              }
+            }
+
+            const li = document.createElement('li');
+
+            // URL-поля
             const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
             if (isUrl) {
               const link = document.createElement('a');
@@ -1675,41 +1690,26 @@ export function renderLog(log) {
               link.textContent = raw;
               link.target = '_blank';
               link.rel = 'noopener noreferrer';
-              list.appendChild(link);
-              return;
+              li.appendChild(link);
+            } else {
+              const keySpan = document.createElement('span');
+              keySpan.className = 'key';
+              keySpan.textContent = formatEntryKey(key);
+              const valueSpan = document.createElement('span');
+              valueSpan.className = 'value';
+              valueSpan.textContent = (raw ?? '—');
+              li.append(keySpan, document.createTextNode(' — '), valueSpan);
             }
-          }
 
-          const li = document.createElement('li');
+            list.appendChild(li);
+          });
+        }
 
-          // URL-поля
-          const isUrl = typeof raw === 'string' && /^https?:\/\//i.test(raw);
-          if (isUrl) {
-            const link = document.createElement('a');
-            link.href = raw;
-            link.textContent = raw;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            li.appendChild(link);
-          } else {
-            const keySpan = document.createElement('span');
-            keySpan.className = 'key';
-            keySpan.textContent = formatEntryKey(key);
-            const valueSpan = document.createElement('span');
-            valueSpan.className = 'value';
-            valueSpan.textContent = (raw ?? '—');
-            li.append(keySpan, document.createTextNode(' — '), valueSpan);
-          }
+        removeTitleIfEmpty();
 
-          list.appendChild(li);
-        });
-      }
-
-      removeTitleIfEmpty();
-
-      itemEl.appendChild(list);
-      itemsWrap.appendChild(itemEl);
-    });
+        itemEl.appendChild(list);
+        itemsWrap.appendChild(itemEl);
+      });
 
       entryEl.appendChild(itemsWrap);
     } // конец else для обычных операций
@@ -2046,7 +2046,7 @@ export function renderLog(log) {
     balanceText.className = 'summary-balance';
     balanceText.style.marginTop = '8px';
     const operationSign = totalSum >= 0 ? '+' : '−';
-    balanceText.innerHTML = `<strong>ВАШ СЧЁТ:</strong> ${formatNumber(currentBank)} ${operationSign} ${formatNumber(Math.abs(totalSum))} = <span style="color: ${balanceColor}; font-weight: bold;">${formatNumber(finalBalance)}</span>`;
+    balanceText.innerHTML = `<strong>ВАШ СЧЁТ:</strong> ${formatNumber(currentBank)} ${operationSign} ${formatNumber(Math.abs(totalSum))} = <span style="color: ${balanceColor};>${formatNumber(finalBalance)}</span>`;
     summaryPanel.appendChild(balanceText);
 
     // Кнопки

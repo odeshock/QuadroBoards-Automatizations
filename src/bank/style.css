@@ -1098,6 +1098,11 @@ textarea {
 
 .summary-total {
   font-size: 20px;
+  text-align: center;
+}
+
+.summary-balance {
+  font-size: 20px;
   margin-bottom: 16px;
   text-align: center;
 }

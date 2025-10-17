@@ -317,7 +317,7 @@ h1 {
   padding: 10px;
 }
 
-.item {
+/* .item {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
@@ -328,7 +328,7 @@ h1 {
 
 .item+.item {
   border-top: 1px dashed var(--border);
-}
+} */
 
 .title {
   font-size: 14px;

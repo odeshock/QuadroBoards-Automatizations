@@ -18,8 +18,15 @@ async function fetchCardsWrappedClean(topic_id, comment_ids, options = {}) {
   const toDoc = html => new DOMParser().parseFromString(html, 'text/html');
 
   async function smartFetchHtml(url) {
+    // Используем window.fetchHtml если доступна (уже с retry)
     if (typeof window.fetchHtml === 'function') return window.fetchHtml(url);
-    const res = await fetch(url, { credentials: 'include' });
+
+    // Fallback: используем fetchWithRetry если доступна, иначе обычный fetch
+    const fetchFunc = typeof window.fetchWithRetry === 'function'
+      ? window.fetchWithRetry
+      : fetch;
+
+    const res = await fetchFunc(url, { credentials: 'include' });
     const buf = await res.arrayBuffer();
     const declared = /charset=([^;]+)/i.exec(res.headers.get('content-type') || '')?.[1]?.toLowerCase();
     const tryDec = enc => { try { return new TextDecoder(enc).decode(buf); } catch { return null; } };

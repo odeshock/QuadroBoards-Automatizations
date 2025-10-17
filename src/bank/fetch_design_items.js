@@ -14,10 +14,17 @@ async function fetchDesignItems(topic_id, comment_ids) {
     return d.textContent || d.innerText || '';
   };
 
-  // Используем window.fetchHtml если доступна (из helpers.js)
+  // Используем window.fetchHtml если доступна (из helpers.js, уже с retry)
+  // Fallback: используем fetchWithRetry если доступна, иначе обычный fetch
   const pageHtml = typeof window.fetchHtml === 'function'
     ? await window.fetchHtml(topicUrl)
-    : await fetch(topicUrl, { credentials: 'include' }).then(r => r.text());
+    : await (async () => {
+        const fetchFunc = typeof window.fetchWithRetry === 'function'
+          ? window.fetchWithRetry
+          : fetch;
+        const res = await fetchFunc(topicUrl, { credentials: 'include' });
+        return res.text();
+      })();
 
   const doc = new DOMParser().parseFromString(pageHtml, 'text/html');
 

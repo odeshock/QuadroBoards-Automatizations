@@ -12,10 +12,14 @@ async function fetchUserCoupons() {
     return [];
   }
 
-  // Используем window.fetchHtml если доступна (из helpers.js)
+  // Используем window.fetchHtml если доступна (из helpers.js), иначе fetchWithRetry
   const fetchFunc = typeof window.fetchHtml === 'function'
     ? window.fetchHtml
-    : (url) => fetch(url, { credentials: 'include' }).then(r => r.text());
+    : async (url) => {
+        const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
+        const res = await fetchWithRetry(url, { credentials: 'include' });
+        return res.text();
+      };
 
   // Функция для получения текущей даты в МСК (yyyy-mm-dd)
   const getTodayMoscow = () => {

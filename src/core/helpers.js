@@ -68,13 +68,64 @@ function serializeFormCP1251_SelectSubmit(form, chosenName='save'){
 }
 
 /**
+ * Выполняет fetch запрос с повторными попытками при серверных ошибках (5xx)
+ * @param {string} url - URL для загрузки
+ * @param {RequestInit} init - Параметры fetch
+ * @param {number} maxRetries - Максимальное количество повторных попыток (по умолчанию 3)
+ * @param {number} delayMs - Задержка между попытками в мс (по умолчанию 1000)
+ * @returns {Promise<Response>} Promise с ответом
+ * @throws {Error} При ошибке после всех попыток
+ */
+async function fetchWithRetry(url, init = {}, maxRetries = 3, delayMs = 1000) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, init);
+
+      // Если статус < 500 (не серверная ошибка), возвращаем ответ
+      if (res.status < 500) {
+        return res;
+      }
+
+      // Серверная ошибка (5xx)
+      lastError = new Error(`HTTP ${res.status}`);
+
+      // Если это последняя попытка, выбрасываем ошибку
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Логируем повторную попытку
+      console.warn(`[fetchWithRetry] HTTP ${res.status} для ${url}, повтор ${attempt + 1}/${maxRetries} через ${delayMs}мс`);
+
+      // Задержка перед следующей попыткой
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+
+    } catch (error) {
+      lastError = error;
+
+      // Если это сетевая ошибка (не HTTP), тоже пытаемся повторить
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      console.warn(`[fetchWithRetry] Ошибка для ${url}: ${error.message}, повтор ${attempt + 1}/${maxRetries} через ${delayMs}мс`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
  * Загружает HTML документ с URL и декодирует его из CP1251
  * @param {string} url - URL для загрузки
  * @returns {Promise<Document>} Promise с распарсенным HTML документом
  * @throws {Error} При ошибке HTTP
  */
 async function fetchCP1251Doc(url){
-  const res = await fetch(url, { credentials:'include' });
+  const res = await fetchWithRetry(url, { credentials:'include' });
   if(!res.ok) throw new Error(`GET ${url} → HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const html = new TextDecoder('windows-1251').decode(buf);
@@ -88,7 +139,7 @@ async function fetchCP1251Doc(url){
  * @returns {Promise<{res: Response, text: string}>} Promise с ответом и декодированным текстом
  */
 async function fetchCP1251Text(url, init){
-  const res = await fetch(url, init);
+  const res = await fetchWithRetry(url, init);
   const buf = await res.arrayBuffer();
   return { res, text: new TextDecoder('windows-1251').decode(buf) };
 }
@@ -125,7 +176,7 @@ function serializeFormCP1251(form){
  * @throws {Error} При ошибке HTTP
  */
 async function fetchHtml(url) {
-  const res = await fetch(url, { credentials: 'include' });
+  const res = await fetchWithRetry(url, { credentials: 'include' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const buf = await res.arrayBuffer();
 
@@ -405,4 +456,9 @@ function textFromNodes(nodes) {
     for (const ch of String(s)) out += keep.test(ch) ? ch : `&#${ch.codePointAt(0)};`;
     return out;
   };
+
+  /**
+   * Экспортируем fetchWithRetry для использования в других модулях
+   */
+  window.fetchWithRetry = window.fetchWithRetry || fetchWithRetry;
 })();

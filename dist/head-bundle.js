@@ -1986,25 +1986,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Проходим по всем контейнерам постов
-    document.querySelectorAll("div.container").forEach(container => {
+    document.querySelectorAll("div.post").forEach(container => {
         try {
             // Ищем кнопку "Редактировать"
             const editLink = container.querySelector(".pl-edit a");
             if (!editLink) return;
-            console.log(editLink);
 
             // Проверяем, что внутри контейнера есть div.post, но не div.post.topicpost
-            const post = container.querySelector("div.post");
+            const post = container;
             if (!post || post.classList.contains("topicpost")) return;
 
             // Ищем ID профиля (N)
+            let N = 0;
             const profileLink = container.querySelector('.pl-email.profile a');
             if (profileLink) {
                 const profileUrl = new URL(profileLink.href);
                 const N = Number(profileUrl.searchParams.get("id"));
-            }
-            else {
-                const N = 0;
             }
 
             // Ищем K — число в теге <bank_data>
@@ -2015,7 +2012,6 @@ document.addEventListener("DOMContentLoaded", () => {
             editLink.removeAttribute("href");
             editLink.removeAttribute("rel");
             editLink.setAttribute("onclick", `bankCommentEditFromBackup(${N}, ${K})`);
-            console.log(`${editLink} done`)
         } catch (e) {
             console.error("Ошибка при обработке контейнера:", e);
         }

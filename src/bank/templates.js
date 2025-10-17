@@ -36,7 +36,7 @@ const waitingTemplate = (text) => infoWithNote(text, TEXT_MESSAGES.PLEASE_WAIT);
 // Генератор шаблона для поля с количеством
 const quantityField = (idPrefix) => {
   const id = `${idPrefix}-qty`;
-  return `<div class="field"><label for="${id}">Количество *</label><input id="${id}" name="quantity" type="number" min="1" value="1" required></div>`;
+  return `<div class="field"><label for="${id}">Количество *</label><input id="${id}" name="quantity" type="number" min="0" value="1" required></div>`;
 };
 
 // Генератор шаблона для поля с URL и кнопкой "+ Еще"

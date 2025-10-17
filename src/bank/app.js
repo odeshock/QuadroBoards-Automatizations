@@ -569,6 +569,62 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
+  // Проверяем формы выкупа (face, char, need) с quantity = 0
+  const isBuyoutForm = templateSelector && [
+    '#form-exp-face-1m',
+    '#form-exp-face-3m',
+    '#form-exp-face-6m',
+    '#form-exp-char-1m',
+    '#form-exp-char-3m',
+    '#form-exp-char-6m',
+    '#form-exp-face-own-1m',
+    '#form-exp-face-own-3m',
+    '#form-exp-face-own-6m',
+    '#form-exp-need-1w',
+    '#form-exp-need-2w',
+    '#form-exp-need-1m'
+  ].includes(templateSelector);
+
+  // Проверяем quantity (если 0 или пусто - удаляем/не создаём)
+  const quantity = obj.quantity !== undefined ? Number(obj.quantity) : null;
+  const hasValidQuantity = quantity !== null && quantity > 0;
+
+  if (isBuyoutForm && !hasValidQuantity) {
+    if (editingEntryId) {
+      // Удаляем существующую запись
+      const originGroup = submissionGroups.find((item) =>
+        item.entries.some((entry) => entry.id === editingEntryId)
+      );
+      if (originGroup) {
+        const idx = originGroup.entries.findIndex((entry) => entry.id === editingEntryId);
+        if (idx !== -1) {
+          const deletedEntry = originGroup.entries[idx];
+          const entryDetails = formatEntryForLog(deletedEntry);
+          originGroup.entries.splice(idx, 1);
+
+          if (shouldLogGroup(originGroup)) {
+            addEditLog(`Удалён item из операции: ${originGroup.title}${entryDetails}`);
+          }
+
+          // Если группа стала пустой - удаляем её
+          if (!originGroup.entries.length) {
+            const groupIndex = submissionGroups.findIndex((item) => item.id === originGroup.id);
+            if (groupIndex !== -1) {
+              submissionGroups.splice(groupIndex, 1);
+              if (shouldLogGroup(originGroup)) {
+                addEditLog(`Удалена операция: ${originGroup.title}`);
+              }
+            }
+          }
+        }
+      }
+      renderLog(log);
+    }
+    // Просто закрываем модалку, не создавая новую запись
+    handleCloseModal();
+    return;
+  }
+
   // Специальная обработка для формы купонов
   const isCouponForm = templateSelector === toSelector(FORM_PERSONAL_COUPON);
   if (isCouponForm) {

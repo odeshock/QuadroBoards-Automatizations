@@ -38,7 +38,7 @@ export function handleBuyoutForms({ template, modalFields, modalAmount, form, am
   // Для форм с mode используем универсальную функцию
   if (mode === 'price_per_item') {
     const updateQuantityAmount = () => {
-      const qty = Number(quantityInput.value) || 1;
+      const qty = Number(quantityInput.value);
       updateModalAmount(modalAmount, form, { items: qty });
     };
     quantityInput.addEventListener('input', updateQuantityAmount);
@@ -46,7 +46,7 @@ export function handleBuyoutForms({ template, modalFields, modalAmount, form, am
   } else if (amountNumber !== null) {
     // Старая логика для форм без mode (для обратной совместимости)
     const updateQuantityAmount = () => {
-      const qty = Number(quantityInput.value) || 1;
+      const qty = Number(quantityInput.value);
       const total = amountNumber * qty;
       modalAmount.textContent = `${formatNumber(amountNumber)} × ${qty} = ${formatNumber(total)}`;
     };

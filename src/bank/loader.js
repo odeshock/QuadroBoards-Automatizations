@@ -12,7 +12,7 @@
  * - Управляет прелоадером (минимум 5 секунд)
  */
 
-console.log("loader.js")
+console.log("loader.js");
 
 const ALLOWED_PARENTS = [
   "https://testfmvoice.rusff.me",      // тест

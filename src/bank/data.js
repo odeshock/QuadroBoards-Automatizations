@@ -183,6 +183,13 @@ function _getGiftItems() {
 export const giftItems = new Proxy([], {
   get(_target, prop) {
     const items = _getGiftItems();
+    console.log('[giftItems Proxy get]', prop, 'items.length:', items.length);
+
+    // Специальная обработка для методов массива
+    if (typeof items[prop] === 'function') {
+      return items[prop].bind(items);
+    }
+
     if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
     if (prop === 'length') return items.length;
     if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
@@ -220,6 +227,9 @@ function _getIconItems() {
 export const iconItems = new Proxy([], {
   get(_target, prop) {
     const items = _getIconItems();
+    if (typeof items[prop] === 'function') {
+      return items[prop].bind(items);
+    }
     if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
     if (prop === 'length') return items.length;
     if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
@@ -257,6 +267,9 @@ function _getBadgeItems() {
 export const badgeItems = new Proxy([], {
   get(_target, prop) {
     const items = _getBadgeItems();
+    if (typeof items[prop] === 'function') {
+      return items[prop].bind(items);
+    }
     if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
     if (prop === 'length') return items.length;
     if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
@@ -294,6 +307,9 @@ function _getBackgroundItems() {
 export const backgroundItems = new Proxy([], {
   get(_target, prop) {
     const items = _getBackgroundItems();
+    if (typeof items[prop] === 'function') {
+      return items[prop].bind(items);
+    }
     if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
     if (prop === 'length') return items.length;
     if (typeof prop === 'string' && !isNaN(prop)) return items[prop];

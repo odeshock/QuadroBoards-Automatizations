@@ -1979,7 +1979,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!document.title.startsWith("Гринготтс")) return;
 
     const postForm = document.getElementById('post-form');
-    const inputFirst = document.getElementById('post-form input[id="fld10"]');
+    const inputFirst = document.querySelector('#post-form input[id="fld10"]');
 
     if (postForm && (!inputFirst)) {
         postForm.style.display = 'none'; // Скрываем элемент

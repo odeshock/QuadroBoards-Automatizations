@@ -99,10 +99,17 @@ const ALLOWED_PARENTS = [
     }
 
     if (d.type === "SKIN") {
+      console.log('[loader] Received SKIN data:', d);
       window.SKIN_DATA_PLASHKA = d.skin_data_plashka || [];
       window.SKIN_DATA_ICON = d.skin_data_icon || [];
       window.SKIN_DATA_BACK = d.skin_data_back || [];
       window.SKIN_DATA_GIFT = d.skin_data_gift || [];
+      console.log('[loader] Assigned to window:', {
+        PLASHKA: window.SKIN_DATA_PLASHKA,
+        ICON: window.SKIN_DATA_ICON,
+        BACK: window.SKIN_DATA_BACK,
+        GIFT: window.SKIN_DATA_GIFT
+      });
     }
 
     if (d.type === "PERSONAL_DISCOUNTS") {

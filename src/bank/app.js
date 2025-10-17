@@ -867,13 +867,20 @@ function renderExpenseList() {
 function renderGiftsList() {
   // Ждём загрузки данных из window.SKIN_DATA_GIFT
   if (typeof window.SKIN_DATA_GIFT === 'undefined') {
+    console.log('[renderGiftsList] Waiting for SKIN_DATA_GIFT...');
     // Повторяем попытку через 100ms
     setTimeout(renderGiftsList, 100);
     return;
   }
 
+  console.log('[renderGiftsList] Rendering with data:', window.SKIN_DATA_GIFT);
+  console.log('[renderGiftsList] giftItems:', giftItems);
+
   const container = document.querySelector('#tab-gifts .gift-grid');
-  if (!container) return;
+  if (!container) {
+    console.warn('[renderGiftsList] Container not found!');
+    return;
+  }
 
   giftItems.forEach(item => {
     const isCustom = item.id === 'custom';
@@ -900,14 +907,22 @@ function renderDesignLists() {
   if (typeof window.SKIN_DATA_ICON === 'undefined' ||
     typeof window.SKIN_DATA_PLASHKA === 'undefined' ||
     typeof window.SKIN_DATA_BACK === 'undefined') {
+    console.log('[renderDesignLists] Waiting for SKIN_DATA...');
     // Повторяем попытку через 100ms
     setTimeout(renderDesignLists, 100);
     return;
   }
 
+  console.log('[renderDesignLists] Rendering with data:', {
+    icon: window.SKIN_DATA_ICON,
+    plashka: window.SKIN_DATA_PLASHKA,
+    back: window.SKIN_DATA_BACK
+  });
+
   // Иконки
   const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {
+    console.log('[renderDesignLists] iconItems:', iconItems);
     iconItems.forEach(item => {
       const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.icon.custom : itemPrices.icon.collection;

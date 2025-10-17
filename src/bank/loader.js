@@ -57,7 +57,9 @@ window.addEventListener("message", async (e) => {
     if (!window.__APP_LOADED__) {
       window.__APP_LOADED__ = true;
       try {
-        await import("./app.js");
+        // Определяем базовый URL для модулей
+        const baseUrl = new URL(import.meta.url).href.replace(/loader\.js.*$/, '');
+        await import(baseUrl + 'app.js');
         appLoaded = true;
         console.log("✅ app.js загружен");
         hidePreloader();

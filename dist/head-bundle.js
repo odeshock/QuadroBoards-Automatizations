@@ -3314,6 +3314,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const skin_data_gift = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Gift);
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Gift");
 
+      console.log("skin!!!", skin_data_plashka,
+        skin_data_icon,
+        skin_data_back,
+        skin_data_gift);
+
       queueMessage(iframeReadyP, () => ({
         type: BankPostMessagesType.skin,
         skin_data_plashka,

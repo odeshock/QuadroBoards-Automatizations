@@ -122,7 +122,7 @@ const ALLOWED_PARENTS = [
     if (window.USER_ID !== undefined &&
       window.IS_ADMIN !== undefined &&
       window.USERS_LIST !== undefined &&
-      window.SKIN_DATA_GIFT !== undefined &&
+      window.SKIN_DATA_PLASHKA !== undefined &&
       window.SKIN_DATA_ICON !== undefined &&
       window.SKIN_DATA_BACK !== undefined &&
       window.SKIN_DATA_GIFT !== undefined

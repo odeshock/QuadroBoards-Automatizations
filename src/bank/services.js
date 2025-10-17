@@ -1455,7 +1455,7 @@ export function updatePersonalCoupons(phase = 'item') {
             coupon_type: coupon.type,
             form: formId,
             discount_amount: discount,
-            calculation: String(discount)
+            calculation: String(coupon.value) // Исходное значение купона
           },
           multiplier: 1
         });

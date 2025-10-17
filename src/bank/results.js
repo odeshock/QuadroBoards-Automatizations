@@ -699,7 +699,7 @@ export function renderLog(log) {
     return;
   }
 
-  // Сортируем группы: сначала операции, потом купоны, потом корректировки, потом скидки
+  // Сортируем группы: сначала операции, потом купоны, потом корректировки, потом скидки (для расчётов)
   const sortedGroups = [...submissionGroups].sort((a, b) => {
     const aIsDiscount = a.isDiscount || a.templateSelector === '#gift-discount';
     const bIsDiscount = b.isDiscount || b.templateSelector === '#gift-discount';
@@ -714,6 +714,39 @@ export function renderLog(log) {
 
     return aOrder - bOrder;
   });
+
+  // Создаем свернутый блок для операций и корректировок
+  const collapsibleBlock = document.createElement('div');
+  collapsibleBlock.className = 'collapsible-operations';
+  collapsibleBlock.style.marginBottom = '16px';
+
+  const collapsibleHeader = document.createElement('div');
+  collapsibleHeader.className = 'collapsible-header';
+  collapsibleHeader.style.padding = '12px';
+  collapsibleHeader.style.background = 'var(--panel, #fff)';
+  collapsibleHeader.style.border = '1px solid var(--border, #e5e7eb)';
+  collapsibleHeader.style.borderRadius = '8px';
+  collapsibleHeader.style.cursor = 'pointer';
+  collapsibleHeader.style.fontWeight = 'bold';
+  collapsibleHeader.style.display = 'flex';
+  collapsibleHeader.style.alignItems = 'center';
+  collapsibleHeader.style.gap = '8px';
+  collapsibleHeader.innerHTML = '<span style="transition: transform 0.2s;">▶</span> Информация по операциям';
+
+  const collapsibleContent = document.createElement('div');
+  collapsibleContent.className = 'collapsible-content';
+  collapsibleContent.style.display = 'none';
+  collapsibleContent.style.marginTop = '8px';
+
+  collapsibleHeader.addEventListener('click', () => {
+    const isOpen = collapsibleContent.style.display !== 'none';
+    collapsibleContent.style.display = isOpen ? 'none' : 'block';
+    const arrow = collapsibleHeader.querySelector('span');
+    arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+  });
+
+  collapsibleBlock.appendChild(collapsibleHeader);
+  collapsibleBlock.appendChild(collapsibleContent);
 
   // Счетчик для обычных операций (без системных)
   let regularOperationIndex = 0;
@@ -1167,12 +1200,11 @@ export function renderLog(log) {
       itemEl.appendChild(list);
       itemsWrap.appendChild(itemEl);
       entryEl.appendChild(itemsWrap);
-      log.appendChild(entryEl);
-      return;
+      // НЕ добавляем в log здесь - будет добавлено в конце
     }
 
     // Для корректировок цен: собираем все в один общий список
-    if (group.isPriceAdjustment) {
+    else if (group.isPriceAdjustment) {
       const itemEl = document.createElement('div');
       itemEl.className = 'entry-item';
 
@@ -1196,12 +1228,11 @@ export function renderLog(log) {
       itemEl.appendChild(list);
       itemsWrap.appendChild(itemEl);
       entryEl.appendChild(itemsWrap);
-      log.appendChild(entryEl);
-      return;
+      // НЕ добавляем в log здесь - будет добавлено в конце
     }
 
     // Для персональных купонов: собираем все в один общий список
-    if (group.isPersonalCoupon) {
+    else if (group.isPersonalCoupon) {
       const itemEl = document.createElement('div');
       itemEl.className = 'entry-item';
 
@@ -1216,7 +1247,23 @@ export function renderLog(log) {
         label.textContent = `${dataObj.coupon_title || 'Купон'}: `;
 
         const calculation = document.createElement('span');
-        calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.discount_amount || 0)}`;
+
+        // Для fixed купонов показываем только значение или (из исходного)
+        if (dataObj.coupon_type === 'fixed') {
+          const discountAmount = dataObj.discount_amount || 0;
+          const calculationStr = dataObj.calculation || '';
+
+          // Если calculation === discount_amount (применен полностью)
+          if (calculationStr && calculationStr.trim() === String(discountAmount)) {
+            calculation.textContent = formatNumber(discountAmount);
+          } else {
+            // Применен частично - показываем "применено (из исходного)"
+            calculation.textContent = `${formatNumber(discountAmount)} (из ${calculationStr})`;
+          }
+        } else {
+          // Для других типов (item, percent) показываем как было
+          calculation.textContent = `${dataObj.calculation || ''} = ${formatNumber(dataObj.discount_amount || 0)}`;
+        }
 
         li.append(label, calculation);
         list.appendChild(li);
@@ -1225,11 +1272,12 @@ export function renderLog(log) {
       itemEl.appendChild(list);
       itemsWrap.appendChild(itemEl);
       entryEl.appendChild(itemsWrap);
-      log.appendChild(entryEl);
-      return;
+      // НЕ добавляем в log здесь - будет добавлено в конце
     }
 
-    group.entries.forEach((item, itemIndex) => {
+    // Обычные операции
+    else {
+      group.entries.forEach((item, itemIndex) => {
       const itemEl = document.createElement('div');
       itemEl.className = 'entry-item';
       itemEl.dataset.entryId = item.id;
@@ -1663,9 +1711,48 @@ export function renderLog(log) {
       itemsWrap.appendChild(itemEl);
     });
 
-    entryEl.appendChild(itemsWrap);
-    log.appendChild(entryEl);
+      entryEl.appendChild(itemsWrap);
+    } // конец else для обычных операций
+
+    // Определяем тип записи
+    const isPersonalCouponEntry = group.isPersonalCoupon || group.templateSelector === '#personal-coupon';
+    const isDiscountEntry = group.isDiscount || group.templateSelector === '#gift-discount';
+    const isAdjustmentEntry = group.isPriceAdjustment || group.templateSelector === '#price-adjustment';
+
+    // Добавляем в правильный контейнер
+    if (isPersonalCouponEntry || isDiscountEntry) {
+      // Купоны и скидки - напрямую в log (будут после свернутого блока)
+      log.appendChild(entryEl);
+    } else {
+      // Операции и корректировки - в свернутый блок
+      // Корректировки добавляем в конец
+      if (isAdjustmentEntry) {
+        collapsibleContent.appendChild(entryEl);
+      } else {
+        // Операции добавляем в начало (до корректировок)
+        const firstAdjustment = Array.from(collapsibleContent.children).find(
+          el => el.classList.contains('system_entry')
+        );
+        if (firstAdjustment) {
+          collapsibleContent.insertBefore(entryEl, firstAdjustment);
+        } else {
+          collapsibleContent.appendChild(entryEl);
+        }
+      }
+    }
   });
+
+  // Добавляем свернутый блок в log после coupon-selector (если есть)
+  if (collapsibleContent.children.length > 0) {
+    const couponSelector = log.querySelector('.coupon-selector');
+    if (couponSelector && couponSelector.nextSibling) {
+      log.insertBefore(collapsibleBlock, couponSelector.nextSibling);
+    } else if (couponSelector) {
+      log.appendChild(collapsibleBlock);
+    } else {
+      log.insertBefore(collapsibleBlock, log.firstChild);
+    }
+  }
 
   // ====== Итоговая плашка с суммой и кнопками ======
   if (sortedGroups.length > 0) {

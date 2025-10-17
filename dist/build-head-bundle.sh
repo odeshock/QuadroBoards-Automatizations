@@ -42,15 +42,23 @@ echo "/* MODULE 7: bank/api.js */" >> dist/head-bundle.js
 cat src/bank/api.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 8: bank/parent.js */" >> dist/head-bundle.js
-cat src/bank/parent.js >> dist/head-bundle.js
+echo "/* MODULE 8: bank/parent/format_text.js */" >> dist/head-bundle.js
+cat src/bank/parent/format_text.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 9: bank/parent_messages.js */" >> dist/head-bundle.js
-cat src/bank/parent_messages.js >> dist/head-bundle.js
+echo "/* MODULE 9: bank/parent/fetch_design_items.js.js */" >> dist/head-bundle.js
+cat src/bank/parent/fetch_design_items.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 10: utilities/text/profile_fields_as_html.js */" >> dist/head-bundle.js
+echo "/* MODULE 10: bank/parent/fetch_user_coupons.js */" >> dist/head-bundle.js
+cat src/bank/parent/fetch_user_coupons.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 11: bank/parent/messages.js */" >> dist/head-bundle.js
+cat src/bank/parent/messages.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 12: utilities/text/profile_fields_as_html.js */" >> dist/head-bundle.js
 cat utilities/text/profile_fields_as_html.js >> dist/head-bundle.js
 
 echo "✅ head-bundle.js created!"

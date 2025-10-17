@@ -35,7 +35,7 @@ async function retry(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeou
 
 /* =============== конфиг пауз (чтобы не казаться ботом) =============== */
 // пауза между СКРЕЙПАМИ (запросами к сайту)
-const SCRAPE_BASE_GAP_MS = 1200;
+const SCRAPE_BASE_GAP_MS = 1000;
 const SCRAPE_JITTER_MS = 800;
 // пауза между ОТПРАВКАМИ в iframe
 const SEND_BASE_GAP_MS = 900;
@@ -79,8 +79,10 @@ const BankPostMessagesType = {
   ads: "ADS_POSTS",
   banner_mayak: "BANNER_MAYAK_FLAG",
   banner_reno: "BANNER_RENO_FLAG",
+  coupons: "PERSONAL_DISCOUNTS",
   first_post: "FIRST_POST_FLAG",
   first_post_missed: "FIRST_POST_MISSED_FLAG",
+  skin: "SKIN",
   personal_posts: "PERSONAL_POSTS",
   plot_posts: "PLOT_POSTS",
   profile_info: "PROFILE_INFO",
@@ -88,6 +90,14 @@ const BankPostMessagesType = {
   users_list: "USERS_LIST",
 };
 
+const BankSkinFieldID = window.SKIN?.LibraryFieldID || 0;
+
+const BankSkinPostID = {
+  Plashka: window.SKIN?.LibraryPlashkaPostID || [],
+  Icon: window.SKIN?.LibraryIconPostID || [],
+  Back: window.SKIN?.LibraryBackPostID || [],
+  Gift: window.SKIN?.LibraryGiftPostID || []
+}
 
 
 /* =============== сервис: дата, готовность iframe =============== */
@@ -258,9 +268,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
   preScrapeBarrier = (async () => {
-    console.log("🟨 [WAIT] pre-scrape barrier: 15000ms");
-    await delay(15000);
-    console.log("🟢 [GO]   pre-scrape barrier passed");
+    // console.log("🟨 [WAIT] pre-scrape barrier: 5000ms");
+    // await delay(5000);
+    // console.log("🟢 [GO]   pre-scrape barrier passed");
     return true;
   })();
   window.preScrapeBarrier = preScrapeBarrier;
@@ -275,6 +285,42 @@ document.addEventListener("DOMContentLoaded", () => {
     user_name: window.UserLogin,
     is_admin: window.UserID == 2
   }), "user_info");
+
+  // Загрузка данных скинов и купонов (async)
+  (async () => {
+    try {
+      const skin_data_plashka = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Plashka);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Plashka");
+
+      const skin_data_icon = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Icon);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Icon");
+
+      const skin_data_back = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Back);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Back");
+
+      const skin_data_gift = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Gift);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Gift");
+
+      queueMessage(iframeReadyP, () => ({
+        type: BankPostMessagesType.skin,
+        skin_data_plashka,
+        skin_data_icon,
+        skin_data_back,
+        skin_data_gift
+      }), "skin_data");
+
+      const coupons_data = await fetchUserCoupons();
+
+      queueMessage(iframeReadyP, () => ({
+        type: BankPostMessagesType.coupons,
+        coupons_data
+      }), "coupons_data");
+
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between Coupons");
+    } catch (e) {
+      console.warn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
+    }
+  })();
 
   // обработчик PURCHASE
   window.addEventListener("message", async (e) => {

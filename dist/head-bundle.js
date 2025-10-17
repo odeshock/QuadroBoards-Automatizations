@@ -2085,7 +2085,7 @@ async function ensureAllowed(group_ids) {
 //   })
 //   .catch(err => console.error("❌ ошибка при записи:", err));
 
-/* MODULE 8: bank/parent.js */
+/* MODULE 8: bank/parent/format_text.js */
 /**
  * Преобразует входной объект { fullData: [...] } в текст по заданным правилам.
  * Использует modalAmount (fallback — amount).
@@ -2777,7 +2777,240 @@ window.decodeJSON = decodeJSON;
 window.getBlockquoteTextAfterPersonalPost = getBlockquoteTextAfterPersonalPost;
 window.getBlockquoteTextFromHtml = getBlockquoteTextFromHtml;
 
-/* MODULE 9: bank/parent_messages.js */
+/* MODULE 9: bank/parent/fetch_design_items.js.js */
+/**
+ * Загружает фоны/иконки/плашки из комментариев форума.
+ * Использует window.fetchHtml если доступна, иначе fallback на базовый fetch.
+ * @param {number} topic_id - ID темы (viewtopic.php?id=<topic_id>)
+ * @param {Array<number>} comment_ids - ID постов (#p<comment_id>-content)
+ * @returns {Promise<Array<{id: string, icon: string, title: string}>>}
+ */
+async function fetchDesignItems(topic_id, comment_ids) {
+  const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
+
+  const decodeEntities = s => {
+    const d = document.createElement('div');
+    d.innerHTML = String(s ?? '');
+    return d.textContent || d.innerText || '';
+  };
+
+  // Используем window.fetchHtml если доступна (из helpers.js, уже с retry)
+  // Fallback: используем fetchWithRetry если доступна, иначе обычный fetch
+  const pageHtml = typeof window.fetchHtml === 'function'
+    ? await window.fetchHtml(topicUrl)
+    : await (async () => {
+        const fetchFunc = typeof window.fetchWithRetry === 'function'
+          ? window.fetchWithRetry
+          : fetch;
+        const res = await fetchFunc(topicUrl, { credentials: 'include' });
+        return res.text();
+      })();
+
+  const doc = new DOMParser().parseFromString(pageHtml, 'text/html');
+
+  const allResults = [];
+
+  for (const comment_id of comment_ids) {
+    const post = doc.querySelector(`#p${String(comment_id)}-content`);
+    if (!post) {
+      console.warn(`Не найден #p${comment_id}-content на ${topicUrl}`);
+      continue;
+    }
+
+    const scripts = [...post.querySelectorAll('script[type="text/html"]')];
+    if (!scripts.length) continue;
+
+    const combined = scripts.map(s => s.textContent || s.innerHTML || '').join('\n');
+    const decoded = decodeEntities(combined).replace(/\u00A0/g, ' ');
+    const innerDoc = new DOMParser().parseFromString(decoded, 'text/html');
+
+    // Выбираем только article.card БЕЗ класса hidden
+    const result = [...innerDoc.querySelectorAll('#grid article.card:not(.hidden)')].map(card => {
+      const id = FMV.normSpace(card.querySelector('.id')?.textContent || '');
+      const title = FMV.normSpace(card.querySelector('.title')?.textContent || '');
+      const icon = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
+
+      return { id, icon, title };
+    });
+
+    allResults.push(...result);
+  }
+
+  return allResults;
+}
+
+window.fetchDesignItems = fetchDesignItems;
+
+/* MODULE 10: bank/parent/fetch_user_coupons.js */
+/**
+ * Загружает персональные купоны пользователя с его профильной страницы.
+ * Следует редиректам (main: usrK_skin) и валидирует даты истечения.
+ *
+ * @returns {Promise<Array<{system_id: string, type: string, form: string, value: number, title: string, html: string, expiresAt?: string}>>}
+ */
+async function fetchUserCoupons() {
+  // Получаем ID пользователя
+  const userId = window.UserID;
+  if (!userId) {
+    console.warn('[fetchUserCoupons] window.UserID не определён');
+    return [];
+  }
+
+  // Используем window.fetchHtml если доступна (из helpers.js), иначе fetchWithRetry
+  const fetchFunc = typeof window.fetchHtml === 'function'
+    ? window.fetchHtml
+    : async (url) => {
+        const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
+        const res = await fetchWithRetry(url, { credentials: 'include' });
+        return res.text();
+      };
+
+  // Функция для получения текущей даты в МСК (yyyy-mm-dd)
+  const getTodayMoscow = () => {
+    const now = new Date();
+    const moscowOffset = 3 * 60; // UTC+3
+    const localOffset = now.getTimezoneOffset(); // минуты от UTC
+    const moscowTime = new Date(now.getTime() + (moscowOffset + localOffset) * 60000);
+
+    const year = moscowTime.getFullYear();
+    const month = String(moscowTime.getMonth() + 1).padStart(2, '0');
+    const day = String(moscowTime.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = getTodayMoscow();
+
+  // Загружаем страницу пользователя
+  let currentUrl = `${location.origin}/pages/usr${userId}_skin`;
+  let pageHtml;
+
+  try {
+    pageHtml = await fetchFunc(currentUrl);
+  } catch (error) {
+    console.error(`[fetchUserCoupons] Ошибка загрузки ${currentUrl}:`, error);
+    return [];
+  }
+
+  const doc = new DOMParser().parseFromString(pageHtml, 'text/html');
+  const container = doc.querySelector('div.container');
+
+  if (!container) {
+    console.warn('[fetchUserCoupons] Не найден div.container');
+    return [];
+  }
+
+  // Проверяем на ошибку "неверная ссылка"
+  const errorText = 'Ссылка, по которой Вы пришли, неверная или устаревшая.';
+  if (container.textContent.includes(errorText)) {
+    console.log('[fetchUserCoupons] Страница не найдена (ошибка "неверная ссылка")');
+    return [];
+  }
+
+  // Проверяем на редирект (<!-- main: usrK_skin -->)
+  const commentNodes = Array.from(container.childNodes).filter(node => node.nodeType === Node.COMMENT_NODE);
+  const mainComment = commentNodes.find(comment => comment.textContent.trim().startsWith('main: usr'));
+
+  if (mainComment) {
+    const match = mainComment.textContent.trim().match(/main:\s*usr(\d+)_skin/);
+    if (match) {
+      const redirectUserId = match[1];
+      console.log(`[fetchUserCoupons] Редирект на usr${redirectUserId}_skin`);
+
+      // Загружаем страницу редиректа
+      const redirectUrl = `${location.origin}/pages/usr${redirectUserId}_skin`;
+      try {
+        pageHtml = await fetchFunc(redirectUrl);
+      } catch (error) {
+        console.error(`[fetchUserCoupons] Ошибка загрузки редиректа ${redirectUrl}:`, error);
+        return [];
+      }
+
+      const redirectDoc = new DOMParser().parseFromString(pageHtml, 'text/html');
+      const redirectContainer = redirectDoc.querySelector('div.container');
+
+      if (!redirectContainer) {
+        console.warn('[fetchUserCoupons] Не найден div.container после редиректа');
+        return [];
+      }
+
+      // Проверяем снова на ошибку
+      if (redirectContainer.textContent.includes(errorText)) {
+        console.log('[fetchUserCoupons] Страница редиректа не найдена');
+        return [];
+      }
+
+      // Используем новый документ для поиска купонов
+      return extractCouponsFromDoc(redirectDoc, today);
+    }
+  }
+
+  // Извлекаем купоны из исходного документа
+  return extractCouponsFromDoc(doc, today);
+}
+
+/**
+ * Извлекает купоны из DOM документа
+ * @param {Document} doc - DOM документ
+ * @param {string} today - Текущая дата в формате yyyy-mm-dd
+ * @returns {Array<Object>} - Массив купонов
+ */
+function extractCouponsFromDoc(doc, today) {
+  const couponSection = doc.querySelector('div._coupon');
+
+  if (!couponSection) {
+    console.log('[fetchUserCoupons] Не найден div._coupon');
+    return [];
+  }
+
+  const items = couponSection.querySelectorAll('div.item[data-coupon-type]');
+  const coupons = [];
+
+  items.forEach(item => {
+    const systemId = item.getAttribute('data-id') || '';
+    const type = item.getAttribute('data-coupon-type') || '';
+    const form = item.getAttribute('data-coupon-form') || '';
+    const valueStr = item.getAttribute('data-coupon-value') || '0';
+    const value = Number(valueStr);
+    const title = item.getAttribute('data-coupon-title') || '';
+    const expiresAt = item.getAttribute('data-expired-date'); // может быть null
+
+    // Фильтрация по дате истечения
+    if (expiresAt) {
+      // Сравниваем даты как строки (yyyy-mm-dd формат позволяет это)
+      if (expiresAt < today) {
+        console.log(`[fetchUserCoupons] Пропущен купон "${title}" (истёк: ${expiresAt} < ${today})`);
+        return; // Пропускаем истекший купон
+      }
+    }
+
+    const html = item.outerHTML;
+
+    const coupon = {
+      system_id: systemId,
+      type: type,
+      form: form,
+      value: value,
+      title: title,
+      html: html
+    };
+
+    // Добавляем expiresAt только если он указан
+    if (expiresAt) {
+      coupon.expiresAt = expiresAt;
+    }
+
+    coupons.push(coupon);
+  });
+
+  console.log(`[fetchUserCoupons] Загружено купонов: ${coupons.length}`);
+  return coupons;
+}
+
+// Экспортируем в window
+window.fetchUserCoupons = fetchUserCoupons;
+
+/* MODULE 11: bank/parent/messages.js */
 /* =============== базовые утилиты: delay + timeout + retry с логами =============== */
 let preScrapeBarrier = Promise.resolve(true);
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
@@ -2815,7 +3048,7 @@ async function retry(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeou
 
 /* =============== конфиг пауз (чтобы не казаться ботом) =============== */
 // пауза между СКРЕЙПАМИ (запросами к сайту)
-const SCRAPE_BASE_GAP_MS = 1200;
+const SCRAPE_BASE_GAP_MS = 1000;
 const SCRAPE_JITTER_MS = 800;
 // пауза между ОТПРАВКАМИ в iframe
 const SEND_BASE_GAP_MS = 900;
@@ -2859,8 +3092,10 @@ const BankPostMessagesType = {
   ads: "ADS_POSTS",
   banner_mayak: "BANNER_MAYAK_FLAG",
   banner_reno: "BANNER_RENO_FLAG",
+  coupons: "PERSONAL_DISCOUNTS",
   first_post: "FIRST_POST_FLAG",
   first_post_missed: "FIRST_POST_MISSED_FLAG",
+  skin: "SKIN",
   personal_posts: "PERSONAL_POSTS",
   plot_posts: "PLOT_POSTS",
   profile_info: "PROFILE_INFO",
@@ -2868,6 +3103,14 @@ const BankPostMessagesType = {
   users_list: "USERS_LIST",
 };
 
+const BankSkinFieldID = window.SKIN?.LibraryFieldID || 0;
+
+const BankSkinPostID = {
+  Plashka: window.SKIN?.LibraryPlashkaPostID || [],
+  Icon: window.SKIN?.LibraryIconPostID || [],
+  Back: window.SKIN?.LibraryBackPostID || [],
+  Gift: window.SKIN?.LibraryGiftPostID || []
+}
 
 
 /* =============== сервис: дата, готовность iframe =============== */
@@ -3038,9 +3281,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
   preScrapeBarrier = (async () => {
-    console.log("🟨 [WAIT] pre-scrape barrier: 15000ms");
-    await delay(15000);
-    console.log("🟢 [GO]   pre-scrape barrier passed");
+    // console.log("🟨 [WAIT] pre-scrape barrier: 5000ms");
+    // await delay(5000);
+    // console.log("🟢 [GO]   pre-scrape barrier passed");
     return true;
   })();
   window.preScrapeBarrier = preScrapeBarrier;
@@ -3055,6 +3298,42 @@ document.addEventListener("DOMContentLoaded", () => {
     user_name: window.UserLogin,
     is_admin: window.UserID == 2
   }), "user_info");
+
+  // Загрузка данных скинов и купонов (async)
+  (async () => {
+    try {
+      const skin_data_plashka = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Plashka);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Plashka");
+
+      const skin_data_icon = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Icon);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Icon");
+
+      const skin_data_back = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Back);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Back");
+
+      const skin_data_gift = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Gift);
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Gift");
+
+      queueMessage(iframeReadyP, () => ({
+        type: BankPostMessagesType.skin,
+        skin_data_plashka,
+        skin_data_icon,
+        skin_data_back,
+        skin_data_gift
+      }), "skin_data");
+
+      const coupons_data = await fetchUserCoupons();
+
+      queueMessage(iframeReadyP, () => ({
+        type: BankPostMessagesType.coupons,
+        coupons_data
+      }), "coupons_data");
+
+      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between Coupons");
+    } catch (e) {
+      console.warn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
+    }
+  })();
 
   // обработчик PURCHASE
   window.addEventListener("message", async (e) => {
@@ -3256,7 +3535,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   })();
 });
-/* MODULE 10: utilities/text/profile_fields_as_html.js */
+/* MODULE 12: utilities/text/profile_fields_as_html.js */
 (function () {
   // === ПУБЛИЧНАЯ ФУНКЦИЯ ==========================================
   // Рендерит указанные доп. поля как HTML (по номерам)

@@ -148,47 +148,76 @@ export const itemDiscountPrices = {
 // ПОДАРКИ
 // ============================================================================
 
+/**
+ * Возвращает массив подарков с данными из window.SKIN_DATA_GIFT
+ * @returns {Array<{id: string, icon: string, title: string}>}
+ */
+export function getGiftItems() {
+  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' };
+  const skinData = window.SKIN_DATA_GIFT || [];
+  return [customItem, ...skinData];
+}
+
+// Для обратной совместимости - статический массив с дефолтными значениями
 export const giftItems = [
-  { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' },
-  { id: '1', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/999003.png">', title: 'Котик' },
-  { id: '2', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/427793.png">', title: 'Часики' },
-  { id: '3', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/899654.png">', title: 'Святая вода' },
-  { id: '4', icon: '<img class="gift" src="https://upforme.ru/uploads/001c/8a/af/3/772108.png">', title: 'Книженция' }
+  { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' }
 ];
 
 // ============================================================================
 // ИКОНКИ
 // ============================================================================
 
+/**
+ * Возвращает массив иконок с данными из window.SKIN_DATA_ICON
+ * @returns {Array<{id: string, icon: string, title: string}>}
+ */
+export function getIconItems() {
+  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' };
+  const skinData = window.SKIN_DATA_ICON || [];
+  return [customItem, ...skinData];
+}
+
+// Для обратной совместимости - статический массив с дефолтными значениями
 export const iconItems = [
-  { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' },
-  { id: '1', icon: '<img class="icon" src="https://static.thenounproject.com/png/2185221-200.png">', title: 'Иконка 1' },
-  { id: '2', icon: '<img class="icon" src="https://cdn2.iconfinder.com/data/icons/harry-potter-colour-collection/60/07_-_Harry_Potter_-_Colour_-_Golden_Snitch-512.png">', title: 'Иконка 2' },
-  { id: '3', icon: '<img class="icon" src="https://upforme.ru/uploads/001c/8a/af/3/35168.png">', title: 'Иконка 3' }
+  { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' }
 ];
 
 // ============================================================================
 // ПЛАШКИ
 // ============================================================================
 
+/**
+ * Возвращает массив плашек с данными из window.SKIN_DATA_PLASHKA
+ * @returns {Array<{id: string, icon: string, title: string}>}
+ */
+export function getBadgeItems() {
+  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' };
+  const skinData = window.SKIN_DATA_PLASHKA || [];
+  return [customItem, ...skinData];
+}
+
+// Для обратной совместимости - статический массив с дефолтными значениями
 export const badgeItems = [
-  { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' },
-  { id: '1', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/87678.png" class="plashka"></a>', title: 'Плашка 1' },
-  { id: '2', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/22368.png" class="plashka"></a>', title: 'Плашка 2' },
-  { id: '3', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/333802.png" class="plashka"></a>', title: 'Плашка 3' },
-  { id: '4', icon: '<a class="modal-link"><img src="https://upforme.ru/uploads/001c/8a/af/3/378106.png" class="plashka"></a>', title: 'Плашка 4' }
+  { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' }
 ];
 
 // ============================================================================
 // ФОНЫ
 // ============================================================================
 
+/**
+ * Возвращает массив фонов с данными из window.SKIN_DATA_BACK
+ * @returns {Array<{id: string, icon: string, title: string}>}
+ */
+export function getBackgroundItems() {
+  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный фон' };
+  const skinData = window.SKIN_DATA_BACK || [];
+  return [customItem, ...skinData];
+}
+
+// Для обратной совместимости - статический массив с дефолтными значениями
 export const backgroundItems = [
-  { id: 'custom', icon: '✨', title: 'Индивидуальный фон' },
-  { id: '1', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/123607.png">', title: 'Фон 1' },
-  { id: '2', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/275271.png">', title: 'Фон 2' },
-  { id: '3', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/235283.png">', title: 'Фон 3' },
-  { id: '4', icon: '<img class="back" src="https://upforme.ru/uploads/001c/8a/af/3/305050.png">', title: 'Фон 4' }
+  { id: 'custom', icon: '✨', title: 'Индивидуальный фон' }
 ];
 
 // ============================================================================

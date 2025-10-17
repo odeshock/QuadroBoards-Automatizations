@@ -77,17 +77,6 @@ const ALLOWED_PARENTS = [
 
 
     // --- получение данных ---
-    if (d.type === "SKIN") {
-      window.SKIN_DATA_PLASHKA = d.skin_data_plashka;
-      window.SKIN_DATA_ICON = d.skin_data_icon;
-      window.SKIN_DATA_BACK = d.skin_data_back;
-      window.SKIN_DATA_GIFT = d.skin_data_gift;
-    }
-
-    if (d.type === "PERSONAL_POSTS") {
-      window.PERSONAL_POSTS = d.coupons_data;
-    }
-
     if (d.type === "USER_INFO") {
       window.USER_ID = d.user_id;
       window.IS_ADMIN = !!d.is_admin;
@@ -109,12 +98,15 @@ const ALLOWED_PARENTS = [
       window.CURRENT_BANK = d.money || 0;
     }
 
-    if (window.USER_ID !== undefined && window.IS_ADMIN !== undefined &&
-      window.USERS_LIST !== undefined && window.CURRENT_BANK !== undefined &&
-      window.SKIN_DATA_PLASHKA !== undefined && window.SKIN_DATA_ICON !== undefined &&
-      window.SKIN_DATA_BACK !== undefined && window.SKIN_DATA_GIFT !== undefined &&
-    ) {
-      hidePreloader();
+    if (d.type === "SKIN") {
+      window.SKIN_DATA_PLASHKA = d.skin_data_plashka || [];
+      window.SKIN_DATA_ICON = d.skin_data_icon || [];
+      window.SKIN_DATA_BACK = d.skin_data_back || [];
+      window.SKIN_DATA_GIFT = d.skin_data_gift || [];
+    }
+
+    if (d.type === "PERSONAL_DISCOUNTS") {
+      window.COUPONS_DATA = d.coupons_data || [];
     }
 
     if (d.type === "PERSONAL_POSTS") window.PERSONAL_POSTS = d.posts || [];
@@ -125,5 +117,17 @@ const ALLOWED_PARENTS = [
     if (d.type === "FIRST_POST_MISSED_FLAG") window.FIRST_POST_MISSED_FLAG = !!d.first_post_missed_flag;
     if (d.type === "BANNER_MAYAK_FLAG") window.BANNER_MAYAK_FLAG = !!d.banner_mayak_flag;
     if (d.type === "BANNER_RENO_FLAG") window.BANNER_RENO_FLAG = !!d.banner_reno_flag;
+
+    // Проверяем, все ли критические данные загружены
+    if (window.USER_ID !== undefined &&
+      window.IS_ADMIN !== undefined &&
+      window.USERS_LIST !== undefined &&
+      window.SKIN_DATA_GIFT !== undefined &&
+      window.SKIN_DATA_ICON !== undefined &&
+      window.SKIN_DATA_BACK !== undefined &&
+      window.SKIN_DATA_GIFT !== undefined
+    ) {
+      hidePreloader();
+    }
   });
 })();

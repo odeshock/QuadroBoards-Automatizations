@@ -162,7 +162,19 @@ function renderCoupons(activeCoupons, modalFields, btnSubmit) {
     }
   });
 
+  // Создаем информационный блок с объяснением
+  const systemInfo = document.createElement('div');
+  systemInfo.className = 'system-info';
+  systemInfo.innerHTML = '<strong>Как работает расчёт:</strong> Item купоны → Корректировки → Fixed купоны → Percent купоны → Автоскидки';
+  systemInfo.style.marginTop = '16px';
+  systemInfo.style.padding = '12px';
+  systemInfo.style.backgroundColor = 'var(--bg-hover, #f9fafb)';
+  systemInfo.style.borderRadius = '8px';
+  systemInfo.style.fontSize = '0.875rem';
+  systemInfo.style.color = 'var(--text-secondary, #6b7280)';
+
   modalFields.appendChild(couponsContainer);
+  modalFields.appendChild(systemInfo);
 
   // Обновляем футер для отображения скидки
   const modalAmountLabel = document.getElementById('modal-amount-label');

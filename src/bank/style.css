@@ -1153,3 +1153,15 @@ textarea {
 .admin_edit {
   background: rgb(73, 73, 73) I !important;
 }
+
+/* Купоны - скролл только для списка купонов */
+.coupons-container {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Информационный блок под купонами */
+.system-info {
+  flex-shrink: 0;
+}

@@ -2010,6 +2010,27 @@ export function renderLog(log) {
 
     // Поле для логов изменений (только если IS_ADMIN_TO_EDIT === true и есть логи)
     if (typeof window.IS_ADMIN_TO_EDIT !== 'undefined' && window.IS_ADMIN_TO_EDIT === true && editLogs.length > 0) {
+      // Label
+      const editLogsLabel = document.createElement('div');
+      editLogsLabel.style.cssText = `
+        margin-bottom: 8px;
+        font-weight: bold;
+        font-size: 14px;
+      `;
+      editLogsLabel.textContent = 'Комментарий администрации:';
+      summaryPanel.appendChild(editLogsLabel);
+
+      // Подсказка
+      const editLogsHint = document.createElement('div');
+      editLogsHint.style.cssText = `
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: var(--text-secondary, #6b7280);
+        font-style: italic;
+      `;
+      editLogsHint.textContent = 'Поправьте этот блок перед отправлением, указав в читаемом формате, что было изменено и почему. Этот комментарий будет указан в скрытом тексте и доступен только автору.';
+      summaryPanel.appendChild(editLogsHint);
+
       const editLogsField = document.createElement('textarea');
       editLogsField.id = 'edit-logs-field';
       editLogsField.style.cssText = `
@@ -2046,7 +2067,7 @@ export function renderLog(log) {
     balanceText.className = 'summary-balance';
     balanceText.style.marginTop = '8px';
     const operationSign = totalSum >= 0 ? '+' : '−';
-    balanceText.innerHTML = `<strong>ВАШ СЧЁТ:</strong> ${formatNumber(currentBank)} ${operationSign} ${formatNumber(Math.abs(totalSum))} = <span style="color: ${balanceColor};>${formatNumber(finalBalance)}</span>`;
+    balanceText.innerHTML = `<strong>ВАШ СЧЁТ:</strong> ${formatNumber(currentBank)} ${operationSign} ${formatNumber(Math.abs(totalSum))} = <span style="color: ${balanceColor};">${formatNumber(finalBalance)}</span>`;
     summaryPanel.appendChild(balanceText);
 
     // Кнопки

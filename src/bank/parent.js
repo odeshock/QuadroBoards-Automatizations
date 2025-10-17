@@ -560,7 +560,7 @@ function formatBankText(data) {
     } else if (priceAdjustmentIds.includes(item.form_id)) {
       rendered = formatBlockNoAmount(title, entriesPriceAdjustmentLines(item.entries));
     } else if (personalCoupons.includes(item.form_id)) {
-      endered = formatBlock(title, amountLike, entriesPersonalCouponsLines(item.entries));
+      rendered = formatBlock(title, amountLike, entriesPersonalCouponsLines(item.entries));
     } else if (giftDiscountIds.includes(item.form_id)) {
       rendered = formatBlock(title, amountLike, entriesGiftDiscountLines(item.entries));
     } else {
@@ -579,7 +579,7 @@ function formatBankText(data) {
       data.environment.CURRENT_BANK !== "undefined" &&
       data.environment.CURRENT_BANK !== undefined) ? Number(data.environment.CURRENT_BANK) : 0;
     let total_sum = Number(data.totalSum);
-    const new_bank = current_bank - total_sum;
+    const new_bank = current_bank + total_sum;
     const clr = Number(data.totalSum) < 0 ? "red" : "green";
     const sign = Number(data.totalSum) > 0 ? "+" : "";
     result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${sign}${data.totalSum}[/color]\n[b]ВАШ СЧЁТ:[/b] ${new_bank}[/align][/size][/quote]`;
@@ -595,7 +595,7 @@ function formatBankText(data) {
     data.editLogs !== "undefined" &&
     data.editLogs !== undefined
   ) {
-    result += `\n\n[hide=9999999999][b]Комментарий администратора:[/b]\n${editLogs}[/hide]`;
+    result += `\n\n[hide=9999999999][b]Комментарий администратора:[/b]\n${data.editLogs}[/hide]`;
   }
 
   return result;

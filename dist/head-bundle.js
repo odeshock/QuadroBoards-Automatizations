@@ -1991,6 +1991,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ищем кнопку "Редактировать"
             const editLink = container.querySelector(".pl-edit a");
             if (!editLink) return;
+            console.log(editLink);
 
             // Проверяем, что внутри контейнера есть div.post, но не div.post.topicpost
             const post = container.querySelector("div.post");
@@ -2010,6 +2011,7 @@ document.addEventListener("DOMContentLoaded", () => {
             editLink.removeAttribute("href");
             editLink.removeAttribute("rel");
             editLink.setAttribute("onclick", `bankCommentEditFromBackup(${N}, ${K})`);
+            console.log(`${editLink} done`)
         } catch (e) {
             console.error("Ошибка при обработке контейнера:", e);
         }

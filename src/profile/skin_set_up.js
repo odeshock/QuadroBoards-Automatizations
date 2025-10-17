@@ -43,7 +43,7 @@
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
       fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID, { isCoupon: true }),
     ]);
 
     // подстраховка от null/undefined

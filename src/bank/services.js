@@ -1376,6 +1376,7 @@ export function updatePersonalCoupons(phase = 'item') {
             template_id: `personal-coupon-${coupon.id}`,
             data: {
               coupon_id: coupon.id,
+              coupon_system_id: coupon.system_id,
               coupon_title: coupon.title,
               coupon_type: coupon.type,
               form: formId,
@@ -1451,6 +1452,7 @@ export function updatePersonalCoupons(phase = 'item') {
           template_id: `personal-coupon-${coupon.id}`,
           data: {
             coupon_id: coupon.id,
+            coupon_system_id: coupon.system_id,
             coupon_title: coupon.title,
             coupon_type: coupon.type,
             form: formId,
@@ -1510,6 +1512,7 @@ export function updatePersonalCoupons(phase = 'item') {
           template_id: `personal-coupon-${coupon.id}`,
           data: {
             coupon_id: coupon.id,
+            coupon_system_id: coupon.system_id,
             coupon_title: coupon.title,
             coupon_type: coupon.type,
             form: formId,

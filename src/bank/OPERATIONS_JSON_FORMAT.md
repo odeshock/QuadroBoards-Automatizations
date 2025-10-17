@@ -208,6 +208,7 @@ discount = {
   "PERSONAL_DISCOUNTS": [
     {
       "id": "coupon-1",
+      "system_id": "coupon-5",
       "type": "item",
       "form": "form-gift-present",
       "value": 2,
@@ -1060,10 +1061,11 @@ window.BACKUP_DATA = {
 ```javascript
 window.PERSONAL_DISCOUNTS = [
   {
-    id: "coupon-1",
-    type: "item",      // тип купона: "item", "fixed", "percent"
+    id: "coupon-1",        // уникальный ID купона
+    system_id: "coupon-5", // системный ID (для группировки одинаковых купонов)
+    type: "item",          // тип купона: "item", "fixed", "percent"
     form: "form-gift-present",  // ID формы без #
-    value: 2,          // значение (количество для item, сумма для fixed, процент для percent)
+    value: 2,              // значение (количество для item, сумма для fixed, процент для percent)
     title: "Скидка на 2 подарка",
     html: "<div>HTML блок купона для отображения</div>",
     expiresAt: "2025-12-31T23:59:59+03:00"  // дата истечения (опционально)
@@ -1168,3 +1170,25 @@ window.PERSONAL_DISCOUNTS = [
 - Купоны с `expiresAt` автоматически фильтруются
 - Показываются только активные купоны (текущее время < expiresAt)
 - Время сравнивается в московском часовом поясе (UTC+3)
+
+### Поля купона в JSON
+
+При сохранении операции с купонами в JSON, каждый entry купона содержит следующие поля:
+
+```javascript
+{
+  "data": {
+    "coupon_id": "coupon-1",           // уникальный ID купона (из PERSONAL_DISCOUNTS[].id)
+    "coupon_system_id": "coupon-5",    // системный ID (из PERSONAL_DISCOUNTS[].system_id)
+    "coupon_title": "Скидка на 2 подарка",
+    "coupon_type": "item",             // "item", "fixed" или "percent"
+    "form": "form-gift-present",       // ID формы без #
+    "discount_amount": 80,             // применённая сумма скидки
+    "calculation": "40 × 2"            // формула расчёта (для отображения)
+  }
+}
+```
+
+**Примечание:**
+- `coupon_id` — уникальный идентификатор конкретного экземпляра купона
+- `coupon_system_id` — системный идентификатор для группировки одинаковых купонов (например, если у пользователя несколько экземпляров одного купона)

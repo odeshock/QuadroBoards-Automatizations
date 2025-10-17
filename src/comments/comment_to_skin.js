@@ -2,9 +2,12 @@
  * Загружает карточки из текущего домена.
  * @param {number} topic_id  id темы (viewtopic.php?id=<topic_id>)
  * @param {Array<number>} comment_ids  id поста (#p<comment_id>-content)
+ * @param {Object} options - дополнительные опции
+ * @param {boolean} options.isCoupon - true если обрабатываем купоны (добавляет data-coupon-* атрибуты)
  * @returns {Promise<Array<{id:string, html:string}>>}
  */
-async function fetchCardsWrappedClean(topic_id, comment_ids) {
+async function fetchCardsWrappedClean(topic_id, comment_ids, options = {}) {
+  const { isCoupon = false } = options;
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
 
   const decodeEntities = s => {
@@ -54,20 +57,26 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
       const rawTitle = FMV.normSpace(card.querySelector('.desc')?.textContent || '');
       const content = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
 
-      // Извлекаем дополнительные поля для купонов
-      const couponTitle = FMV.normSpace(card.querySelector('.title')?.textContent || '');
-      const couponType = FMV.normSpace(card.querySelector('.type')?.textContent || '');
-      const couponForm = FMV.normSpace(card.querySelector('.form')?.textContent || '');
-      const couponValue = FMV.normSpace(card.querySelector('.value')?.textContent || '');
-
-      // Формируем атрибуты
+      // Формируем базовые атрибуты
       const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
-      const couponTitleAttr = couponTitle ? ` data-coupon-title="${couponTitle}"` : '';
-      const couponTypeAttr = couponType ? ` data-coupon-type="${couponType}"` : '';
-      const couponFormAttr = couponForm ? ` data-coupon-form="${couponForm}"` : '';
-      const couponValueAttr = couponValue ? ` data-coupon-value="${couponValue}"` : '';
 
-      const html = `<div class="item" data-id="${id}"${titleAttr}${couponTitleAttr}${couponTypeAttr}${couponFormAttr}${couponValueAttr}>${content}</div>`;
+      // Для купонов извлекаем дополнительные поля
+      let couponAttrs = '';
+      if (isCoupon) {
+        const couponTitle = FMV.normSpace(card.querySelector('.title')?.textContent || '');
+        const couponType = FMV.normSpace(card.querySelector('.type')?.textContent || '');
+        const couponForm = FMV.normSpace(card.querySelector('.form')?.textContent || '');
+        const couponValue = FMV.normSpace(card.querySelector('.value')?.textContent || '');
+
+        const couponTitleAttr = couponTitle ? ` data-coupon-title="${couponTitle}"` : '';
+        const couponTypeAttr = couponType ? ` data-coupon-type="${couponType}"` : '';
+        const couponFormAttr = couponForm ? ` data-coupon-form="${couponForm}"` : '';
+        const couponValueAttr = couponValue ? ` data-coupon-value="${couponValue}"` : '';
+
+        couponAttrs = `${couponTitleAttr}${couponTypeAttr}${couponFormAttr}${couponValueAttr}`;
+      }
+
+      const html = `<div class="item" data-id="${id}"${titleAttr}${couponAttrs}>${content}</div>`;
       return { id, html };
     });
 

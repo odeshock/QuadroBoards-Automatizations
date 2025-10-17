@@ -148,24 +148,35 @@ export const itemDiscountPrices = {
 // ПОДАРКИ
 // ============================================================================
 
+console.log('[data.js] Initializing SKIN_DATA getters/setters...');
+
 let _giftItemsCache = null;
 
-Object.defineProperty(window, 'SKIN_DATA_GIFT', {
-  get() {
-    return this._SKIN_DATA_GIFT;
-  },
-  set(value) {
-    this._SKIN_DATA_GIFT = value;
-    _giftItemsCache = null; // Сбрасываем кэш при обновлении данных
-  },
-  configurable: true
-});
+// Создаём setter/getter для отслеживания изменений
+if (!window.hasOwnProperty('SKIN_DATA_GIFT')) {
+  console.log('[data.js] Creating defineProperty for SKIN_DATA_GIFT');
+  Object.defineProperty(window, 'SKIN_DATA_GIFT', {
+    get() {
+      return this._SKIN_DATA_GIFT;
+    },
+    set(value) {
+      console.log('[SKIN_DATA_GIFT setter] New value:', value);
+      this._SKIN_DATA_GIFT = value;
+      _giftItemsCache = null; // Сбрасываем кэш
+    },
+    configurable: true
+  });
+}
 
 function _getGiftItems() {
-  if (_giftItemsCache) return _giftItemsCache;
+  if (_giftItemsCache) {
+    console.log('[_getGiftItems] Returning cached:', _giftItemsCache);
+    return _giftItemsCache;
+  }
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' };
-  const skinData = window._SKIN_DATA_GIFT || [];
+  const skinData = window.SKIN_DATA_GIFT || []; // Читаем через геттер
   _giftItemsCache = [customItem, ...skinData];
+  console.log('[_getGiftItems] Created new cache:', _giftItemsCache);
   return _giftItemsCache;
 }
 
@@ -185,21 +196,23 @@ export const giftItems = new Proxy([], {
 
 let _iconItemsCache = null;
 
-Object.defineProperty(window, 'SKIN_DATA_ICON', {
-  get() {
-    return this._SKIN_DATA_ICON;
-  },
-  set(value) {
-    this._SKIN_DATA_ICON = value;
-    _iconItemsCache = null;
-  },
-  configurable: true
-});
+if (!window.hasOwnProperty('SKIN_DATA_ICON')) {
+  Object.defineProperty(window, 'SKIN_DATA_ICON', {
+    get() {
+      return this._SKIN_DATA_ICON;
+    },
+    set(value) {
+      this._SKIN_DATA_ICON = value;
+      _iconItemsCache = null;
+    },
+    configurable: true
+  });
+}
 
 function _getIconItems() {
   if (_iconItemsCache) return _iconItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' };
-  const skinData = window._SKIN_DATA_ICON || [];
+  const skinData = window.SKIN_DATA_ICON || [];
   _iconItemsCache = [customItem, ...skinData];
   return _iconItemsCache;
 }
@@ -220,21 +233,23 @@ export const iconItems = new Proxy([], {
 
 let _badgeItemsCache = null;
 
-Object.defineProperty(window, 'SKIN_DATA_PLASHKA', {
-  get() {
-    return this._SKIN_DATA_PLASHKA;
-  },
-  set(value) {
-    this._SKIN_DATA_PLASHKA = value;
-    _badgeItemsCache = null;
-  },
-  configurable: true
-});
+if (!window.hasOwnProperty('SKIN_DATA_PLASHKA')) {
+  Object.defineProperty(window, 'SKIN_DATA_PLASHKA', {
+    get() {
+      return this._SKIN_DATA_PLASHKA;
+    },
+    set(value) {
+      this._SKIN_DATA_PLASHKA = value;
+      _badgeItemsCache = null;
+    },
+    configurable: true
+  });
+}
 
 function _getBadgeItems() {
   if (_badgeItemsCache) return _badgeItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' };
-  const skinData = window._SKIN_DATA_PLASHKA || [];
+  const skinData = window.SKIN_DATA_PLASHKA || [];
   _badgeItemsCache = [customItem, ...skinData];
   return _badgeItemsCache;
 }
@@ -255,21 +270,23 @@ export const badgeItems = new Proxy([], {
 
 let _backgroundItemsCache = null;
 
-Object.defineProperty(window, 'SKIN_DATA_BACK', {
-  get() {
-    return this._SKIN_DATA_BACK;
-  },
-  set(value) {
-    this._SKIN_DATA_BACK = value;
-    _backgroundItemsCache = null;
-  },
-  configurable: true
-});
+if (!window.hasOwnProperty('SKIN_DATA_BACK')) {
+  Object.defineProperty(window, 'SKIN_DATA_BACK', {
+    get() {
+      return this._SKIN_DATA_BACK;
+    },
+    set(value) {
+      this._SKIN_DATA_BACK = value;
+      _backgroundItemsCache = null;
+    },
+    configurable: true
+  });
+}
 
 function _getBackgroundItems() {
   if (_backgroundItemsCache) return _backgroundItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный фон' };
-  const skinData = window._SKIN_DATA_BACK || [];
+  const skinData = window.SKIN_DATA_BACK || [];
   _backgroundItemsCache = [customItem, ...skinData];
   return _backgroundItemsCache;
 }

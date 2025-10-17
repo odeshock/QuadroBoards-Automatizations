@@ -148,58 +148,49 @@ export const itemDiscountPrices = {
 // ПОДАРКИ
 // ============================================================================
 
-/**
- * Возвращает массив подарков с данными из window.SKIN_DATA_GIFT
- * @returns {Array<{id: string, icon: string, title: string}>}
- */
-export function getGiftItems() {
+function _getGiftItems() {
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' };
   const skinData = window.SKIN_DATA_GIFT || [];
   return [customItem, ...skinData];
 }
 
+export const giftItems = _getGiftItems();
+
 // ============================================================================
 // ИКОНКИ
 // ============================================================================
 
-/**
- * Возвращает массив иконок с данными из window.SKIN_DATA_ICON
- * @returns {Array<{id: string, icon: string, title: string}>}
- */
-export function getIconItems() {
+function _getIconItems() {
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' };
   const skinData = window.SKIN_DATA_ICON || [];
   return [customItem, ...skinData];
 }
 
+export const iconItems = _getIconItems();
 
 // ============================================================================
 // ПЛАШКИ
 // ============================================================================
 
-/**
- * Возвращает массив плашек с данными из window.SKIN_DATA_PLASHKA
- * @returns {Array<{id: string, icon: string, title: string}>}
- */
-export function getBadgeItems() {
+function _getBadgeItems() {
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' };
   const skinData = window.SKIN_DATA_PLASHKA || [];
   return [customItem, ...skinData];
 }
 
+export const badgeItems = _getBadgeItems();
+
 // ============================================================================
 // ФОНЫ
 // ============================================================================
 
-/**
- * Возвращает массив фонов с данными из window.SKIN_DATA_BACK
- * @returns {Array<{id: string, icon: string, title: string}>}
- */
-export function getBackgroundItems() {
+function _getBackgroundItems() {
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный фон' };
   const skinData = window.SKIN_DATA_BACK || [];
   return [customItem, ...skinData];
 }
+
+export const backgroundItems = _getBackgroundItems();
 
 
 // ============================================================================

@@ -6,7 +6,7 @@ import { submissionGroups, buildGroupKey, incrementGroupSeq, incrementEntrySeq, 
 import { openModal, closeModal } from './modal/index.js';
 import { renderLog, showConfirmModal } from './results.js';
 import { injectTemplates } from './templates.js';
-import { incomeItems, expenseItems, getGiftItems, getIconItems, getBadgeItems, getBackgroundItems, itemPrices } from './data.js';
+import { incomeItems, expenseItems, giftItems, iconItems, badgeItems, backgroundItems, itemPrices } from './data.js';
 import {
   ADMIN_ALLOWED_ITEMS,
   TEXT_MESSAGES,
@@ -875,7 +875,7 @@ function renderGiftsList() {
   const container = document.querySelector('#tab-gifts .gift-grid');
   if (!container) return;
 
-  getGiftItems().forEach(item => {
+  giftItems.forEach(item => {
     const isCustom = item.id === 'custom';
     const price = isCustom ? itemPrices.gift.custom : itemPrices.gift.collection;
 
@@ -908,7 +908,7 @@ function renderDesignLists() {
   // Иконки
   const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {
-    getIconItems().forEach(item => {
+    iconItems.forEach(item => {
       const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.icon.custom : itemPrices.icon.collection;
 
@@ -929,7 +929,7 @@ function renderDesignLists() {
   // Плашки
   const badgeContainer = document.querySelector('#tab-design .badge-grid');
   if (badgeContainer) {
-    getBadgeItems().forEach(item => {
+    badgeItems.forEach(item => {
       const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.badge.custom : itemPrices.badge.collection;
 
@@ -950,7 +950,7 @@ function renderDesignLists() {
   // Фоны
   const bgContainer = document.querySelector('#tab-design .bg-grid');
   if (bgContainer) {
-    getBackgroundItems().forEach(item => {
+    backgroundItems.forEach(item => {
       const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.background.custom : itemPrices.background.collection;
 

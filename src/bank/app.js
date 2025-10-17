@@ -865,6 +865,13 @@ function renderExpenseList() {
 }
 
 function renderGiftsList() {
+  // Ждём загрузки данных из window.SKIN_DATA_GIFT
+  if (typeof window.SKIN_DATA_GIFT === 'undefined') {
+    // Повторяем попытку через 100ms
+    setTimeout(renderGiftsList, 100);
+    return;
+  }
+
   const container = document.querySelector('#tab-gifts .gift-grid');
   if (!container) return;
 

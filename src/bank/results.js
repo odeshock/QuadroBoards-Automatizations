@@ -2052,7 +2052,7 @@ export function renderLog(log) {
     const totalText = document.createElement('div');
     totalText.className = 'summary-total';
     const totalColor = totalSum >= 0 ? '#22c55e' : '#ef4444';
-    const totalPrefix = totalSum >= 0 ? '+ ' : '− ';
+    const totalPrefix = totalSum >= 0 ? '+' : '−';
     totalText.innerHTML = `<strong>ИТОГО:</strong> <span style="color: ${totalColor}">${totalPrefix}${formatNumber(Math.abs(totalSum))}</span>`;
     summaryPanel.appendChild(totalText);
 

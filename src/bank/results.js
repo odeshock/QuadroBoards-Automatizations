@@ -791,7 +791,7 @@ export function renderLog(log) {
       // Для купонов, автоскидок и корректировок убираем нумерацию
       if (isSystemEntry) {
         // Заменяем "Купоны" на "Использованные купоны"
-        const displayTitle = group.isPersonalCoupon ? 'Использованные купоны' : group.title;
+        const displayTitle = group.isPersonalCoupon ? 'Применённые купоны' : group.title;
         title.textContent = displayTitle;
       } else {
         title.textContent = `#${regularOperationIndex} · ${group.title}`;

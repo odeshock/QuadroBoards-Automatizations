@@ -99,7 +99,6 @@ const ALLOWED_PARENTS = [
     }
 
     if (d.type === "SKIN") {
-      console.log("[SKIN]", d);
       window.SKIN_DATA_PLASHKA = d.skin_data_plashka || [];
       window.SKIN_DATA_ICON = d.skin_data_icon || [];
       window.SKIN_DATA_BACK = d.skin_data_back || [];

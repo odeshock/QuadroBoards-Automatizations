@@ -3302,16 +3302,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // Загрузка данных скинов и купонов (async)
   (async () => {
     try {
-      const skin_data_plashka = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Plashka);
+      const skin_data_plashka = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Plashka);
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Plashka");
 
-      const skin_data_icon = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Icon);
+      const skin_data_icon = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Icon);
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Icon");
 
-      const skin_data_back = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Back);
+      const skin_data_back = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Back);
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Back");
 
-      const skin_data_gift = await fetchCardsWrappedClean(BankSkinFieldID, BankSkinPostID.Gift);
+      const skin_data_gift = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Gift);
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Gift");
 
       console.log("skin!!!", skin_data_plashka,

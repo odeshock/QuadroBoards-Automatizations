@@ -896,6 +896,15 @@ function renderGiftsList() {
 
 // Функции для рендеринга оформления
 function renderDesignLists() {
+  // Ждём загрузки всех данных скинов
+  if (typeof window.SKIN_DATA_ICON === 'undefined' ||
+    typeof window.SKIN_DATA_PLASHKA === 'undefined' ||
+    typeof window.SKIN_DATA_BACK === 'undefined') {
+    // Повторяем попытку через 100ms
+    setTimeout(renderDesignLists, 100);
+    return;
+  }
+
   // Иконки
   const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {

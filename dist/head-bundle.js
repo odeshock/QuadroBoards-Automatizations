@@ -23,7 +23,7 @@ var GROUP_IDS = {
 
 var PROFILE_FIELDS = { // дополнительные поля профиля 
   MoneyID: 6,
-  MoneyTemplate: 10,
+  MoneyTemplate: 0,
   IconID: 5,
   BackgroundID: 4,
   PlashkaID: 3,
@@ -66,14 +66,14 @@ var CHRONO_CHECK = {
   TotalChronoPostID: 83, // в каком посте расположен сбор общего хроно
   PerPersonChronoPostID: 92, // в каком посте расположен сбор хроно по персонажам
   EpisodeMapType: { // отображение типов форумов с эпизодами
-    'personal':['personal','black'], 
-    'plot':['plot','black'], 
-    'au':['au','black'],
-  }, 
+    'personal': ['personal', 'black'],
+    'plot': ['plot', 'black'],
+    'au': ['au', 'black'],
+  },
   EpisodeMapStat: { // отображение статусов форумов с эпизодами
-    'on':['active','green'],
-    'off':['closed','teal'],
-    'archived':['archived','maroon'],
+    'on': ['active', 'green'],
+    'off': ['closed', 'teal'],
+    'archived': ['archived', 'maroon'],
   },
   ForumInfo: EPS_FORUM_INFO,
 };

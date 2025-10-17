@@ -22,7 +22,7 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
     const tryDec = enc => { try { return new TextDecoder(enc).decode(buf); } catch { return null; } };
     if (declared) { const s = tryDec(declared); if (s) return s; }
     const utf = tryDec('utf-8') ?? '';
-    const cp  = tryDec('windows-1251') ?? '';
+    const cp = tryDec('windows-1251') ?? '';
     const bad = s => (s.match(/\uFFFD/g) || []).length;
     if (bad(cp) && !bad(utf)) return utf;
     if (bad(utf) && !bad(cp)) return cp;
@@ -49,12 +49,25 @@ async function fetchCardsWrappedClean(topic_id, comment_ids) {
     const decoded = decodeEntities(combined).replace(/\u00A0/g, ' ');
     const innerDoc = toDoc(decoded);
 
-    const result = [...innerDoc.querySelectorAll('#grid .card')].map(card => {
-      const id        = FMV.normSpace(card.querySelector('.id')?.textContent || '');
-      const rawTitle  = FMV.normSpace(card.querySelector('.desc')?.textContent || '');
-      const content   = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
+    const result = [...innerDoc.querySelectorAll('#grid article.card')].map(card => {
+      const id = FMV.normSpace(card.querySelector('.id')?.textContent || '');
+      const rawTitle = FMV.normSpace(card.querySelector('.desc')?.textContent || '');
+      const content = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
+
+      // Извлекаем дополнительные поля для купонов
+      const couponTitle = FMV.normSpace(card.querySelector('.title')?.textContent || '');
+      const couponType = FMV.normSpace(card.querySelector('.type')?.textContent || '');
+      const couponForm = FMV.normSpace(card.querySelector('.form')?.textContent || '');
+      const couponValue = FMV.normSpace(card.querySelector('.value')?.textContent || '');
+
+      // Формируем атрибуты
       const titleAttr = rawTitle ? ` title="${rawTitle}"` : '';
-      const html      = `<div class="item" data-id="${id}"${titleAttr}>${content}</div>`;
+      const couponTitleAttr = couponTitle ? ` data-coupon-title="${couponTitle}"` : '';
+      const couponTypeAttr = couponType ? ` data-coupon-type="${couponType}"` : '';
+      const couponFormAttr = couponForm ? ` data-coupon-form="${couponForm}"` : '';
+      const couponValueAttr = couponValue ? ` data-coupon-value="${couponValue}"` : '';
+
+      const html = `<div class="item" data-id="${id}"${titleAttr}${couponTitleAttr}${couponTypeAttr}${couponFormAttr}${couponValueAttr}>${content}</div>`;
       return { id, html };
     });
 

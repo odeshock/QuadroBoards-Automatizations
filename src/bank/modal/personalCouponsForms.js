@@ -165,7 +165,7 @@ function renderCoupons(activeCoupons, modalFields, btnSubmit) {
   // Создаем информационный блок с объяснением
   const systemInfo = document.createElement('div');
   systemInfo.className = 'system-info';
-  systemInfo.innerHTML = '<strong>Как работает расчёт:</strong> Item купоны → Корректировки → Fixed купоны → Percent купоны → Автоскидки';
+  systemInfo.innerHTML = '<strong>Как работает расчёт:</strong><br>— Сначала применяются купоны на бесплатное действие<br>— Затем пересчитываются корректировки цены (например, если Вы приобретаете 5 подарков и один из них в подарок по купону, цена будет учтена, как за 4)<br>— После этого учитываются купоны на скидку конкретной суммы<br>— А после них купоны на скидку N%<br><br><strong>Важное уточнение:</strong> Сначала применяются те купоны одного вида (вид операции+тип скидки), что расположены выше.';
   systemInfo.style.marginTop = '16px';
   systemInfo.style.padding = '12px';
   systemInfo.style.backgroundColor = 'var(--bg-hover, #f9fafb)';

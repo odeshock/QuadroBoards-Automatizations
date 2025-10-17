@@ -1978,6 +1978,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Проверяем, что заголовок страницы начинается с "Гринготтс"
     if (!document.title.startsWith("Гринготтс")) return;
 
+    const postForm = document.getElementById('post-form');
+
     if (postForm) {
         postForm.style.display = 'none'; // Скрываем элемент
     }

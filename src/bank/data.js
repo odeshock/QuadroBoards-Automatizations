@@ -148,49 +148,141 @@ export const itemDiscountPrices = {
 // ПОДАРКИ
 // ============================================================================
 
+let _giftItemsCache = null;
+
+Object.defineProperty(window, 'SKIN_DATA_GIFT', {
+  get() {
+    return this._SKIN_DATA_GIFT;
+  },
+  set(value) {
+    this._SKIN_DATA_GIFT = value;
+    _giftItemsCache = null; // Сбрасываем кэш при обновлении данных
+  },
+  configurable: true
+});
+
 function _getGiftItems() {
+  if (_giftItemsCache) return _giftItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' };
-  const skinData = window.SKIN_DATA_GIFT || [];
-  return [customItem, ...skinData];
+  const skinData = window._SKIN_DATA_GIFT || [];
+  _giftItemsCache = [customItem, ...skinData];
+  return _giftItemsCache;
 }
 
-export const giftItems = _getGiftItems();
+export const giftItems = new Proxy([], {
+  get(_target, prop) {
+    const items = _getGiftItems();
+    if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
+    if (prop === 'length') return items.length;
+    if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
+    return items[prop];
+  }
+});
 
 // ============================================================================
 // ИКОНКИ
 // ============================================================================
 
+let _iconItemsCache = null;
+
+Object.defineProperty(window, 'SKIN_DATA_ICON', {
+  get() {
+    return this._SKIN_DATA_ICON;
+  },
+  set(value) {
+    this._SKIN_DATA_ICON = value;
+    _iconItemsCache = null;
+  },
+  configurable: true
+});
+
 function _getIconItems() {
+  if (_iconItemsCache) return _iconItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' };
-  const skinData = window.SKIN_DATA_ICON || [];
-  return [customItem, ...skinData];
+  const skinData = window._SKIN_DATA_ICON || [];
+  _iconItemsCache = [customItem, ...skinData];
+  return _iconItemsCache;
 }
 
-export const iconItems = _getIconItems();
+export const iconItems = new Proxy([], {
+  get(_target, prop) {
+    const items = _getIconItems();
+    if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
+    if (prop === 'length') return items.length;
+    if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
+    return items[prop];
+  }
+});
 
 // ============================================================================
 // ПЛАШКИ
 // ============================================================================
 
+let _badgeItemsCache = null;
+
+Object.defineProperty(window, 'SKIN_DATA_PLASHKA', {
+  get() {
+    return this._SKIN_DATA_PLASHKA;
+  },
+  set(value) {
+    this._SKIN_DATA_PLASHKA = value;
+    _badgeItemsCache = null;
+  },
+  configurable: true
+});
+
 function _getBadgeItems() {
+  if (_badgeItemsCache) return _badgeItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' };
-  const skinData = window.SKIN_DATA_PLASHKA || [];
-  return [customItem, ...skinData];
+  const skinData = window._SKIN_DATA_PLASHKA || [];
+  _badgeItemsCache = [customItem, ...skinData];
+  return _badgeItemsCache;
 }
 
-export const badgeItems = _getBadgeItems();
+export const badgeItems = new Proxy([], {
+  get(_target, prop) {
+    const items = _getBadgeItems();
+    if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
+    if (prop === 'length') return items.length;
+    if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
+    return items[prop];
+  }
+});
 
 // ============================================================================
 // ФОНЫ
 // ============================================================================
 
+let _backgroundItemsCache = null;
+
+Object.defineProperty(window, 'SKIN_DATA_BACK', {
+  get() {
+    return this._SKIN_DATA_BACK;
+  },
+  set(value) {
+    this._SKIN_DATA_BACK = value;
+    _backgroundItemsCache = null;
+  },
+  configurable: true
+});
+
 function _getBackgroundItems() {
+  if (_backgroundItemsCache) return _backgroundItemsCache;
   const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный фон' };
-  const skinData = window.SKIN_DATA_BACK || [];
-  return [customItem, ...skinData];
+  const skinData = window._SKIN_DATA_BACK || [];
+  _backgroundItemsCache = [customItem, ...skinData];
+  return _backgroundItemsCache;
 }
 
-export const backgroundItems = _getBackgroundItems();
+export const backgroundItems = new Proxy([], {
+  get(_target, prop) {
+    const items = _getBackgroundItems();
+    if (prop === Symbol.iterator) return items[Symbol.iterator].bind(items);
+    if (prop === 'length') return items.length;
+    if (typeof prop === 'string' && !isNaN(prop)) return items[prop];
+    return items[prop];
+  }
+});
 
 
 // ============================================================================

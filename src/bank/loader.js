@@ -74,14 +74,29 @@ const ALLOWED_PARENTS = [
       }
     }
 
+
+
     // --- получение данных ---
+    if (d.type === "SKIN") {
+      window.SKIN_DATA_PLASHKA = d.skin_data_plashka;
+      window.SKIN_DATA_ICON = d.skin_data_icon;
+      window.SKIN_DATA_BACK = d.skin_data_back;
+      window.SKIN_DATA_GIFT = d.skin_data_gift;
+    }
+
+    if (d.type === "PERSONAL_POSTS") {
+      window.PERSONAL_POSTS = d.coupons_data;
+    }
+
     if (d.type === "USER_INFO") {
       window.USER_ID = d.user_id;
       window.IS_ADMIN = !!d.is_admin;
-      hidePreloader();
     }
 
-    if (d.type === "USERS_LIST") window.USERS_LIST = Array.isArray(d.users_list) ? d.users_list : [];
+    if (d.type === "USERS_LIST") {
+      window.USERS_LIST = Array.isArray(d.users_list) ? d.users_list : [];
+    }
+
     if (d.type === "PROFILE_INFO") {
       window.MSG100_OLD = d.msg100_old || 0;
       window.MSG100_NEW = d.msg100_new || 0;
@@ -91,6 +106,15 @@ const ALLOWED_PARENTS = [
       window.POS100_NEW = d.pos100_new || 0;
       window.MONTH_OLD = Array.isArray(d.month_old) ? d.month_old : null;
       window.MONTH_NEW = Array.isArray(d.month_new) ? d.month_new : null;
+      window.CURRENT_BANK = d.money || 0;
+    }
+
+    if (window.USER_ID !== undefined && window.IS_ADMIN !== undefined &&
+      window.USERS_LIST !== undefined && window.CURRENT_BANK !== undefined &&
+      window.SKIN_DATA_PLASHKA !== undefined && window.SKIN_DATA_ICON !== undefined &&
+      window.SKIN_DATA_BACK !== undefined && window.SKIN_DATA_GIFT !== undefined &&
+    ) {
+      hidePreloader();
     }
 
     if (d.type === "PERSONAL_POSTS") window.PERSONAL_POSTS = d.posts || [];

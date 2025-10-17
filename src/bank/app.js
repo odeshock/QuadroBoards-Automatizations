@@ -842,7 +842,7 @@ function renderExpenseList() {
 
   expenseItems.forEach(item => {
     const div = document.createElement('div');
-    div.className = 'item';
+    div.className = 'listitem';
     div.setAttribute('role', 'listitem');
 
     const btn = document.createElement('button');

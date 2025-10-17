@@ -1140,7 +1140,7 @@ textarea {
 .coupon-selector {
   margin-bottom: 16px;
   padding: 12px;
-  border-color: #71b4ff !important;
+  border: 1px solid #71b4ff !important;
   background: #dbeaff !important;
   border-radius: 8px;
   cursor: pointer;

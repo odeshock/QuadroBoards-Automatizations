@@ -809,7 +809,7 @@ function initializeAccessControl() {
 // ============================================================================
 
 function renderIncomeList() {
-  const container = document.querySelector('#tab-bank .panel:first-child .list');
+  const container = document.querySelector('#tab-bank .panel .list.income');
   if (!container) return;
 
   incomeItems.forEach(item => {
@@ -837,7 +837,7 @@ function renderIncomeList() {
 }
 
 function renderExpenseList() {
-  const container = document.querySelector('#tab-bank .panel:last-child .list');
+  const container = document.querySelector('#tab-bank .panel .list.expense');
   if (!container) return;
 
   expenseItems.forEach(item => {

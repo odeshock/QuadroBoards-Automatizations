@@ -882,7 +882,9 @@ function renderGiftsList() {
     return;
   }
 
-  giftItems.forEach(item => {
+  console.log('[renderGiftsList] Starting forEach, giftItems.length:', giftItems.length);
+  giftItems.forEach((item, index) => {
+    console.log(`[renderGiftsList] Processing item ${index}:`, item);
     const isCustom = item.id === 'custom';
     const price = isCustom ? itemPrices.gift.custom : itemPrices.gift.collection;
 
@@ -897,8 +899,10 @@ function renderGiftsList() {
     btn.setAttribute('data-gift-id', item.id);
     btn.setAttribute('data-gift-icon', item.icon);
     btn.innerHTML = item.icon;
+    console.log(`[renderGiftsList] Created button for ${item.id}, appending to container`);
     container.appendChild(btn);
   });
+  console.log('[renderGiftsList] Finished forEach, container children:', container.children.length);
 }
 
 // Функции для рендеринга оформления

@@ -1997,12 +1997,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!post || post.classList.contains("topicpost")) return;
 
             // Ищем ID профиля (N)
-            let N = 0;
             const profileLink = container.querySelector('.pl-email.profile a');
-            if (profileLink) {
-                const profileUrl = new URL(profileLink.href);
-                const N = Number(profileUrl.searchParams.get("id"));
-            }
+            const profileUrl = (!profileLink) ? undefined : new URL(profileLink.href);
+            const N = (!profileUrl) ? 0 : Number(profileUrl.searchParams.get("id"));
 
             // Ищем K — число в теге <bank_data>
             const bankData = container.querySelector("bank_data");

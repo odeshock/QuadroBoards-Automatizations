@@ -709,124 +709,846 @@ $(function() {
 })();
 
 /* Private Pages */
-// admin_bridge.js — загрузка/сохранение страницы с проверкой main-маркера (только textarea)
+// skin_html_json_parser.js — Парсинг HTML ↔ JSON для данных скинов
+
+(function () {
+  'use strict';
+
+  if (!window.FMV) window.FMV = {};
+
+  /**
+   * Парсит HTML в JSON структуру
+   * @param {string} html - HTML с секциями ._icon, ._plashka, ._background, ._gift, ._coupon
+   * @returns {Object} - { icon: [...], plashka: [...], background: [...], gift: [...], coupon: [...] }
+   */
+  function parseHtmlToJson(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+    const result = {
+      icon: [],
+      plashka: [],
+      background: [],
+      gift: [],
+      coupon: []
+    };
+
+    // Маппинг классов на ключи
+    const sectionMap = {
+      '_icon': 'icon',
+      '_plashka': 'plashka',
+      '_background': 'background',
+      '_gift': 'gift',
+      '_coupon': 'coupon'
+    };
+
+    for (const [className, key] of Object.entries(sectionMap)) {
+      const section = doc.querySelector(`.${className}`);
+      if (!section) continue;
+
+      const items = section.querySelectorAll('.item');
+      items.forEach(item => {
+        const itemData = {
+          title: item.getAttribute('title') || '',
+          id: item.getAttribute('data-id') || '',
+          content: item.innerHTML || ''
+        };
+
+        // Собираем все data-* атрибуты
+        Array.from(item.attributes).forEach(attr => {
+          if (attr.name.startsWith('data-') && attr.name !== 'data-id') {
+            const attrKey = attr.name.replace('data-', '').replace(/-/g, '_');
+            itemData[attrKey] = attr.value;
+          }
+        });
+
+        result[key].push(itemData);
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Конвертирует JSON в HTML
+   * @param {Object} data - { icon: [...], plashka: [...], background: [...], gift: [...], coupon: [...] }
+   * @returns {string} - HTML строка
+   */
+  function parseJsonToHtml(data) {
+    let html = '';
+
+    const sections = [
+      { key: 'icon', className: '_icon' },
+      { key: 'plashka', className: '_plashka' },
+      { key: 'background', className: '_background' },
+      { key: 'gift', className: '_gift' },
+      { key: 'coupon', className: '_coupon' }
+    ];
+
+    sections.forEach(({ key, className }) => {
+      const items = data[key] || [];
+      if (items.length === 0) return;
+
+      html += `<div class="${className}">\n`;
+
+      items.forEach(item => {
+        const attrs = [
+          `title="${escapeHtml(item.title || '')}"`,
+          `data-id="${escapeHtml(item.id || '')}"`
+        ];
+
+        // Добавляем все остальные data-* атрибуты
+        Object.keys(item).forEach(k => {
+          if (k !== 'title' && k !== 'id' && k !== 'content') {
+            const attrName = 'data-' + k.replace(/_/g, '-');
+            attrs.push(`${attrName}="${escapeHtml(item[k] || '')}"`);
+          }
+        });
+
+        html += `  <div class="item" ${attrs.join(' ')}>${item.content || ''}</div>\n`;
+      });
+
+      html += `</div>\n`;
+    });
+
+    return html;
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Экспорт
+  window.FMV.parseHtmlToJson = parseHtmlToJson;
+  window.FMV.parseJsonToHtml = parseJsonToHtml;
+
+  console.log('[skin_html_json_parser] Загружен');
+})();
+// admin_bridge_api.js — загрузка/сохранение данных через API вместо страниц
 // Экспорт: window.skinAdmin.load(userId) -> { status, initialHtml, save(newHtml), targetUserId }
 
 (function () {
   'use strict';
-  if (window.skinAdmin && typeof window.skinAdmin.load === 'function') return;
 
-  const getHtml = (typeof window.fetchHtml === 'function')
-    ? window.fetchHtml
-    : async (url) => (await fetch(url, { credentials: 'include' })).text();
+  console.log('[admin_bridge_api] Загружается версия с API');
 
-  const toDoc = (html) => new DOMParser().parseFromString(html, 'text/html');
-
-  const normalizeHtml = (s) =>
-    String(s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-      .replace(/&quot;/g, '"').replace(/>\s+</g, '><')
-      .replace(/[ \t\n]+/g, ' ').replace(/\s*=\s*/g, '=').trim();
-
-  async function loadSkinAdmin(userId) {
-    const mkUrl = (uid) => new URL(`/admin_pages.php?edit_page=usr${uid}_skin`, location.origin).toString();
-    const RX_RAW  = /<!--\s*main\s*:\s*usr\s*(\d+)\s*_skin\s*-->/i;
-    const RX_HTML = /&lt;!--\s*main\s*:\s*usr\s*(\d+)\s*_skin\s*--&gt;/i;
-    const htmlDecode = (s) => { const t=document.createElement('textarea'); t.innerHTML=String(s||''); return t.value; };
-
-    const getMainId = (doc) => {
-      const ta = doc.querySelector('#page-content,[name="content"]');
-      if (!ta) return { id: null, value: '' };
-      const v = String(ta.value || '');
-      let m = v.match(RX_RAW);  if (m) return { id: m[1], value: v };
-      m = htmlDecode(v).match(RX_RAW); if (m) return { id: m[1], value: v };
-      m = v.match(RX_HTML); if (m) return { id: m[1], value: v };
-      return { id: null, value: v };
-    };
-
-    let id = String(userId);
-    let url = mkUrl(id);
-
-    // исходная страница
-    let html = await getHtml(url);
-    let doc  = toDoc(html);
-    if (/Ссылка, по которой Вы пришли, неверная или устаревшая\./i.test(doc.body?.textContent || ''))
-      return { status: 'ошибка доступа к персональной странице' };
-
-    // проверка маркера
-    let { id: main1, value: val1 } = getMainId(doc);
-    if (main1) {
-      if (main1 === id) return { status: 'ошибка: найден цикл main-страниц' };
-      // редирект на основную
-      id  = main1;
-      url = mkUrl(id);
-      html = await getHtml(url);
-      doc  = toDoc(html);
-      if (/Ссылка, по которой Вы пришли, неверная или устаревшая\./i.test(doc.body?.textContent || ''))
-        return { status: 'ошибка доступа к персональной странице' };
-      const { id: main2, value: val2 } = getMainId(doc);
-      if (main2) return { status: 'ошибка: найден цикл main-страниц' };
-      val1 = val2;
-    }
-
-    const form = doc.querySelector('form[action*="admin_pages.php"]') || doc.querySelector('form');
-    const ta   = doc.querySelector('#page-content,[name="content"]');
-    if (!form || !ta) return { status: 'ошибка: не найдены форма или textarea' };
-
-    const initialHtml = String(val1 ?? ta.value ?? '');
-
-    async function verifySaved(expected) {
-      try {
-        const chk = await getHtml(url);
-        const chkTa = toDoc(chk).querySelector('#page-content,[name="content"]');
-        return chkTa && normalizeHtml(chkTa.value) === normalizeHtml(expected);
-      } catch { return false; }
-    }
-
-    async function save(newHtml) {
-      const fresh = await getHtml(url);
-      const freshDoc = toDoc(fresh);
-      const fForm = freshDoc.querySelector('form[action*="admin_pages.php"]') || freshDoc.querySelector('form');
-      const fTa   = freshDoc.querySelector('#page-content,[name="content"]');
-      if (!fForm || !fTa) return { ok: false, status: 'ошибка: не найдены форма/textarea при сохранении' };
-
-      fTa.value = newHtml;
-      const postUrl = new URL(fForm.getAttribute('action') || url, location.origin).toString();
-      const submitBtn = [...fForm.elements].find(el =>
-        el.type === 'submit' && (el.name === 'save' || /сохр|save/i.test(el.value || el.textContent || '')));
-      const submitName  = submitBtn?.name  || 'save';
-      const submitValue = submitBtn?.value || '1';
-
-      if (typeof window.serializeFormCP1251_SelectSubmit === 'function' &&
-          typeof window.fetchCP1251Text === 'function') {
-        const body = window.serializeFormCP1251_SelectSubmit(fForm, submitName);
-        const { res, text } = await window.fetchCP1251Text(postUrl, {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=windows-1251' },
-          referrer: url, referrerPolicy: 'strict-origin-when-cross-origin', body
-        });
-        const ok = res.ok || res.redirected || /Сохранено|успешн|изменени[яй]\s+сохранены/i.test(text)
-                   || await verifySaved(newHtml);
-        return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
-      }
-
-      const fd = new FormData(fForm);
-      fd.set(fTa.getAttribute('name') || 'content', fTa.value);
-      fd.append(submitName, submitValue);
-
-      const res  = await fetch(postUrl, {
-        method: 'POST', credentials: 'include', body: fd,
-        referrer: url, referrerPolicy: 'strict-origin-when-cross-origin'
-      });
-      const text = await res.text();
-      const ok = res.ok || res.redirected || /Сохранено|успешн|изменени[яй]\s+сохранены/i.test(text)
-                 || await verifySaved(newHtml);
-      return { ok, status: ok ? 'успешно' : 'ошибка сохранения' };
-    }
-
-    return { status: 'ok', initialHtml, save, targetUserId: id };
+  // Не перезаписываем, если уже есть
+  if (window.skinAdmin && window.skinAdmin.__apiVersion) {
+    console.log('[admin_bridge_api] Уже загружен');
+    return;
   }
 
-  window.skinAdmin = { load: loadSkinAdmin };
+  /**
+   * Получает user_id из .modal_script
+   * Приоритет: data-main-user_id > data-id
+   */
+  function getUserIdFromPage(fallbackUserId) {
+    const modal = document.querySelector('.modal_script[data-id]');
+    if (modal) {
+      const mainUserId = modal.getAttribute('data-main-user_id');
+      if (mainUserId && mainUserId.trim()) {
+        return Number(mainUserId.trim());
+      }
+      const dataId = modal.getAttribute('data-id');
+      if (dataId && dataId.trim()) {
+        return Number(dataId.trim());
+      }
+    }
+    return fallbackUserId ? Number(fallbackUserId) : null;
+  }
+
+  /**
+   * Загружает данные из API для всех категорий
+   */
+  async function loadAllDataFromAPI(userId) {
+    console.log('[admin_bridge_api] Загружаю данные из API для userId:', userId);
+
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+      throw new Error('FMVbank.storageGet не найден');
+    }
+
+    const result = {
+      icon: [],
+      plashka: [],
+      background: [],
+      gift: [],
+      coupon: []
+    };
+
+    const apiLabels = {
+      icon: 'icon_',
+      plashka: 'plashka_',
+      background: 'background_',
+      gift: 'gift_',
+      coupon: 'coupon_'
+    };
+
+    for (const [key, label] of Object.entries(apiLabels)) {
+      try {
+        const data = await window.FMVbank.storageGet(userId, label);
+        console.log(`[admin_bridge_api] ${key} данные:`, data);
+
+        // Данные хранятся в формате { "user_id": [...] }
+        const userData = data?.[String(userId)];
+        if (Array.isArray(userData)) {
+          result[key] = userData;
+        }
+      } catch (e) {
+        console.error(`[admin_bridge_api] Ошибка загрузки ${key}:`, e);
+      }
+    }
+
+    console.log('[admin_bridge_api] Все данные загружены:', result);
+    return result;
+  }
+
+  /**
+   * Сохраняет данные в API для всех категорий
+   */
+  async function saveAllDataToAPI(userId, jsonData) {
+    console.log('[admin_bridge_api] Сохраняю данные в API для userId:', userId, jsonData);
+
+    if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
+      throw new Error('FMVbank.storageSet не найден');
+    }
+
+    const apiLabels = {
+      icon: 'icon_',
+      plashka: 'plashka_',
+      background: 'background_',
+      gift: 'gift_',
+      coupon: 'coupon_'
+    };
+
+    const results = {};
+
+    for (const [key, label] of Object.entries(apiLabels)) {
+      const categoryData = jsonData[key] || [];
+
+      // Формируем данные в формате { "user_id": [...] }
+      const saveData = {
+        [String(userId)]: categoryData
+      };
+
+      try {
+        const result = await window.FMVbank.storageSet(saveData, userId, label);
+        results[key] = result;
+        console.log(`[admin_bridge_api] ${key} сохранено:`, result);
+      } catch (e) {
+        console.error(`[admin_bridge_api] Ошибка сохранения ${key}:`, e);
+        results[key] = false;
+      }
+    }
+
+    // Проверяем, все ли успешно
+    const allSuccess = Object.values(results).every(r => r === true);
+    console.log('[admin_bridge_api] Результаты сохранения:', results, 'Все успешно:', allSuccess);
+
+    return allSuccess;
+  }
+
+  async function loadSkinAdmin(userId) {
+    console.log('[admin_bridge_api] loadSkinAdmin вызван для userId:', userId);
+
+    // Определяем целевой userId (с учётом data-main-user_id)
+    const targetUserId = getUserIdFromPage(userId) || Number(userId);
+    console.log('[admin_bridge_api] Целевой userId:', targetUserId);
+
+    try {
+      // Загружаем данные из API
+      const jsonData = await loadAllDataFromAPI(targetUserId);
+
+      // Конвертируем JSON в HTML для панелей
+      let initialHtml = '';
+      if (window.FMV && typeof window.FMV.parseJsonToHtml === 'function') {
+        initialHtml = window.FMV.parseJsonToHtml(jsonData);
+        console.log('[admin_bridge_api] HTML построен из JSON, длина:', initialHtml.length);
+      } else {
+        console.warn('[admin_bridge_api] FMV.parseJsonToHtml не найден');
+      }
+
+      // Функция сохранения
+      async function save(newHtml) {
+        console.log('[admin_bridge_api] save() вызван, HTML длина:', newHtml.length);
+
+        // Парсим HTML в JSON
+        let jsonData;
+        if (window.FMV && typeof window.FMV.parseHtmlToJson === 'function') {
+          jsonData = window.FMV.parseHtmlToJson(newHtml);
+          console.log('[admin_bridge_api] HTML распарсен в JSON:', jsonData);
+        } else {
+          console.error('[admin_bridge_api] FMV.parseHtmlToJson не найден');
+          return { ok: false, status: 'ошибка: парсер не найден' };
+        }
+
+        // Сохраняем в API
+        const success = await saveAllDataToAPI(targetUserId, jsonData);
+
+        return {
+          ok: success,
+          status: success ? 'успешно' : 'ошибка сохранения'
+        };
+      }
+
+      return {
+        status: 'ok',
+        initialHtml,
+        save,
+        targetUserId
+      };
+
+    } catch (e) {
+      console.error('[admin_bridge_api] Ошибка:', e);
+      return {
+        status: 'ошибка: ' + (e.message || String(e))
+      };
+    }
+  }
+
+  window.skinAdmin = {
+    load: loadSkinAdmin,
+    __apiVersion: true
+  };
+
+  console.log('[admin_bridge_api] Загружен и готов');
+})();
+// get_skin_api.js — Загрузка данных скинов из API вместо страниц
+
+function isProfileFieldsPage() {
+  try {
+    const u = new URL(location.href);
+    return /\/profile\.php$/i.test(u.pathname) &&
+           u.searchParams.get('section') === 'fields' &&
+           /^\d+$/.test(u.searchParams.get('id') || '');
+  } catch { return false; }
+}
+
+function getProfileId() {
+  const u = new URL(location.href);
+  return u.searchParams.get('id') || '';
+}
+
+/**
+ * Получает user_id с учётом data-main-user_id
+ */
+function getUserIdFromPage(profileId) {
+  const modal = document.querySelector('.modal_script[data-id]');
+  if (modal) {
+    const mainUserId = modal.getAttribute('data-main-user_id');
+    if (mainUserId && mainUserId.trim()) {
+      return Number(mainUserId.trim());
+    }
+  }
+  return Number(profileId);
+}
+
+/**
+ * Загружает данные из API для всех категорий
+ */
+async function loadSkinsFromAPI(userId) {
+  console.log('[get_skin_api] Загружаю данные из API для userId:', userId);
+
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    console.error('[get_skin_api] FMVbank.storageGet не найден');
+    return { icons: [], plashki: [], backs: [] };
+  }
+
+  const result = {
+    icons: [],
+    plashki: [],
+    backs: []
+  };
+
+  const apiLabels = {
+    icons: 'icon_',
+    plashki: 'plashka_',
+    backs: 'background_'
+  };
+
+  for (const [key, label] of Object.entries(apiLabels)) {
+    try {
+      const data = await window.FMVbank.storageGet(userId, label);
+      console.log(`[get_skin_api] ${key} данные:`, data);
+
+      // Данные хранятся в формате { "user_id": [...] }
+      const userData = data?.[String(userId)];
+      if (Array.isArray(userData)) {
+        // Конвертируем каждый item в HTML
+        result[key] = userData.map(item => item.content || '').filter(Boolean);
+      }
+    } catch (e) {
+      console.error(`[get_skin_api] Ошибка загрузки ${key}:`, e);
+    }
+  }
+
+  console.log('[get_skin_api] Результат:', result);
+  return result;
+}
+
+/**
+ * Загружает данные скинов из API и возвращает массивы HTML
+ * { icons: string[], plashki: string[], backs: string[] }
+ */
+async function collectSkinSets() {
+  console.log('[get_skin_api] collectSkinSets вызван');
+
+  if (!isProfileFieldsPage()) {
+    console.log('[get_skin_api] Не страница fields');
+    return { icons: [], plashki: [], backs: [] };
+  }
+
+  const profileId = getProfileId();
+  console.log('[get_skin_api] profileId:', profileId);
+
+  // Получаем целевой userId с учётом data-main-user_id
+  const userId = getUserIdFromPage(profileId);
+  console.log('[get_skin_api] Целевой userId:', userId);
+
+  // Загружаем из API
+  const result = await loadSkinsFromAPI(userId);
+
+  console.log('[get_skin_api] Данные загружены:', result);
+  return result;
+}
+// collect_skins_api.js — Загрузка и отображение скинов из API на страницах персонажей
+
+(function () {
+  console.log('[collect_skins_api] Скрипт загружен');
+
+  const CHARACTER_SELECTOR = '.modal_script[data-id]';
+  const DEBUG = true;
+
+  const log = (...a) => DEBUG && console.log('[collect_skins_api]', ...a);
+
+  // Селекторы для вставки данных
+  const SECTION_SELECTORS = {
+    icon: '._icon',
+    plashka: '._plashka',
+    background: '._background',
+    gift: '._gift',
+    coupon: '._coupon'
+  };
+
+  /**
+   * Получает userId из атрибутов .modal_script
+   */
+  function getUserIdFromCharacter(charEl) {
+    if (!charEl) return null;
+
+    const mainUserId = charEl.getAttribute('data-main-user_id');
+    if (mainUserId && mainUserId.trim()) {
+      return Number(mainUserId.trim());
+    }
+
+    const dataId = charEl.getAttribute('data-id');
+    if (dataId && dataId.trim()) {
+      return Number(dataId.trim());
+    }
+
+    return null;
+  }
+
+  /**
+   * Загружает данные из API
+   */
+  async function loadDataFromAPI(userId) {
+    log('Загружаю данные из API для userId', userId);
+
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+      console.error('[collect_skins_api] FMVbank.storageGet не найден');
+      return null;
+    }
+
+    const result = {
+      icon: [],
+      plashka: [],
+      background: [],
+      gift: [],
+      coupon: []
+    };
+
+    const apiLabels = {
+      icon: 'icon_',
+      plashka: 'plashka_',
+      background: 'background_',
+      gift: 'gift_',
+      coupon: 'coupon_'
+    };
+
+    for (const [key, label] of Object.entries(apiLabels)) {
+      try {
+        const data = await window.FMVbank.storageGet(userId, label);
+        log(`${key} данные:`, data);
+
+        // Данные хранятся в формате { "user_id": [...] }
+        const userData = data?.[String(userId)];
+        if (Array.isArray(userData)) {
+          result[key] = userData;
+        }
+      } catch (e) {
+        console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);
+      }
+    }
+
+    log('Все данные загружены:', result);
+    return result;
+  }
+
+  /**
+   * Вставляет данные в DOM
+   */
+  function injectData(scope, data) {
+    log('Вставляю данные в DOM:', data);
+
+    for (const [key, selector] of Object.entries(SECTION_SELECTORS)) {
+      const target = scope.querySelector(selector);
+      if (!target) {
+        log(`Контейнер ${selector} не найден`);
+        continue;
+      }
+
+      const items = data[key] || [];
+      if (items.length === 0) {
+        log(`Нет данных для ${key}`);
+        target.innerHTML = '';
+        continue;
+      }
+
+      let html = '';
+      items.forEach(item => {
+        const attrs = [
+          `title="${escapeHtml(item.title || '')}"`,
+          `data-id="${escapeHtml(item.id || '')}"`
+        ];
+
+        // Добавляем все data-* атрибуты
+        Object.keys(item).forEach(k => {
+          if (k !== 'title' && k !== 'id' && k !== 'content') {
+            const attrName = 'data-' + k.replace(/_/g, '-');
+            attrs.push(`${attrName}="${escapeHtml(item[k] || '')}"`);
+          }
+        });
+
+        html += `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
+      });
+
+      target.innerHTML = html;
+      log(`Вставлено ${items.length} элементов в ${selector}`);
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Находит scope вокруг персонажа
+   */
+  function scopeForCharacter(el) {
+    return el.closest('.modal_wrap, .reveal-modal, .container, #character') || el.parentElement || document;
+  }
+
+  /**
+   * Переносит контейнеры внутрь .character если нужно
+   */
+  function normalizeStructure(scope) {
+    const char = scope.querySelector(CHARACTER_SELECTOR);
+    if (!char) return;
+
+    Object.values(SECTION_SELECTORS).forEach(selector => {
+      const container = scope.querySelector(selector);
+      if (container && container.parentElement !== char) {
+        char.appendChild(container);
+      }
+    });
+  }
+
+  /**
+   * Инициализация для конкретного персонажа
+   */
+  async function initIn(root) {
+    log('initIn вызван, root:', root);
+    if (!root) {
+      log('root не передан');
+      return;
+    }
+
+    // Проверяем наличие FMVbank
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+      console.warn('[collect_skins_api] FMVbank.storageGet не найден');
+      return;
+    }
+
+    // Ищем .modal_script
+    const charEl = root.querySelector(CHARACTER_SELECTOR) || document.querySelector(CHARACTER_SELECTOR);
+    log('charEl:', charEl);
+    if (!charEl) {
+      log('character не найден');
+      return;
+    }
+
+    const scope = scopeForCharacter(charEl);
+    log('scope:', scope);
+    normalizeStructure(scope);
+
+    const userId = getUserIdFromCharacter(charEl);
+    log('userId:', userId);
+    if (!userId) {
+      log('userId не найден');
+      return;
+    }
+
+    // Загружаем данные из API
+    log('Загружаю данные для userId', userId);
+    const data = await loadDataFromAPI(userId);
+
+    if (!data) {
+      log('Данные не загружены');
+      return;
+    }
+
+    // Вставляем в DOM
+    injectData(scope, data);
+    log('Данные вставлены для userId', userId);
+  }
+
+  // Ручной запуск
+  window.loadUserSkinsFromApi = function ({ root, rootSelector } = {}) {
+    const r = root || (rootSelector ? document.querySelector(rootSelector) : document);
+    initIn(r);
+  };
+
+  // Автозапуск при загрузке страницы
+  document.addEventListener('DOMContentLoaded', () => {
+    log('DOMContentLoaded событие');
+    initIn(document);
+  });
+
+  // Динамическое появление персонажей (модалки)
+  const seen = new WeakSet();
+  const observer = new MutationObserver((recs) => {
+    recs.forEach(rec => {
+      rec.addedNodes && rec.addedNodes.forEach(n => {
+        if (!(n instanceof Element)) return;
+
+        if (n.matches && n.matches(CHARACTER_SELECTOR) && !seen.has(n)) {
+          seen.add(n);
+          log('Обнаружен новый character:', n);
+          initIn(scopeForCharacter(n));
+        }
+
+        n.querySelectorAll && n.querySelectorAll(CHARACTER_SELECTOR).forEach(el => {
+          if (seen.has(el)) return;
+          seen.add(el);
+          log('Обнаружен вложенный character:', el);
+          initIn(scopeForCharacter(el));
+        });
+      });
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  log('Скрипт инициализирован');
+})();
+(function () {
+  console.log('[collect_api] Скрипт загружен');
+
+  // ==== настройки ====
+  const CHARACTER_SELECTOR = '.modal_script[data-id]';
+  const CHRONO_TARGET_SEL = '.chrono_info';
+  const DEBUG = true;
+  const API_KEY_LABEL = 'chrono_';
+
+  // ====================
+
+  const log = (...a) => DEBUG && console.log('[collect_api]', ...a);
+
+  // Проверка наличия FMVbank
+  function requireFMVbank() {
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+      throw new Error('FMVbank не найден — подключите src/bank/api.js');
+    }
+  }
+
+  // Получение данных хронологии из API
+  async function fetchChronoFromApi(userId) {
+    requireFMVbank();
+    try {
+      const data = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
+      log('Получены данные для userId', userId, ':', data);
+      return data;
+    } catch (e) {
+      console.error(`[collect_api] Ошибка получения данных для userId ${userId}:`, e);
+      return null;
+    }
+  }
+
+  // Построение HTML из данных хронологии
+  function buildChronoHtml(data) {
+    if (!data || typeof data !== 'object') {
+      return '<p>Нет данных хронологии</p>';
+    }
+
+    // Проверяем наличие FMV.buildChronoHtml
+    if (window.FMV && typeof window.FMV.buildChronoHtml === 'function') {
+      try {
+        return window.FMV.buildChronoHtml(data, { titlePrefix: 'Хронология' });
+      } catch (e) {
+        console.error('[collect_api] Ошибка FMV.buildChronoHtml:', e);
+      }
+    }
+
+    // Fallback: простой вывод данных
+    log('FMV.buildChronoHtml не найден, используем fallback');
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      return '<p>Хронология пуста</p>';
+    }
+
+    let html = '<div class="chrono-data">';
+    for (const [key, value] of entries) {
+      html += `<div><strong>${key}:</strong> ${JSON.stringify(value)}</div>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // Вставка HTML в контейнер
+  function injectHtml(target, html) {
+    if (!target) return;
+    target.innerHTML = html;
+  }
+
+  // Переносит .chrono_info внутрь .character, если они оказались соседями
+  function normalizeStructure(scope) {
+    const char = scope.querySelector(CHARACTER_SELECTOR);
+    if (!char) return;
+    const chrono = scope.querySelector(CHRONO_TARGET_SEL);
+    if (chrono && chrono.parentElement !== char) char.appendChild(chrono);
+  }
+
+  // Находим «узкий» scope вокруг конкретного персонажа
+  function scopeForCharacter(el) {
+    return el.closest('.modal_wrap, .reveal-modal, .container, #character') || el.parentElement || document;
+  }
+
+  // Загрузка и вставка хронологии из API
+  async function loadChronoFromApi(userId, scope) {
+    console.log('[collect_api] loadChronoFromApi, ищем', CHRONO_TARGET_SEL, 'в scope');
+    const target = scope.querySelector(CHRONO_TARGET_SEL);
+    console.log('[collect_api] target найден:', target);
+    if (!target) {
+      log('chrono_info не найден для userId', userId);
+      return;
+    }
+
+    // Показываем индикатор загрузки
+    console.log('[collect_api] Показываем индикатор загрузки');
+    target.innerHTML = '<p>Загрузка хронологии...</p>';
+
+    // Получаем данные из API
+    console.log('[collect_api] Запрашиваем данные из API');
+    const data = await fetchChronoFromApi(userId);
+    console.log('[collect_api] Получены данные:', data);
+
+    if (!data) {
+      console.log('[collect_api] Данные не получены');
+      target.innerHTML = '<p>Не удалось загрузить данные хронологии</p>';
+      return;
+    }
+
+    // Строим HTML
+    console.log('[collect_api] Строим HTML');
+    const html = buildChronoHtml(data);
+    console.log('[collect_api] HTML построен, длина:', html.length);
+
+    // Вставляем в контейнер
+    injectHtml(target, html);
+    console.log('[collect_api] Хронология загружена для userId', userId);
+  }
+
+  async function initIn(root) {
+    console.log('[collect_api] initIn вызван, root:', root);
+    if (!root) {
+      console.log('[collect_api] root не передан');
+      return;
+    }
+
+    // Проверяем наличие FMVbank
+    try {
+      requireFMVbank();
+      console.log('[collect_api] FMVbank найден');
+    } catch (e) {
+      console.warn('[collect_api]', e.message);
+      return;
+    }
+
+    // берём конкретного character, а не первый на документе
+    const charEl = root.querySelector(CHARACTER_SELECTOR) || document.querySelector(CHARACTER_SELECTOR);
+    console.log('[collect_api] charEl:', charEl);
+    if (!charEl) {
+      log('no character');
+      return;
+    }
+
+    const scope = scopeForCharacter(charEl);
+    console.log('[collect_api] scope:', scope);
+    normalizeStructure(scope);
+
+    const userId = charEl.getAttribute('data-id')?.trim();
+    console.log('[collect_api] userId:', userId);
+    if (!userId) {
+      log('no data-id');
+      return;
+    }
+
+    // Загружаем хронологию из API
+    console.log('[collect_api] Вызываем loadChronoFromApi для userId', userId);
+    await loadChronoFromApi(userId, scope);
+  }
+
+  // ручной запуск
+  window.loadUserChronoFromApi = function ({ root, rootSelector } = {}) {
+    const r = root || (rootSelector ? document.querySelector(rootSelector) : document);
+    initIn(r);
+  };
+
+  // автозапуск
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[collect_api] DOMContentLoaded событие');
+    initIn(document);
+  });
+
+  // динамика (модалки)
+  const seen = new WeakSet();
+  const observer = new MutationObserver((recs) => {
+    recs.forEach(rec => {
+      rec.addedNodes && rec.addedNodes.forEach(n => {
+        if (!(n instanceof Element)) return;
+        // если добавили .character — запускаемся в его scope
+        if (n.matches && n.matches(CHARACTER_SELECTOR) && !seen.has(n)) {
+          seen.add(n);
+          initIn(scopeForCharacter(n));
+        }
+        // или если .character появился как потомок
+        n.querySelectorAll && n.querySelectorAll(CHARACTER_SELECTOR).forEach(el => {
+          if (seen.has(el)) return;
+          seen.add(el);
+          initIn(scopeForCharacter(el));
+        });
+      });
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 })();
 // chrono_filter.js — модульная, корне-изолированная версия
 (() => {
@@ -1354,197 +2076,6 @@ $(function() {
     return html;
   };
 })();
-(function () {
-  console.log('[collect_api] Скрипт загружен');
-
-  // ==== настройки ====
-  const CHARACTER_SELECTOR = '.modal_script[data-id]';
-  const CHRONO_TARGET_SEL = '.chrono_info';
-  const DEBUG = true;
-  const API_KEY_LABEL = 'chrono_';
-
-  // ====================
-
-  const log = (...a) => DEBUG && console.log('[collect_api]', ...a);
-
-  // Проверка наличия FMVbank
-  function requireFMVbank() {
-    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
-      throw new Error('FMVbank не найден — подключите src/bank/api.js');
-    }
-  }
-
-  // Получение данных хронологии из API
-  async function fetchChronoFromApi(userId) {
-    requireFMVbank();
-    try {
-      const data = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
-      log('Получены данные для userId', userId, ':', data);
-      return data;
-    } catch (e) {
-      console.error(`[collect_api] Ошибка получения данных для userId ${userId}:`, e);
-      return null;
-    }
-  }
-
-  // Построение HTML из данных хронологии
-  function buildChronoHtml(data) {
-    if (!data || typeof data !== 'object') {
-      return '<p>Нет данных хронологии</p>';
-    }
-
-    // Проверяем наличие FMV.buildChronoHtml
-    if (window.FMV && typeof window.FMV.buildChronoHtml === 'function') {
-      try {
-        return window.FMV.buildChronoHtml(data, { titlePrefix: 'Хронология' });
-      } catch (e) {
-        console.error('[collect_api] Ошибка FMV.buildChronoHtml:', e);
-      }
-    }
-
-    // Fallback: простой вывод данных
-    log('FMV.buildChronoHtml не найден, используем fallback');
-    const entries = Object.entries(data);
-    if (entries.length === 0) {
-      return '<p>Хронология пуста</p>';
-    }
-
-    let html = '<div class="chrono-data">';
-    for (const [key, value] of entries) {
-      html += `<div><strong>${key}:</strong> ${JSON.stringify(value)}</div>`;
-    }
-    html += '</div>';
-    return html;
-  }
-
-  // Вставка HTML в контейнер
-  function injectHtml(target, html) {
-    if (!target) return;
-    target.innerHTML = html;
-  }
-
-  // Переносит .chrono_info внутрь .character, если они оказались соседями
-  function normalizeStructure(scope) {
-    const char = scope.querySelector(CHARACTER_SELECTOR);
-    if (!char) return;
-    const chrono = scope.querySelector(CHRONO_TARGET_SEL);
-    if (chrono && chrono.parentElement !== char) char.appendChild(chrono);
-  }
-
-  // Находим «узкий» scope вокруг конкретного персонажа
-  function scopeForCharacter(el) {
-    return el.closest('.modal_wrap, .reveal-modal, .container, #character') || el.parentElement || document;
-  }
-
-  // Загрузка и вставка хронологии из API
-  async function loadChronoFromApi(userId, scope) {
-    console.log('[collect_api] loadChronoFromApi, ищем', CHRONO_TARGET_SEL, 'в scope');
-    const target = scope.querySelector(CHRONO_TARGET_SEL);
-    console.log('[collect_api] target найден:', target);
-    if (!target) {
-      log('chrono_info не найден для userId', userId);
-      return;
-    }
-
-    // Показываем индикатор загрузки
-    console.log('[collect_api] Показываем индикатор загрузки');
-    target.innerHTML = '<p>Загрузка хронологии...</p>';
-
-    // Получаем данные из API
-    console.log('[collect_api] Запрашиваем данные из API');
-    const data = await fetchChronoFromApi(userId);
-    console.log('[collect_api] Получены данные:', data);
-
-    if (!data) {
-      console.log('[collect_api] Данные не получены');
-      target.innerHTML = '<p>Не удалось загрузить данные хронологии</p>';
-      return;
-    }
-
-    // Строим HTML
-    console.log('[collect_api] Строим HTML');
-    const html = buildChronoHtml(data);
-    console.log('[collect_api] HTML построен, длина:', html.length);
-
-    // Вставляем в контейнер
-    injectHtml(target, html);
-    console.log('[collect_api] Хронология загружена для userId', userId);
-  }
-
-  async function initIn(root) {
-    console.log('[collect_api] initIn вызван, root:', root);
-    if (!root) {
-      console.log('[collect_api] root не передан');
-      return;
-    }
-
-    // Проверяем наличие FMVbank
-    try {
-      requireFMVbank();
-      console.log('[collect_api] FMVbank найден');
-    } catch (e) {
-      console.warn('[collect_api]', e.message);
-      return;
-    }
-
-    // берём конкретного character, а не первый на документе
-    const charEl = root.querySelector(CHARACTER_SELECTOR) || document.querySelector(CHARACTER_SELECTOR);
-    console.log('[collect_api] charEl:', charEl);
-    if (!charEl) {
-      log('no character');
-      return;
-    }
-
-    const scope = scopeForCharacter(charEl);
-    console.log('[collect_api] scope:', scope);
-    normalizeStructure(scope);
-
-    const userId = charEl.getAttribute('data-id')?.trim();
-    console.log('[collect_api] userId:', userId);
-    if (!userId) {
-      log('no data-id');
-      return;
-    }
-
-    // Загружаем хронологию из API
-    console.log('[collect_api] Вызываем loadChronoFromApi для userId', userId);
-    await loadChronoFromApi(userId, scope);
-  }
-
-  // ручной запуск
-  window.loadUserChronoFromApi = function ({ root, rootSelector } = {}) {
-    const r = root || (rootSelector ? document.querySelector(rootSelector) : document);
-    initIn(r);
-  };
-
-  // автозапуск
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('[collect_api] DOMContentLoaded событие');
-    initIn(document);
-  });
-
-  // динамика (модалки)
-  const seen = new WeakSet();
-  const observer = new MutationObserver((recs) => {
-    recs.forEach(rec => {
-      rec.addedNodes && rec.addedNodes.forEach(n => {
-        if (!(n instanceof Element)) return;
-        // если добавили .character — запускаемся в его scope
-        if (n.matches && n.matches(CHARACTER_SELECTOR) && !seen.has(n)) {
-          seen.add(n);
-          initIn(scopeForCharacter(n));
-        }
-        // или если .character появился как потомок
-        n.querySelectorAll && n.querySelectorAll(CHARACTER_SELECTOR).forEach(el => {
-          if (seen.has(el)) return;
-          seen.add(el);
-          initIn(scopeForCharacter(el));
-        });
-      });
-    });
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-})();
 // === проверка через ?edit_page=SLUG ===
 async function pageExistsViaEditEndpoint(slug){
   // если в slug есть небезопасные символы — энкодим как в адресной строке (но сам движок принимает ASCII)
@@ -1871,97 +2402,6 @@ async function FMVeditPersonalPage(name, patch = {}) {
  */
 async function FMVeditTextareaOnly(name, newHtml) {
   return FMVeditPersonalPage(name, { content: newHtml });
-}
-function isProfileFieldsPage() {
-  try {
-    const u = new URL(location.href);
-    return /\/profile\.php$/i.test(u.pathname) &&
-           u.searchParams.get('section') === 'fields' &&
-           /^\d+$/.test(u.searchParams.get('id') || '');
-  } catch { return false; }
-}
-
-function getProfileId() {
-  const u = new URL(location.href);
-  return u.searchParams.get('id') || '';
-}
-
-// Универсальный fetch→Document
-async function fetchDocSmart(url) {
-  if (window.FMV?.fetchDoc) return await FMV.fetchDoc(url);
-  if (typeof window.fetchHtml === 'function') {
-    const html = await window.fetchHtml(url);
-    return new DOMParser().parseFromString(html, 'text/html');
-  }
-  const res = await fetch(url, { credentials: 'include' });
-  const html = await res.text();
-  return new DOMParser().parseFromString(html, 'text/html');
-}
-
-// Ищем комментарий <!-- main: usrN_skin -->
-function findMainPointerId(doc) {
-  const container =
-    doc.querySelector('#pun-main .container') ||
-    doc.querySelector('.pun-main .container');
-  if (!container) return null;
-
-  const walker = doc.createTreeWalker(container, NodeFilter.SHOW_COMMENT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    const m = /main:\s*usr(\d+)_skin/i.exec(n.nodeValue || '');
-    if (m) return m[1];
-  }
-  return null;
-}
-
-// Берём innerHTML каждого .item
-function pickItemsHTML(doc, selector) {
-  return Array.from(doc.querySelectorAll(selector))
-    .map(el => (el.innerHTML || '').trim())
-    .filter(Boolean);
-}
-
-/**
- * Загружает /pages/usrN_skin и возвращает три массива:
- * { icons: string[], plashki: string[], backs: string[] }
- */
-async function collectSkinSets() {
-  if (!isProfileFieldsPage()) return { icons: [], plashki: [], backs: [] };
-
-  const profileId = getProfileId();
-
-  // 1) открываем /pages/usr<profileId>_skin
-  const doc1 = await fetchDocSmart(`/pages/usr${profileId}_skin`);
-  if (!doc1) return { icons: [], plashki: [], backs: [] };
-
-  // 2) смотрим "маяк" на ПЕРВОЙ открытой странице
-  const ptr1 = findMainPointerId(doc1);
-
-  // Если "маяка" нет — парсим doc1 и выходим
-  if (!ptr1) {
-    return {
-      icons:   pickItemsHTML(doc1, '#pun-main ._icon .item, .pun-main ._icon .item'),
-      plashki: pickItemsHTML(doc1, '#pun-main ._plashka .item, .pun-main ._plashka .item'),
-      backs:   pickItemsHTML(doc1, '#pun-main ._background .item, .pun-main ._background .item')
-    };
-  }
-
-  // 3) "маяк" есть → переходим НА СЛЕДУЮЩУЮ страницу /pages/usr<ptr1>_skin
-  const doc2 = await fetchDocSmart(`/pages/usr${ptr1}_skin`);
-  if (!doc2) return { icons: [], plashki: [], backs: [] };
-
-  // 4) если и здесь снова есть "маяк" — это цикл
-  const ptr2 = findMainPointerId(doc2);
-  if (ptr2) {
-    console.log('Найден цикл');
-    return { icons: [], plashki: [], backs: [] };
-  }
-
-  // 5) иначе парсим вторую страницу
-  return {
-    icons:   pickItemsHTML(doc2, '#pun-main ._icon .item, .pun-main ._icon .item'),
-    plashki: pickItemsHTML(doc2, '#pun-main ._plashka .item, .pun-main ._plashka .item'),
-    backs:   pickItemsHTML(doc2, '#pun-main ._background .item, .pun-main ._background .item')
-  };
 }
 
 /* Forms */

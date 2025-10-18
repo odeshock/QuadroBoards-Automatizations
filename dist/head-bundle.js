@@ -3577,8 +3577,8 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
 
   // базовый вызов
-  async function callStorage(method, payload = {}, NEEDED_USER_ID = 1) {
-    const API_KEY = "fmv_bank_info_" + NEEDED_USER_ID;
+  async function callStorage(method, payload = {}, NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+    const API_KEY = api_key_label + NEEDED_USER_ID;
 
     if (method === "storage.get") {
       const qs = enc({ user_id: USER_ID(), method, key: API_KEY });
@@ -3606,20 +3606,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // публичные функции
-  async function storageGet(NEEDED_USER_ID = 1) {
-    const API_KEY = "fmv_bank_info_" + NEEDED_USER_ID;
-    const json = await callStorage("storage.get", {}, NEEDED_USER_ID);
+  async function storageGet(NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+    const API_KEY = api_key_label + NEEDED_USER_ID;
+    const json = await callStorage("storage.get", {}, NEEDED_USER_ID, api_key_label);
     const parsed = parseStorage(json, API_KEY);
     return parsed;
   }
 
-  async function storageSet(valueObj, NEEDED_USER_ID = 1) {
+  async function storageSet(valueObj, NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
     if (!valueObj || typeof valueObj !== "object" || Array.isArray(valueObj)) {
       console.log("[FMVbank] storageSet: ожидался объект JSON");
       return false;
     }
     const stringValue = JSON.stringify(valueObj);
-    await callStorage("storage.set", { value: stringValue }, NEEDED_USER_ID);
+    await callStorage("storage.set", { value: stringValue }, NEEDED_USER_ID, api_key_label);
     return true;
   }
 
@@ -3632,12 +3632,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Пример использования:
 // const dataStr = await FMVbank.storageGet(15);
+// const dataStr = await FMVbank.storageGet(15, "custom_label_");
 // FMVbank.storageSet({}, 15)
 //   .then(ok => {
 //     if (ok) console.log("✅ данные успешно записаны");
 //     else console.warn("⚠ не удалось подтвердить запись");
 //   })
 //   .catch(err => console.error("❌ ошибка при записи:", err));
+// FMVbank.storageSet({}, 15, "custom_label_")
 
 /* MODULE 8: bank/parent/format_text.js */
 /**

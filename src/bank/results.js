@@ -852,7 +852,7 @@ export function renderLog(log) {
       meta.className = 'entry-meta';
 
       // Определяем тип операции: доход (+) или расход (-)
-      const isIncome = group.isDiscount || group.isPersonalCoupon || group.isPriceAdjustment || group.templateSelector?.includes('income');
+      const isIncome = group.isDiscount || group.isPersonalCoupon || group.isPriceAdjustment || group.templateSelector?.includes('income') || group.kind === 'income';
       const prefix = isIncome ? '+ ' : '− ';
       const color = isIncome ? '#22c55e' : '#ef4444';
 
@@ -1777,7 +1777,7 @@ export function renderLog(log) {
         return;
       }
 
-      const isIncome = group.isDiscount || group.isPersonalCoupon || group.isPriceAdjustment || group.templateSelector?.includes('income');
+      const isIncome = group.isDiscount || group.isPersonalCoupon || group.isPriceAdjustment || group.templateSelector?.includes('income') || group.kind === 'income';
 
       // Логируем для купонов, корректировок и скидок
       if (group.isPersonalCoupon || group.isPriceAdjustment || group.isDiscount) {

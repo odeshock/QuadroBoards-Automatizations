@@ -1002,9 +1002,6 @@ function checkAndRestoreBackup() {
       .then((confirmed) => {
         if (confirmed) {
           try {
-            restoreFromBackup(backupData);
-            renderLog(log);
-
             // Переименовываем кнопку "Купить" в "Редактировать" ПОСЛЕ renderLog
             const buyBtn = document.getElementById('buy-button');
             if (buyBtn) {
@@ -1014,15 +1011,22 @@ function checkAndRestoreBackup() {
               console.error('❌ Кнопка #buy-button не найдена');
             }
 
+            // Если было редактирование (BACKUP_DATA был указан), присваиваем COMMENT_ID, CURRENT_BANK и COMMENT_TIMESTAMP
+
+            if (typeof window.NEW_IS_ADMIN_TO_EDIT !== 'undefined') {
+              window.IS_ADMIN_TO_EDIT = window.NEW_IS_ADMIN_TO_EDIT;
+              console.log('✅ IS_ADMIN_TO_EDIT присвоен из NEW_IS_ADMIN_TO_EDIT:', window.IS_ADMIN_TO_EDIT);
+            }
+
             // Обновляем контроль доступа после изменения IS_ADMIN
             initializeAccessControl();
             console.log('✅ Контроль доступа обновлён (IS_ADMIN:', window.IS_ADMIN, ')');
 
-            // Если было редактирование (BACKUP_DATA был указан), присваиваем COMMENT_ID, CURRENT_BANK и COMMENT_TIMESTAMP
             if (typeof window.NEW_COMMENT_ID !== 'undefined') {
               window.COMMENT_ID = window.NEW_COMMENT_ID;
               console.log('✅ COMMENT_ID присвоен из NEW_COMMENT_ID:', window.COMMENT_ID);
             }
+
 
             if (typeof window.NEW_CURRENT_BANK !== 'undefined') {
               window.CURRENT_BANK = window.NEW_CURRENT_BANK;
@@ -1033,6 +1037,9 @@ function checkAndRestoreBackup() {
               window.COMMENT_TIMESTAMP = window.NEW_COMMENT_TIMESTAMP;
               console.log('✅ COMMENT_TIMESTAMP присвоен из NEW_COMMENT_TIMESTAMP:', window.COMMENT_TIMESTAMP);
             }
+
+            restoreFromBackup(backupData);
+            renderLog(log);
 
             console.log('Операции успешно восстановлены из backup');
           } catch (error) {

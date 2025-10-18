@@ -203,9 +203,25 @@ export function restoreFromBackup(backupData) {
 
   console.log('🔄 Начало восстановления из backup:', backupData);
 
-  // Сохраняем текущий IS_ADMIN_TO_EDIT до загрузки ENVIRONMENT
-  window.IS_ADMIN_TO_EDIT = window.IS_ADMIN_TO_EDIT;
+  // Сохраняем текущий NEW_IS_ADMIN_TO_EDIT до загрузки ENVIRONMENT
+  window.IS_ADMIN_TO_EDIT = window.NEW_IS_ADMIN_TO_EDIT;
   console.log('💾 IS_ADMIN_TO_EDIT сохранён:', window.IS_ADMIN_TO_EDIT);
+
+  // Если было редактирование (BACKUP_DATA был указан), присваиваем COMMENT_ID, CURRENT_BANK и COMMENT_TIMESTAMP
+  if (typeof window.NEW_COMMENT_ID !== 'undefined') {
+    window.COMMENT_ID = window.NEW_COMMENT_ID;
+    console.log('✅ COMMENT_ID присвоен из NEW_COMMENT_ID:', window.COMMENT_ID);
+  }
+
+  if (typeof window.NEW_CURRENT_BANK !== 'undefined') {
+    window.CURRENT_BANK = window.NEW_CURRENT_BANK;
+    console.log('✅ CURRENT_BANK присвоен из NEW_CURRENT_BANK:', window.CURRENT_BANK);
+  }
+
+  if (typeof window.NEW_COMMENT_TIMESTAMP !== 'undefined') {
+    window.COMMENT_TIMESTAMP = window.NEW_COMMENT_TIMESTAMP;
+    console.log('✅ COMMENT_TIMESTAMP присвоен из NEW_COMMENT_TIMESTAMP:', window.COMMENT_TIMESTAMP);
+  }
 
   // Если IS_ADMIN_TO_EDIT === true, добавляем класс admin_edit к .bank_html
   if (window.IS_ADMIN_TO_EDIT === true) {
@@ -622,7 +638,7 @@ function calculateGroupCost(group) {
       default:
         entryCost = 0;
     }
-    
+
     total += entryCost * multiplier;
   });
 

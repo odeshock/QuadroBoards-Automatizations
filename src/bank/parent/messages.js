@@ -291,11 +291,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const iframeReadyP = waitForIframeReady(IFRAME_ORIGIN);
 
   // Функция для редактирования комментариев из backup
-  async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
-    console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_ADMIN_EDIT=${NEW_ADMIN_EDIT}`);
+  async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_IS_ADMIN_TO_EDIT = false } = {}) {
+    console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
 
     // Проверки для НЕ-админ редактирования
-    if (!NEW_ADMIN_EDIT) {
+    if (!NEW_IS_ADMIN_TO_EDIT) {
       // 1. Проверка на NEW_COMMENT_ID = 0
       if (NEW_COMMENT_ID === 0) {
         console.error('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
@@ -330,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
       NEW_COMMENT_TIMESTAMP: ts,
       NEW_COMMENT_ID,
       NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
-      NEW_ADMIN_EDIT
+      NEW_IS_ADMIN_TO_EDIT
     }), "comment_info");
     queueMessage(iframeReadyP, () => ({
       type: BankPostMessagesType.backup_data,

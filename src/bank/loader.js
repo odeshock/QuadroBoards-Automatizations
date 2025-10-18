@@ -124,7 +124,7 @@ const ALLOWED_PARENTS = [
       window.NEW_COMMENT_TIMESTAMP = d.NEW_COMMENT_TIMESTAMP;
       window.NEW_COMMENT_ID = d.NEW_COMMENT_ID;
       window.NEW_CURRENT_BANK = d.NEW_CURRENT_BANK;
-      window.NEW_ADMIN_EDIT = d.NEW_ADMIN_EDIT;
+      window.NEW_IS_ADMIN_TO_EDIT = d.NEW_IS_ADMIN_TO_EDIT;
     }
 
     if (d.type === "BACKUP_DATA") {

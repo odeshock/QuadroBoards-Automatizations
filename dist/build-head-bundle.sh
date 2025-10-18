@@ -38,6 +38,10 @@ echo "/* MODULE 6: load_main_users_money.js */" >> dist/head-bundle.js
 cat src/profile/load_main_users_money.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
+echo "/* MODULE 6.5: ui/button.js (createForumButton framework) */" >> dist/head-bundle.js
+cat src/ui/button.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
 echo "/* MODULE 7.0: bank/gringotts_page_update.js */" >> dist/head-bundle.js
 cat src/bank/gringotts_page_update.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js

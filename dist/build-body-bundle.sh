@@ -17,8 +17,12 @@ echo "/* ЗАМЕНА ДЕФИСОВ utilities/text/hyphens_replacing.js */" >> 
 cat utilities/text/hyphens_replacing.js >> dist/body-bundle.js
 
 echo "" >> dist/body-bundle.js
-echo "/* UI Components */" >> dist/body-bundle.js
-cat src/ui/*.js >> dist/body-bundle.js
+echo "/* UI Components (button.js загружается в head-bundle) */" >> dist/body-bundle.js
+for file in src/ui/*.js; do
+  if [ "$(basename "$file")" != "button.js" ]; then
+    cat "$file" >> dist/body-bundle.js
+  fi
+done
 
 echo "" >> dist/body-bundle.js
 echo "/* Private Pages */" >> dist/body-bundle.js

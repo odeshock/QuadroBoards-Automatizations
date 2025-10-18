@@ -2176,20 +2176,20 @@ export function renderLog(log) {
       }
 
       // Формируем полный объект для сохранения
+      let purchaseData;
       if (window.COMMENT_ID !== undefined) {
-        const purchaseData = {
+        purchaseData = {
           type: "EDIT_PURCHASE",
           timestamp: timestamp,
-          comment_id: window.COMMENT_ID,
-          comment_timestamp: window.COMMENT_TIMESTAMP,
-          comment_user_id: window.USER_ID,
+          COMMENT_ID: window.COMMENT_ID,
+          COMMENT_TIMESTAMP: window.COMMENT_TIMESTAMP,
           fullData: fullData,
           environment: environment,
           totalSum: totalSum,
           editLogs: editLogsText // Добавляем логи изменений
         };
       } else {
-        const purchaseData = {
+        purchaseData = {
           type: "PURCHASE",
           timestamp: timestamp,
           fullData: fullData,

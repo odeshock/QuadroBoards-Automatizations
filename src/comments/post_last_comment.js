@@ -100,7 +100,7 @@
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {
-        stopOnFirstNonEmpty: true,
+        stopOnNthPost: 1,
         comments_only: true
       });
 

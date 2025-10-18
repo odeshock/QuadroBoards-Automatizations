@@ -790,7 +790,7 @@ var SKIN = { // для работы с библиотекой скинов
    * @param {string} author - Имя автора (обязательно)
    * @param {Array<string>|string} forums - Список ID форумов (обязательно)
    * @param {Object} [options]
-   * @param {boolean} [options.stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
+   * @param {number}  [options.stopOnNthPost] - Остановиться после N-го поста (undefined = собрать все до last_src)
    * @param {string}  [options.last_src=""] - Пост-граница; сам пост не обрабатываем
    * @param {string}  [options.title_prefix=""] - Начало названия поста для фильтрации
    * @param {number}  [options.maxPages=999]
@@ -804,7 +804,7 @@ var SKIN = { // для работы с библиотекой скинов
     author,
     forums,
     {
-      stopOnFirstNonEmpty = false,
+      stopOnNthPost,
       last_src = [],
       title_prefix = "",
       maxPages = 999,
@@ -1084,8 +1084,8 @@ var SKIN = { // для работы с библиотекой скинов
     }
 
 
-    // Вместо двух режимов:
-    const wanted = stopOnFirstNonEmpty ? 1 : Number.POSITIVE_INFINITY;
+    // Определяем количество постов для сбора
+    const wanted = (stopOnNthPost !== undefined && stopOnNthPost > 0) ? stopOnNthPost : Number.POSITIVE_INFINITY;
     return await collectUpTo(wanted);
 
     // ------ финализация: reverse + вывод ------
@@ -3346,16 +3346,26 @@ function queueMessage(iframeReadyP, buildMessage /* () => object */, label = "me
 /* =============== отправка пост-списков (внутри очереди) =============== */
 async function sendPosts(iframeWindow, { seedPosts, label, forums, type, is_ads = false, title_prefix = "" }) {
   try {
-    const first = Array.isArray(seedPosts) ? seedPosts[0] : null;
-    const posts_html = (first && typeof first.html === "string") ? first.html : "";
+    // Проходимся по всем постам и собираем ссылки из каждого
+    const allRawLinks = [];
 
-    const rawLinks = posts_html
-      ? getBlockquoteTextFromHtml(posts_html, label, 'link')
-      : null;
+    if (Array.isArray(seedPosts)) {
+      for (const post of seedPosts) {
+        const posts_html = (post && typeof post.html === "string") ? post.html : "";
 
-    const used_posts_links = Array.isArray(rawLinks)
-      ? rawLinks
-      : (typeof rawLinks === "string" && rawLinks.trim() !== "" ? [rawLinks] : []);
+        const rawLinks = posts_html
+          ? getBlockquoteTextFromHtml(posts_html, label, 'link')
+          : null;
+
+        if (Array.isArray(rawLinks)) {
+          allRawLinks.push(...rawLinks);
+        } else if (typeof rawLinks === "string" && rawLinks.trim() !== "") {
+          allRawLinks.push(rawLinks);
+        }
+      }
+    }
+
+    const used_posts_links = allRawLinks;
 
     const used_posts = used_posts_links
       .filter((link) => typeof link === "string" && link.includes("/viewtopic.php?"))
@@ -3389,7 +3399,7 @@ async function getLastValue(default_value, { label, is_month = false }) {
     const seed = await retry(
       () => window.scrapePosts(window.UserLogin, BankForums.bank, {
         title_prefix: BankPrefix.bank,
-        stopOnFirstNonEmpty: true,
+        stopOnNthPost: 1,
         keywords: label.split(" ").join(" AND "),
       }),
       { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
@@ -3715,7 +3725,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const coms_banner_mayak = await retry(
         () => window.scrapePosts(window.UserLogin, BankForums.bank, {
           title_prefix: BankPrefix.bank,
-          stopOnFirstNonEmpty: true,
+          stopOnNthPost: 1,
           keywords: BankLabel.banner_mayak.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 800, maxDelay: 7000, timeoutMs: 15000 },
@@ -3731,7 +3741,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const coms_banner_reno = await retry(
         () => window.scrapePosts(window.UserLogin, BankForums.bank, {
           title_prefix: BankPrefix.bank,
-          stopOnFirstNonEmpty: true,
+          stopOnNthPost: 1,
           keywords: BankLabel.banner_reno.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 800, maxDelay: 7000, timeoutMs: 15000 },
@@ -3747,7 +3757,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const ads_seed = await retry(
         () => window.scrapePosts(window.UserLogin, BankForums.bank, {
           title_prefix: BankPrefix.bank,
-          stopOnFirstNonEmpty: true,
+          stopOnNthPost: 1,
           keywords: BankLabel.ads.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
@@ -3769,7 +3779,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const first_post_coms = await retry(
         () => window.scrapePosts(window.UserLogin, BankForums.bank, {
           title_prefix: BankPrefix.bank,
-          stopOnFirstNonEmpty: true,
+          stopOnNthPost: 1,
           keywords: BankLabel.first_post.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 15000 },
@@ -3785,7 +3795,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const personal_seed = await retry(
         () => window.scrapePosts(window.UserLogin, BankForums.bank, {
           title_prefix: BankPrefix.bank,
-          stopOnFirstNonEmpty: true,
+          stopOnNthPost: 1,
           keywords: BankLabel.personal_posts.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
@@ -3806,7 +3816,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const plot_seed = await retry(
         () => window.scrapePosts(window.UserLogin, BankForums.bank, {
           title_prefix: BankPrefix.bank,
-          stopOnFirstNonEmpty: true,
+          stopOnNthPost: 10,
           keywords: BankLabel.plot_posts.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },

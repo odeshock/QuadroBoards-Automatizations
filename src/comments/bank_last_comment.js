@@ -98,7 +98,7 @@
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {
         title_prefix: 'Гринготтс',
-        stopOnFirstNonEmpty: true,
+        stopOnNthPost: 1,
         keywords: 'ИТОГО'
       });
 

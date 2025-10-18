@@ -683,7 +683,7 @@
    * @param {string} author - Имя автора (обязательно)
    * @param {Array<string>|string} forums - Список ID форумов (обязательно)
    * @param {Object} [options]
-   * @param {boolean} [options.stopOnFirstNonEmpty=false] - true: вернуть первый непустой ДО last_src (или []), false: собрать все ДО last_src
+   * @param {number}  [options.stopOnNthPost] - Остановиться после N-го поста (undefined = собрать все до last_src)
    * @param {string}  [options.last_src=""] - Пост-граница; сам пост не обрабатываем
    * @param {string}  [options.title_prefix=""] - Начало названия поста для фильтрации
    * @param {number}  [options.maxPages=999]
@@ -697,7 +697,7 @@
     author,
     forums,
     {
-      stopOnFirstNonEmpty = false,
+      stopOnNthPost,
       last_src = [],
       title_prefix = "",
       maxPages = 999,
@@ -977,8 +977,8 @@
     }
 
 
-    // Вместо двух режимов:
-    const wanted = stopOnFirstNonEmpty ? 1 : Number.POSITIVE_INFINITY;
+    // Определяем количество постов для сбора
+    const wanted = (stopOnNthPost !== undefined && stopOnNthPost > 0) ? stopOnNthPost : Number.POSITIVE_INFINITY;
     return await collectUpTo(wanted);
 
     // ------ финализация: reverse + вывод ------

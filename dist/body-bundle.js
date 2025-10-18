@@ -4076,7 +4076,7 @@ async function FMVupdateGroupIfEquals(user_id, fromGroupId, toGroupId, opts = {}
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {
         title_prefix: 'Гринготтс',
-        stopOnFirstNonEmpty: true,
+        stopOnNthPost: 1,
         keywords: 'ИТОГО'
       });
 
@@ -4291,7 +4291,7 @@ async function fetchCardsWrappedClean(topic_id, comment_ids, options = {}) {
 
     try {
       const posts = await window.scrapePosts(window.UserLogin, forums, {
-        stopOnFirstNonEmpty: true,
+        stopOnNthPost: 1,
         comments_only: true
       });
 

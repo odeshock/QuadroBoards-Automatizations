@@ -788,16 +788,15 @@ $(function() {
    * Сохраняет данные в API для всех категорий
    * Логика:
    * 1. GET текущих данных из API
-   * 2. Фильтруем элементы, которых нет в библиотеке → is_visible: false (не трогаем их)
+   * 2. Сохраняем только те элементы, которые УЖЕ были is_visible: false (не трогаем их)
    * 3. Все новые элементы из панели → is_visible: true
    * 4. Объединяем: [новые видимые, старые невидимые]
    *
    * @param {number} userId
    * @param {object} jsonData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
-   * @param {object} libraryIds - { icon: Set, plashka: Set, background: Set, gift: Set, coupon: Set }
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, jsonData, libraryIds) {
+  async function saveAllDataToAPI(userId, jsonData) {
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageSet не найден');
       return false;
@@ -809,11 +808,8 @@ $(function() {
         const currentResponse = await window.FMVbank.storageGet(userId, label);
         const currentData = (currentResponse && Array.isArray(currentResponse.data)) ? currentResponse.data : [];
 
-        // 2. Фильтруем невидимые элементы (которых нет в библиотеке)
-        const libIds = libraryIds[key] || new Set();
-        const invisibleItems = currentData
-          .filter(item => !libIds.has(String(item.id)))
-          .map(item => ({ ...item, is_visible: false }));
+        // 2. Сохраняем только те элементы, которые УЖЕ были is_visible: false
+        const invisibleItems = currentData.filter(item => item.is_visible === false);
 
         // 3. Новые видимые элементы из панели
         const newVisibleItems = (jsonData[key] || []).map(item => ({ ...item, is_visible: true }));
@@ -842,10 +838,9 @@ $(function() {
   /**
    * Главная функция load
    * @param {string} profileId - id из URL (/profile.php?id=N)
-   * @param {object} libraryIds - { icon: Set, plashka: Set, background: Set, gift: Set, coupon: Set }
    * @returns {Promise<object>} { status, initialData, save, targetUserId }
    */
-  async function load(profileId, libraryIds = {}) {
+  async function load(profileId) {
     const targetUserId = getUserIdFromModalScript() || Number(profileId);
 
     if (!targetUserId) {
@@ -866,7 +861,7 @@ $(function() {
      * @returns {Promise<object>} { ok, status }
      */
     async function save(newData) {
-      const success = await saveAllDataToAPI(targetUserId, newData, libraryIds);
+      const success = await saveAllDataToAPI(targetUserId, newData);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'
@@ -3081,48 +3076,32 @@ async function FMVeditTextareaOnly(name, newHtml) {
       return; // подстраховка: нет функции — никому не показываем
     }
 
-    const mount = await waitMount();
-
-    // Сначала создаём панели, чтобы получить libraryIds
-    let getData = null;
-    let getLibraryIds = null;
-    if (typeof window.setupSkinsJSON === 'function') {
-      try {
-        const api = await window.setupSkinsJSON(mount, { initialData: {} });
-        if (api && typeof api.getData === 'function') getData = api.getData;
-        if (api && typeof api.getLibraryIds === 'function') getLibraryIds = api.getLibraryIds;
-      } catch (e) {
-        console.error('setupSkinsJSON() error:', e);
-      }
-    }
-
-    if (!getData || !getLibraryIds) {
-      console.error('[profile_runner_json] Не удалось инициализировать панели');
-      return;
-    }
-
-    // Теперь загружаем данные, передавая libraryIds
-    const libraryIds = getLibraryIds();
-
     if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
       console.error('[profile_runner_json] skinAdmin.load не найден.');
       return;
     }
 
-    const { status, initialData, save } = await window.skinAdmin.load(id, libraryIds);
+    const { status, initialData, save } = await window.skinAdmin.load(id);
     if (status !== 'ok' && status !== 'ок') {
       console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
       return;
     }
 
-    // Инициализируем панели загруженными данными
-    if (window.__skinsSetupJSONMounted && window.__skinsSetupJSONMounted.panels) {
-      const panels = window.__skinsSetupJSONMounted.panels;
-      if (initialData.gift && panels.gift) panels.gift.init(initialData.gift);
-      if (initialData.coupon && panels.coupon) panels.coupon.init(initialData.coupon);
-      if (initialData.plashka && panels.plashka) panels.plashka.init(initialData.plashka);
-      if (initialData.icon && panels.icon) panels.icon.init(initialData.icon);
-      if (initialData.background && panels.back) panels.back.init(initialData.background);
+    const mount = await waitMount();
+
+    let getData = null;
+    if (typeof window.setupSkinsJSON === 'function') {
+      try {
+        const api = await window.setupSkinsJSON(mount, { initialData });
+        if (api && typeof api.getData === 'function') getData = api.getData;
+      } catch (e) {
+        console.error('setupSkinsJSON() error:', e);
+      }
+    }
+
+    if (!getData) {
+      console.error('[profile_runner_json] Не удалось инициализировать панели');
+      return;
     }
 
     const panelRoot = document.getElementById('fmv-skins-panel');

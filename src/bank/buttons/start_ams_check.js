@@ -167,29 +167,33 @@
       order: 1
     });
 
-    window.createForumButton({
-      allowedGroups: (window.BANK_CHECK?.GroupID) || [],
-      allowedForums: (window.BANK_CHECK?.ForumID) || [],
-      allowedUsers: (window.BANK_CHECK?.UserID) || [],
-      label: 'Начать проверку',
-      order: 1,
-      onClick: async ({ setStatus, setDetails }) => {
-        // Извлекаем comment_id из topicpost
-        const commentId = getTopicPostCommentId();
+    try {
+      window.createForumButton({
+        allowedGroups: (window.BANK_CHECK?.GroupID) || [],
+        allowedForums: (window.BANK_CHECK?.ForumID) || [],
+        allowedUsers: (window.BANK_CHECK?.UserID) || [],
+        label: 'Начать проверку',
+        order: 1,
+        onClick: async ({ setStatus, setDetails }) => {
+          // Извлекаем comment_id из topicpost
+          const commentId = getTopicPostCommentId();
 
-        if (!commentId) {
-          setStatus('❌ Ошибка');
-          setDetails('Не найден topicpost или comment_id');
-          console.error('[AMS_CHECK] Не удалось найти comment_id topicpost');
-          return;
+          if (!commentId) {
+            setStatus('❌ Ошибка');
+            setDetails('Не найден topicpost или comment_id');
+            console.error('[AMS_CHECK] Не удалось найти comment_id topicpost');
+            return;
+          }
+
+          console.log(`[AMS_CHECK] Найден comment_id topicpost: ${commentId}`);
+          await startAmsCheck(commentId, { setStatus, setDetails });
         }
+      });
 
-        console.log(`[AMS_CHECK] Найден comment_id topicpost: ${commentId}`);
-        await startAmsCheck(commentId, { setStatus, setDetails });
-      }
-    });
-
-    console.log('[AMS_CHECK] createForumButton вызван');
+      console.log('[AMS_CHECK] createForumButton вызван успешно');
+    } catch (err) {
+      console.error('[AMS_CHECK] Ошибка при вызове createForumButton:', err);
+    }
   } else {
     console.error('[AMS_CHECK] Функция createForumButton недоступна');
   }

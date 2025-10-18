@@ -2176,14 +2176,28 @@ export function renderLog(log) {
       }
 
       // Формируем полный объект для сохранения
-      const purchaseData = {
-        type: "PURCHASE",
-        timestamp: timestamp,
-        fullData: fullData,
-        environment: environment,
-        totalSum: totalSum,
-        editLogs: editLogsText // Добавляем логи изменений
-      };
+      if (COMMENT_ID != undefined) {
+        const purchaseData = {
+          type: "EDIT_PURCHASE",
+          timestamp: timestamp,
+          comment_id: COMMENT_ID,
+          comment_timestamp: COMMENT_TIMESTAMP,
+          comment_user_id: USER_ID,
+          fullData: fullData,
+          environment: environment,
+          totalSum: totalSum,
+          editLogs: editLogsText // Добавляем логи изменений
+        };
+      } else {
+        const purchaseData = {
+          type: "PURCHASE",
+          timestamp: timestamp,
+          fullData: fullData,
+          environment: environment,
+          totalSum: totalSum,
+          editLogs: editLogsText // Добавляем логи изменений
+        };
+      }
 
       // Отправляем сообщение родительскому окну с операциями
       for (const origin of ALLOWED_PARENTS) {

@@ -237,7 +237,9 @@ export function restoreFromBackup(backupData) {
       'ALLOWED_PARENTS',
       'BASE_URL',
       'BACKUP_DATA',
-      'COMMENT_ID'
+      'COMMENT_ID',
+      'COMMENT_TIMESTAMP',
+      'CURRENT_BANK'
     ];
 
     // Восстанавливаем все остальные переменные

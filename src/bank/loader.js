@@ -120,6 +120,7 @@ const ALLOWED_PARENTS = [
 
     if (d.type === "COMMENT_INFO") {
       console.log("✅ [LOADER] Получен COMMENT_INFO:", d);
+      window.NEW_COMMENT_TIMESTAMP = d.NEW_COMMENT_TIMESTAMP;
       window.NEW_COMMENT_ID = d.NEW_COMMENT_ID;
       window.NEW_CURRENT_BANK = d.NEW_CURRENT_BANK;
       window.NEW_ADMIN_EDIT = d.NEW_ADMIN_EDIT;

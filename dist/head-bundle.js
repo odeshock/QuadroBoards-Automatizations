@@ -3456,6 +3456,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     queueMessage(iframeReadyP, () => ({
       type: BankPostMessagesType.comment_info,
+      NEW_COMMENT_TIMESTAMP: ts,
       NEW_COMMENT_ID,
       NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
       NEW_ADMIN_EDIT
@@ -3467,6 +3468,15 @@ document.addEventListener("DOMContentLoaded", () => {
       BACKUP_DATA
     }), "backup_data");
     await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between backup_data");
+
+    // Скроллим страницу к div.post.topicpost
+    const topicPost = document.querySelector("div.post.topicpost");
+    if (topicPost) {
+      topicPost.scrollIntoView({ behavior: "smooth", block: "start" });
+      console.log("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
+    } else {
+      console.warn("⚠️ [BACKUP] div.post.topicpost не найден");
+    }
   }
 
   // Экспортируем функцию в глобальную область видимости для использования в onclick
@@ -3547,6 +3557,106 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
+  });
+
+  // обработчик EDIT_PURCHASE
+  window.addEventListener("message", async (e) => {
+    if (e.origin !== IFRAME_ORIGIN) return;
+    if (!e.data || e.data.type !== "EDIT_PURCHASE") return;
+
+    console.log("🟦 [STEP] EDIT_PURCHASE received");
+    const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
+    const newText = formatBankText(e.data);
+    const ts = Date.now();
+    const comment_ts = e.data.comment_timestamp;
+    const comment_id = e.data.comment_id;
+    const comment_user_id = e.data.comment_user_id;
+
+    // Сохраняем данные в storage
+    const current_storage = await FMVbank.storageGet(comment_user_id);
+    current_storage[ts] = e.data;
+    delete current_storage[comment_ts];
+    const storage_set_flag = FMVbank.storageSet(current_storage, comment_user_id);
+
+    if (!storage_set_flag) {
+      alert("Попробуйте нажать на кнопку еще раз.");
+      return;
+    }
+
+    // Открываем страницу редактирования в скрытом iframe
+    console.log("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
+
+    const editIframe = document.createElement('iframe');
+    editIframe.style.display = 'none';
+    editIframe.src = `${SITE_URL}/edit.php?id=${comment_id}`;
+    document.body.appendChild(editIframe);
+
+    // Ждём загрузки iframe и отправляем форму
+    editIframe.onload = async function () {
+      try {
+        const iframeDoc = editIframe.contentDocument || editIframe.contentWindow.document;
+        const iframeTextArea = iframeDoc.querySelector('textarea[name="req_message"]');
+        const iframeSubmitButton = iframeDoc.querySelector(
+          'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
+        );
+
+        if (!iframeTextArea || !iframeSubmitButton) {
+          console.warn("❌ [ERROR] Не найдена форма редактирования в iframe");
+          editIframe.remove();
+          return;
+        }
+
+        // Вставляем текст
+        iframeTextArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
+        console.log("✅ [EDIT] Текст вставлен в форму редактирования");
+
+        // Отслеживаем редирект после отправки
+        let redirectUrl = null;
+        const checkRedirect = () => {
+          try {
+            const currentUrl = editIframe.contentWindow.location.href;
+            if (currentUrl.includes('/viewtopic.php?')) {
+              redirectUrl = currentUrl;
+              console.log("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
+
+              // Переходим в основном окне
+              window.location.href = redirectUrl;
+
+              // Удаляем iframe
+              editIframe.remove();
+            }
+          } catch (err) {
+            // Игнорируем CORS ошибки
+          }
+        };
+
+        // Проверяем редирект каждые 500ms
+        const redirectCheckInterval = setInterval(checkRedirect, 500);
+
+        // Останавливаем проверку через 10 секунд
+        setTimeout(() => {
+          clearInterval(redirectCheckInterval);
+          if (!redirectUrl) {
+            console.warn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
+            editIframe.remove();
+          }
+        }, 10000);
+
+        // Отправляем форму
+        iframeSubmitButton.click();
+        console.log("🟩 [SENT] EDIT_PURCHASE form submitted в iframe");
+
+      } catch (error) {
+        console.error("❌ [ERROR] Ошибка при работе с iframe:", error);
+        editIframe.remove();
+      }
+    };
+
+    // Обработка ошибки загрузки iframe
+    editIframe.onerror = function () {
+      console.error("❌ [ERROR] Не удалось загрузить страницу редактирования");
+      editIframe.remove();
+    };
   });
 
   // === ПОСЛЕДОВАТЕЛЬНАЯ ЛЕНТА СКРЕЙПОВ ===

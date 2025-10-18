@@ -989,12 +989,22 @@ $(function() {
         continue;
       }
 
-      // Просто берём content напрямую из каждого элемента
-      const html = items.map(item => item.content || '').join('\n');
+      // Оборачиваем content в <div class="item"> с атрибутами
+      const html = items.map(item => {
+        const attrs = [`data-id="${escapeAttr(item.id)}"`, `title="${escapeAttr(item.title || '')}"`];
+        return `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
+      }).join('\n');
 
       target.innerHTML = html;
       log(`Вставлено ${items.length} элементов в ${selector}`);
     }
+  }
+
+  function escapeAttr(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
 
@@ -2488,16 +2498,6 @@ async function FMVeditTextareaOnly(name, newHtml) {
 (function(){
   'use strict';
 
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const ready = (sel, root = document) => new Promise((res) => {
-    const el = root.querySelector(sel);
-    if (el) return res(el);
-    const obs = new MutationObserver(() => {
-      const el2 = root.querySelector(sel);
-      if (el2) { obs.disconnect(); res(el2); }
-    });
-    obs.observe(document.documentElement, { childList: true, subtree: true });
-  });
 
   const baseCSS = `
   details.ufo-panel{margin-top:12px;border:1px solid #d0d0d7;border-radius:10px;background:#fff}
@@ -2552,33 +2552,6 @@ async function FMVeditTextareaOnly(name, newHtml) {
   }
   function firstVisibleCard(container){ const cards = [...container.querySelectorAll('.ufo-card')]; return cards.find(c => getComputedStyle(c).display !== 'none') || null; }
   function computeTwoRowMaxLib(container){ const card = firstVisibleCard(container); if (!card) { container.style.maxHeight=''; return; } const ch = card.getBoundingClientRect().height; const cs = getComputedStyle(container); const rowGap = parseFloat(cs.rowGap) || 0; const pt = parseFloat(cs.paddingTop) || 0; const pb = parseFloat(cs.paddingBottom) || 0; const max = Math.round(ch * 2 + rowGap + pt + pb); container.style.maxHeight = max + 'px'; }
-
-  /**
-   * Извлекает все data-* атрибуты из элемента
-   */
-  function extractDataAttributes(el) {
-    const result = {};
-    if (!el || !el.attributes) return result;
-    for (let i = 0; i < el.attributes.length; i++) {
-      const attr = el.attributes[i];
-      if (attr.name.startsWith('data-')) {
-        result[attr.name] = attr.value;
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Применяет data-* атрибуты к элементу
-   */
-  function applyDataAttributes(el, dataAttrs) {
-    if (!el || !dataAttrs) return;
-    Object.keys(dataAttrs).forEach(key => {
-      if (key.startsWith('data-')) {
-        el.setAttribute(key, dataAttrs[key]);
-      }
-    });
-  }
 
   function createChoicePanelJSON(userOpts){
     const opts = Object.assign({
@@ -2653,8 +2626,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
       const newItem = {
         id: libItem.id,
         title: itemEl ? (itemEl.getAttribute(opts.editableAttr) || '') : '',
-        content: libItem.html.trim(),
-        ...extractDataAttributes(itemEl)
+        content: itemEl ? itemEl.innerHTML.trim() : '', // Только innerHTML, без обёртки
       };
 
       // Если есть expirableAttr, извлекаем дату
@@ -2831,62 +2803,66 @@ async function FMVeditTextareaOnly(name, newHtml) {
 
     /**
      * Возвращает массив данных для сохранения в API
-     * @returns {Array} [{ id, title, content, ...data-attrs }]
+     * @returns {Array} [{ id, title, content }]
      */
     function getData() {
       return selectedItems.map(item => {
-        // Обновляем content с актуальным title и expired_date
+        // Создаём временный элемент для применения изменений
         const tmp = document.createElement('div');
         tmp.innerHTML = item.content.trim();
-        const itemEl = tmp.querySelector(opts.itemSelector);
 
-        if (itemEl) {
-          // Применяем title
-          if (item.title) {
-            itemEl.setAttribute(opts.editableAttr, item.title);
-          }
+        // Применяем title к атрибуту (если нужно)
+        if (item.title) {
+          const titleAttrElements = tmp.querySelectorAll(`[${opts.editableAttr}]`);
+          titleAttrElements.forEach(el => {
+            el.setAttribute(opts.editableAttr, item.title);
+          });
+        }
 
-          // Применяем expired_date
-          if (opts.expirableAttr) {
-            if (item.expired_date) {
-              itemEl.setAttribute(opts.expirableAttr, item.expired_date);
+        // Применяем expired_date (если есть)
+        if (opts.expirableAttr && item.expired_date) {
+          const expirableElements = tmp.querySelectorAll(`[${opts.expirableAttr}]`);
+          expirableElements.forEach(el => {
+            el.setAttribute(opts.expirableAttr, item.expired_date);
 
-              // Обновляем span.coupon_deadline
-              let deadlineSpan = itemEl.querySelector('.coupon_deadline');
-              if (!deadlineSpan) {
-                deadlineSpan = document.createElement('span');
-                deadlineSpan.className = 'coupon_deadline';
-                const imgEl = itemEl.querySelector('img');
-                if (imgEl && imgEl.nextSibling) {
-                  itemEl.insertBefore(deadlineSpan, imgEl.nextSibling);
-                } else if (imgEl) {
-                  imgEl.parentNode.appendChild(deadlineSpan);
-                } else {
-                  itemEl.appendChild(deadlineSpan);
-                }
+            // Обновляем span.coupon_deadline
+            let deadlineSpan = el.querySelector('.coupon_deadline');
+            if (!deadlineSpan) {
+              deadlineSpan = document.createElement('span');
+              deadlineSpan.className = 'coupon_deadline';
+              const imgEl = el.querySelector('img');
+              if (imgEl && imgEl.nextSibling) {
+                el.insertBefore(deadlineSpan, imgEl.nextSibling);
+              } else if (imgEl) {
+                imgEl.parentNode.appendChild(deadlineSpan);
+              } else {
+                el.appendChild(deadlineSpan);
               }
-
-              // Конвертируем yyyy-mm-dd -> dd/mm/yy
-              const parts = item.expired_date.split('-');
-              if (parts.length === 3) {
-                const year = parts[0].slice(2);
-                const month = parts[1];
-                const day = parts[2];
-                deadlineSpan.textContent = `${day}/${month}/${year}`;
-              }
-            } else {
-              itemEl.removeAttribute(opts.expirableAttr);
-              const deadlineSpan = itemEl.querySelector('.coupon_deadline');
-              if (deadlineSpan) deadlineSpan.remove();
             }
-          }
+
+            // Конвертируем yyyy-mm-dd -> dd/mm/yy
+            const parts = item.expired_date.split('-');
+            if (parts.length === 3) {
+              const year = parts[0].slice(2);
+              const month = parts[1];
+              const day = parts[2];
+              deadlineSpan.textContent = `${day}/${month}/${year}`;
+            }
+          });
+        } else if (opts.expirableAttr && !item.expired_date) {
+          // Удаляем атрибут и span если даты нет
+          const expirableElements = tmp.querySelectorAll(`[${opts.expirableAttr}]`);
+          expirableElements.forEach(el => {
+            el.removeAttribute(opts.expirableAttr);
+            const deadlineSpan = el.querySelector('.coupon_deadline');
+            if (deadlineSpan) deadlineSpan.remove();
+          });
         }
 
         return {
           id: item.id,
           title: item.title || '',
-          content: tmp.innerHTML,
-          ...extractDataAttributes(itemEl)
+          content: tmp.innerHTML.trim() // Только innerHTML, без data-id
         };
       });
     }

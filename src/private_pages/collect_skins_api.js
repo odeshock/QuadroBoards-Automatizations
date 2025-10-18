@@ -103,12 +103,22 @@
         continue;
       }
 
-      // Просто берём content напрямую из каждого элемента
-      const html = items.map(item => item.content || '').join('\n');
+      // Оборачиваем content в <div class="item"> с атрибутами
+      const html = items.map(item => {
+        const attrs = [`data-id="${escapeAttr(item.id)}"`, `title="${escapeAttr(item.title || '')}"`];
+        return `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
+      }).join('\n');
 
       target.innerHTML = html;
       log(`Вставлено ${items.length} элементов в ${selector}`);
     }
+  }
+
+  function escapeAttr(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
 

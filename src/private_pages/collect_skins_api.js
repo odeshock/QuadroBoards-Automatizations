@@ -19,20 +19,33 @@
 
   /**
    * Получает userId из атрибутов .modal_script
+   * Приоритет: data-main-user_id > data-id
    */
   function getUserIdFromCharacter(charEl) {
-    if (!charEl) return null;
+    if (!charEl) {
+      log('getUserIdFromCharacter: charEl отсутствует');
+      return null;
+    }
 
     const mainUserId = charEl.getAttribute('data-main-user_id');
+    log('getUserIdFromCharacter: data-main-user_id =', mainUserId);
+
     if (mainUserId && mainUserId.trim()) {
-      return Number(mainUserId.trim());
+      const result = Number(mainUserId.trim());
+      log('getUserIdFromCharacter: используем data-main-user_id =', result);
+      return result;
     }
 
     const dataId = charEl.getAttribute('data-id');
+    log('getUserIdFromCharacter: data-id =', dataId);
+
     if (dataId && dataId.trim()) {
-      return Number(dataId.trim());
+      const result = Number(dataId.trim());
+      log('getUserIdFromCharacter: используем data-id =', result);
+      return result;
     }
 
+    log('getUserIdFromCharacter: userId не найден');
     return null;
   }
 

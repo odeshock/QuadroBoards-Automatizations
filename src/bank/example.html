@@ -1,125 +1,131 @@
 <!doctype html>
 <html lang="ru">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Доходы / Расходы — форма по пунктам (статическая разметка)</title>
   <link rel="stylesheet" href="./style.css">
 </head>
+
 <body>
-<!-- Preloader -->
-<div id="preloader" class="preloader">
-  <div class="preloader-content">
-    <div class="hogwarts-crest">
-      <div class="magic-wand">⚡</div>
-    </div>
-    <div class="loader-animation">
-      <div class="magical-item item-1">🪄</div>
-      <div class="magical-item item-2">✨</div>
-      <div class="magical-item item-3">🔮</div>
-    </div>
-    <p class="preloader-text">Заглядываем в хранилище Гринготтса...</p>
-    <div class="sparkles">
-      <span class="sparkle" style="left: 20%; top: 30%;">✨</span>
-      <span class="sparkle" style="left: 80%; top: 40%;">✨</span>
-      <span class="sparkle" style="left: 15%; top: 70%;">✨</span>
-      <span class="sparkle" style="left: 85%; top: 65%;">✨</span>
-      <span class="sparkle" style="left: 50%; top: 20%;">✨</span>
+  <!-- Preloader -->
+  <div id="preloader" class="preloader">
+    <div class="preloader-content">
+      <div class="hogwarts-crest">
+        <div class="magic-wand">⚡</div>
+      </div>
+      <div class="loader-animation">
+        <div class="magical-item item-1">🪄</div>
+        <div class="magical-item item-2">✨</div>
+        <div class="magical-item item-3">🔮</div>
+      </div>
+      <p class="preloader-text">Заглядываем в хранилище Гринготтса...</p>
+      <div class="sparkles">
+        <span class="sparkle" style="left: 20%; top: 30%;">✨</span>
+        <span class="sparkle" style="left: 80%; top: 40%;">✨</span>
+        <span class="sparkle" style="left: 15%; top: 70%;">✨</span>
+        <span class="sparkle" style="left: 85%; top: 65%;">✨</span>
+        <span class="sparkle" style="left: 50%; top: 20%;">✨</span>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="bank_html">
-  <div class="page">
-    <div class="tabs" role="tablist" aria-label="Разделы">
-      <button class="tab-btn is-active" type="button" role="tab" aria-selected="true" aria-controls="tab-bank" data-tab-target="bank">Банк</button>
-      <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-design" data-tab-target="design">Оформление</button>
-      <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-gifts" data-tab-target="gifts">Подарки</button>
-    </div>
-
-    <div class="tab-panels">
-      <div class="tab-panel is-active" id="tab-bank" role="tabpanel">
-        <div class="grid">
-      <!-- Доходы -->
-      <section class="panel" aria-labelledby="income-title">
-        <header>
-          <h2 id="income-title">Получить</h2>
-        </header>
-        <div class="list" role="list"></div>
-      </section>
-
-      <!-- Расходы -->
-      <section class="panel" aria-labelledby="expense-title">
-        <header>
-          <h2 id="expense-title">Потратить</h2>
-        </header>
-        <div class="list" role="list"></div>
-      </section>
-        </div>
+  <div class="bank_html">
+    <div class="page">
+      <div class="tabs" role="tablist" aria-label="Разделы">
+        <button class="tab-btn is-active" type="button" role="tab" aria-selected="true" aria-controls="tab-bank"
+          data-tab-target="bank">Банк</button>
+        <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-design"
+          data-tab-target="design">Оформление</button>
+        <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-gifts"
+          data-tab-target="gifts">Подарки</button>
       </div>
 
-      <div class="tab-panel" id="tab-design" role="tabpanel" hidden>
-        <div class="design-grid">
-          <div class="design-column">
-            <h3>Иконки</h3>
-            <div class="icon-grid"></div>
-          </div>
-          <div class="design-column">
-            <h3>Плашки</h3>
-            <div class="badge-grid"></div>
-          </div>
-          <div class="design-column">
-            <h3>Фоны</h3>
-            <div class="bg-grid"></div>
+      <div class="tab-panels">
+        <div class="tab-panel is-active" id="tab-bank" role="tabpanel">
+          <div class="grid">
+            <!-- Доходы -->
+            <section class="panel" aria-labelledby="income-title">
+              <header>
+                <h2 id="income-title">Получить</h2>
+              </header>
+              <div class="list" role="list"></div>
+            </section>
+
+            <!-- Расходы -->
+            <section class="panel" aria-labelledby="expense-title">
+              <header>
+                <h2 id="expense-title">Потратить</h2>
+              </header>
+              <div class="list" role="list"></div>
+            </section>
           </div>
         </div>
-      </div>
 
-      <div class="tab-panel" id="tab-gifts" role="tabpanel" hidden>
-        <div class="gift-grid"></div>
-      </div>
-    </div>
-
-    <!-- Хранилище форм (генерируются из JS) -->
-    <div id="forms" style="display:none">
-      <div id="modal-forms-container"></div>
-    </div>
-
-    <!-- Модалка -->
-    <div class="modal-backdrop" id="backdrop" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <header>
-          <h3 id="modal-title">Заголовок</h3>
-          <button class="close" id="btn-close" aria-label="Закрыть">×</button>
-        </header>
-        <form id="modal-form">
-          <div class="body">
-            <div id="modal-fields"></div>
-          </div>
-          <div class="form-footer">
-            <div class="hint"><span id="modal-amount-label"></span>: <span id="modal-amount"></span></div>
-            <div style="display:flex; gap:8px;">
-              <button type="submit" class="button primary" id="btn-submit">Сохранить</button>
+        <div class="tab-panel" id="tab-design" role="tabpanel" hidden>
+          <div class="design-grid">
+            <div class="design-column">
+              <h3>Иконки</h3>
+              <div class="icon-grid"></div>
+            </div>
+            <div class="design-column">
+              <h3>Плашки</h3>
+              <div class="badge-grid"></div>
+            </div>
+            <div class="design-column">
+              <h3>Фоны</h3>
+              <div class="bg-grid"></div>
             </div>
           </div>
-        </form>
+        </div>
+
+        <div class="tab-panel" id="tab-gifts" role="tabpanel" hidden>
+          <div class="gift-grid"></div>
+        </div>
       </div>
+
+      <!-- Хранилище форм (генерируются из JS) -->
+      <div id="forms" style="display:none">
+        <div id="modal-forms-container"></div>
+      </div>
+
+      <!-- Модалка -->
+      <div class="modal-backdrop" id="backdrop" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <header>
+            <h3 id="modal-title">Заголовок</h3>
+            <button class="close" id="btn-close" aria-label="Закрыть">×</button>
+          </header>
+          <form id="modal-form">
+            <div class="body">
+              <div id="modal-fields"></div>
+            </div>
+            <div class="form-footer">
+              <div class="hint"><span id="modal-amount-label"></span>: <span id="modal-amount"></span></div>
+              <div style="display:flex; gap:8px;">
+                <button type="submit" class="button primary" id="btn-submit">Сохранить</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="log" id="log" aria-live="polite"></div>
     </div>
-
-    <div class="log" id="log" aria-live="polite"></div>
   </div>
-</div>
 
-<script>
-  // Скрываем preloader, когда IS_ADMIN объявлен
-  (function checkIsAdmin() {
-    if (typeof window.IS_ADMIN !== 'undefined') {
-      document.getElementById('preloader').style.display = 'none';
-    } else {
-      setTimeout(checkIsAdmin, 100);
-    }
-  })();
-</script>
-<script src="./app.js" type="module"></script>
+  <script>
+    // Скрываем preloader, когда IS_ADMIN объявлен
+    (function checkIsAdmin() {
+      if (typeof window.IS_ADMIN !== 'undefined') {
+        document.getElementById('preloader').style.display = 'none';
+      } else {
+        setTimeout(checkIsAdmin, 100);
+      }
+    })();
+  </script>
+  <script src="./loader.js" type="module"></script>
 </body>
+
 </html>

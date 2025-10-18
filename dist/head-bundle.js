@@ -2797,7 +2797,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Извлекает данные из поста для вызова bankCommentEditFromBackup
    */
-  function getPostData(post) {
+  async function getPostData(post) {
     // Извлекаем usr_id из профиля
     const profileLink = post.querySelector('.pl-email.profile a');
     const profileUrl = profileLink ? new URL(profileLink.href) : null;
@@ -2807,31 +2807,72 @@ document.addEventListener("DOMContentLoaded", () => {
     const bankData = post.querySelector('bank_data');
     const ts = bankData ? Number(bankData.textContent.trim()) || 0 : 0;
 
-    // Извлекаем comment_id из ссылки редактирования
-    const editLink = post.querySelector('.pl-edit a');
+    // Извлекаем comment_id из h3 span .permalink по хешу (#p346)
     let comment_id = 0;
-    if (editLink && editLink.getAttribute('onclick')) {
-      const match = editLink.getAttribute('onclick').match(/bankCommentEditFromBackup\([^,]+,\s*[^,]+,\s*(\d+)/);
-      if (match) {
-        comment_id = Number(match[1]) || 0;
+    const permalink = post.querySelector('h3 span .permalink');
+    if (permalink && permalink.href) {
+      try {
+        const url = new URL(permalink.href);
+        const hash = url.hash; // например, "#p346"
+        if (hash && hash.startsWith('#p')) {
+          comment_id = Number(hash.substring(2)) || 0; // убираем "#p" и берём число
+        }
+      } catch (e) {
+        console.warn('[adminEdit] Не удалось извлечь comment_id из permalink:', e);
       }
     }
 
-    // Извлекаем current_bank из поля MoneyID
+    // Извлекаем current_bank из поля MoneyID (аналогично gringotts_page_update.js)
     let current_bank = 0;
-    const moneyFieldClass = `pa-fld${window.PROFILE_FIELDS?.MoneyID || 0}`;
-    const moneyField = post.querySelector(`.${moneyFieldClass}`);
-    if (moneyField) {
-      const fieldNameSpan = moneyField.querySelector('span.fld-name');
-      let textContent = moneyField.textContent || '';
-      if (fieldNameSpan) {
-        textContent = textContent.replace(fieldNameSpan.textContent, '');
+    try {
+      const moneyFieldClass = `pa-fld${window.PROFILE_FIELDS?.MoneyID || 0}`;
+      const moneyField = post.querySelector(`.${moneyFieldClass}`);
+
+      if (moneyField) {
+        // Проверяем наличие комментария <!-- main: usrN -->
+        const walker = document.createTreeWalker(moneyField, NodeFilter.SHOW_COMMENT);
+        let hasMainComment = false;
+        const RE_MAIN = /^\s*main:\s*usr(\d+)\s*$/i;
+
+        for (let node; (node = walker.nextNode());) {
+          const match = (node.nodeValue || "").match(RE_MAIN);
+          if (match) {
+            hasMainComment = true;
+            // Если есть комментарий <!-- main: usrN -->, используем API для получения значения
+            if (window.MainUsrFieldResolver?.getFieldValue) {
+              try {
+                const value = await window.MainUsrFieldResolver.getFieldValue({
+                  doc: document,
+                  fieldId: window.PROFILE_FIELDS?.MoneyID || 0
+                });
+                current_bank = Number(value) || 0;
+              } catch (err) {
+                console.warn("Ошибка получения значения через MainUsrFieldResolver:", err);
+                current_bank = 0;
+              }
+            }
+            break;
+          }
+        }
+
+        // Если нет комментария, берём текстовое значение из li (вне span)
+        if (!hasMainComment) {
+          const fieldNameSpan = moneyField.querySelector('span.fld-name');
+          let textContent = moneyField.textContent || '';
+
+          if (fieldNameSpan) {
+            textContent = textContent.replace(fieldNameSpan.textContent, '');
+          }
+
+          textContent = textContent.replace(/\u00A0/g, ' ').trim();
+          const match = textContent.match(/-?\d+(?:\.\d+)?/);
+          if (match) {
+            current_bank = Number(match[0]) || 0;
+          }
+        }
       }
-      textContent = textContent.replace(/\u00A0/g, ' ').trim();
-      const match = textContent.match(/-?\d+(?:\.\d+)?/);
-      if (match) {
-        current_bank = Number(match[0]) || 0;
-      }
+    } catch (e) {
+      console.warn('[adminEdit] Не удалось извлечь current_bank:', e);
     }
 
     return { usr_id, ts, comment_id, current_bank };
@@ -2934,34 +2975,36 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(`[adminEdit] "${label}": Найдено постов: ${posts.length}`);
 
     let addedCount = 0;
-    posts.forEach((post, index) => {
+    for (let index = 0; index < posts.length; index++) {
+      const post = posts[index];
+
       // Пропускаем topicpost
-      if (post.classList.contains('topicpost')) return;
+      if (post.classList.contains('topicpost')) continue;
 
       const postContent = post.querySelector('.post-content');
-      if (!postContent) return;
+      if (!postContent) continue;
 
       // Проверяем, что ЕСТЬ bank_ams_check, но НЕТ bank_ams_done
       const hasAmsCheck = postContent.querySelector('bank_ams_check');
       const hasAmsDone = postContent.querySelector('bank_ams_done');
       if (!hasAmsCheck || hasAmsDone) {
         console.log(`[adminEdit] "${label}": Пост ${index}: hasAmsCheck=${!!hasAmsCheck}, hasAmsDone=${!!hasAmsDone}, пропуск`);
-        return;
+        continue;
       }
 
       const container = postContent.querySelector(containerSelector);
-      if (!container) return;
+      if (!container) continue;
 
       // Проверяем, не добавлена ли уже кнопка
-      if (container.querySelector(`[data-post-button-label="${label}"]`)) return;
+      if (container.querySelector(`[data-post-button-label="${label}"]`)) continue;
 
-      const postData = getPostData(post);
+      const postData = await getPostData(post);
       console.log(`[adminEdit] "${label}": Пост ${index}: getPostData вернул:`, postData);
 
       const { usr_id, ts, comment_id, current_bank } = postData;
       if (!usr_id || !ts || !comment_id) {
         console.log(`[adminEdit] "${label}": Пост ${index}: проверка не прошла - usr_id=${usr_id}, ts=${ts}, comment_id=${comment_id}`);
-        return;
+        continue;
       }
 
       console.log(`[adminEdit] "${label}": Пост ${index}: данные OK - usr_id=${usr_id}, ts=${ts}, comment_id=${comment_id}, current_bank=${current_bank}`);
@@ -3039,7 +3082,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       addedCount++;
-    });
+    }
 
     console.log(`[adminEdit] "${label}": Добавлено кнопок: ${addedCount}`);
   }

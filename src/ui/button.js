@@ -83,33 +83,73 @@
       topicId = null,               // НОВОЕ
     } = opts || {};
 
-    if (typeof onClick !== 'function') return;
+    console.log(`[createForumButton] Вызов для "${label}":`, { allowedGroups, allowedForums, allowedUsers, containerSelector });
+
+    if (typeof onClick !== 'function') {
+      console.log(`[createForumButton] "${label}": onClick не функция, выход`);
+      return;
+    }
 
     await waitAmsReady();
+    console.log(`[createForumButton] "${label}": AMS готов`);
 
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()
       : NaN;
 
+    console.log(`[createForumButton] "${label}": текущая группа = ${gid}, разрешённые = [${allowedGroups}]`);
+
     // строгая проверка группы
-    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) return;
-    if (!allowedGroups.map(Number).includes(Number(gid))) return;
+    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) {
+      console.log(`[createForumButton] "${label}": allowedGroups пустой, выход`);
+      return;
+    }
+    if (!allowedGroups.map(Number).includes(Number(gid))) {
+      console.log(`[createForumButton] "${label}": группа ${gid} не в списке, выход`);
+      return;
+    }
+
+    console.log(`[createForumButton] "${label}": проверка группы пройдена`);
 
     // строгая проверка форума
-    if (!Array.isArray(allowedForums) || allowedForums.length === 0) return;
-    if (!isAllowedForum(allowedForums)) return;
+    if (!Array.isArray(allowedForums) || allowedForums.length === 0) {
+      console.log(`[createForumButton] "${label}": allowedForums пустой, выход`);
+      return;
+    }
+    if (!isAllowedForum(allowedForums)) {
+      console.log(`[createForumButton] "${label}": форум не разрешён, выход`);
+      return;
+    }
+
+    console.log(`[createForumButton] "${label}": проверка форума пройдена`);
 
     // проверка пользователей (если задано)
     if (Array.isArray(allowedUsers) && allowedUsers.length > 0) {
       const uid = Number(window.UserID);
-      if (!allowedUsers.map(Number).includes(uid)) return;
+      console.log(`[createForumButton] "${label}": текущий UserID = ${uid}, разрешённые = [${allowedUsers}]`);
+      if (!allowedUsers.map(Number).includes(uid)) {
+        console.log(`[createForumButton] "${label}": пользователь ${uid} не в списке, выход`);
+        return;
+      }
     }
 
+    console.log(`[createForumButton] "${label}": проверка пользователей пройдена`);
+
     // НОВОЕ: строгая проверка нужной темы
-    if (!isOnTopicId(topicId)) return;
+    if (!isOnTopicId(topicId)) {
+      console.log(`[createForumButton] "${label}": topicId не совпадает, выход`);
+      return;
+    }
+
+    console.log(`[createForumButton] "${label}": ищем контейнер "${containerSelector}"`);
 
     const container = await FMV.waitForSelector(containerSelector, 5000).catch(() => null);
-    if (!container) return;
+    if (!container) {
+      console.log(`[createForumButton] "${label}": контейнер "${containerSelector}" не найден, выход`);
+      return;
+    }
+
+    console.log(`[createForumButton] "${label}": контейнер найден, создаём кнопку`);
 
     // ---------- UI ----------
     const br = document.createElement('br');

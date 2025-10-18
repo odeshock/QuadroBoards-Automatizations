@@ -4679,18 +4679,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Отслеживаем редирект после отправки
         let redirectUrl = null;
+        let redirectDetected = false;
+        let redirectCheckInterval;
+
         const checkRedirect = () => {
           try {
             const currentUrl = editIframe.contentWindow.location.href;
             if (currentUrl.includes('/viewtopic.php?')) {
               redirectUrl = currentUrl;
+              redirectDetected = true;
               console.log("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
 
-              // Переходим в основном окне
-              window.location.href = redirectUrl;
+              // Очищаем интервал
+              clearInterval(redirectCheckInterval);
 
               // Удаляем iframe
               editIframe.remove();
+
+              // Переходим в основном окне
+              console.log("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
+              window.location.href = redirectUrl;
             }
           } catch (err) {
             // Игнорируем CORS ошибки
@@ -4698,12 +4706,12 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         // Проверяем редирект каждые 500ms
-        const redirectCheckInterval = setInterval(checkRedirect, 500);
+        redirectCheckInterval = setInterval(checkRedirect, 500);
 
         // Останавливаем проверку через 10 секунд
         setTimeout(() => {
           clearInterval(redirectCheckInterval);
-          if (!redirectUrl) {
+          if (!redirectDetected) {
             console.warn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
             editIframe.remove();
           }

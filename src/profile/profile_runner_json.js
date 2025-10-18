@@ -56,32 +56,49 @@
       return; // подстраховка: нет функции — никому не показываем
     }
 
-    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
-      console.error('[profile_runner_json] skinAdmin.load не найден.');
-      return;
-    }
-
-    const { status, initialData, save } = await window.skinAdmin.load(id);
-    if (status !== 'ok' && status !== 'ок') {
-      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
-      return;
-    }
-
     const mount = await waitMount();
 
+    // Сначала создаём панели, чтобы получить libraryIds
     let getData = null;
+    let getLibraryIds = null;
     if (typeof window.setupSkinsJSON === 'function') {
       try {
-        const api = await window.setupSkinsJSON(mount, { initialData });
+        const api = await window.setupSkinsJSON(mount, { initialData: {} });
         if (api && typeof api.getData === 'function') getData = api.getData;
+        if (api && typeof api.getLibraryIds === 'function') getLibraryIds = api.getLibraryIds;
       } catch (e) {
         console.error('setupSkinsJSON() error:', e);
       }
     }
 
-    if (!getData) {
+    if (!getData || !getLibraryIds) {
       console.error('[profile_runner_json] Не удалось инициализировать панели');
       return;
+    }
+
+    // Получаем libraryIds
+    const libraryIds = getLibraryIds();
+
+    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
+      console.error('[profile_runner_json] skinAdmin.load не найден.');
+      return;
+    }
+
+    // Загружаем данные с учетом libraryIds
+    const { status, visibleData, save } = await window.skinAdmin.load(id, libraryIds);
+    if (status !== 'ok' && status !== 'ок') {
+      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
+      return;
+    }
+
+    // Инициализируем панели только видимыми данными
+    if (window.__skinsSetupJSONMounted && window.__skinsSetupJSONMounted.panels) {
+      const panels = window.__skinsSetupJSONMounted.panels;
+      if (visibleData.gift && panels.gift) panels.gift.init(visibleData.gift);
+      if (visibleData.coupon && panels.coupon) panels.coupon.init(visibleData.coupon);
+      if (visibleData.plashka && panels.plashka) panels.plashka.init(visibleData.plashka);
+      if (visibleData.icon && panels.icon) panels.icon.init(visibleData.icon);
+      if (visibleData.background && panels.back) panels.back.init(visibleData.background);
     }
 
     const panelRoot = document.getElementById('fmv-skins-panel');

@@ -38,12 +38,21 @@
 
   /**
    * Загружает данные из API для всех категорий
-   * Фильтрует только видимые элементы (is_visible !== false)
+   * Помечает каждый элемент is_visible в зависимости от наличия в библиотеке
    * @param {number} userId
-   * @returns {Promise<object>} { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+   * @param {object} libraryIds - { icon: Set, plashka: Set, ... }
+   * @returns {Promise<object>} { visible: { icon: [], ... }, invisible: { icon: [], ... } }
    */
-  async function loadAllDataFromAPI(userId) {
-    const result = {
+  async function loadAllDataFromAPI(userId, libraryIds) {
+    const visible = {
+      icon: [],
+      plashka: [],
+      background: [],
+      gift: [],
+      coupon: []
+    };
+
+    const invisible = {
       icon: [],
       plashka: [],
       background: [],
@@ -53,7 +62,7 @@
 
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageGet не найден');
-      return result;
+      return { visible, invisible };
     }
 
     for (const [key, label] of Object.entries(apiLabels)) {
@@ -62,30 +71,37 @@
 
         // Формат: { last_update_ts, data: [...] }
         if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          // Фильтруем только видимые элементы для редактирования
-          result[key] = response.data.filter(item => item.is_visible !== false);
+          const libIds = libraryIds[key] || new Set();
+
+          response.data.forEach(item => {
+            const isInLibrary = libIds.has(String(item.id));
+            const markedItem = { ...item, is_visible: isInLibrary };
+
+            if (isInLibrary) {
+              visible[key].push(markedItem);
+            } else {
+              invisible[key].push(markedItem);
+            }
+          });
         }
       } catch (err) {
         console.error(`[admin_bridge_json] Ошибка загрузки ${key}:`, err);
       }
     }
 
-    return result;
+    return { visible, invisible };
   }
 
   /**
    * Сохраняет данные в API для всех категорий
-   * Логика:
-   * 1. GET текущих данных из API
-   * 2. Сохраняем только те элементы, которые УЖЕ были is_visible: false (не трогаем их)
-   * 3. Все новые элементы из панели → is_visible: true
-   * 4. Объединяем: [новые видимые, старые невидимые]
+   * Объединяет данные из панели + невидимые элементы
    *
    * @param {number} userId
-   * @param {object} jsonData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+   * @param {object} visibleData - { icon: [], plashka: [], ... } данные из панели
+   * @param {object} invisibleData - { icon: [], plashka: [], ... } невидимые элементы
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, jsonData) {
+  async function saveAllDataToAPI(userId, visibleData, invisibleData) {
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageSet не найден');
       return false;
@@ -93,18 +109,14 @@
 
     try {
       for (const [key, label] of Object.entries(apiLabels)) {
-        // 1. GET текущих данных из API
-        const currentResponse = await window.FMVbank.storageGet(userId, label);
-        const currentData = (currentResponse && Array.isArray(currentResponse.data)) ? currentResponse.data : [];
+        // Видимые элементы из панели (помечаем is_visible: true)
+        const visible = (visibleData[key] || []).map(item => ({ ...item, is_visible: true }));
 
-        // 2. Сохраняем только те элементы, которые УЖЕ были is_visible: false
-        const invisibleItems = currentData.filter(item => item.is_visible === false);
+        // Невидимые элементы (уже помечены is_visible: false)
+        const invisible = invisibleData[key] || [];
 
-        // 3. Новые видимые элементы из панели
-        const newVisibleItems = (jsonData[key] || []).map(item => ({ ...item, is_visible: true }));
-
-        // 4. Объединяем: сначала видимые, потом невидимые
-        const mergedData = [...newVisibleItems, ...invisibleItems];
+        // Объединяем: сначала видимые, потом невидимые
+        const mergedData = [...visible, ...invisible];
 
         const saveData = {
           last_update_ts: Math.floor(Date.now() / 1000),
@@ -127,30 +139,32 @@
   /**
    * Главная функция load
    * @param {string} profileId - id из URL (/profile.php?id=N)
-   * @returns {Promise<object>} { status, initialData, save, targetUserId }
+   * @param {object} libraryIds - { icon: Set, plashka: Set, ... }
+   * @returns {Promise<object>} { status, visibleData, invisibleData, save, targetUserId }
    */
-  async function load(profileId) {
+  async function load(profileId, libraryIds) {
     const targetUserId = getUserIdFromModalScript() || Number(profileId);
 
     if (!targetUserId) {
       return {
         status: 'error',
-        initialData: {},
+        visibleData: {},
+        invisibleData: {},
         save: null,
         targetUserId: null
       };
     }
 
-    // Загружаем данные из API
-    const initialData = await loadAllDataFromAPI(targetUserId);
+    // Загружаем данные из API и помечаем is_visible
+    const { visible, invisible } = await loadAllDataFromAPI(targetUserId, libraryIds);
 
     /**
      * Функция сохранения
-     * @param {object} newData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+     * @param {object} newVisibleData - { icon: [], plashka: [], ... } данные из панели
      * @returns {Promise<object>} { ok, status }
      */
-    async function save(newData) {
-      const success = await saveAllDataToAPI(targetUserId, newData);
+    async function save(newVisibleData) {
+      const success = await saveAllDataToAPI(targetUserId, newVisibleData, invisible);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'
@@ -159,7 +173,8 @@
 
     return {
       status: 'ok',
-      initialData,
+      visibleData: visible,
+      invisibleData: invisible,
       save,
       targetUserId
     };

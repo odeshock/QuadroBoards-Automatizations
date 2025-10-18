@@ -509,9 +509,9 @@ document.addEventListener("DOMContentLoaded", () => {
               // Удаляем iframe
               editIframe.remove();
 
-              // Переходим в основном окне
+              // Переходим в основном окне (принудительная перезагрузка)
               console.log("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
-              window.location.href = redirectUrl;
+              window.location.reload();
             }
           } catch (err) {
             console.log("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);

@@ -5451,7 +5451,7 @@ async function collectChronoByUser(opts = {}) {
         const lines = [`Статус: ${success ? 'ok' : (st || 'unknown')}`];
         if (info)  lines.push(info);
         if (error) lines.push(error);
-        setDetails(lines.join('\n'));
+        setDetails(lines.join('<br>'));
       } catch (e) {
         setStatus('Ошибка');
         setDetails(e?.message || String(e));
@@ -5679,7 +5679,7 @@ async function collectChronoByUser(opts = {}) {
 
         // Если сам вызов отработал — это «Готово», даже если были частичные "нет доступа"/"не упоминается"
         setStatus('Готово');
-        setDetails(lines.length ? lines.join('\n') : ''); // пусто — если нет «проблемных» юзеров
+        setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет «проблемных» юзеров
       } catch (e) {
         setStatus('Ошибка');
         setDetails(e?.message || String(e));
@@ -5892,7 +5892,7 @@ async function collectChronoByUser(opts = {}) {
 
         // Если сам вызов отработал — это «Готово»
         setStatus('Готово');
-        setDetails(lines.length ? lines.join('\n') : ''); // пусто — если нет проблемных юзеров
+        setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет проблемных юзеров
       } catch (e) {
         setStatus('Ошибка');
         setDetails(e?.message || String(e));

@@ -144,7 +144,7 @@
         const lines = [`Статус: ${success ? 'ok' : (st || 'unknown')}`];
         if (info)  lines.push(info);
         if (error) lines.push(error);
-        setDetails(lines.join('\n'));
+        setDetails(lines.join('<br>'));
       } catch (e) {
         setStatus('Ошибка');
         setDetails(e?.message || String(e));

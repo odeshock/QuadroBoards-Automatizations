@@ -218,7 +218,13 @@
     };
     const setDetails = (text = '') => {
       if (!pre) return;
-      pre.textContent = String(text || '');
+      const str = String(text || '');
+      // Если текст содержит HTML теги, используем innerHTML, иначе textContent
+      if (str.includes('<') && str.includes('>')) {
+        pre.innerHTML = str;
+      } else {
+        pre.textContent = str;
+      }
     };
     const setLink = (url, text = 'Открыть') => {
       if (!link) return;

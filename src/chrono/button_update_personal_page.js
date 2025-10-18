@@ -217,7 +217,7 @@
 
         // Если сам вызов отработал — это «Готово», даже если были частичные "нет доступа"/"не упоминается"
         setStatus('Готово');
-        setDetails(lines.length ? lines.join('\n') : ''); // пусто — если нет «проблемных» юзеров
+        setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет «проблемных» юзеров
       } catch (e) {
         setStatus('Ошибка');
         setDetails(e?.message || String(e));

@@ -2551,23 +2551,44 @@ document.addEventListener("DOMContentLoaded", () => {
       showDetails = true,
     } = opts || {};
 
-    if (typeof onClick !== 'function') return;
+    console.log(`[createPostButtons] "${label}": Вызов с параметрами:`, { allowedGroups, allowedForums, allowedUsers, containerSelector, postSelector });
+
+    if (typeof onClick !== 'function') {
+      console.log(`[createPostButtons] "${label}": onClick не функция, выход`);
+      return;
+    }
 
     // Ждём готовности AMS
+    console.log(`[createPostButtons] "${label}": Проверка __ams_ready:`, window.__ams_ready);
     if (window.__ams_ready === undefined) {
+      console.log(`[createPostButtons] "${label}": Ждём события ams:ready`);
       await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
     }
+    console.log(`[createPostButtons] "${label}": AMS готов`);
 
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()
       : NaN;
 
+    console.log(`[createPostButtons] "${label}": текущая группа = ${gid}, разрешённые = [${allowedGroups}]`);
+
     // Проверка группы
-    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) return;
-    if (!allowedGroups.map(Number).includes(Number(gid))) return;
+    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) {
+      console.log(`[createPostButtons] "${label}": allowedGroups пустой, выход`);
+      return;
+    }
+    if (!allowedGroups.map(Number).includes(Number(gid))) {
+      console.log(`[createPostButtons] "${label}": группа ${gid} не в списке, выход`);
+      return;
+    }
+
+    console.log(`[createPostButtons] "${label}": проверка группы пройдена`);
 
     // Проверка форума
-    if (!Array.isArray(allowedForums) || allowedForums.length === 0) return;
+    if (!Array.isArray(allowedForums) || allowedForums.length === 0) {
+      console.log(`[createPostButtons] "${label}": allowedForums пустой, выход`);
+      return;
+    }
 
     // Проверка форума через isAllowedForum (из button.js)
     const isAllowedForum = (forumIds) => {
@@ -2592,34 +2613,64 @@ document.addEventListener("DOMContentLoaded", () => {
       return false;
     };
 
-    if (!isAllowedForum(allowedForums)) return;
+    if (!isAllowedForum(allowedForums)) {
+      console.log(`[createPostButtons] "${label}": форум не разрешён, выход`);
+      return;
+    }
+
+    console.log(`[createPostButtons] "${label}": проверка форума пройдена`);
 
     // Проверка пользователей (если задано)
     if (Array.isArray(allowedUsers) && allowedUsers.length > 0) {
       const uid = Number(window.UserID);
-      if (!allowedUsers.map(Number).includes(uid)) return;
+      console.log(`[createPostButtons] "${label}": текущий UserID = ${uid}, разрешённые = [${allowedUsers}]`);
+      if (!allowedUsers.map(Number).includes(uid)) {
+        console.log(`[createPostButtons] "${label}": пользователь ${uid} не в списке, выход`);
+        return;
+      }
     }
+
+    console.log(`[createPostButtons] "${label}": проверка пользователей пройдена`);
 
     // Находим все подходящие посты
     const posts = document.querySelectorAll(postSelector);
+    console.log(`[createPostButtons] "${label}": Найдено постов по селектору "${postSelector}":`, posts.length);
 
-    posts.forEach(post => {
+    let addedCount = 0;
+    posts.forEach((post, index) => {
       const postContent = post.querySelector('.post-content');
-      if (!postContent) return;
+      if (!postContent) {
+        console.log(`[createPostButtons] "${label}": Пост ${index}: нет .post-content, пропуск`);
+        return;
+      }
 
       // Проверяем, что нет тегов bank_ams_check и bank_ams_done
       const hasAmsCheck = postContent.querySelector('bank_ams_check');
       const hasAmsDone = postContent.querySelector('bank_ams_done');
-      if (hasAmsCheck || hasAmsDone) return;
+      if (hasAmsCheck || hasAmsDone) {
+        console.log(`[createPostButtons] "${label}": Пост ${index}: есть bank_ams_check или bank_ams_done, пропуск`);
+        return;
+      }
 
       const container = postContent.querySelector(containerSelector);
-      if (!container) return;
+      if (!container) {
+        console.log(`[createPostButtons] "${label}": Пост ${index}: контейнер "${containerSelector}" не найден, пропуск`);
+        return;
+      }
 
       // Проверяем, не добавлена ли уже кнопка
-      if (container.querySelector(`[data-post-button-label="${label}"]`)) return;
+      if (container.querySelector(`[data-post-button-label="${label}"]`)) {
+        console.log(`[createPostButtons] "${label}": Пост ${index}: кнопка уже добавлена, пропуск`);
+        return;
+      }
 
       const commentId = getCommentId(post);
-      if (!commentId) return;
+      if (!commentId) {
+        console.log(`[createPostButtons] "${label}": Пост ${index}: не удалось получить commentId, пропуск`);
+        return;
+      }
+
+      console.log(`[createPostButtons] "${label}": Пост ${index}: добавляем кнопку для комментария ${commentId}`);
 
       // Создаём UI
       const wrap = document.createElement('div');
@@ -2693,7 +2744,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if (showDetails) setDetails((err && err.message) ? err.message : String(err));
         }
       });
+
+      addedCount++;
     });
+
+    console.log(`[createPostButtons] "${label}": Добавлено кнопок: ${addedCount}`);
   }
 
   // Используем createPostButtons для создания кнопок

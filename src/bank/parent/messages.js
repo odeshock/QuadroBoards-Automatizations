@@ -292,7 +292,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Функция для редактирования комментариев из backup
   async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
-    console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}`);
+    console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_ADMIN_EDIT=${NEW_ADMIN_EDIT}`);
+
+    // Проверки для НЕ-админ редактирования
+    if (!NEW_ADMIN_EDIT) {
+      // 1. Проверка на NEW_COMMENT_ID = 0
+      if (NEW_COMMENT_ID === 0) {
+        console.error('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
+        alert("Извините! Произошла ошибка. Пожалуйста, обратитесь в Приёмную.");
+        return;
+      }
+
+      // 2. Проверка на наличие bank_ams_check или bank_ams_done
+      const commentContent = document.querySelector(`#p${NEW_COMMENT_ID}-content`);
+      if (commentContent) {
+        const hasAmsCheck = commentContent.querySelector('bank_ams_check');
+        const hasAmsDone = commentContent.querySelector('bank_ams_done');
+
+        if (hasAmsCheck || hasAmsDone) {
+          console.warn('⚠️ [BACKUP] Обнаружен bank_ams_check или bank_ams_done, редактирование запрещено');
+          alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
+          return;
+        }
+      } else {
+        console.warn(`⚠️ [BACKUP] Элемент #p${NEW_COMMENT_ID}-content не найден`);
+      }
+    }
 
     const current_storage = await FMVbank.storageGet(user_id);
     console.log(`🟦 [BACKUP] current_storage:`, current_storage);

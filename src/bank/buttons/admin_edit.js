@@ -323,6 +323,12 @@
     });
   }
 
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[adminEdit] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
+  });
+
   // Экспортируем функцию
   window.createAdminEditButtons = createAdminEditButtons;
 })();

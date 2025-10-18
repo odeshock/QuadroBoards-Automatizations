@@ -2450,6 +2450,13 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error('Не найдена форма редактирования');
       }
 
+      // Находим форму и убираем target, чтобы редирект был внутри iframe
+      const form = submitButton.closest('form');
+      if (form) {
+        form.removeAttribute('target');
+        console.log('[START_AMS_CHECK] Удалён атрибут target из формы');
+      }
+
       // Добавляем тег в начало, если его ещё нет
       const currentValue = textarea.value || '';
       if (!currentValue.includes(TAG)) {
@@ -2512,12 +2519,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus('✅ Проверка запущена');
         setDetails(`Комментарий ${commentId} обновлён`);
 
-        // Перезагружаем страницу через 2 секунды
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-
-        return { success: true, redirectUrl };
+        return { success: true, redirectUrl, commentId };
       } else {
         throw new Error('Не удалось обнаружить редирект после отправки');
       }
@@ -2769,8 +2771,29 @@ document.addEventListener("DOMContentLoaded", () => {
       order: 1,
       containerSelector: '.ams_info',
       postSelector: 'div.post',
-      onClick: async ({ commentId, setStatus, setDetails }) => {
-        await startAmsCheck(commentId, { setStatus, setDetails });
+      onClick: async ({ commentId, post, setStatus, setDetails, wrap }) => {
+        const result = await startAmsCheck(commentId, { setStatus, setDetails });
+
+        if (result && result.success) {
+          console.log('[START_AMS_CHECK] Успешно! Обновляем DOM без перезагрузки');
+
+          // Добавляем тег bank_ams_check в DOM
+          const postContent = post.querySelector('div.post-content');
+          if (postContent) {
+            const amsCheckTag = document.createElement('bank_ams_check');
+            postContent.appendChild(amsCheckTag);
+            console.log('[START_AMS_CHECK] Добавлен тег bank_ams_check в DOM');
+          }
+
+          // Удаляем кнопку "Начать проверку"
+          if (wrap) {
+            wrap.remove();
+            console.log('[START_AMS_CHECK] Удалена кнопка "Начать проверку"');
+          }
+
+          // Диспатчим событие для пересоздания кнопок
+          window.dispatchEvent(new CustomEvent('bank:buttons:refresh'));
+        }
       }
     });
   }
@@ -3106,6 +3129,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[adminEdit] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
+  });
+
   // Экспортируем функцию
   window.createAdminEditButtons = createAdminEditButtons;
 })();
@@ -3300,8 +3329,18 @@ document.addEventListener("DOMContentLoaded", () => {
     allowedUsers: (window.BANK_CHECK?.UserID) || []
   };
 
-  createPostButtons(config).catch(err => {
-    console.error('[NO_EDITS_NEEDED] Ошибка при создании кнопок:', err);
+  function init() {
+    createPostButtons(config).catch(err => {
+      console.error('[NO_EDITS_NEEDED] Ошибка при создании кнопок:', err);
+    });
+  }
+
+  init();
+
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[NO_EDITS_NEEDED] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
   });
 })();
 
@@ -3472,8 +3511,18 @@ document.addEventListener("DOMContentLoaded", () => {
     allowedUsers: (window.BANK_CHECK?.UserID) || []
   };
 
-  createPostButtons(config).catch(err => {
-    console.error('[PAY_OUT] Ошибка при создании кнопок:', err);
+  function init() {
+    createPostButtons(config).catch(err => {
+      console.error('[PAY_OUT] Ошибка при создании кнопок:', err);
+    });
+  }
+
+  init();
+
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[PAY_OUT] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
   });
 })();
 

@@ -164,7 +164,17 @@
     allowedUsers: (window.BANK_CHECK?.UserID) || []
   };
 
-  createPostButtons(config).catch(err => {
-    console.error('[PAY_OUT] Ошибка при создании кнопок:', err);
+  function init() {
+    createPostButtons(config).catch(err => {
+      console.error('[PAY_OUT] Ошибка при создании кнопок:', err);
+    });
+  }
+
+  init();
+
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[PAY_OUT] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
   });
 })();

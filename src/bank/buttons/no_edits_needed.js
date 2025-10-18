@@ -187,7 +187,17 @@
     allowedUsers: (window.BANK_CHECK?.UserID) || []
   };
 
-  createPostButtons(config).catch(err => {
-    console.error('[NO_EDITS_NEEDED] Ошибка при создании кнопок:', err);
+  function init() {
+    createPostButtons(config).catch(err => {
+      console.error('[NO_EDITS_NEEDED] Ошибка при создании кнопок:', err);
+    });
+  }
+
+  init();
+
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[NO_EDITS_NEEDED] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
   });
 })();

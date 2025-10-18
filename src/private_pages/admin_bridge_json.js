@@ -38,6 +38,7 @@
 
   /**
    * Загружает данные из API для всех категорий
+   * Фильтрует только видимые элементы (is_visible !== false)
    * @param {number} userId
    * @returns {Promise<object>} { icon: [], plashka: [], background: [], gift: [], coupon: [] }
    */
@@ -61,7 +62,8 @@
 
         // Формат: { last_update_ts, data: [...] }
         if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          result[key] = response.data;
+          // Фильтруем только видимые элементы для редактирования
+          result[key] = response.data.filter(item => item.is_visible !== false);
         }
       } catch (err) {
         console.error(`[admin_bridge_json] Ошибка загрузки ${key}:`, err);
@@ -73,11 +75,18 @@
 
   /**
    * Сохраняет данные в API для всех категорий
+   * Логика:
+   * 1. GET текущих данных из API
+   * 2. Фильтруем элементы, которых нет в библиотеке → is_visible: false (не трогаем их)
+   * 3. Все новые элементы из панели → is_visible: true
+   * 4. Объединяем: [новые видимые, старые невидимые]
+   *
    * @param {number} userId
    * @param {object} jsonData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+   * @param {object} libraryIds - { icon: Set, plashka: Set, background: Set, gift: Set, coupon: Set }
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, jsonData) {
+  async function saveAllDataToAPI(userId, jsonData, libraryIds) {
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageSet не найден');
       return false;
@@ -85,11 +94,25 @@
 
     try {
       for (const [key, label] of Object.entries(apiLabels)) {
-        const categoryData = jsonData[key] || [];
+        // 1. GET текущих данных из API
+        const currentResponse = await window.FMVbank.storageGet(userId, label);
+        const currentData = (currentResponse && Array.isArray(currentResponse.data)) ? currentResponse.data : [];
+
+        // 2. Фильтруем невидимые элементы (которых нет в библиотеке)
+        const libIds = libraryIds[key] || new Set();
+        const invisibleItems = currentData
+          .filter(item => !libIds.has(String(item.id)))
+          .map(item => ({ ...item, is_visible: false }));
+
+        // 3. Новые видимые элементы из панели
+        const newVisibleItems = (jsonData[key] || []).map(item => ({ ...item, is_visible: true }));
+
+        // 4. Объединяем: сначала видимые, потом невидимые
+        const mergedData = [...newVisibleItems, ...invisibleItems];
 
         const saveData = {
           last_update_ts: Math.floor(Date.now() / 1000),
-          data: categoryData
+          data: mergedData
         };
 
         const result = await window.FMVbank.storageSet(saveData, userId, label);
@@ -108,9 +131,10 @@
   /**
    * Главная функция load
    * @param {string} profileId - id из URL (/profile.php?id=N)
+   * @param {object} libraryIds - { icon: Set, plashka: Set, background: Set, gift: Set, coupon: Set }
    * @returns {Promise<object>} { status, initialData, save, targetUserId }
    */
-  async function load(profileId) {
+  async function load(profileId, libraryIds = {}) {
     const targetUserId = getUserIdFromModalScript() || Number(profileId);
 
     if (!targetUserId) {
@@ -131,7 +155,7 @@
      * @returns {Promise<object>} { ok, status }
      */
     async function save(newData) {
-      const success = await saveAllDataToAPI(targetUserId, newData);
+      const success = await saveAllDataToAPI(targetUserId, newData, libraryIds);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'

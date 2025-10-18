@@ -127,8 +127,20 @@
       };
     }
 
+    // --- getLibraryIds: возвращает Set id для каждой категории
+    function getLibraryIds() {
+      return {
+        icon: new Set(libIcon0.map(x => String(x.id))),
+        plashka: new Set(libPlashka0.map(x => String(x.id))),
+        background: new Set(libBack0.map(x => String(x.id))),
+        gift: new Set(libGift0.map(x => String(x.id))),
+        coupon: new Set(libCoupon0.map(x => String(x.id)))
+      };
+    }
+
     const api = {
       getData,
+      getLibraryIds,
       panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift, coupon: panelCoupon },
     };
     window.__skinsSetupJSONMounted = api;

@@ -749,6 +749,7 @@ $(function() {
 
   /**
    * Загружает данные из API для всех категорий
+   * Фильтрует только видимые элементы (is_visible !== false)
    * @param {number} userId
    * @returns {Promise<object>} { icon: [], plashka: [], background: [], gift: [], coupon: [] }
    */
@@ -772,7 +773,8 @@ $(function() {
 
         // Формат: { last_update_ts, data: [...] }
         if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          result[key] = response.data;
+          // Фильтруем только видимые элементы для редактирования
+          result[key] = response.data.filter(item => item.is_visible !== false);
         }
       } catch (err) {
         console.error(`[admin_bridge_json] Ошибка загрузки ${key}:`, err);
@@ -784,11 +786,18 @@ $(function() {
 
   /**
    * Сохраняет данные в API для всех категорий
+   * Логика:
+   * 1. GET текущих данных из API
+   * 2. Фильтруем элементы, которых нет в библиотеке → is_visible: false (не трогаем их)
+   * 3. Все новые элементы из панели → is_visible: true
+   * 4. Объединяем: [новые видимые, старые невидимые]
+   *
    * @param {number} userId
    * @param {object} jsonData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+   * @param {object} libraryIds - { icon: Set, plashka: Set, background: Set, gift: Set, coupon: Set }
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, jsonData) {
+  async function saveAllDataToAPI(userId, jsonData, libraryIds) {
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageSet не найден');
       return false;
@@ -796,11 +805,25 @@ $(function() {
 
     try {
       for (const [key, label] of Object.entries(apiLabels)) {
-        const categoryData = jsonData[key] || [];
+        // 1. GET текущих данных из API
+        const currentResponse = await window.FMVbank.storageGet(userId, label);
+        const currentData = (currentResponse && Array.isArray(currentResponse.data)) ? currentResponse.data : [];
+
+        // 2. Фильтруем невидимые элементы (которых нет в библиотеке)
+        const libIds = libraryIds[key] || new Set();
+        const invisibleItems = currentData
+          .filter(item => !libIds.has(String(item.id)))
+          .map(item => ({ ...item, is_visible: false }));
+
+        // 3. Новые видимые элементы из панели
+        const newVisibleItems = (jsonData[key] || []).map(item => ({ ...item, is_visible: true }));
+
+        // 4. Объединяем: сначала видимые, потом невидимые
+        const mergedData = [...newVisibleItems, ...invisibleItems];
 
         const saveData = {
           last_update_ts: Math.floor(Date.now() / 1000),
-          data: categoryData
+          data: mergedData
         };
 
         const result = await window.FMVbank.storageSet(saveData, userId, label);
@@ -819,9 +842,10 @@ $(function() {
   /**
    * Главная функция load
    * @param {string} profileId - id из URL (/profile.php?id=N)
+   * @param {object} libraryIds - { icon: Set, plashka: Set, background: Set, gift: Set, coupon: Set }
    * @returns {Promise<object>} { status, initialData, save, targetUserId }
    */
-  async function load(profileId) {
+  async function load(profileId, libraryIds = {}) {
     const targetUserId = getUserIdFromModalScript() || Number(profileId);
 
     if (!targetUserId) {
@@ -842,7 +866,7 @@ $(function() {
      * @returns {Promise<object>} { ok, status }
      */
     async function save(newData) {
-      const success = await saveAllDataToAPI(targetUserId, newData);
+      const success = await saveAllDataToAPI(targetUserId, newData, libraryIds);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'
@@ -932,8 +956,9 @@ $(function() {
 
         // Новый формат: { last_update_ts, data: [...] }
         if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          result[key] = response.data;
-          log(`${key} загружено ${response.data.length} элементов`);
+          // Фильтруем только видимые элементы (is_visible !== false)
+          result[key] = response.data.filter(item => item.is_visible !== false);
+          log(`${key} загружено ${result[key].length} видимых элементов из ${response.data.length}`);
         }
       } catch (e) {
         console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);
@@ -3000,8 +3025,20 @@ async function FMVeditTextareaOnly(name, newHtml) {
       };
     }
 
+    // --- getLibraryIds: возвращает Set id для каждой категории
+    function getLibraryIds() {
+      return {
+        icon: new Set(libIcon0.map(x => String(x.id))),
+        plashka: new Set(libPlashka0.map(x => String(x.id))),
+        background: new Set(libBack0.map(x => String(x.id))),
+        gift: new Set(libGift0.map(x => String(x.id))),
+        coupon: new Set(libCoupon0.map(x => String(x.id)))
+      };
+    }
+
     const api = {
       getData,
+      getLibraryIds,
       panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift, coupon: panelCoupon },
     };
     window.__skinsSetupJSONMounted = api;
@@ -3023,11 +3060,6 @@ async function FMVeditTextareaOnly(name, newHtml) {
       if (document.readyState === 'complete' || document.readyState === 'interactive') return res();
       document.addEventListener('DOMContentLoaded', () => res(), { once: true });
     });
-  }
-  function getProfileIdFromURL() {
-    const u = new URL(location.href);
-    const id = u.searchParams.get('id');
-    return id ? String(id).trim() : '';
   }
 
   async function waitMount() {
@@ -3073,32 +3105,48 @@ async function FMVeditTextareaOnly(name, newHtml) {
       return; // подстраховка: нет функции — никому не показываем
     }
 
-    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
-      console.error('[profile_runner_json] skinAdmin.load не найден.');
-      return;
-    }
-
-    const { status, initialData, save, targetUserId } = await window.skinAdmin.load(id);
-    if (status !== 'ok' && status !== 'ок') {
-      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
-      return;
-    }
-
     const mount = await waitMount();
 
+    // Сначала создаём панели, чтобы получить libraryIds
     let getData = null;
+    let getLibraryIds = null;
     if (typeof window.setupSkinsJSON === 'function') {
       try {
-        const api = await window.setupSkinsJSON(mount, { initialData });
+        const api = await window.setupSkinsJSON(mount, { initialData: {} });
         if (api && typeof api.getData === 'function') getData = api.getData;
+        if (api && typeof api.getLibraryIds === 'function') getLibraryIds = api.getLibraryIds;
       } catch (e) {
         console.error('setupSkinsJSON() error:', e);
       }
     }
 
-    if (!getData) {
+    if (!getData || !getLibraryIds) {
       console.error('[profile_runner_json] Не удалось инициализировать панели');
       return;
+    }
+
+    // Теперь загружаем данные, передавая libraryIds
+    const libraryIds = getLibraryIds();
+
+    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
+      console.error('[profile_runner_json] skinAdmin.load не найден.');
+      return;
+    }
+
+    const { status, initialData, save } = await window.skinAdmin.load(id, libraryIds);
+    if (status !== 'ok' && status !== 'ок') {
+      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
+      return;
+    }
+
+    // Инициализируем панели загруженными данными
+    if (window.__skinsSetupJSONMounted && window.__skinsSetupJSONMounted.panels) {
+      const panels = window.__skinsSetupJSONMounted.panels;
+      if (initialData.gift && panels.gift) panels.gift.init(initialData.gift);
+      if (initialData.coupon && panels.coupon) panels.coupon.init(initialData.coupon);
+      if (initialData.plashka && panels.plashka) panels.plashka.init(initialData.plashka);
+      if (initialData.icon && panels.icon) panels.icon.init(initialData.icon);
+      if (initialData.background && panels.back) panels.back.init(initialData.background);
     }
 
     const panelRoot = document.getElementById('fmv-skins-panel');

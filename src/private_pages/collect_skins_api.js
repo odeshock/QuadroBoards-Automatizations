@@ -70,8 +70,9 @@
 
         // Новый формат: { last_update_ts, data: [...] }
         if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          result[key] = response.data;
-          log(`${key} загружено ${response.data.length} элементов`);
+          // Фильтруем только видимые элементы (is_visible !== false)
+          result[key] = response.data.filter(item => item.is_visible !== false);
+          log(`${key} загружено ${result[key].length} видимых элементов из ${response.data.length}`);
         }
       } catch (e) {
         console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);

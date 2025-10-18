@@ -12,11 +12,6 @@
       document.addEventListener('DOMContentLoaded', () => res(), { once: true });
     });
   }
-  function getProfileIdFromURL() {
-    const u = new URL(location.href);
-    const id = u.searchParams.get('id');
-    return id ? String(id).trim() : '';
-  }
 
   async function waitMount() {
     await onReady();
@@ -61,32 +56,48 @@
       return; // подстраховка: нет функции — никому не показываем
     }
 
-    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
-      console.error('[profile_runner_json] skinAdmin.load не найден.');
-      return;
-    }
-
-    const { status, initialData, save, targetUserId } = await window.skinAdmin.load(id);
-    if (status !== 'ok' && status !== 'ок') {
-      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
-      return;
-    }
-
     const mount = await waitMount();
 
+    // Сначала создаём панели, чтобы получить libraryIds
     let getData = null;
+    let getLibraryIds = null;
     if (typeof window.setupSkinsJSON === 'function') {
       try {
-        const api = await window.setupSkinsJSON(mount, { initialData });
+        const api = await window.setupSkinsJSON(mount, { initialData: {} });
         if (api && typeof api.getData === 'function') getData = api.getData;
+        if (api && typeof api.getLibraryIds === 'function') getLibraryIds = api.getLibraryIds;
       } catch (e) {
         console.error('setupSkinsJSON() error:', e);
       }
     }
 
-    if (!getData) {
+    if (!getData || !getLibraryIds) {
       console.error('[profile_runner_json] Не удалось инициализировать панели');
       return;
+    }
+
+    // Теперь загружаем данные, передавая libraryIds
+    const libraryIds = getLibraryIds();
+
+    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
+      console.error('[profile_runner_json] skinAdmin.load не найден.');
+      return;
+    }
+
+    const { status, initialData, save } = await window.skinAdmin.load(id, libraryIds);
+    if (status !== 'ok' && status !== 'ок') {
+      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
+      return;
+    }
+
+    // Инициализируем панели загруженными данными
+    if (window.__skinsSetupJSONMounted && window.__skinsSetupJSONMounted.panels) {
+      const panels = window.__skinsSetupJSONMounted.panels;
+      if (initialData.gift && panels.gift) panels.gift.init(initialData.gift);
+      if (initialData.coupon && panels.coupon) panels.coupon.init(initialData.coupon);
+      if (initialData.plashka && panels.plashka) panels.plashka.init(initialData.plashka);
+      if (initialData.icon && panels.icon) panels.icon.init(initialData.icon);
+      if (initialData.background && panels.back) panels.back.init(initialData.background);
     }
 
     const panelRoot = document.getElementById('fmv-skins-panel');

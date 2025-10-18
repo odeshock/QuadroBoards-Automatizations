@@ -9,17 +9,22 @@ document.addEventListener("DOMContentLoaded", () => {
         postForm.style.display = 'none'; // Скрываем элемент
     }
 
-    // Создаём .ams_info для topicpost (первого поста), если его ещё нет
-    const topicPost = document.querySelector('div.post.topicpost');
-    if (topicPost) {
-        const topicPostContent = topicPost.querySelector('.post-content');
-        if (topicPostContent && !topicPostContent.querySelector('.ams_info')) {
+    // Создаём .ams_info для постов без bank_ams_check и bank_ams_done
+    document.querySelectorAll('div.post').forEach((post) => {
+        const postContent = post.querySelector('.post-content');
+        if (!postContent) return;
+
+        // Проверяем, что нет тегов bank_ams_check и bank_ams_done
+        const hasAmsCheck = postContent.querySelector('bank_ams_check');
+        const hasAmsDone = postContent.querySelector('bank_ams_done');
+
+        if (!hasAmsCheck && !hasAmsDone && !postContent.querySelector('.ams_info')) {
             const amsInfo = document.createElement('div');
             amsInfo.className = 'ams_info';
-            topicPostContent.appendChild(amsInfo);
-            console.log('[gringotts_page_update] .ams_info создан для topicpost');
+            postContent.appendChild(amsInfo);
+            console.log('[gringotts_page_update] .ams_info создан для поста');
         }
-    }
+    });
 
     // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
     document.querySelectorAll("div.post").forEach(async (container) => {

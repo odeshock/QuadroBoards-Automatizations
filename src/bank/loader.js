@@ -118,6 +118,14 @@ const ALLOWED_PARENTS = [
     if (d.type === "BANNER_MAYAK_FLAG") window.BANNER_MAYAK_FLAG = !!d.banner_mayak_flag;
     if (d.type === "BANNER_RENO_FLAG") window.BANNER_RENO_FLAG = !!d.banner_reno_flag;
 
+    if (d.type === "COMMENT_INFO") {
+      window.NEW_COMMENT_ID = d.NEW_COMMENT_ID;
+      window.NEW_CURRENT_BANK = d.NEW_CURRENT_BANK;
+      window.NEW_ADMIN_EDIT = d.NEW_ADMIN_EDIT;
+    }
+
+    if (d.type === "BACKUP_DATA") window.BACKUP_DATA = d.BACKUP_DATA;
+
     // Проверяем, все ли критические данные загружены
     if (window.USER_ID !== undefined &&
       window.IS_ADMIN !== undefined &&

@@ -46,8 +46,7 @@ function renderGiftPickerUniversal({
   price,
   updateTotalCost,
   showPreview = false,
-  includeGiftDataField = false,
-  title = null
+  includeGiftDataField = false
 }) {
   return renderRecipientPickerUniversal({
     users,
@@ -65,7 +64,7 @@ function renderGiftPickerUniversal({
     prefillCurrentUser: false,
     hideFieldsForCurrentUser: false,
 
-    giftData: { id: giftId, icon: giftIcon, title: title },
+    giftData: { id: giftId, icon: giftIcon },
     priceData: null,
 
     updateCostCallback: updateTotalCost,
@@ -73,7 +72,7 @@ function renderGiftPickerUniversal({
   });
 }
 
-export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price, title }) {
+export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
   // 1) Очищаем модальное окно
   clearModalFields(modalFields);
 
@@ -86,7 +85,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
     disableSubmitButton(btnSubmit);
   };
 
-  
+
   const updateTotalCost = (giftGroups) => {
     const totalCount = giftGroups.length;
     const itemPrice = Number.parseInt(price, 10) || 100;
@@ -114,8 +113,7 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
       price,
       updateTotalCost,
       showPreview: false,
-      includeGiftDataField: true,
-      title
+      includeGiftDataField: true
     });
   };
 
@@ -128,58 +126,12 @@ export function setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, ti
 // SETUP GIFT FLOW - Подарки
 // ============================================================================
 
-export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price, title }) {
+export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId, giftIcon, price }) {
   // 1) Очищаем модальное окно
   clearModalFields(modalFields);
 
   // 2) Показываем сообщение ожидания
   showWaitMessage(modalFields, TEXT_MESSAGES.PLEASE_WAIT);
-
-  // 3) Предзагружаем иконку и показываем превью только когда она загрузится
-  if (giftIcon && title) {
-    // Создаём временный контейнер для парсинга HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = giftIcon;
-    const imgElement = tempDiv.querySelector('img');
-
-    const showPreview = (preloadedImg = null) => {
-      const preview = document.createElement('div');
-      preview.className = 'preview';
-
-      const iconSpan = document.createElement('span');
-      iconSpan.className = 'icon-prw';
-
-      // Если есть предзагруженное изображение, используем его
-      if (preloadedImg) {
-        iconSpan.appendChild(preloadedImg);
-      } else {
-        iconSpan.innerHTML = giftIcon;
-      }
-
-      const titleSpan = document.createElement('span');
-      titleSpan.style.fontWeight = '600';
-      titleSpan.textContent = title;
-
-      preview.append(iconSpan, titleSpan);
-      // Вставляем в самое начало
-      modalFields.insertBefore(preview, modalFields.firstChild);
-    };
-
-    if (imgElement && imgElement.src) {
-      // Есть img - предзагружаем
-      const preloadImg = new Image();
-      // Копируем все атрибуты из оригинального img
-      Array.from(imgElement.attributes).forEach(attr => {
-        preloadImg.setAttribute(attr.name, attr.value);
-      });
-      preloadImg.onload = () => showPreview(preloadImg);
-      preloadImg.onerror = () => showPreview(); // Показываем без картинки если загрузка не удалась
-      preloadImg.src = imgElement.src;
-    } else {
-      // Нет img (например, эмодзи) - показываем сразу
-      showPreview();
-    }
-  }
 
   // 3) Функция для отображения ошибки
   const fail = () => {
@@ -215,9 +167,8 @@ export function setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutM
       giftIcon,
       price,
       updateTotalCost,
-      showPreview: false, // Превью уже показано выше
-      includeGiftDataField: false,
-      title
+      showPreview: false,
+      includeGiftDataField: false
     });
   };
 
@@ -239,8 +190,8 @@ export function handleGiftsAndDesignForms({ template, modalFields, btnSubmit, co
   const timeoutMs = config.timeoutMs || GIFT_TIMEOUT_MS;
 
   counterWatcher = isCustom
-    ? setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price, title: config.title })
-    : setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price, title: config.title });
+    ? setupCustomGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price })
+    : setupGiftFlow({ modalFields, btnSubmit, counterWatcher, timeoutMs, data, modalAmount, giftId: config.giftId, giftIcon: config.giftIcon, price: config.price });
 
   return { handled: true, counterWatcher };
 }

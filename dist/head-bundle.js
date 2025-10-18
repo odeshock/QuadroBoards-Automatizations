@@ -2827,7 +2827,7 @@ window.getBlockquoteTextFromHtml = getBlockquoteTextFromHtml;
  * Использует window.fetchHtml если доступна, иначе fallback на базовый fetch.
  * @param {number} topic_id - ID темы (viewtopic.php?id=<topic_id>)
  * @param {Array<number>} comment_ids - ID постов (#p<comment_id>-content)
- * @returns {Promise<Array<{id: string, icon: string, title: string}>>}
+ * @returns {Promise<Array<{id: string, icon: string}>>}
  */
 async function fetchDesignItems(topic_id, comment_ids) {
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
@@ -2871,10 +2871,9 @@ async function fetchDesignItems(topic_id, comment_ids) {
     // Выбираем только article.card БЕЗ класса hidden
     const result = [...innerDoc.querySelectorAll('#grid article.card:not(.hidden)')].map(card => {
       const id = FMV.normSpace(card.querySelector('.id')?.textContent || '');
-      const title = FMV.normSpace(card.querySelector('.title')?.textContent || '');
       const icon = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
 
-      return { id, icon, title };
+      return { id, icon };
     });
 
     allResults.push(...result);
@@ -2886,6 +2885,46 @@ async function fetchDesignItems(topic_id, comment_ids) {
 window.fetchDesignItems = fetchDesignItems;
 
 /* MODULE 10: bank/parent/fetch_user_coupons.js */
+const typeRank = { item: 0, fixed: 1 };
+const rankType = t => (t in typeRank ? typeRank[t] : 2);
+
+// Безопасное приведение value к числу (нечисловые → -Infinity, чтобы улетали в конец при убывании)
+const toNumber = v => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : -Infinity;
+};
+
+// Приведение expiresAt к таймстемпу; невалидные/пустые → +Infinity (как «без срока» в конце)
+const toTimeOrInf = v => {
+  if (v === undefined || v === null || v === "") return Infinity;
+  const t = (v instanceof Date) ? v.getTime() : Date.parse(v);
+  return Number.isFinite(t) ? t : Infinity;
+};
+
+const comparator = (a, b) => {
+  // 1) type: item → fixed → остальное
+  let diff = rankType(a.type) - rankType(b.type);
+  if (diff !== 0) return diff;
+
+  // 2) value: по убыванию
+  diff = toNumber(b.value) - toNumber(a.value);
+  if (diff !== 0) return diff;
+
+  // 3) expiresAt: присутствующие раньше отсутствующих; внутри — по возрастанию
+  const ta = toTimeOrInf(a.expiresAt);
+  const tb = toTimeOrInf(b.expiresAt);
+
+  // Если у одного Infinity (нет срока), он идёт позже
+  if (ta === Infinity && tb !== Infinity) return 1;
+  if (tb === Infinity && ta !== Infinity) return -1;
+
+  // Оба есть или оба Infinity → обычное сравнение
+  diff = ta - tb;
+  if (diff !== 0) return diff;
+
+  return 0;
+};
+
 /**
  * Загружает персональные купоны пользователя с его профильной страницы.
  * Следует редиректам (main: usrK_skin) и валидирует даты истечения.
@@ -2904,10 +2943,10 @@ async function fetchUserCoupons() {
   const fetchFunc = typeof window.fetchHtml === 'function'
     ? window.fetchHtml
     : async (url) => {
-        const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
-        const res = await fetchWithRetry(url, { credentials: 'include' });
-        return res.text();
-      };
+      const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
+      const res = await fetchWithRetry(url, { credentials: 'include' });
+      return res.text();
+    };
 
   // Функция для получения текущей даты в МСК (yyyy-mm-dd)
   const getTodayMoscow = () => {
@@ -3048,7 +3087,7 @@ function extractCouponsFromDoc(doc, today) {
   });
 
   console.log(`[fetchUserCoupons] Загружено купонов: ${coupons.length}`);
-  return coupons;
+  return coupons.sort(comparator);
 }
 
 // Экспортируем в window

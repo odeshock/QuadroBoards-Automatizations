@@ -25,7 +25,7 @@ import { hideWaitMessage, normalizeString } from './helpers.js';
  *
  * @param {Object} config.giftData - Данные подарка (для форм подарков)
  * @param {string} config.giftData.id - ID подарка
- * @param {string} config.giftData.icon - Иконка подарка
+ * @param {string} config.giftData.icon - HTML иконки подарка
  *
  * @param {Object} config.priceData - Данные для расчёта цены (для форм с количеством)
  * @param {number} config.priceData.basePrice - Базовая цена за единицу
@@ -67,11 +67,7 @@ export function renderRecipientPickerUniversal({
     // Вставляем HTML ДО добавления в DOM чтобы браузер мог начать предзагрузку
     iconSpan.innerHTML = giftData.icon || '';
 
-    const titleSpan = document.createElement('span');
-    titleSpan.style.fontWeight = '600';
-    titleSpan.textContent = giftData.title || `ID: ${giftData.id || ''}`;
-
-    preview.append(iconSpan, titleSpan);
+    preview.appendChild(iconSpan);
     modalFields.appendChild(preview);
   }
 

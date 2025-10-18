@@ -724,6 +724,7 @@ form.addEventListener('submit', (e) => {
     group.amountLabel = meta.amountLabel;
     group.kind = meta.kind;
     group.giftId = meta.giftId;
+    group.giftIcon = meta.giftIcon;
     group.price = meta.price;
     group.bonus = meta.bonus;
     group.mode = meta.mode;
@@ -867,24 +868,14 @@ function renderExpenseList() {
 function renderGiftsList() {
   // Ждём загрузки данных из window.SKIN_DATA_GIFT
   if (typeof window.SKIN_DATA_GIFT === 'undefined') {
-    console.log('[renderGiftsList] Waiting for SKIN_DATA_GIFT...');
-    // Повторяем попытку через 100ms
     setTimeout(renderGiftsList, 100);
     return;
   }
 
-  console.log('[renderGiftsList] Rendering with data:', window.SKIN_DATA_GIFT);
-  console.log('[renderGiftsList] giftItems:', giftItems);
-
   const container = document.querySelector('#tab-gifts .gift-grid');
-  if (!container) {
-    console.warn('[renderGiftsList] Container not found!');
-    return;
-  }
+  if (!container) return;
 
-  console.log('[renderGiftsList] Starting forEach, giftItems.length:', giftItems.length);
-  giftItems.forEach((item, index) => {
-    console.log(`[renderGiftsList] Processing item ${index}:`, item);
+  giftItems.forEach(item => {
     const isCustom = item.id === 'custom';
     const price = isCustom ? itemPrices.gift.custom : itemPrices.gift.collection;
 
@@ -895,14 +886,11 @@ function renderGiftsList() {
     btn.setAttribute('data-kind', 'expense');
     btn.setAttribute('data-amount', String(price));
     btn.setAttribute('data-price', String(price));
-    btn.setAttribute('data-title', item.title);
     btn.setAttribute('data-gift-id', item.id);
     btn.setAttribute('data-gift-icon', item.icon);
     btn.innerHTML = item.icon;
-    console.log(`[renderGiftsList] Created button for ${item.id}, appending to container`);
     container.appendChild(btn);
   });
-  console.log('[renderGiftsList] Finished forEach, container children:', container.children.length);
 }
 
 // Функции для рендеринга оформления
@@ -911,22 +899,13 @@ function renderDesignLists() {
   if (typeof window.SKIN_DATA_ICON === 'undefined' ||
     typeof window.SKIN_DATA_PLASHKA === 'undefined' ||
     typeof window.SKIN_DATA_BACK === 'undefined') {
-    console.log('[renderDesignLists] Waiting for SKIN_DATA...');
-    // Повторяем попытку через 100ms
     setTimeout(renderDesignLists, 100);
     return;
   }
 
-  console.log('[renderDesignLists] Rendering with data:', {
-    icon: window.SKIN_DATA_ICON,
-    plashka: window.SKIN_DATA_PLASHKA,
-    back: window.SKIN_DATA_BACK
-  });
-
   // Иконки
   const iconContainer = document.querySelector('#tab-design .icon-grid');
   if (iconContainer) {
-    console.log('[renderDesignLists] iconItems:', iconItems);
     iconItems.forEach(item => {
       const isCustom = item.id === 'custom';
       const price = isCustom ? itemPrices.icon.custom : itemPrices.icon.collection;

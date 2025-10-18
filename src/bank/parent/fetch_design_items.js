@@ -3,7 +3,7 @@
  * Использует window.fetchHtml если доступна, иначе fallback на базовый fetch.
  * @param {number} topic_id - ID темы (viewtopic.php?id=<topic_id>)
  * @param {Array<number>} comment_ids - ID постов (#p<comment_id>-content)
- * @returns {Promise<Array<{id: string, icon: string, title: string}>>}
+ * @returns {Promise<Array<{id: string, icon: string}>>}
  */
 async function fetchDesignItems(topic_id, comment_ids) {
   const topicUrl = `${location.origin.replace(/\/$/, '')}/viewtopic.php?id=${encodeURIComponent(String(topic_id))}`;
@@ -47,10 +47,9 @@ async function fetchDesignItems(topic_id, comment_ids) {
     // Выбираем только article.card БЕЗ класса hidden
     const result = [...innerDoc.querySelectorAll('#grid article.card:not(.hidden)')].map(card => {
       const id = FMV.normSpace(card.querySelector('.id')?.textContent || '');
-      const title = FMV.normSpace(card.querySelector('.title')?.textContent || '');
       const icon = (card.querySelector('.content')?.innerHTML || '').replace(/\u00A0/g, ' ').trim();
 
-      return { id, icon, title };
+      return { id, icon };
     });
 
     allResults.push(...result);

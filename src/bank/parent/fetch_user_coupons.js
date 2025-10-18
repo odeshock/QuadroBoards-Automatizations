@@ -1,3 +1,43 @@
+const typeRank = { item: 0, fixed: 1 };
+const rankType = t => (t in typeRank ? typeRank[t] : 2);
+
+// Безопасное приведение value к числу (нечисловые → -Infinity, чтобы улетали в конец при убывании)
+const toNumber = v => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : -Infinity;
+};
+
+// Приведение expiresAt к таймстемпу; невалидные/пустые → +Infinity (как «без срока» в конце)
+const toTimeOrInf = v => {
+  if (v === undefined || v === null || v === "") return Infinity;
+  const t = (v instanceof Date) ? v.getTime() : Date.parse(v);
+  return Number.isFinite(t) ? t : Infinity;
+};
+
+const comparator = (a, b) => {
+  // 1) type: item → fixed → остальное
+  let diff = rankType(a.type) - rankType(b.type);
+  if (diff !== 0) return diff;
+
+  // 2) value: по убыванию
+  diff = toNumber(b.value) - toNumber(a.value);
+  if (diff !== 0) return diff;
+
+  // 3) expiresAt: присутствующие раньше отсутствующих; внутри — по возрастанию
+  const ta = toTimeOrInf(a.expiresAt);
+  const tb = toTimeOrInf(b.expiresAt);
+
+  // Если у одного Infinity (нет срока), он идёт позже
+  if (ta === Infinity && tb !== Infinity) return 1;
+  if (tb === Infinity && ta !== Infinity) return -1;
+
+  // Оба есть или оба Infinity → обычное сравнение
+  diff = ta - tb;
+  if (diff !== 0) return diff;
+
+  return 0;
+};
+
 /**
  * Загружает персональные купоны пользователя с его профильной страницы.
  * Следует редиректам (main: usrK_skin) и валидирует даты истечения.
@@ -16,10 +56,10 @@ async function fetchUserCoupons() {
   const fetchFunc = typeof window.fetchHtml === 'function'
     ? window.fetchHtml
     : async (url) => {
-        const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
-        const res = await fetchWithRetry(url, { credentials: 'include' });
-        return res.text();
-      };
+      const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
+      const res = await fetchWithRetry(url, { credentials: 'include' });
+      return res.text();
+    };
 
   // Функция для получения текущей даты в МСК (yyyy-mm-dd)
   const getTodayMoscow = () => {
@@ -160,7 +200,7 @@ function extractCouponsFromDoc(doc, today) {
   });
 
   console.log(`[fetchUserCoupons] Загружено купонов: ${coupons.length}`);
-  return coupons;
+  return coupons.sort(comparator);
 }
 
 // Экспортируем в window

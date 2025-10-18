@@ -86,7 +86,7 @@ export const formTemplates = {
   [FORM_INCOME_POST_OF]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
   [FORM_INCOME_EPISODE_OF]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
   [FORM_INCOME_ACTIVIST]: infoWithNote(TEXT_MESSAGES.ADMIN_INFO),
-  
+
   // ДОХОДЫ (формы)
   [FORM_INCOME_NEEDREQUEST]: urlFieldWithExtra({
     name: 'need',
@@ -211,7 +211,7 @@ export const formTemplates = {
 
   // КУПОНЫ
   [FORM_PERSONAL_COUPON]: infoWithNote(
-    'Сначала добавьте операцию, потом используйте купон.<br><br><strong>Процентные скидки</strong> для каждого вида операции можно использовать за транзакцию <strong>лишь раз</strong>.',
+    'Сначала добавьте операцию, потом используйте купон.<br><br><strong>Процентные скидки</strong> для каждого вида операции можно использовать за транзакцию <strong>лишь раз</strong>.<br><br>Дата — <strong>последний день</strong>, когда купон работает. Все даты указаны <strong>по московскому времени</strong>.',
     TEXT_MESSAGES.PLEASE_WAIT
   )
 };

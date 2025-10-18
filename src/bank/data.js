@@ -148,19 +148,15 @@ export const itemDiscountPrices = {
 // ПОДАРКИ
 // ============================================================================
 
-console.log('[data.js] Initializing SKIN_DATA getters/setters...');
-
 let _giftItemsCache = null;
 
 // Создаём setter/getter для отслеживания изменений
 if (!window.hasOwnProperty('SKIN_DATA_GIFT')) {
-  console.log('[data.js] Creating defineProperty for SKIN_DATA_GIFT');
   Object.defineProperty(window, 'SKIN_DATA_GIFT', {
     get() {
       return this._SKIN_DATA_GIFT;
     },
     set(value) {
-      console.log('[SKIN_DATA_GIFT setter] New value:', value);
       this._SKIN_DATA_GIFT = value;
       _giftItemsCache = null; // Сбрасываем кэш
     },
@@ -169,21 +165,16 @@ if (!window.hasOwnProperty('SKIN_DATA_GIFT')) {
 }
 
 function _getGiftItems() {
-  if (_giftItemsCache) {
-    console.log('[_getGiftItems] Returning cached:', _giftItemsCache);
-    return _giftItemsCache;
-  }
-  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный подарок' };
-  const skinData = window.SKIN_DATA_GIFT || []; // Читаем через геттер
+  if (_giftItemsCache) return _giftItemsCache;
+  const customItem = { id: 'custom', icon: '✨' };
+  const skinData = window.SKIN_DATA_GIFT || [];
   _giftItemsCache = [customItem, ...skinData];
-  console.log('[_getGiftItems] Created new cache:', _giftItemsCache);
   return _giftItemsCache;
 }
 
 export const giftItems = new Proxy([], {
   get(_target, prop) {
     const items = _getGiftItems();
-    console.log('[giftItems Proxy get]', prop, 'items.length:', items.length);
 
     // Специальная обработка для методов массива
     if (typeof items[prop] === 'function') {
@@ -218,7 +209,7 @@ if (!window.hasOwnProperty('SKIN_DATA_ICON')) {
 
 function _getIconItems() {
   if (_iconItemsCache) return _iconItemsCache;
-  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная иконка' };
+  const customItem = { id: 'custom', icon: '✨' };
   const skinData = window.SKIN_DATA_ICON || [];
   _iconItemsCache = [customItem, ...skinData];
   return _iconItemsCache;
@@ -258,7 +249,7 @@ if (!window.hasOwnProperty('SKIN_DATA_PLASHKA')) {
 
 function _getBadgeItems() {
   if (_badgeItemsCache) return _badgeItemsCache;
-  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальная плашка' };
+  const customItem = { id: 'custom', icon: '✨' };
   const skinData = window.SKIN_DATA_PLASHKA || [];
   _badgeItemsCache = [customItem, ...skinData];
   return _badgeItemsCache;
@@ -298,7 +289,7 @@ if (!window.hasOwnProperty('SKIN_DATA_BACK')) {
 
 function _getBackgroundItems() {
   if (_backgroundItemsCache) return _backgroundItemsCache;
-  const customItem = { id: 'custom', icon: '✨', title: 'Индивидуальный фон' };
+  const customItem = { id: 'custom', icon: '✨' };
   const skinData = window.SKIN_DATA_BACK || [];
   _backgroundItemsCache = [customItem, ...skinData];
   return _backgroundItemsCache;

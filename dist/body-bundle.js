@@ -927,17 +927,40 @@ function getProfileId() {
 }
 
 /**
- * Получает user_id с учётом data-main-user_id
+ * Загружает страницу /pages/usrN и извлекает user_id из .modal_script
+ * Приоритет: data-main-user_id > N из URL
  */
-function getUserIdFromPage(profileId) {
-  const modal = document.querySelector('.modal_script[data-id]');
-  if (modal) {
-    const mainUserId = modal.getAttribute('data-main-user_id');
+async function getUserIdFromPage(profileId) {
+  try {
+    const pageUrl = `/pages/usr${profileId}`;
+    const response = await fetch(pageUrl);
+    if (!response.ok) {
+      console.error(`[get_skin_api] Не удалось загрузить ${pageUrl}`);
+      return Number(profileId);
+    }
+
+    const html = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const modalScript = doc.querySelector('.modal_script');
+    if (!modalScript) {
+      console.warn(`[get_skin_api] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+      return Number(profileId);
+    }
+
+    const mainUserId = modalScript.getAttribute('data-main-user_id');
     if (mainUserId && mainUserId.trim()) {
+      console.log(`[get_skin_api] Найден data-main-user_id=${mainUserId}`);
       return Number(mainUserId.trim());
     }
+
+    // Если data-main-user_id не указан, используем profileId
+    return Number(profileId);
+  } catch (err) {
+    console.error('[get_skin_api] Ошибка загрузки страницы:', err);
+    return Number(profileId);
   }
-  return Number(profileId);
 }
 
 /**
@@ -998,8 +1021,8 @@ async function collectSkinSets() {
   const profileId = getProfileId();
   console.log('[get_skin_api] profileId:', profileId);
 
-  // Получаем целевой userId с учётом data-main-user_id
-  const userId = getUserIdFromPage(profileId);
+  // Получаем целевой userId с учётом data-main-user_id (async!)
+  const userId = await getUserIdFromPage(profileId);
   console.log('[get_skin_api] Целевой userId:', userId);
 
   // Загружаем из API

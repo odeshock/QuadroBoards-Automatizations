@@ -19,37 +19,74 @@
     const allowedForums = opts?.allowedForums || [];
     const allowedUsers = opts?.allowedUsers || [];
 
-    // Проверяем права доступа
-    const userGroup = Number(window.UserGroup) || 0;
-    const currentForum = Number(window.ForumID) || 0;
-    const uid = Number(window.UserID) || 0;
+    console.log('[NO_EDITS_NEEDED] Вызов с параметрами:', { allowedGroups, allowedForums, allowedUsers });
 
-    // Проверяем группу
-    if (Array.isArray(allowedGroups) && allowedGroups.length > 0) {
-      if (!allowedGroups.map(Number).includes(userGroup)) {
-        return;
-      }
-    }
-
-    // Проверяем форум
-    if (Array.isArray(allowedForums) && allowedForums.length > 0) {
-      if (!allowedForums.map(Number).includes(currentForum)) {
-        return;
-      }
-    }
-
-    // Проверяем пользователя
-    if (Array.isArray(allowedUsers) && allowedUsers.length > 0) {
-      if (!allowedUsers.map(Number).includes(uid)) {
-        return;
-      }
-    }
-
-    // Ждём готовности gringotts
+    // Ждём события gringotts:ready
     if (!window.__gringotts_ready) {
-      await new Promise(resolve => {
-        window.addEventListener('gringotts:ready', resolve, { once: true });
+      console.log('[NO_EDITS_NEEDED] Ждём события gringotts:ready');
+      await new Promise(r => window.addEventListener('gringotts:ready', r, { once: true }));
+    } else {
+      console.log('[NO_EDITS_NEEDED] gringotts уже готов');
+    }
+
+    const gid = typeof window.getCurrentGroupId === 'function'
+      ? window.getCurrentGroupId()
+      : NaN;
+
+    console.log('[NO_EDITS_NEEDED] текущая группа =', gid, ', разрешённые =', allowedGroups);
+
+    // Проверка группы
+    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) {
+      console.log('[NO_EDITS_NEEDED] allowedGroups пустой, выход');
+      return;
+    }
+    if (!allowedGroups.map(Number).includes(Number(gid))) {
+      console.log('[NO_EDITS_NEEDED] группа', gid, 'не в списке, выход');
+      return;
+    }
+
+    // Проверка форума
+    if (!Array.isArray(allowedForums) || allowedForums.length === 0) {
+      console.log('[NO_EDITS_NEEDED] allowedForums пустой, выход');
+      return;
+    }
+
+    // Проверка форума через isAllowedForum
+    const isAllowedForum = (forumIds) => {
+      const allow = (forumIds || []).map(String);
+      const crumbs = document.querySelector('.container.crumbs');
+
+      const matchIn = (root) => Array.from(root.querySelectorAll('a[href]')).some(a => {
+        try {
+          const u = new URL(a.getAttribute('href'), location.href);
+          if (!u.pathname.includes('viewforum.php')) return false;
+          const id = (u.searchParams.get('id') || '').trim();
+          return id && allow.includes(id);
+        } catch { return false; }
       });
+
+      if (crumbs && matchIn(crumbs)) return true;
+      if (matchIn(document)) return true;
+
+      const bodyForumId = document.body?.dataset?.forumId;
+      if (bodyForumId && allow.includes(String(bodyForumId))) return true;
+
+      return false;
+    };
+
+    if (!isAllowedForum(allowedForums)) {
+      console.log('[NO_EDITS_NEEDED] форум не разрешён, выход');
+      return;
+    }
+
+    // Проверка пользователей
+    if (Array.isArray(allowedUsers) && allowedUsers.length > 0) {
+      const uid = Number(window.UserID);
+      console.log('[NO_EDITS_NEEDED] текущий UserID =', uid, ', разрешённые =', allowedUsers);
+      if (!allowedUsers.map(Number).includes(uid)) {
+        console.log('[NO_EDITS_NEEDED] пользователь', uid, 'не в списке, выход');
+        return;
+      }
     }
 
     console.log('[NO_EDITS_NEEDED] Начинаем создание кнопок');

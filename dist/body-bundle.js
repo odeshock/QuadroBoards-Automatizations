@@ -1356,60 +1356,76 @@ $(function() {
 })();
 (function () {
   // ==== настройки ====
-  const SOURCE_BLOCK = '#pun-main .container';
-  const INFO_TEXT = 'Ссылка, по которой Вы пришли, неверная или устаревшая.';
-  const DEFAULT_CHARSET = 'windows-1251';
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
-  const SKIN_TARGET_SEL = '.skin_info';
   const CHRONO_TARGET_SEL = '.chrono_info';
   const DEBUG = false;
+  const API_KEY_LABEL = 'chrono_';
 
-  // соответствия "имя секции" -> "селектор целевого контейнера"
-  // важное: для _background страница называется usrN_back
-  const SECTION_MAP = {
-    skin: '.skin_info',          // /pages/usrN_skin
-    chrono: '.chrono_info',      // /pages/usrN_chrono
-    gift: '._gift',              // /pages/usrN_gift
-    plashka: '._plashka',        // /pages/usrN_plashka
-    icon: '._icon',              // /pages/usrN_icon
-    background: '._background',  // /pages/usrN_background 
-    coupon: '._coupon'           // /pages/usrN_coupon
-  };
   // ====================
 
-  const log = (...a) => DEBUG && console.log('[collect]', ...a);
+  const log = (...a) => DEBUG && console.log('[collect_api]', ...a);
 
-  async function fetchDecoded(url) {
-    const res = await fetch(url, { credentials: 'same-origin' });
-    if (!res.ok) return null;
-    const buf = await res.arrayBuffer();
-    const ct = res.headers.get('content-type') || '';
-    const m = ct.match(/charset=([^;]+)/i);
-    const charset = (m ? m[1] : DEFAULT_CHARSET).toLowerCase();
-    try { return new TextDecoder(charset).decode(buf); }
-    catch { return new TextDecoder('utf-8').decode(buf); }
+  // Проверка наличия FMVbank
+  function requireFMVbank() {
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+      throw new Error('FMVbank не найден — подключите src/bank/api.js');
+    }
   }
 
-  function extractNode(html) {
-    if (!html || html.includes(INFO_TEXT)) return null;
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.querySelector(SOURCE_BLOCK);
+  // Получение данных хронологии из API
+  async function fetchChronoFromApi(userId) {
+    requireFMVbank();
+    try {
+      const data = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
+      log('Получены данные для userId', userId, ':', data);
+      return data;
+    } catch (e) {
+      console.error(`[collect_api] Ошибка получения данных для userId ${userId}:`, e);
+      return null;
+    }
   }
 
-  function injectNodeClone(target, node) {
-    if (!target || !node) return;
-    target.innerHTML = '';
-    target.appendChild(node.cloneNode(true));
+  // Построение HTML из данных хронологии
+  function buildChronoHtml(data) {
+    if (!data || typeof data !== 'object') {
+      return '<p>Нет данных хронологии</p>';
+    }
+
+    // Проверяем наличие FMV.buildChronoHtml
+    if (window.FMV && typeof window.FMV.buildChronoHtml === 'function') {
+      try {
+        return window.FMV.buildChronoHtml(data, { titlePrefix: 'Хронология' });
+      } catch (e) {
+        console.error('[collect_api] Ошибка FMV.buildChronoHtml:', e);
+      }
+    }
+
+    // Fallback: простой вывод данных
+    log('FMV.buildChronoHtml не найден, используем fallback');
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      return '<p>Хронология пуста</p>';
+    }
+
+    let html = '<div class="chrono-data">';
+    for (const [key, value] of entries) {
+      html += `<div><strong>${key}:</strong> ${JSON.stringify(value)}</div>`;
+    }
+    html += '</div>';
+    return html;
   }
 
-  // Переносит .skin_info / .chrono_info внутрь .character, если они оказались соседями
-  // (оставляем как в оригинале; при необходимости можно добавить и новые секции)
+  // Вставка HTML в контейнер
+  function injectHtml(target, html) {
+    if (!target) return;
+    target.innerHTML = html;
+  }
+
+  // Переносит .chrono_info внутрь .character, если они оказались соседями
   function normalizeStructure(scope) {
     const char = scope.querySelector(CHARACTER_SELECTOR);
     if (!char) return;
-    const skin = scope.querySelector(SKIN_TARGET_SEL);
     const chrono = scope.querySelector(CHRONO_TARGET_SEL);
-    if (skin && skin.parentElement !== char) char.appendChild(skin);
     if (chrono && chrono.parentElement !== char) char.appendChild(chrono);
   }
 
@@ -1418,55 +1434,66 @@ $(function() {
     return el.closest('.modal_wrap, .reveal-modal, .container, #character') || el.parentElement || document;
   }
 
-  // универсальная загрузка секции с поддержкой комментария-редиректа <!-- main: usrM_<section> -->
-  async function loadSection(N, scope, name, selector) {
-    const target = scope.querySelector(selector);
-    if (!target) return;
-
-    // формируем suffix страницы: back — особый случай, остальные = name как есть
-    const suffix = (name === 'back') ? 'back' : name;
-
-    // 1-я попытка
-    const firstHTML = await fetchDecoded(`/pages/usr${N}_${suffix}`);
-    if (!firstHTML) return;
-
-    // проверяем универсальный редирект через комментарий
-    const redirectRe = new RegExp(`<!--\\s*main:\\s*usr(\\d+)_${suffix}\\s*-->`, 'i');
-    const match = redirectRe.exec(firstHTML);
-    if (match) {
-      const M = match[1];
-      // 2-я попытка по "основному" пользователю
-      const secondHTML = await fetchDecoded(`/pages/usr${M}_${suffix}`);
-      if (!secondHTML || redirectRe.test(secondHTML)) return; // страховка от зацикливания
-      const node = extractNode(secondHTML);
-      injectNodeClone(target, node);
+  // Загрузка и вставка хронологии из API
+  async function loadChronoFromApi(userId, scope) {
+    const target = scope.querySelector(CHRONO_TARGET_SEL);
+    if (!target) {
+      log('chrono_info не найден для userId', userId);
       return;
     }
 
-    const node = extractNode(firstHTML);
-    injectNodeClone(target, node);
+    // Показываем индикатор загрузки
+    target.innerHTML = '<p>Загрузка хронологии...</p>';
+
+    // Получаем данные из API
+    const data = await fetchChronoFromApi(userId);
+
+    if (!data) {
+      target.innerHTML = '<p>Не удалось загрузить данные хронологии</p>';
+      return;
+    }
+
+    // Строим HTML
+    const html = buildChronoHtml(data);
+
+    // Вставляем в контейнер
+    injectHtml(target, html);
+    log('Хронология загружена для userId', userId);
   }
 
   async function initIn(root) {
     if (!root) return;
+
+    // Проверяем наличие FMVbank
+    try {
+      requireFMVbank();
+    } catch (e) {
+      console.warn('[collect_api]', e.message);
+      return;
+    }
+
     // берём конкретного character, а не первый на документе
     const charEl = root.querySelector(CHARACTER_SELECTOR) || document.querySelector(CHARACTER_SELECTOR);
-    if (!charEl) { log('no character'); return; }
+    if (!charEl) {
+      log('no character');
+      return;
+    }
 
     const scope = scopeForCharacter(charEl);
-    normalizeStructure(scope); // выравниваем вложенность, как в оригинале
+    normalizeStructure(scope);
 
-    const N = charEl.getAttribute('data-id')?.trim();
-    if (!N) return;
+    const userId = charEl.getAttribute('data-id')?.trim();
+    if (!userId) {
+      log('no data-id');
+      return;
+    }
 
-    // параллельно грузим все зарегистрированные секции
-    await Promise.all(
-      Object.entries(SECTION_MAP).map(([name, selector]) => loadSection(N, scope, name, selector))
-    );
+    // Загружаем хронологию из API
+    await loadChronoFromApi(userId, scope);
   }
 
   // ручной запуск
-  window.loadUserSections = function ({ root, rootSelector } = {}) {
+  window.loadUserChronoFromApi = function ({ root, rootSelector } = {}) {
     const r = root || (rootSelector ? document.querySelector(rootSelector) : document);
     initIn(r);
   };

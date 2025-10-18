@@ -1109,7 +1109,8 @@ async function collectSkinSets() {
       coupon: 'coupon_'
     };
 
-    for (const [key, label] of Object.entries(apiLabels)) {
+    // Загружаем все категории ПАРАЛЛЕЛЬНО для скорости
+    const promises = Object.entries(apiLabels).map(async ([key, label]) => {
       try {
         const response = await window.FMVbank.storageGet(userId, label);
         log(`${key} ответ:`, response);
@@ -1117,13 +1118,24 @@ async function collectSkinSets() {
         // Новый формат: { last_update_ts, data: [...] }
         if (response && typeof response === 'object' && Array.isArray(response.data)) {
           // Фильтруем только видимые элементы (is_visible !== false)
-          result[key] = response.data.filter(item => item.is_visible !== false);
-          log(`${key} загружено ${result[key].length} видимых элементов из ${response.data.length}`);
+          const filtered = response.data.filter(item => item.is_visible !== false);
+          log(`${key} загружено ${filtered.length} видимых элементов из ${response.data.length}`);
+          return { key, data: filtered };
         }
       } catch (e) {
         console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);
       }
-    }
+      return { key, data: [] };
+    });
+
+    const responses = await Promise.all(promises);
+
+    // Собираем результаты
+    responses.forEach(({ key, data }) => {
+      if (key && data) {
+        result[key] = data;
+      }
+    });
 
     log('Все данные загружены:', result);
     return result;

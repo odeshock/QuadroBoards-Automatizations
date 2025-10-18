@@ -6,10 +6,15 @@
 (function () {
   'use strict';
 
+  console.log('[AMS_CHECK] Скрипт загружен. Заголовок страницы:', document.title);
+
   // Проверяем, что заголовок страницы начинается с "Гринготтс"
   if (!document.title.startsWith('Гринготтс')) {
+    console.log('[AMS_CHECK] Страница не подходит (заголовок не начинается с "Гринготтс")');
     return;
   }
+
+  console.log('[AMS_CHECK] Проверка заголовка пройдена');
 
   const TAG = '[FMVbank_ams_check]';
   const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
@@ -150,7 +155,18 @@
   }
 
   // Используем createForumButton для создания кнопки
+  console.log('[AMS_CHECK] Проверка createForumButton:', typeof window.createForumButton);
+  console.log('[AMS_CHECK] BANK_CHECK:', window.BANK_CHECK);
+
   if (typeof window.createForumButton === 'function') {
+    console.log('[AMS_CHECK] Вызываем createForumButton с параметрами:', {
+      allowedGroups: (window.BANK_CHECK?.GroupID) || [],
+      allowedForums: (window.BANK_CHECK?.ForumID) || [],
+      allowedUsers: (window.BANK_CHECK?.UserID) || [],
+      label: 'Начать проверку',
+      order: 1
+    });
+
     window.createForumButton({
       allowedGroups: (window.BANK_CHECK?.GroupID) || [],
       allowedForums: (window.BANK_CHECK?.ForumID) || [],
@@ -172,6 +188,8 @@
         await startAmsCheck(commentId, { setStatus, setDetails });
       }
     });
+
+    console.log('[AMS_CHECK] createForumButton вызван');
   } else {
     console.error('[AMS_CHECK] Функция createForumButton недоступна');
   }

@@ -50,7 +50,7 @@ cat src/chrono/button_update_total.js >> dist/body-bundle.js
 cat src/chrono/button_total_to_excel.js >> dist/body-bundle.js
 cat src/chrono/button_update_per_user.js >> dist/body-bundle.js
 cat src/chrono/button_update_personal_page.js >> dist/body-bundle.js
-cat src/chrono/button_update_chrono_api >> dist/body-bundle.js
+cat src/chrono/button_update_chrono_api.js >> dist/body-bundle.js
 
 echo "" >> dist/body-bundle.js
 echo "/* Episodes */" >> dist/body-bundle.js

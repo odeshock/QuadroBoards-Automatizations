@@ -2180,9 +2180,9 @@ export function renderLog(log) {
         const purchaseData = {
           type: "EDIT_PURCHASE",
           timestamp: timestamp,
-          comment_id: COMMENT_ID,
-          comment_timestamp: COMMENT_TIMESTAMP,
-          comment_user_id: USER_ID,
+          comment_id: window.COMMENT_ID,
+          comment_timestamp: window.COMMENT_TIMESTAMP,
+          comment_user_id: window.USER_ID,
           fullData: fullData,
           environment: environment,
           totalSum: totalSum,

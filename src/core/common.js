@@ -164,13 +164,13 @@
     }
 
     const parts = raw.split(/\s*;\s*/).filter(Boolean);
-    const participantsSet   = new Set();
-    const masksByCharLower  = new Map();
-    const htmlMaskPairs     = [];
+    const participantsSet = new Set();
+    const masksByCharLower = new Map();
+    const htmlMaskPairs = [];
 
     for (const p of parts) {
       const [left, right] = p.split('=');
-      const id = String(Number((left.match(/user(\d+)/i) || [,''])[1]));
+      const id = String(Number((left.match(/user(\d+)/i) || [, ''])[1]));
       const key = ('user' + id).toLowerCase();
       participantsSet.add(key);
 
@@ -190,8 +190,8 @@
 
     const htmlParticipants = participantsLower.map(low => {
       const roles = Array.from(masksByCharLower.get(low) || []);
-      const id    = String(+low.replace(/^user/i,''));
-      const base  = (typeof profileLink === 'function')
+      const id = String(+low.replace(/^user/i, ''));
+      const base = (typeof profileLink === 'function')
         ? profileLink(id, idToNameMap?.get(id))
         : FMV.escapeHtml(`user${id}`);
       return roles.length ? `${base} [as ${FMV.escapeHtml(roles.join(', '))}]` : base;
@@ -268,7 +268,7 @@
           time: Date.now(),
           data: list
         }));
-      } catch (_) {}
+      } catch (_) { }
     };
 
     // Проверка кэша
@@ -526,21 +526,21 @@
     const forumsParam = forums.join(",");
     const basePath = "/search.php";
     const targetAuthor = author;
-    const keywordsRaw   = String(keywords ?? "").trim();
+    const keywordsRaw = String(keywords ?? "").trim();
 
     const buildSearchUrl = (p) => {
       // используем старый «совместимый» формат: forum=, show_as=topics
       const params = [
-        ['action',   'search'],
+        ['action', 'search'],
         ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],
-        ['author',   encodeForSearch(author.trim())],
-        ['forums',    forumsParam],
-        ['search_in','0'],
-        ['sort_by',  '0'],
+        ['author', encodeForSearch(author.trim())],
+        ['forums', forumsParam],
+        ['search_in', '0'],
+        ['sort_by', '0'],
         ['sort_dir', 'DESC'],
-        ['show_as',  'topics'],
-        ['search',   encodeForSearch('Отправить')],
-        ['p',        String(p)]
+        ['show_as', 'topics'],
+        ['search', encodeForSearch('Отправить')],
+        ['p', String(p)]
       ].filter(([_, v]) => v !== '');
 
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
@@ -560,7 +560,7 @@
       return new DOMParser().parseFromString(html, "text/html");
     }
 
-    const hash = (s) => { let h=0; for (const c of s) { h=((h<<5)-h)+c.charCodeAt(0); h|=0; } return h; };
+    const hash = (s) => { let h = 0; for (const c of s) { h = ((h << 5) - h) + c.charCodeAt(0); h |= 0; } return h; };
 
     function getDirectChildAnchor(el) {
       for (const ch of el.children) if (ch.tagName === "A") return ch;
@@ -624,7 +624,7 @@
             }
           }
         }
-      } catch {}
+      } catch { }
       return null;
     }
 
@@ -636,10 +636,10 @@
     for (let p = 2; p <= maxPages; p++) {
       const doc = await getDoc(buildSearchUrl(p));
       const currentPageNum = Number(doc.querySelector('div.linkst div.pagelink strong')?.textContent || 1);
-        if (currentPageNum === 1 && p !== 1) {
-          // сервер снова выдал первую страницу — выходим из цикла
-          break;
-        }
+      if (currentPageNum === 1 && p !== 1) {
+        // сервер снова выдал первую страницу — выходим из цикла
+        break;
+      }
 
       const links = extractTopicPageLinks(doc, keywords = keywords);
       if (!links.length) break;
@@ -669,7 +669,7 @@
             firstPostLinks.push(perm);
           }
         }
-      } catch {}
+      } catch { }
       await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
     }
 
@@ -704,13 +704,14 @@
       delayMs = 300,
       keywords = "",
       comments_only = false,
+      min_symbols_num = -1
     } = {}
   ) {
     if (!author) throw new Error("author обязателен");
     if (!forums || (Array.isArray(forums) && forums.length === 0)) throw new Error("forums обязателен");
 
-    const forumsParam   = Array.isArray(forums) ? forums.join(",") : String(forums);
-    const keywordsRaw   = String(keywords ?? "").trim();
+    const forumsParam = Array.isArray(forums) ? forums.join(",") : String(forums);
+    const keywordsRaw = String(keywords ?? "").trim();
     const titlePrefixLC = String(title_prefix || "").trim().toLocaleLowerCase('ru');
 
     // Приводим last_src к массиву строк
@@ -750,22 +751,22 @@
       return out;
     }
 
-    const hash = (s) => { let h=0; for (const c of s) { h=((h<<5)-h)+c.charCodeAt(0); h|=0; } return h; };
+    const hash = (s) => { let h = 0; for (const c of s) { h = ((h << 5) - h) + c.charCodeAt(0); h |= 0; } return h; };
     const pageSignature = (items) => hash(items.join("\n"));
 
     const buildUrl = (p) => {
       console.log("[scrapePosts] keywords:", `${keywordsRaw}`);
       const params = [
-        ['action',   'search'],
+        ['action', 'search'],
         ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],
-        ['author',   encodeForSearch(author.trim())],
-        ['forums',    forumsParam],
-        ['search_in','0'],
-        ['sort_by',  '0'],
+        ['author', encodeForSearch(author.trim())],
+        ['forums', forumsParam],
+        ['search_in', '0'],
+        ['sort_by', '0'],
         ['sort_dir', 'DESC'],
-        ['show_as',  'posts'],
-        ['search',   encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
-        ['p',        String(p)]
+        ['show_as', 'posts'],
+        ['search', encodeForSearch('Отправить')], // %CE%F2%EF%F0%E0%E2%E8%F2%FC
+        ['p', String(p)]
       ].filter(([_, v]) => v !== '');
 
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
@@ -824,18 +825,18 @@
         s.insertAdjacentText("beforebegin", t ? `\n${t}\n` : ""); s.remove();
       });
       // переносы для блочных
-      const blockTags = ["ADDRESS","ARTICLE","ASIDE","BLOCKQUOTE","DIV","DL","DT","DD","FIELDSET","FIGCAPTION","FIGURE","FOOTER","FORM","H1","H2","H3","H4","H5","H6","HEADER","HR","LI","MAIN","NAV","OL","P","PRE","SECTION","TABLE","THEAD","TBODY","TFOOT","TR","UL","BR"];
-      tmp.querySelectorAll(blockTags.join(",")).forEach(el => { if (el.tagName==="BR") el.insertAdjacentText("beforebegin","\n"); else el.insertAdjacentText("afterend","\n"); });
+      const blockTags = ["ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "DIV", "DL", "DT", "DD", "FIELDSET", "FIGCAPTION", "FIGURE", "FOOTER", "FORM", "H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "HR", "LI", "MAIN", "NAV", "OL", "P", "PRE", "SECTION", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "UL", "BR"];
+      tmp.querySelectorAll(blockTags.join(",")).forEach(el => { if (el.tagName === "BR") el.insertAdjacentText("beforebegin", "\n"); else el.insertAdjacentText("afterend", "\n"); });
 
       // нормализация
-      let t = (tmp.textContent || "").replace(/\u00A0/g," ");
-      t = t.replace(/\[\/?indent\]/gi,"").replace(/\[\/?float(?:=[^\]]+)?\]/gi,"").replace(/\[DiceFM[^\]]*?\]/gi,"");
-      t = t.replace(/[ \t]+\n/g,"\n").replace(/\n[ \t]+/g,"\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n");
+      let t = (tmp.textContent || "").replace(/\u00A0/g, " ");
+      t = t.replace(/\[\/?indent\]/gi, "").replace(/\[\/?float(?:=[^\]]+)?\]/gi, "").replace(/\[DiceFM[^\]]*?\]/gi, "");
+      t = t.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/ {2,}/g, " ").replace(/\n{2,}/g, "\n");
 
-      const out=[]; for (const raw of t.split("\n")) { const line = raw.trim(); if (line==="") { if (out.length && out[out.length-1] !== "") out.push(""); } else out.push(line); }
-      return out.join("\n").replace(/ {2,}/g," ").replace(/\n{2,}/g,"\n").replace(/^\n+|\n+$/g,"").trim();
+      const out = []; for (const raw of t.split("\n")) { const line = raw.trim(); if (line === "") { if (out.length && out[out.length - 1] !== "") out.push(""); } else out.push(line); }
+      return out.join("\n").replace(/ {2,}/g, " ").replace(/\n{2,}/g, "\n").replace(/^\n+|\n+$/g, "").trim();
     };
-    const expandBBHtmlToText = (html="") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi,(_,inner)=>htmlToMultilineText(inner));
+    const expandBBHtmlToText = (html = "") => html.replace(/\[html\]([\s\S]*?)\[\/html\]/gi, (_, inner) => htmlToMultilineText(inner));
 
     // ----- извлечение одного поста -----
     // ----- извлечение одного поста -----
@@ -848,7 +849,7 @@
 
       // ссылка на сам пост
       const rawHref = a[2] ? new URL(a[2].getAttribute("href"), location.href).href : "";
-      const src     = rawHref ? toPidHashFormat(rawHref) : "";
+      const src = rawHref ? toPidHashFormat(rawHref) : "";
 
       // текст из ссылки — это дата в читаемом виде
       const date_text = a[2]?.innerText?.trim() || "";
@@ -934,14 +935,14 @@
       let prevSig = null;
 
       for (let p = 1; p <= maxPages; p++) {
-        const doc   = (p === 1) ? doc1 : await getDoc(buildUrl(p));
+        const doc = (p === 1) ? doc1 : await getDoc(buildUrl(p));
 
         // СТОП 1: служебная страница "Информация / ничего не найдено"
         if (isNoResultsPage(doc)) return finalize(acc);
 
         const posts = extractPosts(doc); // уже отфильтрованные (prefix, comments_only)
-        const raw   = extractRawSrcs(doc);           // «сырые» ссылки
-        const sig   = pageSignature(raw);
+        const raw = extractRawSrcs(doc);           // «сырые» ссылки
+        const sig = pageSignature(raw);
 
         // СТОП 2: пустая страница по DOM (нет постов и «сырых» ссылок)
         if (!raw.length && !doc.querySelector('.post')) return finalize(acc);
@@ -954,14 +955,19 @@
         // if (p > 1 && sig === baseSig) return finalize(acc);
 
         for (const post of posts) {
+          // 1) сначала фильтрация по длине
+          const passLen = post.symbols_num > min_symbols_num;
+          if (!passLen) continue;
+
+          // 2) только для прошедших проверяем last_src
           if (lastSrcKeys.size && lastSrcKeys.has(post.src)) {
-            console.log(`[scrapePosts] найден last_src: ${post.src}, остановка`);
+            console.log(`[scrapePosts] найден last_src (после фильтра по длине): ${post.src}, остановка`);
             return finalize(acc);
           }
-          if (post.symbols_num > 0) {
-            acc.push(post);
-            if (acc.length >= maxResults) return finalize(acc);
-          }
+
+          // 3) копим результат
+          acc.push(post);
+          if (acc.length >= maxResults) return finalize(acc);
         }
 
         await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
@@ -985,7 +991,7 @@
           src: r.src,
           symbols_num: r.symbols_num,
           html: r.html,
-          textPreview: r.text.slice(0,120).replace(/\s+/g," "),
+          textPreview: r.text.slice(0, 120).replace(/\s+/g, " "),
           date: r.date_ts
         })));
       } catch { console.log(finalArr); }

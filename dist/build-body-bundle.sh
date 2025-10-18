@@ -28,17 +28,18 @@ echo "" >> dist/body-bundle.js
 echo "/* Private Pages */" >> dist/body-bundle.js
 # Загружаем JSON-версии для API
 cat src/private_pages/admin_bridge_json.js >> dist/body-bundle.js
+cat src/private_pages/get_skin_api.js >> dist/body-bundle.js
 cat src/private_pages/collect_skins_api.js >> dist/body-bundle.js
 cat src/private_pages/collect_skin_n_chrono_api.js >> dist/body-bundle.js
-# Остальные файлы из private_pages (кроме уже загруженных и ВСЕХ старых версий)
+# Остальные файлы из private_pages (кроме уже загруженных и старых версий)
 for file in src/private_pages/*.js; do
   filename=$(basename "$file")
   if [ "$filename" != "admin_bridge_json.js" ] && \
+     [ "$filename" != "get_skin_api.js" ] && \
      [ "$filename" != "collect_skins_api.js" ] && \
      [ "$filename" != "collect_skin_n_chrono_api.js" ] && \
      [ "$filename" != "skin_html_json_parser.js" ] && \
      [ "$filename" != "admin_bridge_api.js" ] && \
-     [ "$filename" != "get_skin_api.js" ] && \
      [ "$filename" != "admin_bridge.js" ] && \
      [ "$filename" != "get_skin.js" ]; then
     cat "$file" >> dist/body-bundle.js

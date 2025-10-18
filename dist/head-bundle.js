@@ -3272,28 +3272,6 @@ function getBankToday() {
   return [d.getFullYear(), d.getMonth() + 1, d.getDate()];
 }
 
-async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
-  const current_storage = await FMVbank.storageGet(user_id);
-  const BACKUP_DATA = current_storage[ts];
-
-  queueMessage(iframeReadyP, () => ({
-    type: BankPostMessagesType.comment_info,
-    NEW_COMMENT_ID,
-    NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
-    NEW_ADMIN_EDIT
-  }), "comment_info");
-  await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between comment_info");
-
-  queueMessage(iframeReadyP, () => ({
-    type: BankPostMessagesType.backup_data,
-    BACKUP_DATA
-  }), "backup_data");
-  await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between backup_data");
-}
-
-// Экспортируем функцию в глобальную область видимости для использования в onclick
-window.bankCommentEditFromBackup = bankCommentEditFromBackup;
-
 function waitForIframeReady(origin) {
   return new Promise((resolve) => {
     function onMsg(e) {
@@ -3465,6 +3443,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const textArea = document.querySelector('textarea[name="req_message"]');
   const iframeReadyP = waitForIframeReady(IFRAME_ORIGIN);
+
+  // Функция для редактирования комментариев из backup
+  async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
+    const current_storage = await FMVbank.storageGet(user_id);
+    const BACKUP_DATA = current_storage[ts];
+
+    queueMessage(iframeReadyP, () => ({
+      type: BankPostMessagesType.comment_info,
+      NEW_COMMENT_ID,
+      NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
+      NEW_ADMIN_EDIT
+    }), "comment_info");
+    await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between comment_info");
+
+    queueMessage(iframeReadyP, () => ({
+      type: BankPostMessagesType.backup_data,
+      BACKUP_DATA
+    }), "backup_data");
+    await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between backup_data");
+  }
+
+  // Экспортируем функцию в глобальную область видимости для использования в onclick
+  window.bankCommentEditFromBackup = bankCommentEditFromBackup;
 
   // user_info — можно отправить сразу после готовности iframe (без данных)
   queueMessage(iframeReadyP, () => ({

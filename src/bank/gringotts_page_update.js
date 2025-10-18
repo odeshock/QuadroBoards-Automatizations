@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Создаём .ams_info для постов без bank_ams_check и bank_ams_done
+    let createdCount = 0;
     document.querySelectorAll('div.post').forEach((post) => {
         const postContent = post.querySelector('.post-content');
         if (!postContent) return;
@@ -22,9 +23,15 @@ document.addEventListener("DOMContentLoaded", () => {
             const amsInfo = document.createElement('div');
             amsInfo.className = 'ams_info';
             postContent.appendChild(amsInfo);
-            console.log('[gringotts_page_update] .ams_info создан для поста');
+            createdCount++;
         }
     });
+
+    console.log(`[gringotts_page_update] .ams_info создано: ${createdCount}`);
+
+    // Отправляем событие, что Gringotts готов
+    window.dispatchEvent(new CustomEvent('gringotts:ready'));
+    console.log('[gringotts_page_update] Событие gringotts:ready отправлено');
 
     // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
     document.querySelectorAll("div.post").forEach(async (container) => {

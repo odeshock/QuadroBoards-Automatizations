@@ -2258,6 +2258,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Создаём .ams_info для постов без bank_ams_check и bank_ams_done
+    let createdCount = 0;
     document.querySelectorAll('div.post').forEach((post) => {
         const postContent = post.querySelector('.post-content');
         if (!postContent) return;
@@ -2270,9 +2271,15 @@ document.addEventListener("DOMContentLoaded", () => {
             const amsInfo = document.createElement('div');
             amsInfo.className = 'ams_info';
             postContent.appendChild(amsInfo);
-            console.log('[gringotts_page_update] .ams_info создан для поста');
+            createdCount++;
         }
     });
+
+    console.log(`[gringotts_page_update] .ams_info создано: ${createdCount}`);
+
+    // Отправляем событие, что Gringotts готов
+    window.dispatchEvent(new CustomEvent('gringotts:ready'));
+    console.log('[gringotts_page_update] Событие gringotts:ready отправлено');
 
     // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
     document.querySelectorAll("div.post").forEach(async (container) => {
@@ -2558,13 +2565,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Ждём готовности AMS
-    console.log(`[createPostButtons] "${label}": Проверка __ams_ready:`, window.__ams_ready);
-    if (window.__ams_ready === undefined) {
-      console.log(`[createPostButtons] "${label}": Ждём события ams:ready`);
-      await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
-    }
-    console.log(`[createPostButtons] "${label}": AMS готов`);
+    // Ждём события gringotts:ready от gringotts_page_update.js
+    console.log(`[createPostButtons] "${label}": Ждём события gringotts:ready`);
+    await new Promise(r => window.addEventListener('gringotts:ready', r, { once: true }));
+    console.log(`[createPostButtons] "${label}": gringotts:ready получен`);
 
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()

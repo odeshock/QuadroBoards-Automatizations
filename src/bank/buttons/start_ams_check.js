@@ -160,13 +160,10 @@
       return;
     }
 
-    // Ждём готовности AMS
-    console.log(`[createPostButtons] "${label}": Проверка __ams_ready:`, window.__ams_ready);
-    if (window.__ams_ready === undefined) {
-      console.log(`[createPostButtons] "${label}": Ждём события ams:ready`);
-      await new Promise(r => window.addEventListener('ams:ready', r, { once: true }));
-    }
-    console.log(`[createPostButtons] "${label}": AMS готов`);
+    // Ждём события gringotts:ready от gringotts_page_update.js
+    console.log(`[createPostButtons] "${label}": Ждём события gringotts:ready`);
+    await new Promise(r => window.addEventListener('gringotts:ready', r, { once: true }));
+    console.log(`[createPostButtons] "${label}": gringotts:ready получен`);
 
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()

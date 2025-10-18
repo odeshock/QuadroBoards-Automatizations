@@ -161,9 +161,13 @@
     }
 
     // Ждём события gringotts:ready от gringotts_page_update.js
-    console.log(`[createPostButtons] "${label}": Ждём события gringotts:ready`);
-    await new Promise(r => window.addEventListener('gringotts:ready', r, { once: true }));
-    console.log(`[createPostButtons] "${label}": gringotts:ready получен`);
+    if (!window.__gringotts_ready) {
+      console.log(`[createPostButtons] "${label}": Ждём события gringotts:ready`);
+      await new Promise(r => window.addEventListener('gringotts:ready', r, { once: true }));
+    } else {
+      console.log(`[createPostButtons] "${label}": gringotts уже готов (флаг установлен)`);
+    }
+    console.log(`[createPostButtons] "${label}": Продолжаем работу`);
 
     const gid = typeof window.getCurrentGroupId === 'function'
       ? window.getCurrentGroupId()

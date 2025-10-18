@@ -9,29 +9,30 @@ document.addEventListener("DOMContentLoaded", () => {
         postForm.style.display = 'none'; // Скрываем элемент
     }
 
-    // Создаём .ams_info для постов без bank_ams_check и bank_ams_done
-    let createdCount = 0;
-    document.querySelectorAll('div.post').forEach((post) => {
-        const postContent = post.querySelector('.post-content');
-        if (!postContent) return;
+    // Создаём .ams_info ТОЛЬКО для UserID === 2
+    if (window.UserID === 2) {
+        let createdCount = 0;
+        document.querySelectorAll('div.post').forEach((post) => {
+            // Пропускаем topicpost
+            if (post.classList.contains('topicpost')) return;
 
-        // Проверяем, что нет тегов bank_ams_check и bank_ams_done
-        const hasAmsCheck = postContent.querySelector('bank_ams_check');
-        const hasAmsDone = postContent.querySelector('bank_ams_done');
+            const postContent = post.querySelector('.post-content');
+            if (!postContent) return;
 
-        if (!hasAmsCheck && !hasAmsDone && !postContent.querySelector('.ams_info')) {
-            const amsInfo = document.createElement('div');
-            amsInfo.className = 'ams_info';
-            postContent.appendChild(amsInfo);
-            createdCount++;
-        }
-    });
+            // Проверяем, что нет тегов bank_ams_check и bank_ams_done
+            const hasAmsCheck = postContent.querySelector('bank_ams_check');
+            const hasAmsDone = postContent.querySelector('bank_ams_done');
 
-    console.log(`[gringotts_page_update] .ams_info создано: ${createdCount}`);
+            if (!hasAmsCheck && !hasAmsDone && !postContent.querySelector('.ams_info')) {
+                const amsInfo = document.createElement('div');
+                amsInfo.className = 'ams_info';
+                postContent.appendChild(amsInfo);
+                createdCount++;
+            }
+        });
 
-    // Отправляем событие, что Gringotts готов
-    window.dispatchEvent(new CustomEvent('gringotts:ready'));
-    console.log('[gringotts_page_update] Событие gringotts:ready отправлено');
+        console.log(`[gringotts_page_update] .ams_info создано для UserID=2: ${createdCount}`);
+    }
 
     // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
     document.querySelectorAll("div.post").forEach(async (container) => {
@@ -132,25 +133,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    if (window.UserID === 2) {
-        document.querySelectorAll('div.post').forEach(post => {
-            // Пропускаем, если это topicpost
-            if (post.classList.contains('topicpost')) return;
-
-            const postContent = post.querySelector('.post-content');
-            if (!postContent) return;
-
-            // Проверяем, нет ли внутри тега bank_ams_done
-            if (!postContent.querySelector('bank_ams_done')) {
-                // Создаем новый блок div.ams_info
-                const amsInfo = document.createElement('div');
-                amsInfo.className = 'ams_info';
-                amsInfo.textContent = 'Здесь может быть ваш контент'; // можно убрать или изменить
-
-                // Добавляем в самый низ post-content
-                postContent.appendChild(amsInfo);
-            }
-        });
-    }
-
+    // Отправляем событие в конце и устанавливаем флаг
+    window.__gringotts_ready = true;
+    window.dispatchEvent(new CustomEvent('gringotts:ready'));
+    console.log('[gringotts_page_update] Событие gringotts:ready отправлено, флаг установлен');
 });

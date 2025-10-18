@@ -2774,15 +2774,9 @@ function formatBankText(data) {
   let result = blocks.join("\n\n");
 
   if (typeof data.totalSum !== "undefined" && data.totalSum !== null && data.totalSum !== "") {
-    let current_bank = (data.environment.CURRENT_BANK !== "" &&
-      data.environment.CURRENT_BANK !== null &&
-      data.environment.CURRENT_BANK !== "undefined" &&
-      data.environment.CURRENT_BANK !== undefined) ? Number(data.environment.CURRENT_BANK) : 0;
-    let total_sum = Number(data.totalSum);
-    const new_bank = current_bank + total_sum;
     const clr = Number(data.totalSum) < 0 ? "red" : "green";
     const sign = Number(data.totalSum) > 0 ? "+" : "";
-    result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${sign}${data.totalSum}[/color]\n[b]ВАШ СЧЁТ:[/b] ${new_bank}[/align][/size][/quote]`;
+    result += `\n\n[quote][size=16][align=center][b]ИТОГО:[/b] [color=${clr}]${sign}${data.totalSum}[/color][/align][/size][/quote]`;
   }
 
   if (

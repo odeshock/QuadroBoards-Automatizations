@@ -7,9 +7,9 @@
    *  Утилиты
    *  ============================ */
   const esc = s => String(s ?? "")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
   const escAttr = s => esc(s).replace(/"/g, "&quot;");
   const unique = arr => Array.from(new Set((arr || []).filter(Boolean)));
   const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
@@ -19,14 +19,14 @@
 
   // Отображаемые метки для типа/статуса (оставляю как у тебя)
   const TYPE_RU = {
-    personal: { label: "личный",  emoji: "<иконка>" },
-    plot:     { label: "сюжетный", emoji: "<иконка>" },
-    au:       { label: "au",       emoji: "<иконка>" },
+    personal: { label: "личный", emoji: "<иконка>" },
+    plot: { label: "сюжетный", emoji: "<иконка>" },
+    au: { label: "au", emoji: "<иконка>" },
   };
   const STATUS_RU = {
-    on:   { label: "активен",     emoji: "<иконка>" },
-    archived: { label: "неактуален",  emoji: "<иконка>" },
-    off:   { label: "закрыт",      emoji: "<иконка>" },
+    on: { label: "активен", emoji: "<иконка>" },
+    archived: { label: "неактуален", emoji: "<иконка>" },
+    off: { label: "закрыт", emoji: "<иконка>" },
   };
 
   /** ============================
@@ -41,13 +41,13 @@
     const s = String(raw || "").trim();
     if (!s) return null;
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-    if (m) return { y:+m[3], m:+m[2], d:+m[1], g:"day" };
+    if (m) return { y: +m[3], m: +m[2], d: +m[1], g: "day" };
     m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return { y:+m[1], m:+m[2], d:+m[3], g:"day" };
+    if (m) return { y: +m[1], m: +m[2], d: +m[3], g: "day" };
     m = s.match(/^(\d{1,2})\.(\d{4})$/);
-    if (m) return { y:+m[2], m:+m[1], d:1, g:"month" };
+    if (m) return { y: +m[2], m: +m[1], d: 1, g: "month" };
     m = s.match(/^(\d{4})$/);
-    if (m) return { y:+m[1], m:1, d:1, g:"year" };
+    if (m) return { y: +m[1], m: 1, d: 1, g: "year" };
     return null;
   }
 
@@ -56,7 +56,7 @@
     const ps = parseDateSmart(startRaw);
     const pe = endRaw ? parseDateSmart(endRaw) : null;
 
-    if (!ps && !pe) return { startL:"", startR:"", endL:"", endR:"" };
+    if (!ps && !pe) return { startL: "", startR: "", endL: "", endR: "" };
 
     // --- START ---
     let startL = "", startR = "";
@@ -118,8 +118,8 @@
     const s = parseDateSmart(startRaw);
     const e = parseDateSmart(endRaw);
 
-    const fmtDay  = (o) => `${pad(o.d)}.${pad(o.m)}.${o.y}`;
-    const fmtMon  = (o) => `${pad(o.m)}.${o.y}`;
+    const fmtDay = (o) => `${pad(o.d)}.${pad(o.m)}.${o.y}`;
+    const fmtMon = (o) => `${pad(o.m)}.${o.y}`;
     const fmtYear = (o) => `${o.y}`;
 
     if (!s && !e) return ""; // 0: нет даже года — не выводим
@@ -127,25 +127,25 @@
     // Совпадают?
     const equal = (() => {
       if (!s || !e) return false;
-      if (s.g === 'day'   && e.g === 'day'   && s.y===e.y && s.m===e.m && s.d===e.d) return true;
-      if (s.g === 'month' && e.g === 'month' && s.y===e.y && s.m===e.m)               return true;
-      if (s.g === 'year'  && e.g === 'year'  && s.y===e.y)                            return true;
+      if (s.g === 'day' && e.g === 'day' && s.y === e.y && s.m === e.m && s.d === e.d) return true;
+      if (s.g === 'month' && e.g === 'month' && s.y === e.y && s.m === e.m) return true;
+      if (s.g === 'year' && e.g === 'year' && s.y === e.y) return true;
       return false;
     })();
 
     if (equal) {
-      if (s.g === 'day')   return fmtDay(s);   // dd.mm.yyyy
+      if (s.g === 'day') return fmtDay(s);   // dd.mm.yyyy
       if (s.g === 'month') return fmtMon(s);   // mm.yyyy
-      if (s.g === 'year')  return fmtYear(s);  // yyyy
+      if (s.g === 'year') return fmtYear(s);  // yyyy
     }
 
     // Разные, но одна пустая → ничего
     if (!s || !e) return "";
 
     // Нормализация a/b/c:
-    const S = {...s};
-    const E = {...e};
-    const ensureDay = (obj, month, day=1) => {
+    const S = { ...s };
+    const E = { ...e };
+    const ensureDay = (obj, month, day = 1) => {
       obj.m = (typeof month === 'number') ? month : (obj.m ?? 1);
       obj.d = day;
       obj.g = 'day';
@@ -241,7 +241,7 @@
     const boundsArr = episodes.map(e => {
       const b = calcBounds(e?.dateStart, e?.dateEnd);
       if (b.startL && (!globalMin || b.startL < globalMin)) globalMin = b.startL;
-      if (b.endR   && (!globalMax || b.endR   > globalMax)) globalMax = b.endR;
+      if (b.endR && (!globalMax || b.endR > globalMax)) globalMax = b.endR;
       return b;
     });
 
@@ -261,7 +261,7 @@
     const locationOptions = locationsAll
       .map(l => `<label><input type="checkbox" name="location" value="${escAttr(l)}"> ${esc(l)}</label>`)
       .join("");
-  
+
     // Шапка + фильтры
     let html = `<div class="filters" id="filters">
     <div class="f">
@@ -324,7 +324,7 @@
   
   <div class="list" id="list">
     `;
-   
+
     // Эпизоды
     if (!episodes.length) {
       html += `<div class="meta">Нет эпизодов</div></section>`;
@@ -332,11 +332,11 @@
     }
 
     episodes.forEach((ep, idx) => {
-      const typeMeta   = TYPE_RU[ep?.type] || TYPE_RU.au;
+      const typeMeta = TYPE_RU[ep?.type] || TYPE_RU.au;
       const statusMeta = STATUS_RU[ep?.status] || STATUS_RU.archived;
 
-      const typeLabel   = ep?.type || "";
-      const typeBadge   = `${capitalize(typeLabel)} ${typeMeta.emoji}`;
+      const typeLabel = ep?.type || "";
+      const typeBadge = `${capitalize(typeLabel)} ${typeMeta.emoji}`;
       const statusLabel = ep?.status || "";
       const statusBadge = `${capitalize(statusLabel)} ${statusMeta.emoji}`;
 
@@ -351,9 +351,9 @@
           return token.replace(/;/g, " ");
         })
         .filter(Boolean);
-      
+
       const playersData = participantTokens.join(";"); // для data-players
-      
+
       // а вот для текстового вывода делаем ссылки
       const playersHuman = (Array.isArray(ep?.participants) ? ep.participants : [])
         .map(p => {
@@ -373,8 +373,8 @@
       const human = formatHumanRange(ep?.dateStart, ep?.dateEnd);
       const dateBlock = human ? `<span class="muted">${esc(human)} — </span>` : "";
 
-       
-      
+
+
       html += `
   <div class="episode" 
        data-type="${escAttr(typeLabel)}" 
@@ -392,7 +392,7 @@
   </div>`;
     });
 
-    html += `</div>\n<script type="text/javascript" src="https://odeshock.github.io/QuadroBoards-Automatizations/additional_functional/private_pages/chrono_filter.js"></script>`;
+    html += `</div>`;
     return html;
   };
 })();

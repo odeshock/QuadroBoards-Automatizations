@@ -103,7 +103,7 @@
 
     const results = [];
     for (const u of users) {
-      const data = byUser[u.id]["episodes"];
+      const data = byUser[u.id];
       if (!data) {
         results.push({ id: u.id, status: "нет данных (пользователь не найден в хроно-коллекции)" });
         continue;

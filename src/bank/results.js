@@ -2176,7 +2176,7 @@ export function renderLog(log) {
       }
 
       // Формируем полный объект для сохранения
-      if (COMMENT_ID != undefined) {
+      if (window.COMMENT_ID !== undefined) {
         const purchaseData = {
           type: "EDIT_PURCHASE",
           timestamp: timestamp,

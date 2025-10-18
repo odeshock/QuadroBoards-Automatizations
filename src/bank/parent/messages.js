@@ -77,8 +77,10 @@ const BankLabel = {
 
 const BankPostMessagesType = {
   ads: "ADS_POSTS",
+  backup_data: "BACKUP_DATA",
   banner_mayak: "BANNER_MAYAK_FLAG",
   banner_reno: "BANNER_RENO_FLAG",
+  comment_info: "COMMENT_INFO",
   coupons: "PERSONAL_DISCOUNTS",
   first_post: "FIRST_POST_FLAG",
   first_post_missed: "FIRST_POST_MISSED_FLAG",
@@ -105,6 +107,28 @@ function getBankToday() {
   const d = new Date();
   return [d.getFullYear(), d.getMonth() + 1, d.getDate()];
 }
+
+async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
+  const current_storage = await FMVbank.storageGet(user_id);
+  const BACKUP_DATA = current_storage[ts];
+
+  queueMessage(iframeReadyP, () => ({
+    type: BankPostMessagesType.comment_info,
+    NEW_COMMENT_ID,
+    NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
+    NEW_ADMIN_EDIT
+  }), "comment_info");
+  await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between comment_info");
+
+  queueMessage(iframeReadyP, () => ({
+    type: BankPostMessagesType.backup_data,
+    BACKUP_DATA
+  }), "backup_data");
+  await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between backup_data");
+}
+
+// Экспортируем функцию в глобальную область видимости для использования в onclick
+window.bankCommentEditFromBackup = bankCommentEditFromBackup;
 
 function waitForIframeReady(origin) {
   return new Promise((resolve) => {
@@ -338,17 +362,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const ts = Date.now();
     const current_storage = await FMVbank.storageGet(window.UserID);
     current_storage[ts] = e.data;
-    FMVbank.storageSet(current_storage, window.UserID);
-    if (textArea) {
-      textArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
-      const button = document.querySelector(
-        'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
-      );
-      if (button) {
-        button.click();
-        console.log("🟩 [SENT]  PURCHASE form submitted");
-      } else {
-        console.warn("❌ [ERROR] Submit button not found.");
+    const storage_set_flag = FMVbank.storageSet(current_storage, window.UserID);
+    if (!storage_set_flag) { alert("Попробуйте нажать на кнопку еще раз."); } else {
+      if (textArea) {
+        textArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
+        const button = document.querySelector(
+          'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
+        );
+        if (button) {
+          button.click();
+          console.log("🟩 [SENT]  PURCHASE form submitted");
+        } else {
+          console.warn("❌ [ERROR] Submit button not found.");
+        }
       }
     }
   });

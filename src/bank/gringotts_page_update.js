@@ -9,8 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
         postForm.style.display = 'none'; // Скрываем элемент
     }
 
-    // Проходим по всем контейнерам постов
-    document.querySelectorAll("div.post").forEach(container => {
+    // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
+    document.querySelectorAll("div.post").forEach(async (container) => {
         try {
             // Ищем кнопку "Редактировать"
             const editLink = container.querySelector(".pl-edit a");
@@ -23,16 +23,86 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ищем ID профиля (N)
             const profileLink = container.querySelector('.pl-email.profile a');
             const profileUrl = (!profileLink) ? undefined : new URL(profileLink.href);
-            const N = (!profileUrl) ? 0 : Number(profileUrl.searchParams.get("id"));
+            const usr_id = (!profileUrl) ? 0 : Number(profileUrl.searchParams.get("id"));
 
             // Ищем K — число в теге <bank_data>
             const bankData = container.querySelector("bank_data");
-            const K = (!bankData) ? 0 : Number(bankData.textContent.trim());
+            const ts = (!bankData) ? 0 : Number(bankData.textContent.trim());
+
+            // Извлекаем comment_id из href ссылки редактирования
+            // Формат: https://testfmvoice.rusff.me/edit.php?id=154
+            let comment_id = 0;
+            try {
+                const editUrl = new URL(editLink.href);
+                comment_id = Number(editUrl.searchParams.get("id")) || 0;
+            } catch (e) {
+                console.warn("Не удалось извлечь comment_id из href:", e);
+            }
+
+            // Извлекаем текущее значение денег из профиля (поле MoneyID)
+            let current_bank = 0;
+            try {
+                const moneyFieldClass = `pa-fld${window.PROFILE_FIELDS?.MoneyID || 0}`;
+                const moneyField = container.querySelector(`.${moneyFieldClass}`);
+
+                if (moneyField) {
+                    // Проверяем наличие комментария <!-- main: usrN -->
+                    const walker = document.createTreeWalker(moneyField, NodeFilter.SHOW_COMMENT);
+                    let hasMainComment = false;
+                    const RE_MAIN = /^\s*main:\s*usr(\d+)\s*$/i;
+
+                    for (let node; (node = walker.nextNode());) {
+                        const match = (node.nodeValue || "").match(RE_MAIN);
+                        if (match) {
+                            hasMainComment = true;
+                            // Если есть комментарий <!-- main: usrN -->, используем API для получения значения
+                            if (window.MainUsrFieldResolver?.getFieldValue) {
+                                try {
+                                    const value = await window.MainUsrFieldResolver.getFieldValue({
+                                        doc: document,
+                                        fieldId: window.PROFILE_FIELDS?.MoneyID || 0
+                                    });
+                                    current_bank = Number(value) || 0;
+                                } catch (err) {
+                                    console.warn("Ошибка получения значения через MainUsrFieldResolver:", err);
+                                    current_bank = 0;
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                    // Если нет комментария, берём текстовое значение из li (вне span)
+                    if (!hasMainComment) {
+                        // Ищем текст вне <span class="fld-name">
+                        const fieldNameSpan = moneyField.querySelector('span.fld-name');
+                        let textContent = moneyField.textContent || '';
+
+                        if (fieldNameSpan) {
+                            // Убираем текст из span.fld-name
+                            textContent = textContent.replace(fieldNameSpan.textContent, '');
+                        }
+
+                        // Очищаем от пробелов и неразрывных пробелов
+                        textContent = textContent.replace(/\u00A0/g, ' ').trim();
+
+                        // Извлекаем число
+                        const match = textContent.match(/-?\d+(?:\.\d+)?/);
+                        if (match) {
+                            current_bank = Number(match[0]) || 0;
+                        }
+                    }
+                } else {
+                    current_bank = 0;
+                }
+            } catch (e) {
+                console.warn("Не удалось извлечь current_bank:", e);
+            }
 
             // Заменяем поведение кнопки
             editLink.removeAttribute("href");
             editLink.removeAttribute("rel");
-            editLink.setAttribute("onclick", `bankCommentEditFromBackup(${N}, ${K})`);
+            editLink.setAttribute("onclick", `bankCommentEditFromBackup(${usr_id}, ${ts}, ${comment_id}, ${current_bank})`);
         } catch (e) {
             console.error("Ошибка при обработке контейнера:", e);
         }

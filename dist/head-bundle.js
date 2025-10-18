@@ -1985,8 +1985,8 @@ document.addEventListener("DOMContentLoaded", () => {
         postForm.style.display = 'none'; // Скрываем элемент
     }
 
-    // Проходим по всем контейнерам постов
-    document.querySelectorAll("div.post").forEach(container => {
+    // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
+    document.querySelectorAll("div.post").forEach(async (container) => {
         try {
             // Ищем кнопку "Редактировать"
             const editLink = container.querySelector(".pl-edit a");
@@ -1999,16 +1999,86 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ищем ID профиля (N)
             const profileLink = container.querySelector('.pl-email.profile a');
             const profileUrl = (!profileLink) ? undefined : new URL(profileLink.href);
-            const N = (!profileUrl) ? 0 : Number(profileUrl.searchParams.get("id"));
+            const usr_id = (!profileUrl) ? 0 : Number(profileUrl.searchParams.get("id"));
 
             // Ищем K — число в теге <bank_data>
             const bankData = container.querySelector("bank_data");
-            const K = (!bankData) ? 0 : Number(bankData.textContent.trim());
+            const ts = (!bankData) ? 0 : Number(bankData.textContent.trim());
+
+            // Извлекаем comment_id из href ссылки редактирования
+            // Формат: https://testfmvoice.rusff.me/edit.php?id=154
+            let comment_id = 0;
+            try {
+                const editUrl = new URL(editLink.href);
+                comment_id = Number(editUrl.searchParams.get("id")) || 0;
+            } catch (e) {
+                console.warn("Не удалось извлечь comment_id из href:", e);
+            }
+
+            // Извлекаем текущее значение денег из профиля (поле MoneyID)
+            let current_bank = 0;
+            try {
+                const moneyFieldClass = `pa-fld${window.PROFILE_FIELDS?.MoneyID || 0}`;
+                const moneyField = container.querySelector(`.${moneyFieldClass}`);
+
+                if (moneyField) {
+                    // Проверяем наличие комментария <!-- main: usrN -->
+                    const walker = document.createTreeWalker(moneyField, NodeFilter.SHOW_COMMENT);
+                    let hasMainComment = false;
+                    const RE_MAIN = /^\s*main:\s*usr(\d+)\s*$/i;
+
+                    for (let node; (node = walker.nextNode());) {
+                        const match = (node.nodeValue || "").match(RE_MAIN);
+                        if (match) {
+                            hasMainComment = true;
+                            // Если есть комментарий <!-- main: usrN -->, используем API для получения значения
+                            if (window.MainUsrFieldResolver?.getFieldValue) {
+                                try {
+                                    const value = await window.MainUsrFieldResolver.getFieldValue({
+                                        doc: document,
+                                        fieldId: window.PROFILE_FIELDS?.MoneyID || 0
+                                    });
+                                    current_bank = Number(value) || 0;
+                                } catch (err) {
+                                    console.warn("Ошибка получения значения через MainUsrFieldResolver:", err);
+                                    current_bank = 0;
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                    // Если нет комментария, берём текстовое значение из li (вне span)
+                    if (!hasMainComment) {
+                        // Ищем текст вне <span class="fld-name">
+                        const fieldNameSpan = moneyField.querySelector('span.fld-name');
+                        let textContent = moneyField.textContent || '';
+
+                        if (fieldNameSpan) {
+                            // Убираем текст из span.fld-name
+                            textContent = textContent.replace(fieldNameSpan.textContent, '');
+                        }
+
+                        // Очищаем от пробелов и неразрывных пробелов
+                        textContent = textContent.replace(/\u00A0/g, ' ').trim();
+
+                        // Извлекаем число
+                        const match = textContent.match(/-?\d+(?:\.\d+)?/);
+                        if (match) {
+                            current_bank = Number(match[0]) || 0;
+                        }
+                    }
+                } else {
+                    current_bank = 0;
+                }
+            } catch (e) {
+                console.warn("Не удалось извлечь current_bank:", e);
+            }
 
             // Заменяем поведение кнопки
             editLink.removeAttribute("href");
             editLink.removeAttribute("rel");
-            editLink.setAttribute("onclick", `bankCommentEditFromBackup(${N}, ${K})`);
+            editLink.setAttribute("onclick", `bankCommentEditFromBackup(${usr_id}, ${ts}, ${comment_id}, ${current_bank})`);
         } catch (e) {
             console.error("Ошибка при обработке контейнера:", e);
         }
@@ -2032,7 +2102,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // авто-подхват токена
-  (function autoDetectToken(){
+  (function autoDetectToken() {
     const guess =
       w.ForumAPITicket ||
       w.ticket ||
@@ -2103,7 +2173,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function storageSet(valueObj, NEEDED_USER_ID = 1) {
     if (!valueObj || typeof valueObj !== "object" || Array.isArray(valueObj)) {
-      throw new Error("[FMVbank] storageSet: ожидался объект JSON");
+      console.log("[FMVbank] storageSet: ожидался объект JSON");
+      return false;
     }
     const stringValue = JSON.stringify(valueObj);
     await callStorage("storage.set", { value: stringValue }, NEEDED_USER_ID);
@@ -3170,8 +3241,10 @@ const BankLabel = {
 
 const BankPostMessagesType = {
   ads: "ADS_POSTS",
+  backup_data: "BACKUP_DATA",
   banner_mayak: "BANNER_MAYAK_FLAG",
   banner_reno: "BANNER_RENO_FLAG",
+  comment_info: "COMMENT_INFO",
   coupons: "PERSONAL_DISCOUNTS",
   first_post: "FIRST_POST_FLAG",
   first_post_missed: "FIRST_POST_MISSED_FLAG",
@@ -3198,6 +3271,28 @@ function getBankToday() {
   const d = new Date();
   return [d.getFullYear(), d.getMonth() + 1, d.getDate()];
 }
+
+async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
+  const current_storage = await FMVbank.storageGet(user_id);
+  const BACKUP_DATA = current_storage[ts];
+
+  queueMessage(iframeReadyP, () => ({
+    type: BankPostMessagesType.comment_info,
+    NEW_COMMENT_ID,
+    NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
+    NEW_ADMIN_EDIT
+  }), "comment_info");
+  await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between comment_info");
+
+  queueMessage(iframeReadyP, () => ({
+    type: BankPostMessagesType.backup_data,
+    BACKUP_DATA
+  }), "backup_data");
+  await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between backup_data");
+}
+
+// Экспортируем функцию в глобальную область видимости для использования в onclick
+window.bankCommentEditFromBackup = bankCommentEditFromBackup;
 
 function waitForIframeReady(origin) {
   return new Promise((resolve) => {
@@ -3431,17 +3526,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const ts = Date.now();
     const current_storage = await FMVbank.storageGet(window.UserID);
     current_storage[ts] = e.data;
-    FMVbank.storageSet(current_storage, window.UserID);
-    if (textArea) {
-      textArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
-      const button = document.querySelector(
-        'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
-      );
-      if (button) {
-        button.click();
-        console.log("🟩 [SENT]  PURCHASE form submitted");
-      } else {
-        console.warn("❌ [ERROR] Submit button not found.");
+    const storage_set_flag = FMVbank.storageSet(current_storage, window.UserID);
+    if (!storage_set_flag) { alert("Попробуйте нажать на кнопку еще раз."); } else {
+      if (textArea) {
+        textArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
+        const button = document.querySelector(
+          'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
+        );
+        if (button) {
+          button.click();
+          console.log("🟩 [SENT]  PURCHASE form submitted");
+        } else {
+          console.warn("❌ [ERROR] Submit button not found.");
+        }
       }
     }
   });

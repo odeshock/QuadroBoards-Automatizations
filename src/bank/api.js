@@ -15,7 +15,7 @@
   };
 
   // авто-подхват токена
-  (function autoDetectToken(){
+  (function autoDetectToken() {
     const guess =
       w.ForumAPITicket ||
       w.ticket ||
@@ -86,7 +86,8 @@
 
   async function storageSet(valueObj, NEEDED_USER_ID = 1) {
     if (!valueObj || typeof valueObj !== "object" || Array.isArray(valueObj)) {
-      throw new Error("[FMVbank] storageSet: ожидался объект JSON");
+      console.log("[FMVbank] storageSet: ожидался объект JSON");
+      return false;
     }
     const stringValue = JSON.stringify(valueObj);
     await callStorage("storage.set", { value: stringValue }, NEEDED_USER_ID);

@@ -414,18 +414,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const comment_ts = e.data.comment_timestamp;
     const comment_id = e.data.comment_id;
     const comment_user_id = e.data.comment_user_id;
-    const admin_flag = (!e.data.is_admin_to_edit) ? "" : "[FMVbankAmsCheck]"
-
-    // Сохраняем данные в storage
-    const current_storage = await FMVbank.storageGet(comment_user_id);
-    current_storage[ts] = e.data;
-    delete current_storage[comment_ts];
-    const storage_set_flag = FMVbank.storageSet(current_storage, comment_user_id);
-
-    if (!storage_set_flag) {
-      alert("Попробуйте нажать на кнопку еще раз.");
-      return;
-    }
+    const is_admin_to_edit = e.data.is_admin_to_edit || false;
+    const admin_flag = (!is_admin_to_edit) ? "" : "[FMVbankAmsCheck]";
 
     // Открываем страницу редактирования в скрытом iframe
     console.log("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
@@ -447,6 +437,26 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!iframeTextArea || !iframeSubmitButton) {
           console.warn("❌ [ERROR] Не найдена форма редактирования в iframe");
           editIframe.remove();
+          return;
+        }
+
+        // Проверяем наличие [FMVbankAmsCheck] или [FMVbankAmsDone] если это НЕ админ-редактирование
+        if (!is_admin_to_edit && (iframeTextArea.value.includes('[FMVbankAmsCheck]') || iframeTextArea.value.includes('[FMVbankAmsDone]'))) {
+          console.warn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck] или FMVbankAmsDone, редактирование запрещено");
+          editIframe.remove();
+          alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
+          return;
+        }
+
+        // Сохраняем данные в storage ПОСЛЕ проверки
+        const current_storage = await FMVbank.storageGet(comment_user_id);
+        current_storage[ts] = e.data;
+        delete current_storage[comment_ts];
+        const storage_set_flag = FMVbank.storageSet(current_storage, comment_user_id);
+
+        if (!storage_set_flag) {
+          editIframe.remove();
+          alert("Попробуйте нажать на кнопку еще раз.");
           return;
         }
 

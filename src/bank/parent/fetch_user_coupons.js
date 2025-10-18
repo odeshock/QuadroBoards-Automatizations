@@ -200,7 +200,11 @@ function extractCouponsFromDoc(doc, today) {
   });
 
   console.log(`[fetchUserCoupons] Загружено купонов: ${coupons.length}`);
-  return coupons.sort(comparator);
+  const update_data = coupons.sort(comparator);
+  update_data.forEach((item, index) => {
+    item.id = String(index + 1);
+  });
+  return update_data;
 }
 
 // Экспортируем в window

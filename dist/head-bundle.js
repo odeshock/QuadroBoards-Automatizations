@@ -4898,6 +4898,17 @@ document.addEventListener("DOMContentLoaded", () => {
   async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_IS_ADMIN_TO_EDIT = false } = {}) {
     console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
 
+    // Проверка на bank_ams_done для всех (включая админов)
+    const commentContent = document.querySelector(`#p${NEW_COMMENT_ID}-content`);
+    if (commentContent) {
+      const hasAmsDone = commentContent.querySelector('bank_ams_done');
+      if (hasAmsDone) {
+        console.warn('⚠️ [BACKUP] Обнаружен bank_ams_done, редактирование запрещено');
+        alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
+        return;
+      }
+    }
+
     // Проверки для НЕ-админ редактирования
     if (!NEW_IS_ADMIN_TO_EDIT) {
       // 1. Проверка на NEW_COMMENT_ID = 0
@@ -4907,14 +4918,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // 2. Проверка на наличие bank_ams_check или bank_ams_done
-      const commentContent = document.querySelector(`#p${NEW_COMMENT_ID}-content`);
+      // 2. Проверка на наличие bank_ams_check
       if (commentContent) {
         const hasAmsCheck = commentContent.querySelector('bank_ams_check');
-        const hasAmsDone = commentContent.querySelector('bank_ams_done');
 
-        if (hasAmsCheck || hasAmsDone) {
-          console.warn('⚠️ [BACKUP] Обнаружен bank_ams_check или bank_ams_done, редактирование запрещено');
+        if (hasAmsCheck) {
+          console.warn('⚠️ [BACKUP] Обнаружен bank_ams_check, редактирование запрещено');
           alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
         }
@@ -5069,9 +5078,17 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        // Проверяем наличие [FMVbankAmsCheck] или [FMVbankAmsDone] если это НЕ админ-редактирование
-        if (!is_admin_to_edit && (iframeTextArea.value.includes('[FMVbankAmsCheck]') || iframeTextArea.value.includes('[FMVbankAmsDone]'))) {
-          console.warn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck] или FMVbankAmsDone, редактирование запрещено");
+        // Проверяем наличие [FMVbankAmsDone] если это НЕ админ-редактирование
+        if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsDone]')) {
+          console.warn("⚠️ [EDIT] Обнаружен [FMVbankAmsDone], редактирование запрещено");
+          editIframe.remove();
+          alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
+          return;
+        }
+
+        // Проверяем наличие [FMVbankAmsCheck] если это НЕ админ-редактирование
+        if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsCheck]')) {
+          console.warn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck], редактирование запрещено");
           editIframe.remove();
           alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;

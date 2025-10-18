@@ -107,4 +107,26 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Ошибка при обработке контейнера:", e);
         }
     });
+
+    if (window.UserID === 2) {
+        document.querySelectorAll('div.post').forEach(post => {
+            // Пропускаем, если это topicpost
+            if (post.classList.contains('topicpost')) return;
+
+            const postContent = post.querySelector('.post-content');
+            if (!postContent) return;
+
+            // Проверяем, нет ли внутри тега bank_ams_done
+            if (!postContent.querySelector('bank_ams_done')) {
+                // Создаем новый блок div.ams_info
+                const amsInfo = document.createElement('div');
+                amsInfo.className = 'ams_info';
+                amsInfo.textContent = 'Здесь может быть ваш контент'; // можно убрать или изменить
+
+                // Добавляем в самый низ post-content
+                postContent.appendChild(amsInfo);
+            }
+        });
+    }
+
 });

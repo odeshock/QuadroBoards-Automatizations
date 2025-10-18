@@ -1,8 +1,10 @@
 (function () {
+  console.log('[collect_api] Скрипт загружен');
+
   // ==== настройки ====
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const CHRONO_TARGET_SEL = '.chrono_info';
-  const DEBUG = false;
+  const DEBUG = true;
   const API_KEY_LABEL = 'chrono_';
 
   // ====================
@@ -80,37 +82,50 @@
 
   // Загрузка и вставка хронологии из API
   async function loadChronoFromApi(userId, scope) {
+    console.log('[collect_api] loadChronoFromApi, ищем', CHRONO_TARGET_SEL, 'в scope');
     const target = scope.querySelector(CHRONO_TARGET_SEL);
+    console.log('[collect_api] target найден:', target);
     if (!target) {
       log('chrono_info не найден для userId', userId);
       return;
     }
 
     // Показываем индикатор загрузки
+    console.log('[collect_api] Показываем индикатор загрузки');
     target.innerHTML = '<p>Загрузка хронологии...</p>';
 
     // Получаем данные из API
+    console.log('[collect_api] Запрашиваем данные из API');
     const data = await fetchChronoFromApi(userId);
+    console.log('[collect_api] Получены данные:', data);
 
     if (!data) {
+      console.log('[collect_api] Данные не получены');
       target.innerHTML = '<p>Не удалось загрузить данные хронологии</p>';
       return;
     }
 
     // Строим HTML
+    console.log('[collect_api] Строим HTML');
     const html = buildChronoHtml(data);
+    console.log('[collect_api] HTML построен, длина:', html.length);
 
     // Вставляем в контейнер
     injectHtml(target, html);
-    log('Хронология загружена для userId', userId);
+    console.log('[collect_api] Хронология загружена для userId', userId);
   }
 
   async function initIn(root) {
-    if (!root) return;
+    console.log('[collect_api] initIn вызван, root:', root);
+    if (!root) {
+      console.log('[collect_api] root не передан');
+      return;
+    }
 
     // Проверяем наличие FMVbank
     try {
       requireFMVbank();
+      console.log('[collect_api] FMVbank найден');
     } catch (e) {
       console.warn('[collect_api]', e.message);
       return;
@@ -118,21 +133,25 @@
 
     // берём конкретного character, а не первый на документе
     const charEl = root.querySelector(CHARACTER_SELECTOR) || document.querySelector(CHARACTER_SELECTOR);
+    console.log('[collect_api] charEl:', charEl);
     if (!charEl) {
       log('no character');
       return;
     }
 
     const scope = scopeForCharacter(charEl);
+    console.log('[collect_api] scope:', scope);
     normalizeStructure(scope);
 
     const userId = charEl.getAttribute('data-id')?.trim();
+    console.log('[collect_api] userId:', userId);
     if (!userId) {
       log('no data-id');
       return;
     }
 
     // Загружаем хронологию из API
+    console.log('[collect_api] Вызываем loadChronoFromApi для userId', userId);
     await loadChronoFromApi(userId, scope);
   }
 
@@ -143,7 +162,10 @@
   };
 
   // автозапуск
-  document.addEventListener('DOMContentLoaded', () => initIn(document));
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[collect_api] DOMContentLoaded событие');
+    initIn(document);
+  });
 
   // динамика (модалки)
   const seen = new WeakSet();

@@ -39,27 +39,65 @@ const comparator = (a, b) => {
 };
 
 /**
- * Загружает персональные купоны пользователя с его профильной страницы.
- * Следует редиректам (main: usrK_skin) и валидирует даты истечения.
+ * Загружает страницу /pages/usrN и извлекает user_id из .modal_script
+ * Приоритет: data-main-user_id > N из URL
+ */
+async function getUserIdFromPage(profileId) {
+  try {
+    const pageUrl = `/pages/usr${profileId}`;
+    const response = await fetch(pageUrl);
+    if (!response.ok) {
+      console.error(`[fetchUserCoupons] Не удалось загрузить ${pageUrl}`);
+      return Number(profileId);
+    }
+
+    const html = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const modalScript = doc.querySelector('.modal_script');
+    if (!modalScript) {
+      console.warn(`[fetchUserCoupons] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+      return Number(profileId);
+    }
+
+    const mainUserId = modalScript.getAttribute('data-main-user_id');
+    if (mainUserId && mainUserId.trim()) {
+      console.log(`[fetchUserCoupons] Найден data-main-user_id=${mainUserId}`);
+      return Number(mainUserId.trim());
+    }
+
+    // Если data-main-user_id не указан, используем profileId
+    return Number(profileId);
+  } catch (err) {
+    console.error('[fetchUserCoupons] Ошибка загрузки страницы:', err);
+    return Number(profileId);
+  }
+}
+
+/**
+ * Загружает персональные купоны пользователя из API.
+ * Следует data-main-user_id и валидирует даты истечения.
  *
  * @returns {Promise<Array<{system_id: string, type: string, form: string, value: number, title: string, html: string, expiresAt?: string}>>}
  */
 async function fetchUserCoupons() {
   // Получаем ID пользователя
-  const userId = window.UserID;
-  if (!userId) {
+  const profileId = window.UserID;
+  if (!profileId) {
     console.warn('[fetchUserCoupons] window.UserID не определён');
     return [];
   }
 
-  // Используем window.fetchHtml если доступна (из helpers.js), иначе fetchWithRetry
-  const fetchFunc = typeof window.fetchHtml === 'function'
-    ? window.fetchHtml
-    : async (url) => {
-      const fetchWithRetry = window.fetchWithRetry || (async (u, init) => fetch(u, init));
-      const res = await fetchWithRetry(url, { credentials: 'include' });
-      return res.text();
-    };
+  // Получаем целевой userId с учётом data-main-user_id (async!)
+  const userId = await getUserIdFromPage(profileId);
+  console.log('[fetchUserCoupons] Целевой userId:', userId);
+
+  // Проверяем доступность API
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    console.error('[fetchUserCoupons] FMVbank.storageGet не найден');
+    return [];
+  }
 
   // Функция для получения текущей даты в МСК (yyyy-mm-dd)
   const getTodayMoscow = () => {
@@ -77,99 +115,38 @@ async function fetchUserCoupons() {
 
   const today = getTodayMoscow();
 
-  // Загружаем страницу пользователя
-  let currentUrl = `${location.origin}/pages/usr${userId}_skin`;
-  let pageHtml;
-
+  // Загружаем купоны из API
+  let response;
   try {
-    pageHtml = await fetchFunc(currentUrl);
+    response = await window.FMVbank.storageGet(userId, 'coupon_');
+    console.log('[fetchUserCoupons] API ответ:', response);
   } catch (error) {
-    console.error(`[fetchUserCoupons] Ошибка загрузки ${currentUrl}:`, error);
+    console.error('[fetchUserCoupons] Ошибка загрузки из API:', error);
     return [];
   }
 
-  const doc = new DOMParser().parseFromString(pageHtml, 'text/html');
-  const container = doc.querySelector('div.container');
-
-  if (!container) {
-    console.warn('[fetchUserCoupons] Не найден div.container');
+  // Новый формат: { last_update_ts, data: [...] }
+  if (!response || typeof response !== 'object' || !Array.isArray(response.data)) {
+    console.warn('[fetchUserCoupons] Неверный формат ответа API');
     return [];
   }
 
-  // Проверяем на ошибку "неверная ссылка"
-  const errorText = 'Ссылка, по которой Вы пришли, неверная или устаревшая.';
-  if (container.textContent.includes(errorText)) {
-    console.log('[fetchUserCoupons] Страница не найдена (ошибка "неверная ссылка")');
-    return [];
-  }
-
-  // Проверяем на редирект (<!-- main: usrK_skin -->)
-  const commentNodes = Array.from(container.childNodes).filter(node => node.nodeType === Node.COMMENT_NODE);
-  const mainComment = commentNodes.find(comment => comment.textContent.trim().startsWith('main: usr'));
-
-  if (mainComment) {
-    const match = mainComment.textContent.trim().match(/main:\s*usr(\d+)_skin/);
-    if (match) {
-      const redirectUserId = match[1];
-      console.log(`[fetchUserCoupons] Редирект на usr${redirectUserId}_skin`);
-
-      // Загружаем страницу редиректа
-      const redirectUrl = `${location.origin}/pages/usr${redirectUserId}_skin`;
-      try {
-        pageHtml = await fetchFunc(redirectUrl);
-      } catch (error) {
-        console.error(`[fetchUserCoupons] Ошибка загрузки редиректа ${redirectUrl}:`, error);
-        return [];
-      }
-
-      const redirectDoc = new DOMParser().parseFromString(pageHtml, 'text/html');
-      const redirectContainer = redirectDoc.querySelector('div.container');
-
-      if (!redirectContainer) {
-        console.warn('[fetchUserCoupons] Не найден div.container после редиректа');
-        return [];
-      }
-
-      // Проверяем снова на ошибку
-      if (redirectContainer.textContent.includes(errorText)) {
-        console.log('[fetchUserCoupons] Страница редиректа не найдена');
-        return [];
-      }
-
-      // Используем новый документ для поиска купонов
-      return extractCouponsFromDoc(redirectDoc, today);
-    }
-  }
-
-  // Извлекаем купоны из исходного документа
-  return extractCouponsFromDoc(doc, today);
-}
-
-/**
- * Извлекает купоны из DOM документа
- * @param {Document} doc - DOM документ
- * @param {string} today - Текущая дата в формате yyyy-mm-dd
- * @returns {Array<Object>} - Массив купонов
- */
-function extractCouponsFromDoc(doc, today) {
-  const couponSection = doc.querySelector('div._coupon');
-
-  if (!couponSection) {
-    console.log('[fetchUserCoupons] Не найден div._coupon');
-    return [];
-  }
-
-  const items = couponSection.querySelectorAll('div.item[data-coupon-type]');
   const coupons = [];
 
-  items.forEach(item => {
-    const systemId = item.getAttribute('data-id') || '';
-    const type = item.getAttribute('data-coupon-type') || '';
-    const form = item.getAttribute('data-coupon-form') || '';
-    const valueStr = item.getAttribute('data-coupon-value') || '0';
-    const value = Number(valueStr);
-    const title = item.getAttribute('data-coupon-title') || '';
-    const expiresAt = item.getAttribute('data-expired-date'); // может быть null
+  response.data.forEach(item => {
+    // Пропускаем невидимые элементы
+    if (item.is_visible === false) {
+      console.log(`[fetchUserCoupons] Пропущен невидимый купон id=${item.id}`);
+      return;
+    }
+
+    // Извлекаем данные из item
+    const systemId = String(item.id || '');
+    const type = item.coupon_type || '';
+    const form = item.coupon_form || '';
+    const value = Number(item.coupon_value || 0);
+    const title = item.coupon_title || item.title || '';
+    const expiresAt = item.expired_date; // yyyy-mm-dd
 
     // Фильтрация по дате истечения
     if (expiresAt) {
@@ -180,7 +157,22 @@ function extractCouponsFromDoc(doc, today) {
       }
     }
 
-    const html = item.outerHTML;
+    // Восстанавливаем HTML из content — берём ВСЕ атрибуты из JSON
+    const escapeAttr = s => (s || '').replace(/"/g, '&quot;');
+    const attrs = [
+      `data-id="${escapeAttr(systemId)}"`,
+      `title="${escapeAttr(item.title || '')}"`
+    ];
+
+    // Добавляем ВСЕ data-* атрибуты из JSON (кроме id, title, content, is_visible)
+    Object.keys(item).forEach(key => {
+      if (key !== 'id' && key !== 'title' && key !== 'content' && key !== 'is_visible') {
+        const attrName = 'data-' + key.replace(/_/g, '-');
+        attrs.push(`${attrName}="${escapeAttr(String(item[key] || ''))}"`);
+      }
+    });
+
+    const html = `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
 
     const coupon = {
       system_id: systemId,

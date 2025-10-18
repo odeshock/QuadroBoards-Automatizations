@@ -2954,14 +2954,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Проверяем, не добавлена ли уже кнопка
       if (container.querySelector(`[data-post-button-label="${label}"]`)) return;
-      console.log("Пост:", post);
-      const { usr_id, ts, comment_id, current_bank } = getPostData(post);
+
+      const postData = getPostData(post);
+      console.log(`[adminEdit] "${label}": Пост ${index}: getPostData вернул:`, postData);
+
+      const { usr_id, ts, comment_id, current_bank } = postData;
       if (!usr_id || !ts || !comment_id) {
-        console.log(`[adminEdit] "${label}": Пост ${index}: не удалось получить данные, пропуск`);
+        console.log(`[adminEdit] "${label}": Пост ${index}: проверка не прошла - usr_id=${usr_id}, ts=${ts}, comment_id=${comment_id}`);
         return;
       }
 
-      console.log(`[adminEdit] "${label}": Пост ${index}: данные - usr_id=${usr_id}, ts=${ts}, comment_id=${comment_id}, current_bank=${current_bank}`);
+      console.log(`[adminEdit] "${label}": Пост ${index}: данные OK - usr_id=${usr_id}, ts=${ts}, comment_id=${comment_id}, current_bank=${current_bank}`);
 
       // Создаём UI
       const wrap = document.createElement('div');

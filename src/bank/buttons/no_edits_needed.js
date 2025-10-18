@@ -158,11 +158,10 @@
           }
         }
 
-        // Блокируем и скрываем текущую кнопку
+        // Блокируем текущую кнопку (но не скрываем)
         button.disabled = true;
         button.style.opacity = '0.5';
         button.style.cursor = 'not-allowed';
-        wrap.style.display = 'none';
 
         // Разблокируем кнопку "Выплатить"
         const payOutWrap = amsInfo.querySelector('[data-post-button-label="Выплатить"]');

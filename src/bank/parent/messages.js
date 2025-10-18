@@ -375,7 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("🟦 [STEP] PURCHASE received");
     const encode = encodeJSON(e.data);
     const newText = formatBankText(e.data);
-    const ts = Date.now();
+    const ts = e.data.timestamp;
     const current_storage = await FMVbank.storageGet(window.UserID);
     current_storage[ts] = e.data;
     const storage_set_flag = FMVbank.storageSet(current_storage, window.UserID);
@@ -403,7 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("🟦 [STEP] EDIT_PURCHASE received");
     const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
     const newText = formatBankText(e.data);
-    const ts = Date.now();
+    const ts = e.data.timestamp;
     const comment_ts = e.data.comment_timestamp;
     const comment_id = e.data.comment_id;
     const comment_user_id = e.data.comment_user_id;

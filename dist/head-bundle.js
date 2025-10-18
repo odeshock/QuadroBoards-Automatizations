@@ -3232,43 +3232,64 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Проверяем, не создана ли уже кнопка
-      if (amsInfo.querySelector('.btn-no-edits-needed')) {
+      if (amsInfo.querySelector('[data-post-button-label="В правках не нуждается"]')) {
         console.log(`[NO_EDITS_NEEDED] Пост #${index}: кнопка уже существует`);
         continue;
       }
 
-      // Создаём кнопку
+      // Создаём UI (как в admin_edit.js)
+      const wrap = document.createElement('div');
+      wrap.dataset.order = 3; // после "Внести правки" (order=2)
+      wrap.dataset.postButtonLabel = 'В правках не нуждается';
+
       const button = document.createElement('button');
-      button.className = 'btn-no-edits-needed';
+      button.type = 'button';
+      button.className = 'button';
       button.textContent = 'В правках не нуждается';
-      button.style.cssText = 'margin: 5px; padding: 5px 10px; cursor: pointer;';
+
+      wrap.appendChild(button);
+
+      // Вставка по order (как в admin_edit.js)
+      const siblings = Array.from(amsInfo.querySelectorAll('div[data-order]'));
+      const next = siblings.find(el => Number(el.dataset.order) > 3);
+      if (next) amsInfo.insertBefore(wrap, next);
+      else amsInfo.appendChild(wrap);
 
       // Обработчик нажатия
       button.addEventListener('click', function () {
         console.log(`[NO_EDITS_NEEDED] Кнопка нажата для поста #${index}`);
 
         // Блокируем кнопку "Внести правки"
-        const adminEditBtn = amsInfo.querySelector('.btn-admin-edit');
-        if (adminEditBtn) {
-          adminEditBtn.disabled = true;
-          adminEditBtn.style.opacity = '0.5';
-          adminEditBtn.style.cursor = 'not-allowed';
-          console.log(`[NO_EDITS_NEEDED] Заблокирована кнопка "Внести правки"`);
+        const adminEditWrap = amsInfo.querySelector('[data-post-button-label="Внести правки"]');
+        if (adminEditWrap) {
+          const adminEditBtn = adminEditWrap.querySelector('button');
+          if (adminEditBtn) {
+            adminEditBtn.disabled = true;
+            adminEditBtn.style.opacity = '0.5';
+            adminEditBtn.style.cursor = 'not-allowed';
+            console.log(`[NO_EDITS_NEEDED] Заблокирована кнопка "Внести правки"`);
+          }
         }
 
-        // Скрываем текущую кнопку
-        button.style.display = 'none';
+        // Блокируем и скрываем текущую кнопку
+        button.disabled = true;
+        button.style.opacity = '0.5';
+        button.style.cursor = 'not-allowed';
+        wrap.style.display = 'none';
 
-        // Показываем кнопку "Выплатить"
-        const payOutBtn = amsInfo.querySelector('.btn-pay-out');
-        if (payOutBtn) {
-          payOutBtn.style.display = 'inline-block';
-          console.log(`[NO_EDITS_NEEDED] Показана кнопка "Выплатить"`);
+        // Разблокируем кнопку "Выплатить"
+        const payOutWrap = amsInfo.querySelector('[data-post-button-label="Выплатить"]');
+        if (payOutWrap) {
+          const payOutBtn = payOutWrap.querySelector('button');
+          if (payOutBtn) {
+            payOutBtn.disabled = false;
+            payOutBtn.style.opacity = '1';
+            payOutBtn.style.cursor = 'pointer';
+            console.log(`[NO_EDITS_NEEDED] Разблокирована кнопка "Выплатить"`);
+          }
         }
       });
 
-      // Вставляем кнопку в .ams_info
-      amsInfo.appendChild(button);
       console.log(`[NO_EDITS_NEEDED] Кнопка добавлена в пост #${index}`);
     }
   }
@@ -3408,16 +3429,31 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Проверяем, не создана ли уже кнопка
-      if (amsInfo.querySelector('.btn-pay-out')) {
+      if (amsInfo.querySelector('[data-post-button-label="Выплатить"]')) {
         console.log(`[PAY_OUT] Пост #${index}: кнопка уже существует`);
         continue;
       }
 
-      // Создаём кнопку
+      // Создаём UI (как в admin_edit.js)
+      const wrap = document.createElement('div');
+      wrap.dataset.order = 4; // после "В правках не нуждается" (order=3)
+      wrap.dataset.postButtonLabel = 'Выплатить';
+
       const button = document.createElement('button');
-      button.className = 'btn-pay-out';
+      button.type = 'button';
+      button.className = 'button';
       button.textContent = 'Выплатить';
-      button.style.cssText = 'margin: 5px; padding: 5px 10px; cursor: pointer; display: none;'; // скрыта по умолчанию
+      button.disabled = true; // заблокирована по умолчанию
+      button.style.opacity = '0.5';
+      button.style.cursor = 'not-allowed';
+
+      wrap.appendChild(button);
+
+      // Вставка по order (как в admin_edit.js)
+      const siblings = Array.from(amsInfo.querySelectorAll('div[data-order]'));
+      const next = siblings.find(el => Number(el.dataset.order) > 4);
+      if (next) amsInfo.insertBefore(wrap, next);
+      else amsInfo.appendChild(wrap);
 
       // Обработчик нажатия
       button.addEventListener('click', function () {
@@ -3426,9 +3462,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return true;
       });
 
-      // Вставляем кнопку в .ams_info
-      amsInfo.appendChild(button);
-      console.log(`[PAY_OUT] Кнопка добавлена в пост #${index} (скрыта)`);
+      console.log(`[PAY_OUT] Кнопка добавлена в пост #${index} (заблокирована)`);
     }
   }
 

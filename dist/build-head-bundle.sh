@@ -54,6 +54,14 @@ echo "/* MODULE 7.2: bank/buttons/admin_edit.js */" >> dist/head-bundle.js
 cat src/bank/buttons/admin_edit.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
+echo "/* MODULE 7.3: bank/buttons/no_edits_needed.js */" >> dist/head-bundle.js
+cat src/bank/buttons/no_edits_needed.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 7.4: bank/buttons/pay_out.js */" >> dist/head-bundle.js
+cat src/bank/buttons/pay_out.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
 echo "/* MODULE 7: bank/api.js */" >> dist/head-bundle.js
 cat src/bank/api.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js

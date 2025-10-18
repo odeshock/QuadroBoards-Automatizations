@@ -42,6 +42,10 @@ echo "/* MODULE 7.0: bank/gringotts_page_update.js */" >> dist/head-bundle.js
 cat src/bank/gringotts_page_update.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
+echo "/* MODULE 7.1: bank/buttons/start_ams_check.js */" >> dist/head-bundle.js
+cat src/bank/buttons/start_ams_check.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
 echo "/* MODULE 7: bank/api.js */" >> dist/head-bundle.js
 cat src/bank/api.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js

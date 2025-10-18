@@ -85,6 +85,12 @@ var PROFILE_CHECK = { // для работы проверки анкет
   MoneyFieldTemplate: PROFILE_FIELDS.MoneyTemplate, // шаблон для денежек
 };
 
+var BANK_CHECK = { // для проверки банковских операций
+  GroupID: [GROUP_IDS.Admin], // кому из групп разрешено проверять банк
+  UserID: [2], // кому из юзеров из этих групп разрешено проверять банк
+  ForumID: FORUMS_IDS.Bank, // форум, где лежит банк
+};
+
 var SKIN = { // для работы с библиотекой скинов
   GroupID: [GROUP_IDS.Admin], // кому из групп разрешено назначать в хранилище скины
   LibraryFieldID: 41, // ID темы с библиотекой

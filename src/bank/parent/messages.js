@@ -307,13 +307,10 @@ document.addEventListener("DOMContentLoaded", () => {
       NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
       NEW_ADMIN_EDIT
     }), "comment_info");
-    await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between comment_info");
-
     queueMessage(iframeReadyP, () => ({
       type: BankPostMessagesType.backup_data,
       BACKUP_DATA
     }), "backup_data");
-    await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between backup_data");
 
     // Скроллим страницу к div.post.topicpost
     const topicPost = document.querySelector("div.post.topicpost");

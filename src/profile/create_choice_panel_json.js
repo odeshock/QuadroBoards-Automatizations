@@ -136,7 +136,19 @@
         content: itemEl ? itemEl.innerHTML.trim() : '', // Только innerHTML, без обёртки
       };
 
-      // Если есть expirableAttr, извлекаем дату
+      // Извлекаем ВСЕ data-* атрибуты из элемента
+      if (itemEl && itemEl.attributes) {
+        for (let i = 0; i < itemEl.attributes.length; i++) {
+          const attr = itemEl.attributes[i];
+          if (attr.name.startsWith('data-') && attr.name !== 'data-id') {
+            // Убираем префикс "data-" и заменяем дефисы на подчёркивания
+            const key = attr.name.substring(5).replace(/-/g, '_');
+            newItem[key] = attr.value;
+          }
+        }
+      }
+
+      // Если есть expirableAttr, извлекаем дату (может перезаписать то, что извлекли выше)
       if (opts.expirableAttr && itemEl) {
         newItem.expired_date = itemEl.getAttribute(opts.expirableAttr) || '';
       }
@@ -310,13 +322,47 @@
 
     /**
      * Возвращает массив данных для сохранения в API
-     * @returns {Array} [{ id, title, content }]
+     * @returns {Array} [{ id, title, content, ...data-attrs }]
      */
     function getData() {
       return selectedItems.map(item => {
         // Создаём временный элемент для применения изменений
         const tmp = document.createElement('div');
         tmp.innerHTML = item.content.trim();
+
+        // Если купоны (expirableAttr), всегда добавляем/обновляем span.coupon_deadline
+        if (opts.expirableAttr) {
+          // Находим img и добавляем span после него
+          const imgEl = tmp.querySelector('img');
+          if (imgEl) {
+            // Удаляем старый span если есть
+            const oldSpan = imgEl.parentNode.querySelector('.coupon_deadline');
+            if (oldSpan) oldSpan.remove();
+
+            // Создаём новый span
+            const deadlineSpan = document.createElement('span');
+            deadlineSpan.className = 'coupon_deadline';
+
+            if (item.expired_date) {
+              // Конвертируем yyyy-mm-dd -> dd/mm/yy
+              const parts = item.expired_date.split('-');
+              if (parts.length === 3) {
+                const year = parts[0].slice(2);
+                const month = parts[1];
+                const day = parts[2];
+                deadlineSpan.textContent = `${day}/${month}/${year}`;
+              }
+            }
+            // Если даты нет, span остаётся пустым
+
+            // Вставляем span после img
+            if (imgEl.nextSibling) {
+              imgEl.parentNode.insertBefore(deadlineSpan, imgEl.nextSibling);
+            } else {
+              imgEl.parentNode.appendChild(deadlineSpan);
+            }
+          }
+        }
 
         // Применяем title к атрибуту (если нужно)
         if (item.title) {
@@ -326,51 +372,21 @@
           });
         }
 
-        // Применяем expired_date (если есть)
-        if (opts.expirableAttr && item.expired_date) {
-          const expirableElements = tmp.querySelectorAll(`[${opts.expirableAttr}]`);
-          expirableElements.forEach(el => {
-            el.setAttribute(opts.expirableAttr, item.expired_date);
-
-            // Обновляем span.coupon_deadline
-            let deadlineSpan = el.querySelector('.coupon_deadline');
-            if (!deadlineSpan) {
-              deadlineSpan = document.createElement('span');
-              deadlineSpan.className = 'coupon_deadline';
-              const imgEl = el.querySelector('img');
-              if (imgEl && imgEl.nextSibling) {
-                el.insertBefore(deadlineSpan, imgEl.nextSibling);
-              } else if (imgEl) {
-                imgEl.parentNode.appendChild(deadlineSpan);
-              } else {
-                el.appendChild(deadlineSpan);
-              }
-            }
-
-            // Конвертируем yyyy-mm-dd -> dd/mm/yy
-            const parts = item.expired_date.split('-');
-            if (parts.length === 3) {
-              const year = parts[0].slice(2);
-              const month = parts[1];
-              const day = parts[2];
-              deadlineSpan.textContent = `${day}/${month}/${year}`;
-            }
-          });
-        } else if (opts.expirableAttr && !item.expired_date) {
-          // Удаляем атрибут и span если даты нет
-          const expirableElements = tmp.querySelectorAll(`[${opts.expirableAttr}]`);
-          expirableElements.forEach(el => {
-            el.removeAttribute(opts.expirableAttr);
-            const deadlineSpan = el.querySelector('.coupon_deadline');
-            if (deadlineSpan) deadlineSpan.remove();
-          });
-        }
-
-        return {
+        // Собираем результат
+        const result = {
           id: item.id,
           title: item.title || '',
-          content: tmp.innerHTML.trim() // Только innerHTML, без data-id
+          content: tmp.innerHTML.trim()
         };
+
+        // Добавляем все data-* атрибуты (кроме id, title, content)
+        Object.keys(item).forEach(key => {
+          if (key !== 'id' && key !== 'title' && key !== 'content') {
+            result[key] = item[key];
+          }
+        });
+
+        return result;
       });
     }
 

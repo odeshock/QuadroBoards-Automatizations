@@ -105,7 +105,20 @@
 
       // Оборачиваем content в <div class="item"> с атрибутами
       const html = items.map(item => {
-        const attrs = [`data-id="${escapeAttr(item.id)}"`, `title="${escapeAttr(item.title || '')}"`];
+        const attrs = [
+          `data-id="${escapeAttr(item.id)}"`,
+          `title="${escapeAttr(item.title || '')}"`
+        ];
+
+        // Добавляем все остальные data-* атрибуты
+        Object.keys(item).forEach(itemKey => {
+          if (itemKey !== 'id' && itemKey !== 'title' && itemKey !== 'content' && itemKey !== 'is_visible') {
+            // Конвертируем подчёркивания обратно в дефисы (coupon_type -> coupon-type)
+            const attrName = 'data-' + itemKey.replace(/_/g, '-');
+            attrs.push(`${attrName}="${escapeAttr(item[itemKey] || '')}"`);
+          }
+        });
+
         return `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
       }).join('\n');
 

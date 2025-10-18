@@ -171,7 +171,7 @@
 
       // Проверяем, не добавлена ли уже кнопка
       if (container.querySelector(`[data-post-button-label="${label}"]`)) return;
-
+      console.log("Пост:", post);
       const { usr_id, ts, comment_id, current_bank } = getPostData(post);
       if (!usr_id || !ts || !comment_id) {
         console.log(`[adminEdit] "${label}": Пост ${index}: не удалось получить данные, пропуск`);

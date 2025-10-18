@@ -58,6 +58,7 @@
    * @param {Object}   opts
    * @param {string[]} [opts.allowedGroups=[]]
    * @param {string[]} [opts.allowedForums=[]]
+   * @param {string[]} [opts.allowedUsers=[]]
    * @param {string}   [opts.label='Действие']
    * @param {Function} opts.onClick  async ({statusEl, linkEl, detailsEl, setStatus, setDetails, setLink, wrap}) => void
    * @param {string}   [opts.containerSelector='.ams_info']
@@ -71,6 +72,7 @@
     const {
       allowedGroups = [],
       allowedForums = [],
+      allowedUsers = [],
       label = 'Действие',
       onClick,
       containerSelector = '.ams_info',
@@ -96,6 +98,12 @@
     // строгая проверка форума
     if (!Array.isArray(allowedForums) || allowedForums.length === 0) return;
     if (!isAllowedForum(allowedForums)) return;
+
+    // проверка пользователей (если задано)
+    if (Array.isArray(allowedUsers) && allowedUsers.length > 0) {
+      const uid = Number(window.UserID);
+      if (!allowedUsers.map(Number).includes(uid)) return;
+    }
 
     // НОВОЕ: строгая проверка нужной темы
     if (!isOnTopicId(topicId)) return;

@@ -1,68 +1,49 @@
 /**
  * Кнопка "Начать проверку АМС"
- * Добавляет метку [FMVbank_ams_check] в начало комментария и отправляет форму редактирования
+ * Добавляет метку [FMVbank_ams_check] в начало комментария topicpost и отправляет форму редактирования
  */
 
 (function () {
   'use strict';
 
-  const BUTTON_CONFIG = {
-    allowedGroups: (window.BANK_CHECK && window.BANK_CHECK?.GroupID) || [],
-    allowedForums: (window.BANK_CHECK && window.BANK_CHECK?.ForumID) || [],
-    allowedUsers: (window.BANK_CHECK && window.BANK_CHECK?.UserID) || [],
-    label: 'Начать проверку',
-    order: 1
-  };
+  // Проверяем, что заголовок страницы начинается с "Гринготтс"
+  if (!document.title.startsWith('Гринготтс')) {
+    return;
+  }
 
   const TAG = '[FMVbank_ams_check]';
   const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
 
   /**
-   * Проверяет, доступна ли кнопка на текущей странице
+   * Извлекает comment_id из topicpost (первого поста)
    */
-  function isButtonAvailable() {
-    // Проверка заголовка страницы
-    const pageTitle = document.title || '';
-    if (!pageTitle.startsWith('Гринготтс')) {
-      return false;
+  function getTopicPostCommentId() {
+    const topicPost = document.querySelector('div.post.topicpost');
+    if (!topicPost) {
+      return 0;
     }
 
-    const userId = window.UserID;
-    const userGroup = window.UserGroup;
-    const currentForum = getCurrentForumId();
-
-    // Проверка ID пользователя
-    if (BUTTON_CONFIG.allowedUsers.length > 0 && !BUTTON_CONFIG.allowedUsers.includes(userId)) {
-      return false;
+    const editLink = topicPost.querySelector('.pl-edit a');
+    if (!editLink) {
+      return 0;
     }
 
-    // Проверка группы пользователя
-    if (BUTTON_CONFIG.allowedGroups.length > 0 && !BUTTON_CONFIG.allowedGroups.includes(userGroup)) {
-      return false;
+    try {
+      const editUrl = new URL(editLink.href);
+      return Number(editUrl.searchParams.get('id')) || 0;
+    } catch (e) {
+      console.warn('[AMS_CHECK] Не удалось извлечь comment_id:', e);
+      return 0;
     }
-
-    // Проверка форума
-    if (BUTTON_CONFIG.allowedForums.length > 0 && !BUTTON_CONFIG.allowedForums.includes(currentForum)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Получает ID текущего форума из URL
-   */
-  function getCurrentForumId() {
-    const url = new URL(window.location.href);
-    return parseInt(url.searchParams.get('id')) || 0;
   }
 
   /**
    * Запускает проверку АМС для указанного комментария
    */
-  async function startAmsCheck(commentId) {
+  async function startAmsCheck(commentId, { setStatus, setDetails }) {
     try {
       console.log(`🟦 [AMS_CHECK] Начинаем проверку для комментария ID: ${commentId}`);
+      setStatus('⏳ Загрузка...');
 
       // Создаём скрытый iframe для редактирования
       const iframe = document.createElement('iframe');
@@ -92,9 +73,13 @@
       if (!currentValue.includes(TAG)) {
         textarea.value = TAG + currentValue;
         console.log(`✅ [AMS_CHECK] Тег ${TAG} добавлен в начало комментария`);
+        setDetails(`Тег ${TAG} добавлен`);
       } else {
         console.log(`ℹ️ [AMS_CHECK] Тег ${TAG} уже присутствует в комментарии`);
+        setDetails(`Тег ${TAG} уже присутствует`);
       }
+
+      setStatus('⏳ Отправка...');
 
       // Отслеживаем редирект после отправки
       let redirectUrl = null;
@@ -149,7 +134,8 @@
 
       if (redirectDetected) {
         console.log(`✅ [AMS_CHECK] Проверка успешно запущена для комментария ${commentId}`);
-        alert(`Проверка АМС успешно запущена для комментария ${commentId}`);
+        setStatus('✅ Проверка запущена');
+        setDetails(`Комментарий ${commentId} обновлён`);
         return { success: true, redirectUrl };
       } else {
         throw new Error('Не удалось обнаружить редирект после отправки');
@@ -157,80 +143,37 @@
 
     } catch (error) {
       console.error(`❌ [AMS_CHECK] Ошибка при запуске проверки:`, error);
-      alert(`Ошибка при запуске проверки АМС: ${error.message}`);
+      setStatus('❌ Ошибка');
+      setDetails(error.message);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Добавляет кнопку "Начать проверку" к комментарию
-   */
-  function addButtonToComment(commentElement) {
-    // Ищем ссылку редактирования
-    const editLink = commentElement.querySelector('.pl-edit a');
-    if (!editLink) return;
+  // Используем createForumButton для создания кнопки
+  if (typeof window.createForumButton === 'function') {
+    window.createForumButton({
+      allowedGroups: (window.BANK_CHECK?.GroupID) || [],
+      allowedForums: (window.BANK_CHECK?.ForumID) || [],
+      allowedUsers: (window.BANK_CHECK?.UserID) || [],
+      label: 'Начать проверку',
+      order: 1,
+      onClick: async ({ setStatus, setDetails }) => {
+        // Извлекаем comment_id из topicpost
+        const commentId = getTopicPostCommentId();
 
-    // Извлекаем comment_id из href
-    let commentId = 0;
-    try {
-      const editUrl = new URL(editLink.href);
-      commentId = Number(editUrl.searchParams.get('id')) || 0;
-    } catch (e) {
-      console.warn('[AMS_CHECK] Не удалось извлечь comment_id:', e);
-      return;
-    }
+        if (!commentId) {
+          setStatus('❌ Ошибка');
+          setDetails('Не найден topicpost или comment_id');
+          console.error('[AMS_CHECK] Не удалось найти comment_id topicpost');
+          return;
+        }
 
-    if (!commentId) return;
-
-    // Проверяем, не добавлена ли уже кнопка
-    const existingButton = commentElement.querySelector('.ams-check-button');
-    if (existingButton) return;
-
-    // Создаём кнопку
-    const button = document.createElement('button');
-    button.className = 'ams-check-button';
-    button.textContent = BUTTON_CONFIG.label;
-    button.style.cssText = 'margin-left: 10px; padding: 4px 8px; cursor: pointer;';
-    button.dataset.commentId = commentId;
-
-    button.onclick = async (e) => {
-      e.preventDefault();
-      button.disabled = true;
-      button.textContent = 'Обработка...';
-
-      await startAmsCheck(commentId);
-
-      button.disabled = false;
-      button.textContent = BUTTON_CONFIG.label;
-    };
-
-    // Добавляем кнопку рядом с ссылкой редактирования
-    const editContainer = commentElement.querySelector('.pl-edit');
-    if (editContainer) {
-      editContainer.appendChild(button);
-    }
-  }
-
-  /**
-   * Инициализация
-   */
-  function init() {
-    if (!isButtonAvailable()) {
-      console.log('[AMS_CHECK] Кнопка недоступна на текущей странице');
-      return;
-    }
-
-    // Добавляем кнопки ко всем комментариям
-    document.querySelectorAll('.post').forEach(addButtonToComment);
-
-    console.log('[AMS_CHECK] Кнопки добавлены');
-  }
-
-  // Запускаем при загрузке DOM
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+        console.log(`[AMS_CHECK] Найден comment_id topicpost: ${commentId}`);
+        await startAmsCheck(commentId, { setStatus, setDetails });
+      }
+    });
   } else {
-    init();
+    console.error('[AMS_CHECK] Функция createForumButton недоступна');
   }
 
   // Экспортируем функцию для внешнего использования

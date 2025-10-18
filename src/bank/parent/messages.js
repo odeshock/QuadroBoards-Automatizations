@@ -282,8 +282,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Функция для редактирования комментариев из backup
   async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_ADMIN_EDIT = false } = {}) {
+    console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}`);
+
     const current_storage = await FMVbank.storageGet(user_id);
+    console.log(`🟦 [BACKUP] current_storage:`, current_storage);
+
     const BACKUP_DATA = current_storage[ts];
+    console.log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
 
     queueMessage(iframeReadyP, () => ({
       type: BankPostMessagesType.comment_info,

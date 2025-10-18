@@ -119,12 +119,17 @@ const ALLOWED_PARENTS = [
     if (d.type === "BANNER_RENO_FLAG") window.BANNER_RENO_FLAG = !!d.banner_reno_flag;
 
     if (d.type === "COMMENT_INFO") {
+      console.log("✅ [LOADER] Получен COMMENT_INFO:", d);
       window.NEW_COMMENT_ID = d.NEW_COMMENT_ID;
       window.NEW_CURRENT_BANK = d.NEW_CURRENT_BANK;
       window.NEW_ADMIN_EDIT = d.NEW_ADMIN_EDIT;
     }
 
-    if (d.type === "BACKUP_DATA") window.BACKUP_DATA = d.BACKUP_DATA;
+    if (d.type === "BACKUP_DATA") {
+      console.log("✅ [LOADER] Получен BACKUP_DATA:", d);
+      window.BACKUP_DATA = d.BACKUP_DATA;
+      console.log("✅ [LOADER] window.BACKUP_DATA установлен:", window.BACKUP_DATA);
+    }
 
     // Проверяем, все ли критические данные загружены
     if (window.USER_ID !== undefined &&

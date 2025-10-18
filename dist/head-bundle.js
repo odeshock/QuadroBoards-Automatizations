@@ -2257,6 +2257,18 @@ document.addEventListener("DOMContentLoaded", () => {
         postForm.style.display = 'none'; // Скрываем элемент
     }
 
+    // Создаём .ams_info для topicpost (первого поста), если его ещё нет
+    const topicPost = document.querySelector('div.post.topicpost');
+    if (topicPost) {
+        const topicPostContent = topicPost.querySelector('.post-content');
+        if (topicPostContent && !topicPostContent.querySelector('.ams_info')) {
+            const amsInfo = document.createElement('div');
+            amsInfo.className = 'ams_info';
+            topicPostContent.appendChild(amsInfo);
+            console.log('[gringotts_page_update] .ams_info создан для topicpost');
+        }
+    }
+
     // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)
     document.querySelectorAll("div.post").forEach(async (container) => {
         try {

@@ -107,6 +107,7 @@ const ALLOWED_PARENTS = [
 
     if (d.type === "PERSONAL_DISCOUNTS") {
       window.PERSONAL_DISCOUNTS = d.coupons_data || [];
+      console.log("Loaded coupons", window.PERSONAL_DISCOUNTS);
     }
 
     if (d.type === "PERSONAL_POSTS") window.PERSONAL_POSTS = d.posts || [];

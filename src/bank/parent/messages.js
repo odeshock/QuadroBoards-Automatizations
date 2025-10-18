@@ -414,6 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const comment_ts = e.data.comment_timestamp;
     const comment_id = e.data.comment_id;
     const comment_user_id = e.data.comment_user_id;
+    const admin_flag = (!e.data.is_admin_to_edit) ? "" : "[FMVbankAmsCheck]"
 
     // Сохраняем данные в storage
     const current_storage = await FMVbank.storageGet(comment_user_id);
@@ -450,7 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Вставляем текст
-        iframeTextArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
+        iframeTextArea.value = `${admin_flag}[FMVbank]${ts}[/FMVbank]${newText}`;
         console.log("✅ [EDIT] Текст вставлен в форму редактирования");
 
         // Отслеживаем редирект после отправки

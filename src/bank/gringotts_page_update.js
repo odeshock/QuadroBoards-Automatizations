@@ -9,8 +9,11 @@ document.addEventListener("DOMContentLoaded", () => {
         postForm.style.display = 'none'; // Скрываем элемент
     }
 
-    // Создаём .ams_info ТОЛЬКО для UserID === 2
-    if (window.UserID === 2) {
+    // Создаём .ams_info только для разрешённых пользователей
+    const allowedUsers = (window.BANK_CHECK?.UserID) || [];
+    const currentUser = Number(window.UserID);
+
+    if (allowedUsers.length > 0 && allowedUsers.map(Number).includes(currentUser)) {
         let createdCount = 0;
         document.querySelectorAll('div.post').forEach((post) => {
             // Пропускаем topicpost
@@ -19,11 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const postContent = post.querySelector('.post-content');
             if (!postContent) return;
 
-            // Проверяем, что нет тегов bank_ams_check и bank_ams_done
-            const hasAmsCheck = postContent.querySelector('bank_ams_check');
+            // Проверяем, что нет тега bank_ams_done
             const hasAmsDone = postContent.querySelector('bank_ams_done');
 
-            if (!hasAmsCheck && !hasAmsDone && !postContent.querySelector('.ams_info')) {
+            if (!hasAmsDone && !postContent.querySelector('.ams_info')) {
                 const amsInfo = document.createElement('div');
                 amsInfo.className = 'ams_info';
                 postContent.appendChild(amsInfo);
@@ -31,7 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        console.log(`[gringotts_page_update] .ams_info создано для UserID=2: ${createdCount}`);
+        console.log(`[gringotts_page_update] .ams_info создано для UserID=${currentUser}: ${createdCount}`);
+    } else {
+        console.log(`[gringotts_page_update] UserID=${currentUser} не в списке allowedUsers=[${allowedUsers}], .ams_info не создаётся`);
     }
 
     // Проходим по всем контейнерам постов (асинхронно для поддержки MainUsrFieldResolver)

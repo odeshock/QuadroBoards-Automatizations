@@ -1,6 +1,6 @@
 /**
  * Кнопка "Начать проверку АМС"
- * Добавляет метку [FMVbank_ams_check] в начало комментария и отправляет форму редактирования
+ * Добавляет метку [FMVbankAmsCheck] в начало комментария и отправляет форму редактирования
  */
 
 (function () {
@@ -11,7 +11,7 @@
     return;
   }
 
-  const TAG = '[FMVbank_ams_check]';
+  const TAG = '[FMVbankAmsCheck]';
   const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
 
   /**
@@ -154,6 +154,12 @@
     } = opts || {};
 
     console.log(`[createPostButtons] "${label}": Вызов с параметрами:`, { allowedGroups, allowedForums, allowedUsers, containerSelector, postSelector });
+
+    // Проверяем заголовок страницы
+    if (!document.title.startsWith('Гринготтс')) {
+      console.log(`[createPostButtons] "${label}": Страница не Гринготтс, выход`);
+      return;
+    }
 
     if (typeof onClick !== 'function') {
       console.log(`[createPostButtons] "${label}": onClick не функция, выход`);

@@ -2184,6 +2184,7 @@ export function renderLog(log) {
           comment_id: window.COMMENT_ID,
           comment_timestamp: window.COMMENT_TIMESTAMP,
           comment_user_id: window.USER_ID,
+          is_admin_to_edit: window.IS_ADMIN_TO_EDIT,
           fullData: fullData,
           environment: environment,
           totalSum: totalSum,

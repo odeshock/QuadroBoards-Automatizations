@@ -709,168 +709,50 @@ $(function() {
 })();
 
 /* Private Pages */
-// skin_html_json_parser.js — Парсинг HTML ↔ JSON для данных скинов
+// admin_bridge_json.js — API bridge для работы напрямую с JSON
+// Загружает данные из API и сохраняет обратно БЕЗ HTML-прослойки
 
 (function () {
   'use strict';
 
-  if (!window.FMV) window.FMV = {};
-
   /**
-   * Парсит HTML в JSON структуру
-   * @param {string} html - HTML с секциями ._icon, ._plashka, ._background, ._gift, ._coupon
-   * @returns {Object} - { icon: [...], plashka: [...], background: [...], gift: [...], coupon: [...] }
-   */
-  function parseHtmlToJson(html) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-
-    const result = {
-      icon: [],
-      plashka: [],
-      background: [],
-      gift: [],
-      coupon: []
-    };
-
-    // Маппинг классов на ключи
-    const sectionMap = {
-      '_icon': 'icon',
-      '_plashka': 'plashka',
-      '_background': 'background',
-      '_gift': 'gift',
-      '_coupon': 'coupon'
-    };
-
-    for (const [className, key] of Object.entries(sectionMap)) {
-      const section = doc.querySelector(`.${className}`);
-      if (!section) continue;
-
-      const items = section.querySelectorAll('.item');
-      items.forEach(item => {
-        const itemData = {
-          title: item.getAttribute('title') || '',
-          id: item.getAttribute('data-id') || '',
-          content: item.innerHTML || ''
-        };
-
-        // Собираем все data-* атрибуты
-        Array.from(item.attributes).forEach(attr => {
-          if (attr.name.startsWith('data-') && attr.name !== 'data-id') {
-            const attrKey = attr.name.replace('data-', '').replace(/-/g, '_');
-            itemData[attrKey] = attr.value;
-          }
-        });
-
-        result[key].push(itemData);
-      });
-    }
-
-    return result;
-  }
-
-  /**
-   * Конвертирует JSON в HTML
-   * @param {Object} data - { icon: [...], plashka: [...], background: [...], gift: [...], coupon: [...] }
-   * @returns {string} - HTML строка
-   */
-  function parseJsonToHtml(data) {
-    let html = '';
-
-    const sections = [
-      { key: 'icon', className: '_icon' },
-      { key: 'plashka', className: '_plashka' },
-      { key: 'background', className: '_background' },
-      { key: 'gift', className: '_gift' },
-      { key: 'coupon', className: '_coupon' }
-    ];
-
-    sections.forEach(({ key, className }) => {
-      const items = data[key] || [];
-      if (items.length === 0) return;
-
-      html += `<div class="${className}">\n`;
-
-      items.forEach(item => {
-        const attrs = [
-          `title="${escapeHtml(item.title || '')}"`,
-          `data-id="${escapeHtml(item.id || '')}"`
-        ];
-
-        // Добавляем все остальные data-* атрибуты
-        Object.keys(item).forEach(k => {
-          if (k !== 'title' && k !== 'id' && k !== 'content') {
-            const attrName = 'data-' + k.replace(/_/g, '-');
-            attrs.push(`${attrName}="${escapeHtml(item[k] || '')}"`);
-          }
-        });
-
-        html += `  <div class="item" ${attrs.join(' ')}>${item.content || ''}</div>\n`;
-      });
-
-      html += `</div>\n`;
-    });
-
-    return html;
-  }
-
-  function escapeHtml(str) {
-    return String(str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  // Экспорт
-  window.FMV.parseHtmlToJson = parseHtmlToJson;
-  window.FMV.parseJsonToHtml = parseJsonToHtml;
-
-  console.log('[skin_html_json_parser] Загружен');
-})();
-// admin_bridge_api.js — загрузка/сохранение данных через API вместо страниц
-// Экспорт: window.skinAdmin.load(userId) -> { status, initialHtml, save(newHtml), targetUserId }
-
-(function () {
-  'use strict';
-
-  console.log('[admin_bridge_api] Загружается версия с API');
-
-  // Не перезаписываем, если уже есть
-  if (window.skinAdmin && window.skinAdmin.__apiVersion) {
-    console.log('[admin_bridge_api] Уже загружен');
-    return;
-  }
-
-  /**
-   * Получает user_id из .modal_script
+   * Определяет user_id из .modal_script
    * Приоритет: data-main-user_id > data-id
    */
-  function getUserIdFromPage(fallbackUserId) {
-    const modal = document.querySelector('.modal_script[data-id]');
-    if (modal) {
-      const mainUserId = modal.getAttribute('data-main-user_id');
-      if (mainUserId && mainUserId.trim()) {
-        return Number(mainUserId.trim());
-      }
-      const dataId = modal.getAttribute('data-id');
-      if (dataId && dataId.trim()) {
-        return Number(dataId.trim());
-      }
+  function getUserIdFromModalScript() {
+    const modalScript = document.querySelector('.modal_script');
+    if (!modalScript) return null;
+
+    const mainUserId = modalScript.getAttribute('data-main-user_id');
+    if (mainUserId && mainUserId.trim()) {
+      return Number(mainUserId.trim());
     }
-    return fallbackUserId ? Number(fallbackUserId) : null;
+
+    const dataId = modalScript.getAttribute('data-id');
+    if (dataId && dataId.trim()) {
+      return Number(dataId.trim());
+    }
+
+    return null;
   }
+
+  /**
+   * Маппинг категорий → API labels
+   */
+  const apiLabels = {
+    icon: 'icon_',
+    plashka: 'plashka_',
+    background: 'background_',
+    gift: 'gift_',
+    coupon: 'coupon_'
+  };
 
   /**
    * Загружает данные из API для всех категорий
+   * @param {number} userId
+   * @returns {Promise<object>} { icon: [], plashka: [], background: [], gift: [], coupon: [] }
    */
   async function loadAllDataFromAPI(userId) {
-    console.log('[admin_bridge_api] Загружаю данные из API для userId:', userId);
-
-    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
-      throw new Error('FMVbank.storageGet не найден');
-    }
-
     const result = {
       icon: [],
       plashka: [],
@@ -879,241 +761,105 @@ $(function() {
       coupon: []
     };
 
-    const apiLabels = {
-      icon: 'icon_',
-      plashka: 'plashka_',
-      background: 'background_',
-      gift: 'gift_',
-      coupon: 'coupon_'
-    };
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+      console.error('[admin_bridge_json] FMVbank.storageGet не найден');
+      return result;
+    }
 
     for (const [key, label] of Object.entries(apiLabels)) {
       try {
-        const data = await window.FMVbank.storageGet(userId, label);
-        console.log(`[admin_bridge_api] ${key} данные:`, data);
+        const response = await window.FMVbank.storageGet(userId, label);
 
-        // Данные хранятся в формате { "user_id": [...] }
-        const userData = data?.[String(userId)];
-        if (Array.isArray(userData)) {
-          result[key] = userData;
+        // Формат: { last_update_ts, data: [...] }
+        if (response && typeof response === 'object' && Array.isArray(response.data)) {
+          result[key] = response.data;
         }
-      } catch (e) {
-        console.error(`[admin_bridge_api] Ошибка загрузки ${key}:`, e);
+      } catch (err) {
+        console.error(`[admin_bridge_json] Ошибка загрузки ${key}:`, err);
       }
     }
 
-    console.log('[admin_bridge_api] Все данные загружены:', result);
     return result;
   }
 
   /**
    * Сохраняет данные в API для всех категорий
+   * @param {number} userId
+   * @param {object} jsonData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+   * @returns {Promise<boolean>}
    */
   async function saveAllDataToAPI(userId, jsonData) {
-    console.log('[admin_bridge_api] Сохраняю данные в API для userId:', userId, jsonData);
-
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
-      throw new Error('FMVbank.storageSet не найден');
+      console.error('[admin_bridge_json] FMVbank.storageSet не найден');
+      return false;
     }
-
-    const apiLabels = {
-      icon: 'icon_',
-      plashka: 'plashka_',
-      background: 'background_',
-      gift: 'gift_',
-      coupon: 'coupon_'
-    };
-
-    const results = {};
-
-    for (const [key, label] of Object.entries(apiLabels)) {
-      const categoryData = jsonData[key] || [];
-
-      // Формируем данные в формате { "user_id": [...] }
-      const saveData = {
-        [String(userId)]: categoryData
-      };
-
-      try {
-        const result = await window.FMVbank.storageSet(saveData, userId, label);
-        results[key] = result;
-        console.log(`[admin_bridge_api] ${key} сохранено:`, result);
-      } catch (e) {
-        console.error(`[admin_bridge_api] Ошибка сохранения ${key}:`, e);
-        results[key] = false;
-      }
-    }
-
-    // Проверяем, все ли успешно
-    const allSuccess = Object.values(results).every(r => r === true);
-    console.log('[admin_bridge_api] Результаты сохранения:', results, 'Все успешно:', allSuccess);
-
-    return allSuccess;
-  }
-
-  async function loadSkinAdmin(userId) {
-    console.log('[admin_bridge_api] loadSkinAdmin вызван для userId:', userId);
-
-    // Определяем целевой userId (с учётом data-main-user_id)
-    const targetUserId = getUserIdFromPage(userId) || Number(userId);
-    console.log('[admin_bridge_api] Целевой userId:', targetUserId);
 
     try {
-      // Загружаем данные из API
-      const jsonData = await loadAllDataFromAPI(targetUserId);
+      for (const [key, label] of Object.entries(apiLabels)) {
+        const categoryData = jsonData[key] || [];
 
-      // Конвертируем JSON в HTML для панелей
-      let initialHtml = '';
-      if (window.FMV && typeof window.FMV.parseJsonToHtml === 'function') {
-        initialHtml = window.FMV.parseJsonToHtml(jsonData);
-        console.log('[admin_bridge_api] HTML построен из JSON, длина:', initialHtml.length);
-      } else {
-        console.warn('[admin_bridge_api] FMV.parseJsonToHtml не найден');
-      }
-
-      // Функция сохранения
-      async function save(newHtml) {
-        console.log('[admin_bridge_api] save() вызван, HTML длина:', newHtml.length);
-
-        // Парсим HTML в JSON
-        let jsonData;
-        if (window.FMV && typeof window.FMV.parseHtmlToJson === 'function') {
-          jsonData = window.FMV.parseHtmlToJson(newHtml);
-          console.log('[admin_bridge_api] HTML распарсен в JSON:', jsonData);
-        } else {
-          console.error('[admin_bridge_api] FMV.parseHtmlToJson не найден');
-          return { ok: false, status: 'ошибка: парсер не найден' };
-        }
-
-        // Сохраняем в API
-        const success = await saveAllDataToAPI(targetUserId, jsonData);
-
-        return {
-          ok: success,
-          status: success ? 'успешно' : 'ошибка сохранения'
+        const saveData = {
+          last_update_ts: Math.floor(Date.now() / 1000),
+          data: categoryData
         };
+
+        const result = await window.FMVbank.storageSet(saveData, userId, label);
+        if (!result) {
+          console.error(`[admin_bridge_json] Не удалось сохранить ${key}`);
+          return false;
+        }
       }
-
-      return {
-        status: 'ok',
-        initialHtml,
-        save,
-        targetUserId
-      };
-
-    } catch (e) {
-      console.error('[admin_bridge_api] Ошибка:', e);
-      return {
-        status: 'ошибка: ' + (e.message || String(e))
-      };
+      return true;
+    } catch (err) {
+      console.error('[admin_bridge_json] Ошибка сохранения:', err);
+      return false;
     }
   }
 
-  window.skinAdmin = {
-    load: loadSkinAdmin,
-    __apiVersion: true
-  };
+  /**
+   * Главная функция load
+   * @param {string} profileId - id из URL (/profile.php?id=N)
+   * @returns {Promise<object>} { status, initialData, save, targetUserId }
+   */
+  async function load(profileId) {
+    const targetUserId = getUserIdFromModalScript() || Number(profileId);
 
-  console.log('[admin_bridge_api] Загружен и готов');
+    if (!targetUserId) {
+      return {
+        status: 'error',
+        initialData: {},
+        save: null,
+        targetUserId: null
+      };
+    }
+
+    // Загружаем данные из API
+    const initialData = await loadAllDataFromAPI(targetUserId);
+
+    /**
+     * Функция сохранения
+     * @param {object} newData - { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+     * @returns {Promise<object>} { ok, status }
+     */
+    async function save(newData) {
+      const success = await saveAllDataToAPI(targetUserId, newData);
+      return {
+        ok: success,
+        status: success ? 'успешно' : 'ошибка сохранения'
+      };
+    }
+
+    return {
+      status: 'ok',
+      initialData,
+      save,
+      targetUserId
+    };
+  }
+
+  // Экспортируем в window.skinAdmin
+  window.skinAdmin = { load };
 })();
-// get_skin_api.js — Загрузка данных скинов из API вместо страниц
-
-function isProfileFieldsPage() {
-  try {
-    const u = new URL(location.href);
-    return /\/profile\.php$/i.test(u.pathname) &&
-           u.searchParams.get('section') === 'fields' &&
-           /^\d+$/.test(u.searchParams.get('id') || '');
-  } catch { return false; }
-}
-
-function getProfileId() {
-  const u = new URL(location.href);
-  return u.searchParams.get('id') || '';
-}
-
-/**
- * Получает user_id с учётом data-main-user_id
- */
-function getUserIdFromPage(profileId) {
-  const modal = document.querySelector('.modal_script[data-id]');
-  if (modal) {
-    const mainUserId = modal.getAttribute('data-main-user_id');
-    if (mainUserId && mainUserId.trim()) {
-      return Number(mainUserId.trim());
-    }
-  }
-  return Number(profileId);
-}
-
-/**
- * Загружает данные из API для всех категорий
- */
-async function loadSkinsFromAPI(userId) {
-  console.log('[get_skin_api] Загружаю данные из API для userId:', userId);
-
-  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
-    console.error('[get_skin_api] FMVbank.storageGet не найден');
-    return { icons: [], plashki: [], backs: [] };
-  }
-
-  const result = {
-    icons: [],
-    plashki: [],
-    backs: []
-  };
-
-  const apiLabels = {
-    icons: 'icon_',
-    plashki: 'plashka_',
-    backs: 'background_'
-  };
-
-  for (const [key, label] of Object.entries(apiLabels)) {
-    try {
-      const data = await window.FMVbank.storageGet(userId, label);
-      console.log(`[get_skin_api] ${key} данные:`, data);
-
-      // Данные хранятся в формате { "user_id": [...] }
-      const userData = data?.[String(userId)];
-      if (Array.isArray(userData)) {
-        // Конвертируем каждый item в HTML
-        result[key] = userData.map(item => item.content || '').filter(Boolean);
-      }
-    } catch (e) {
-      console.error(`[get_skin_api] Ошибка загрузки ${key}:`, e);
-    }
-  }
-
-  console.log('[get_skin_api] Результат:', result);
-  return result;
-}
-
-/**
- * Загружает данные скинов из API и возвращает массивы HTML
- * { icons: string[], plashki: string[], backs: string[] }
- */
-async function collectSkinSets() {
-  console.log('[get_skin_api] collectSkinSets вызван');
-
-  if (!isProfileFieldsPage()) {
-    console.log('[get_skin_api] Не страница fields');
-    return { icons: [], plashki: [], backs: [] };
-  }
-
-  const profileId = getProfileId();
-  console.log('[get_skin_api] profileId:', profileId);
-
-  // Получаем целевой userId с учётом data-main-user_id
-  const userId = getUserIdFromPage(profileId);
-  console.log('[get_skin_api] Целевой userId:', userId);
-
-  // Загружаем из API
-  const result = await loadSkinsFromAPI(userId);
-
-  console.log('[get_skin_api] Данные загружены:', result);
-  return result;
-}
 // collect_skins_api.js — Загрузка и отображение скинов из API на страницах персонажей
 
 (function () {
@@ -1181,13 +927,13 @@ async function collectSkinSets() {
 
     for (const [key, label] of Object.entries(apiLabels)) {
       try {
-        const data = await window.FMVbank.storageGet(userId, label);
-        log(`${key} данные:`, data);
+        const response = await window.FMVbank.storageGet(userId, label);
+        log(`${key} ответ:`, response);
 
-        // Данные хранятся в формате { "user_id": [...] }
-        const userData = data?.[String(userId)];
-        if (Array.isArray(userData)) {
-          result[key] = userData;
+        // Новый формат: { last_update_ts, data: [...] }
+        if (response && typeof response === 'object' && Array.isArray(response.data)) {
+          result[key] = response.data;
+          log(`${key} загружено ${response.data.length} элементов`);
         }
       } catch (e) {
         console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);
@@ -1218,37 +964,14 @@ async function collectSkinSets() {
         continue;
       }
 
-      let html = '';
-      items.forEach(item => {
-        const attrs = [
-          `title="${escapeHtml(item.title || '')}"`,
-          `data-id="${escapeHtml(item.id || '')}"`
-        ];
-
-        // Добавляем все data-* атрибуты
-        Object.keys(item).forEach(k => {
-          if (k !== 'title' && k !== 'id' && k !== 'content') {
-            const attrName = 'data-' + k.replace(/_/g, '-');
-            attrs.push(`${attrName}="${escapeHtml(item[k] || '')}"`);
-          }
-        });
-
-        html += `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
-      });
+      // Просто берём content напрямую из каждого элемента
+      const html = items.map(item => item.content || '').join('\n');
 
       target.innerHTML = html;
       log(`Вставлено ${items.length} элементов в ${selector}`);
     }
   }
 
-  function escapeHtml(str) {
-    return String(str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
 
   /**
    * Находит scope вокруг персонажа
@@ -2733,13 +2456,9 @@ async function FMVeditTextareaOnly(name, newHtml) {
 })();
 
 /* Profile */
-// Admin: универсальные панели выбора (external-режим + builder)
-// createChoicePanel({ title, targetClass, library, ...opts })
-// Точечные правки:
-// 1) Добавлен buildSelectedInnerAll() — собирает HTML всех выбранных.
-// 2) В PANELS.getSelectedInner теперь buildSelectedInnerAll, а не buildSelectedInnerHTML одиночного ряда.
-// 3) В builder() и submit-хуке используем buildSelectedInnerAll().
-// Остальная логика — без изменений.
+// Admin: универсальные панели выбора (JSON-режим для API)
+// createChoicePanelJSON({ title, targetClass, library, ...opts })
+// Возвращает { getData(), init(jsonArray) }
 
 (function(){
   'use strict';
@@ -2754,7 +2473,6 @@ async function FMVeditTextareaOnly(name, newHtml) {
     });
     obs.observe(document.documentElement, { childList: true, subtree: true });
   });
-  const ensureTextarea = async (sel) => ready(sel);
 
   const baseCSS = `
   details.ufo-panel{margin-top:12px;border:1px solid #d0d0d7;border-radius:10px;background:#fff}
@@ -2786,11 +2504,12 @@ async function FMVeditTextareaOnly(name, newHtml) {
   .ufo-date-edit input:focus{outline:none}
   `;
   (function injectCSS(){
+    if (window.__ufoCSS) return;
+    window.__ufoCSS = true;
     const s=document.createElement('style'); s.textContent=baseCSS; document.head.appendChild(s);
     if (typeof GM_addStyle==='function') GM_addStyle(baseCSS);
   })();
 
-  const PANELS = [];
   const mkBtn = (txt, onClick) => { const b=document.createElement('button'); b.type='button'; b.className='ufo-btn'; b.textContent=txt; b.addEventListener('click', onClick); return b; };
 
   function computeTwoRowMaxSelected(container){
@@ -2808,76 +2527,55 @@ async function FMVeditTextareaOnly(name, newHtml) {
   }
   function firstVisibleCard(container){ const cards = [...container.querySelectorAll('.ufo-card')]; return cards.find(c => getComputedStyle(c).display !== 'none') || null; }
   function computeTwoRowMaxLib(container){ const card = firstVisibleCard(container); if (!card) { container.style.maxHeight=''; return; } const ch = card.getBoundingClientRect().height; const cs = getComputedStyle(container); const rowGap = parseFloat(cs.rowGap) || 0; const pt = parseFloat(cs.paddingTop) || 0; const pb = parseFloat(cs.paddingBottom) || 0; const max = Math.round(ch * 2 + rowGap + pt + pb); container.style.maxHeight = max + 'px'; }
-  function observeSelected(container){ const mo = new MutationObserver(()=> computeTwoRowMaxSelected(container)); mo.observe(container, { childList: true, subtree: true, attributes: true }); window.addEventListener('resize', ()=> computeTwoRowMaxSelected(container)); computeTwoRowMaxSelected(container); }
-  function observeLib(container){ const mo = new MutationObserver(()=> computeTwoRowMaxLib(container)); mo.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter:['style','class'] }); window.addEventListener('resize', ()=> computeTwoRowMaxLib(container)); computeTwoRowMaxLib(container); }
-  const safeComment = (s) => String(s).replace(/--/g,'—');
 
-  function rewriteSectionHTML(pageHtml, opts, selectedInner, selectedIds){
-    const { targetClass, itemSelector = '.item', idAttr = 'data-id' } = opts;
-    const libIds = new Set((opts.library || []).map(x => String(x.id)));
-    
-    const root=document.createElement('div'); root.innerHTML=pageHtml;
-    const block=root.querySelector('div.'+targetClass);
-    
-    const nodeToPreservedComment = (node) => {
-      if (node.nodeType===1){
-        const el=node;
-        if (el.matches(itemSelector)) {
-          let id = el.getAttribute(idAttr);
-          if (id == null) id = 'undefined';
-          // новый порядок:
-          // 1) любые элементы из библиотеки — УДАЛЯЕМ (секцию строим заново из выбранных)
-          if (libIds.has(String(id))) return '';
-          // 2) всё, что не из библиотеки — сохраняем в комментарии
-          return `<!-- preserved (${idAttr}="${safeComment(id)}")\n${safeComment(el.outerHTML)}\n-->`;
-        }
-        // не .item — тоже сохраняем как preserved
-        return `<!-- preserved (${idAttr}="undefined")\n${safeComment(el.outerHTML)}\n-->`;
-     } else if (node.nodeType===8){
-        return `<!--${safeComment(node.nodeValue)}-->`;
-      } else if (node.nodeType===3){
-        const txt=node.nodeValue; if (txt.trim()==='') return '';
-        return `<!-- preserved (${idAttr}="undefined")\n${safeComment(txt)}\n-->`;
+  /**
+   * Извлекает все data-* атрибуты из элемента
+   */
+  function extractDataAttributes(el) {
+    const result = {};
+    if (!el || !el.attributes) return result;
+    for (let i = 0; i < el.attributes.length; i++) {
+      const attr = el.attributes[i];
+      if (attr.name.startsWith('data-')) {
+        result[attr.name] = attr.value;
       }
-      return '';
-    };
-    if (block){
-      const preserved=[];
-      block.childNodes.forEach(n=>preserved.push(nodeToPreservedComment(n)));
-      block.innerHTML = (selectedInner?selectedInner+'\n':'') + preserved.filter(Boolean).join('\n');
-    } else {
-      const div=document.createElement('div'); div.className=targetClass; div.innerHTML=selectedInner; root.appendChild(div);
     }
-    return root.innerHTML;
+    return result;
   }
 
-  function ensureGlobalSubmitHook(textareaSelector){
-    if (ensureGlobalSubmitHook._installed) return; ensureGlobalSubmitHook._installed = true;
-    const form = $('#editpage') || $('form[action*="admin_pages.php"]'); if (!form) return;
-    form.addEventListener('submit', ()=>{
-      const ta = $(textareaSelector) || $('#page-content');
-      const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
-      let current = ''; if (tm) current = tm.getContent(); else if (ta) current = ta.value || '';
-      for (const p of PANELS) {
-        const selectedInner = p.getSelectedInner(); // FIX: берём общий HTML всех выбранных
-        const selectedIds = p.getSelectedIds();
-        current = rewriteSectionHTML(current, p.opts, selectedInner, selectedIds);
+  /**
+   * Применяет data-* атрибуты к элементу
+   */
+  function applyDataAttributes(el, dataAttrs) {
+    if (!el || !dataAttrs) return;
+    Object.keys(dataAttrs).forEach(key => {
+      if (key.startsWith('data-')) {
+        el.setAttribute(key, dataAttrs[key]);
       }
-      if (tm) tm.setContent(current); if (ta) ta.value = current;
-    }, true);
+    });
   }
 
-  function createChoicePanel(userOpts){
+  function createChoicePanelJSON(userOpts){
     const opts = Object.assign({
-      title: 'Библиотека и выбранные', targetClass: '_section', library: [], startOpen: false,
-      textareaSelector: '#page-content', anchorSelector: null, itemSelector: '.item', idAttr: 'data-id', editableAttr: 'title',
-      searchPlaceholder: 'поиск по id', mountEl: null, initialHtml: null, external: false,
-      allowMultiAdd: false,            // ← НОВОЕ: разрешать многоразовое добавление одного и того же id
-      expirableAttr: null              // ← НОВОЕ: если задано (например 'data-expired-date'), добавляем инпут для даты
+      title: 'Библиотека и выбранные',
+      targetClass: '_section',
+      library: [],           // [{ id, html }]
+      startOpen: false,
+      itemSelector: '.item',
+      idAttr: 'data-id',
+      editableAttr: 'title',
+      searchPlaceholder: 'поиск по id',
+      mountEl: null,
+      allowMultiAdd: false,
+      expirableAttr: null    // например 'data-expired-date' для купонов
     }, userOpts || {});
     if (!Array.isArray(opts.library)) opts.library = [];
 
     const uid = 'ufo_' + (opts.targetClass || 'section').replace(/\W+/g,'_') + '_' + Math.random().toString(36).slice(2,7);
+
+    // Массив выбранных элементов (внутреннее состояние)
+    // Каждый элемент: { id, title, content, expired_date?, ...data-attrs }
+    let selectedItems = [];
 
     const details = document.createElement('details'); details.className = 'ufo-panel'; details.open = !!opts.startOpen;
     const summary = document.createElement('summary'); summary.textContent = opts.title || 'Панель';
@@ -2895,7 +2593,9 @@ async function FMVeditTextareaOnly(name, newHtml) {
 
     wrap.append(libCol, selCol); details.append(summary, wrap);
 
-    (async ()=>{ if (opts.mountEl) { opts.mountEl.appendChild(details); } else { await ensureTextarea(opts.textareaSelector); const anchor = opts.anchorSelector ? $(opts.anchorSelector) : $(opts.textareaSelector); if (anchor) anchor.insertAdjacentElement('afterend', details);} })();
+    if (opts.mountEl) {
+      opts.mountEl.appendChild(details);
+    }
 
     function renderLibItem(item){
       const card=document.createElement('div'); card.className='ufo-card'; card.dataset.id=item.id;
@@ -2903,238 +2603,558 @@ async function FMVeditTextareaOnly(name, newHtml) {
       const full=document.createElement('div'); full.className='ufo-full';
       const tmp=document.createElement('div'); tmp.innerHTML=item.html.trim(); full.appendChild(tmp.firstElementChild);
       const actions=document.createElement('div'); actions.className='ufo-actions';
-      actions.appendChild(mkBtn('Добавить ↑', (e)=>{e.preventDefault(); e.stopPropagation(); addToSelected(item); }));
+      actions.appendChild(mkBtn('Добавить ↑', (e)=>{e.preventDefault(); e.stopPropagation(); addItemFromLibrary(item); }));
       card.append(id, full, actions); return card;
     }
     opts.library.forEach(x => libBox.appendChild(renderLibItem(x)));
 
-    function addToSelected(item, o){
-      o = o || {};
-      const libCard = libBox.querySelector(`.ufo-card[data-id="${item.id}"]`);
-      // в обычных секциях — блокируем дубль и «гасим» карточку в библиотеке
-      if (!opts.allowMultiAdd) {
-        if (libCard) libCard.classList.add('disabled');
-        if (selBox.querySelector(`.ufo-card[data-id="${item.id}"]`)) return;
-      }
-      const row=document.createElement('div'); row.className='ufo-card'; row.draggable=true; row.dataset.id=item.id;
-      const id=document.createElement('div'); id.className='ufo-idtag'; id.textContent='#'+item.id;
-      const full=document.createElement('div'); full.className='ufo-full';
-      const tmp=document.createElement('div'); tmp.innerHTML=(o.usePageHtml ? o.usePageHtml : item.html).trim(); full.appendChild(tmp.firstElementChild);
-      const editor=document.createElement('div'); editor.className='ufo-title-edit'; editor.contentEditable=true;
-      const elItem = full.querySelector(opts.itemSelector); const currentAttr = elItem ? (elItem.getAttribute(opts.editableAttr) || '') : '';
-      editor.textContent = currentAttr;
+    /**
+     * Добавляет элемент из библиотеки в selectedItems
+     */
+    function addItemFromLibrary(libItem) {
+      const libCard = libBox.querySelector(`.ufo-card[data-id="${libItem.id}"]`);
 
-      // Если включен expirableAttr, добавляем поле для даты
+      // Блокировка дублей (если allowMultiAdd = false)
+      if (!opts.allowMultiAdd) {
+        if (selectedItems.some(i => i.id === libItem.id)) return;
+        if (libCard) libCard.classList.add('disabled');
+      }
+
+      // Парсим HTML из библиотеки, извлекаем данные
+      const tmp = document.createElement('div');
+      tmp.innerHTML = libItem.html.trim();
+      const itemEl = tmp.querySelector(opts.itemSelector);
+
+      const newItem = {
+        id: libItem.id,
+        title: itemEl ? (itemEl.getAttribute(opts.editableAttr) || '') : '',
+        content: libItem.html.trim(),
+        ...extractDataAttributes(itemEl)
+      };
+
+      // Если есть expirableAttr, извлекаем дату
+      if (opts.expirableAttr && itemEl) {
+        newItem.expired_date = itemEl.getAttribute(opts.expirableAttr) || '';
+      }
+
+      selectedItems.unshift(newItem); // добавляем в начало (новее сверху)
+      renderSelected();
+    }
+
+    /**
+     * Рендерит UI из selectedItems
+     */
+    function renderSelected() {
+      selBox.innerHTML = '';
+      selectedItems.forEach((item, index) => {
+        const row = createSelectedCard(item, index);
+        selBox.appendChild(row);
+      });
+      computeTwoRowMaxSelected(selBox);
+    }
+
+    /**
+     * Создаёт DOM-карточку для выбранного элемента
+     */
+    function createSelectedCard(item, index) {
+      const row = document.createElement('div');
+      row.className = 'ufo-card';
+      row.draggable = true;
+      row.dataset.id = item.id;
+      row.dataset.index = index;
+
+      const id = document.createElement('div');
+      id.className = 'ufo-idtag';
+      id.textContent = '#' + item.id;
+
+      const full = document.createElement('div');
+      full.className = 'ufo-full';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = item.content.trim();
+      full.appendChild(tmp.firstElementChild);
+
+      const editor = document.createElement('div');
+      editor.className = 'ufo-title-edit';
+      editor.contentEditable = true;
+      editor.textContent = item.title || '';
+      editor.addEventListener('blur', () => {
+        const cleanTitle = String(editor.innerHTML || '')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        selectedItems[index].title = cleanTitle;
+      });
+
       let dateEditor = null;
       if (opts.expirableAttr) {
         dateEditor = document.createElement('div');
         dateEditor.className = 'ufo-date-edit';
         const dateInput = document.createElement('input');
         dateInput.type = 'date';
-        const currentDate = elItem ? (elItem.getAttribute(opts.expirableAttr) || '') : '';
-        dateInput.value = currentDate;
+        dateInput.value = item.expired_date || '';
+        dateInput.addEventListener('change', () => {
+          selectedItems[index].expired_date = dateInput.value;
+        });
         dateEditor.appendChild(dateInput);
       }
 
-      const actions=document.createElement('div'); actions.className='ufo-actions';
-      const recalc = ()=> computeTwoRowMaxSelected(selBox);
-      const btnUp=mkBtn('↑', (e)=>{e.preventDefault(); e.stopPropagation(); if (row.previousElementSibling) row.parentElement.insertBefore(row, row.previousElementSibling); recalc();});
-      const btnDown=mkBtn('↓', (e)=>{e.preventDefault(); e.stopPropagation(); if (row.nextElementSibling) row.parentElement.insertBefore(row.nextElementSibling, row); recalc();});
-      const btnRemove=mkBtn('✕', (e)=>{
+      const actions = document.createElement('div');
+      actions.className = 'ufo-actions';
+      const recalc = () => computeTwoRowMaxSelected(selBox);
+
+      const btnUp = mkBtn('↑', (e) => {
         e.preventDefault(); e.stopPropagation();
-        row.remove();
-        if (!opts.allowMultiAdd && libCard) libCard.classList.remove('disabled');
-        recalc();
+        if (index > 0) {
+          [selectedItems[index - 1], selectedItems[index]] = [selectedItems[index], selectedItems[index - 1]];
+          renderSelected();
+        }
       });
+      const btnDown = mkBtn('↓', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (index < selectedItems.length - 1) {
+          [selectedItems[index], selectedItems[index + 1]] = [selectedItems[index + 1], selectedItems[index]];
+          renderSelected();
+        }
+      });
+      const btnRemove = mkBtn('✕', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        selectedItems.splice(index, 1);
+        if (!opts.allowMultiAdd) {
+          const libCard = libBox.querySelector(`.ufo-card[data-id="${item.id}"]`);
+          if (libCard) libCard.classList.remove('disabled');
+        }
+        renderSelected();
+      });
+
       actions.append(btnUp, btnDown, btnRemove);
-      row.dataset.html = item.html.trim();
-      // если карточка пришла из текущей страницы — сохраним этот HTML,
-      // чтобы при сборке не терять её фактический title:
-      if (o.usePageHtml) {
-        row.dataset.pageHtml = o.usePageHtml.trim();
-      }
-      if (o.usePageHtml) {
-        // запомним «как было на странице», чтобы при сборке беречь его title
-        row.dataset.pageHtml = o.usePageHtml.trim();
-      }
+
       row.append(id, full, actions, editor);
       if (dateEditor) row.appendChild(dateEditor);
-      selBox.insertBefore(row, selBox.firstChild); recalc();
+
+      return row;
     }
 
-    (function enableDnd(container){
-      let dragEl=null;
-      container.addEventListener('dragstart', (e)=>{const card=e.target.closest('.ufo-card'); if(!card) return; dragEl=card; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','');});
-      container.addEventListener('dragover', (e)=>{e.preventDefault(); const over=e.target.closest('.ufo-card'); if(!over || over===dragEl) return; const r=over.getBoundingClientRect(); const before=(e.clientY-r.top)/r.height<0.5; over.parentElement.insertBefore(dragEl, before?over:over.nextSibling);});
-      container.addEventListener('drop', (e)=>{e.preventDefault(); dragEl=null; computeTwoRowMaxSelected(container);});
-      container.addEventListener('dragend', ()=>{dragEl=null; computeTwoRowMaxSelected(container);});
+    // Drag & Drop для переупорядочивания
+    (function enableDnd(container) {
+      let dragIndex = null;
+      container.addEventListener('dragstart', (e) => {
+        const card = e.target.closest('.ufo-card');
+        if (!card) return;
+        dragIndex = parseInt(card.dataset.index, 10);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', '');
+      });
+      container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const over = e.target.closest('.ufo-card');
+        if (!over || dragIndex === null) return;
+        const overIndex = parseInt(over.dataset.index, 10);
+        if (dragIndex === overIndex) return;
+        // Меняем местами в массиве
+        const temp = selectedItems[dragIndex];
+        selectedItems.splice(dragIndex, 1);
+        selectedItems.splice(overIndex, 0, temp);
+        dragIndex = overIndex;
+        renderSelected();
+      });
+      container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragIndex = null;
+      });
+      container.addEventListener('dragend', () => {
+        dragIndex = null;
+      });
     })(selBox);
 
-    search.addEventListener('input', ()=>{
+    // Поиск в библиотеке
+    search.addEventListener('input', () => {
       const v = search.value.trim();
-      libBox.querySelectorAll('.ufo-card').forEach(c=>{ c.style.display = (!v || c.dataset.id.includes(v)) ? '' : 'none'; });
+      libBox.querySelectorAll('.ufo-card').forEach(c => {
+        c.style.display = (!v || c.dataset.id.includes(v)) ? '' : 'none';
+      });
       computeTwoRowMaxLib(libBox);
     });
 
-    const mo1=new MutationObserver(()=>computeTwoRowMaxSelected(selBox)); mo1.observe(selBox,{childList:true,subtree:true,attributes:true});
-    const mo2=new MutationObserver(()=>computeTwoRowMaxLib(libBox)); mo2.observe(libBox,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
-    window.addEventListener('resize',()=>{computeTwoRowMaxLib(libBox); computeTwoRowMaxSelected(selBox);});
-    computeTwoRowMaxLib(libBox); computeTwoRowMaxSelected(selBox);
+    const mo1 = new MutationObserver(() => computeTwoRowMaxSelected(selBox));
+    mo1.observe(selBox, { childList: true, subtree: true, attributes: true });
+    const mo2 = new MutationObserver(() => computeTwoRowMaxLib(libBox));
+    mo2.observe(libBox, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+    window.addEventListener('resize', () => { computeTwoRowMaxLib(libBox); computeTwoRowMaxSelected(selBox); });
+    computeTwoRowMaxLib(libBox);
+    computeTwoRowMaxSelected(selBox);
 
-    // Гидратация: переносим уже присутствующие в секции элементы (если их id есть в библиотеке) в «Выбранные»
-    (function hydrateFromPage(){
-      let current='';
-      if (typeof opts.initialHtml === 'string') current = opts.initialHtml;
-      else {
-        const ta = $(opts.textareaSelector);
-        const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
-        if (tm) current = tm.getContent(); else if (ta) current = ta.value || '';
-      }
-      if (!current) return;
-      const root=document.createElement('div'); root.innerHTML=current;
-      const block=root.querySelector('div.'+opts.targetClass); if (!block) return;
-      const libIds = new Set(opts.library.map(x=>x.id));
-      const items=[];
-      block.childNodes.forEach(n=>{
-        if (n.nodeType===1 && n.matches(opts.itemSelector)){
-          const id = n.getAttribute(opts.idAttr) || '';
-          if (id && libIds.has(id)) items.push({ id, pageHtml:n.outerHTML, lib: opts.library.find(x=>x.id===id) });
+    /**
+     * Инициализация из массива JSON
+     * @param {Array} jsonArray - [{ id, title, content, ...data-attrs }]
+     */
+    function init(jsonArray) {
+      if (!Array.isArray(jsonArray)) return;
+      selectedItems = [];
+      jsonArray.forEach(item => {
+        // Добавляем элемент как есть
+        selectedItems.push({ ...item });
+
+        // Блокируем в библиотеке если нужно
+        if (!opts.allowMultiAdd) {
+          const libCard = libBox.querySelector(`.ufo-card[data-id="${item.id}"]`);
+          if (libCard) libCard.classList.add('disabled');
         }
       });
-      for (let i=items.length-1; i>=0; i--){
-        const it=items[i];
-        addToSelected({ id: it.id, html: it.lib.html }, { usePageHtml: it.pageHtml });
-        const libCard = libBox.querySelector(`.ufo-card[data-id="${it.id}"]`);
-        if (!opts.allowMultiAdd && libCard) libCard.classList.add('disabled');
-      }
-    })();
+      renderSelected();
+    }
 
-    function getSelectedIds(){ return new Set([...selBox.querySelectorAll('.ufo-card')].map(r=>r.dataset.id||'').filter(Boolean)); }
+    /**
+     * Возвращает массив данных для сохранения в API
+     * @returns {Array} [{ id, title, content, ...data-attrs }]
+     */
+    function getData() {
+      return selectedItems.map(item => {
+        // Обновляем content с актуальным title и expired_date
+        const tmp = document.createElement('div');
+        tmp.innerHTML = item.content.trim();
+        const itemEl = tmp.querySelector(opts.itemSelector);
 
-    // Билдер для одной «выбранной» карточки (как было)
-    function buildSelectedInnerHTML(row, html, opts = {}) {
-      if (!row || typeof row.querySelector !== 'function') return String(html || '');
-    
-      const ATTR = opts.editableAttr || 'title';
-      // База: предпочитаем HTML, который реально был на странице (с текущим title),
-      // затем — библиотечный, затем — то, что пришло в аргументах.
-      const base = row.dataset.pageHtml || row.dataset.html || String(html || '');
-    
-      // Текст из редактора
-      const ed = row.querySelector('.ufo-title-edit');
-      const cleanTitle = String(ed ? ed.innerHTML : '')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    
-      // Работаем через DOM, чтобы править только .item
-      const tmp = document.createElement('div');
-      tmp.innerHTML = base.trim();
-      const itemEl = tmp.querySelector((opts && opts.itemSelector) || '.item');
-    
-      if (itemEl) {
-        if (cleanTitle) {
-          itemEl.setAttribute(ATTR, cleanTitle);
-        } // если пусто — оставляем исходный title как есть
+        if (itemEl) {
+          // Применяем title
+          if (item.title) {
+            itemEl.setAttribute(opts.editableAttr, item.title);
+          }
 
-        // Если включен expirableAttr, читаем дату и применяем атрибут + span.coupon_deadline
-        if (opts.expirableAttr) {
-          const dateEdit = row.querySelector('.ufo-date-edit input');
-          if (dateEdit) {
-            const dateValue = (dateEdit.value || '').trim(); // yyyy-mm-dd из input type="date"
+          // Применяем expired_date
+          if (opts.expirableAttr) {
+            if (item.expired_date) {
+              itemEl.setAttribute(opts.expirableAttr, item.expired_date);
 
-            // Удаляем старый span.coupon_deadline если есть
-            const oldSpan = itemEl.querySelector('.coupon_deadline');
-            if (oldSpan) oldSpan.remove();
+              // Обновляем span.coupon_deadline
+              let deadlineSpan = itemEl.querySelector('.coupon_deadline');
+              if (!deadlineSpan) {
+                deadlineSpan = document.createElement('span');
+                deadlineSpan.className = 'coupon_deadline';
+                const imgEl = itemEl.querySelector('img');
+                if (imgEl && imgEl.nextSibling) {
+                  itemEl.insertBefore(deadlineSpan, imgEl.nextSibling);
+                } else if (imgEl) {
+                  imgEl.parentNode.appendChild(deadlineSpan);
+                } else {
+                  itemEl.appendChild(deadlineSpan);
+                }
+              }
 
-            // Создаём новый span.coupon_deadline после img
-            const imgEl = itemEl.querySelector('img');
-            const newSpan = document.createElement('span');
-            newSpan.className = 'coupon_deadline';
-
-            if (dateValue) {
-              // Конвертируем yyyy-mm-dd -> dd/mm/yy для отображения
-              const parts = dateValue.split('-');
+              // Конвертируем yyyy-mm-dd -> dd/mm/yy
+              const parts = item.expired_date.split('-');
               if (parts.length === 3) {
-                const year = parts[0].slice(2); // берём последние 2 цифры года
+                const year = parts[0].slice(2);
                 const month = parts[1];
                 const day = parts[2];
-                newSpan.textContent = `${day}/${month}/${year}`;
+                deadlineSpan.textContent = `${day}/${month}/${year}`;
               }
-              // Устанавливаем data-expired-date в формате yyyy-mm-dd
-              itemEl.setAttribute(opts.expirableAttr, dateValue);
             } else {
-              // Если дата не заполнена, span остаётся пустым
-              newSpan.textContent = '';
               itemEl.removeAttribute(opts.expirableAttr);
-            }
-
-            // Вставляем span после img (или в конец если img нет)
-            if (imgEl && imgEl.nextSibling) {
-              itemEl.insertBefore(newSpan, imgEl.nextSibling);
-            } else if (imgEl) {
-              imgEl.parentNode.appendChild(newSpan);
-            } else {
-              itemEl.appendChild(newSpan);
+              const deadlineSpan = itemEl.querySelector('.coupon_deadline');
+              if (deadlineSpan) deadlineSpan.remove();
             }
           }
         }
-      }
 
-      // (Опционально) перенести текст в <wrds> из .ufo-text-edit
-      const edText = row.querySelector('.ufo-text-edit');
-      if (edText && itemEl) {
-        const rawText = edText.innerHTML || edText.textContent || '';
-        const cleanText = String(rawText)
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/&nbsp;|[\u00A0\u200B-\u200D\u2060\uFEFF]/g, '')
-          .replace(/\s+$/g, '')
-          .trim();
-        const wrdsEl = itemEl.querySelector('wrds');
-        if (cleanText && wrdsEl) wrdsEl.textContent = cleanText;
-      }
-    
-      return tmp.innerHTML;
+        return {
+          id: item.id,
+          title: item.title || '',
+          content: tmp.innerHTML,
+          ...extractDataAttributes(itemEl)
+        };
+      });
     }
 
-    // NEW: собрать HTML ВСЕХ «выбранных»
-    function buildSelectedInnerAll(){
-      const rows = [...selBox.querySelectorAll('.ufo-card')];
-      return rows.map(row => {
-        const html = row.dataset.html || '';
-        return buildSelectedInnerHTML(row, html, {
-          editableAttr: opts.editableAttr,
-          expirableAttr: opts.expirableAttr,
-          itemSelector: opts.itemSelector
-        });
-      }).join('\n');
-    }
-
-    // регистрируем панель для submit-хука (админка)
-    PANELS.push({ uid, opts, rootEl: details, selectedBox: selBox, libBox, getSelectedInner: buildSelectedInnerAll, getSelectedIds });
-
-    if (!opts.external) ensureGlobalSubmitHook(opts.textareaSelector);
-
-    // external-builder: переписывает секцию targetClass, вставляя ВСЕ выбранные в начало
-    function builder(fullHtmlOpt){
-      let current = '';
-      if (typeof fullHtmlOpt === 'string') current = fullHtmlOpt;
-      else if (typeof opts.initialHtml === 'string') current = opts.initialHtml;
-      else {
-        const ta = $(opts.textareaSelector);
-        const tm = (window.tinymce && window.tinymce.get && window.tinymce.get(ta?.id || 'page-content')) || null;
-        if (tm) current = tm.getContent(); else if (ta) current = ta.value || '';
-      }
-      const inner = buildSelectedInnerAll();
-      const ids = getSelectedIds();
-      return rewriteSectionHTML(current, opts, inner, ids);
-    }
-
-    return { details, builder, getSelectedIds };
+    return { details, init, getData };
   }
 
-  window.createChoicePanel = createChoicePanel;
+  window.createChoicePanelJSON = createChoicePanelJSON;
+})();
+// skin_set_up_json.js
+// setupSkinsJSON(container, opts?) -> Promise<{ getData() => object, panels }>
+
+(function () {
+  'use strict';
+
+  /**
+   * @param {HTMLElement} container         куда рисовать панели
+   * @param {Object=}     opts
+   *   @param {boolean=}  opts.withHeaders  показывать заголовки секций (по умолчанию true)
+   *   @param {boolean=}  opts.startOpen    панели раскрыты при старте (по умолчанию false)
+   *   @param {Object=}   opts.initialData  начальные данные { icon: [], plashka: [], background: [], gift: [], coupon: [] }
+   *
+   * @returns {Promise<{ getData: ()=>object, panels: { plashka, icon, back, gift, coupon } }>}
+   */
+  async function setupSkinsJSON(container, opts = {}) {
+    if (!container || !(container instanceof HTMLElement)) {
+      throw new Error('[setupSkinsJSON] container обязателен и должен быть HTMLElement');
+    }
+    if (typeof window.createChoicePanelJSON !== 'function') {
+      throw new Error('[setupSkinsJSON] createChoicePanelJSON не найден. Подключите файл с панелью раньше.');
+    }
+
+    if (window.__skinsSetupJSONMounted) {
+      return window.__skinsSetupJSONMounted;
+    }
+
+    const withHeaders = opts.withHeaders ?? true;
+    const startOpen   = opts.startOpen   ?? false;
+    const initialData = opts.initialData || {};
+
+    // --- тянем библиотеки через fetchCardsWrappedClean
+    const SKIN = window.SKIN;
+
+    // если SKIN не объявлен — выходим и логируем предупреждение
+    if (!SKIN) {
+      console.warn('[setupSkinsJSON] window.SKIN не найден — прекращаю выполнение.');
+      return;
+    }
+
+    // --- тянем библиотеки через fetchCardsWrappedClean
+    let [libPlashka0, libIcon0, libBack0, libGift0, libCoupon0] = await Promise.all([
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
+      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID, { isCoupon: true }),
+    ]);
+
+    // подстраховка от null/undefined
+    libPlashka0 = Array.isArray(libPlashka0) ? libPlashka0 : [];
+    libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
+    libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
+    libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
+    libCoupon0  = Array.isArray(libCoupon0)  ? libCoupon0  : [];
+
+    // --- контейнер под панели
+    let grid = container.querySelector('.skins-setup-grid');
+    if (!grid) {
+      grid = document.createElement('div');
+      grid.className = 'skins-setup-grid';
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = '1fr';
+      grid.style.gap = '16px';
+      container.appendChild(grid);
+    }
+
+    // --- панели (JSON-режим)
+    const panelGift = window.createChoicePanelJSON({
+      title: withHeaders ? 'Подарки' : undefined,
+      targetClass: '_gift',
+      library: libGift0,
+      mountEl: grid,
+      startOpen,
+      allowMultiAdd: true
+    });
+
+    const panelCoupon = window.createChoicePanelJSON({
+      title: withHeaders ? 'Купоны' : undefined,
+      targetClass: '_coupon',
+      library: libCoupon0,
+      mountEl: grid,
+      startOpen,
+      allowMultiAdd: true,
+      expirableAttr: 'data-expired-date'
+    });
+
+    const panelPlashka = window.createChoicePanelJSON({
+      title: withHeaders ? 'Плашки' : undefined,
+      targetClass: '_plashka',
+      library: libPlashka0,
+      mountEl: grid,
+      startOpen
+    });
+
+    const panelIcon = window.createChoicePanelJSON({
+      title: withHeaders ? 'Иконки' : undefined,
+      targetClass: '_icon',
+      library: libIcon0,
+      mountEl: grid,
+      startOpen
+    });
+
+    const panelBack = window.createChoicePanelJSON({
+      title: withHeaders ? 'Фон' : undefined,
+      targetClass: '_background',
+      library: libBack0,
+      mountEl: grid,
+      startOpen
+    });
+
+    // --- Инициализация данными из API
+    if (initialData.gift) panelGift.init(initialData.gift);
+    if (initialData.coupon) panelCoupon.init(initialData.coupon);
+    if (initialData.plashka) panelPlashka.init(initialData.plashka);
+    if (initialData.icon) panelIcon.init(initialData.icon);
+    if (initialData.background) panelBack.init(initialData.background);
+
+    // --- getData: собирает данные из всех панелей
+    function getData() {
+      return {
+        icon: panelIcon.getData(),
+        plashka: panelPlashka.getData(),
+        background: panelBack.getData(),
+        gift: panelGift.getData(),
+        coupon: panelCoupon.getData()
+      };
+    }
+
+    const api = {
+      getData,
+      panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift, coupon: panelCoupon },
+    };
+    window.__skinsSetupJSONMounted = api;
+    return api;
+  }
+
+  window.setupSkinsJSON = setupSkinsJSON;
+})();
+// profile_runner_json.js — запуск JSON-панелей со страницы профиля (EDIT-режим)
+(function () {
+  'use strict';
+
+  if (window.__profileRunnerJSONMounted) return;
+  window.__profileRunnerJSONMounted = true;
+
+  const qs = (sel, root = document) => root.querySelector(sel);
+  function onReady() {
+    return new Promise((res) => {
+      if (document.readyState === 'complete' || document.readyState === 'interactive') return res();
+      document.addEventListener('DOMContentLoaded', () => res(), { once: true });
+    });
+  }
+  function getProfileIdFromURL() {
+    const u = new URL(location.href);
+    const id = u.searchParams.get('id');
+    return id ? String(id).trim() : '';
+  }
+
+  async function waitMount() {
+    await onReady();
+    const box = qs('#viewprofile .container') || qs('#viewprofile') || qs('#pun-main') || document.body;
+    const wrap = document.createElement('div');
+    wrap.id = 'fmv-skins-panel';
+    wrap.style.margin = '16px 0';
+    wrap.innerHTML = `
+       <details open style="border:1px solid #d6d6de;border-radius:10px;background:#fff">
+        <summary style="list-style:none;padding:10px 14px;border-bottom:1px solid #e8e8ef;border-radius:10px;font-weight:600;background:#f6f7fb;cursor:pointer">
+          Обновление скинов
+        </summary>
+        <div class="fmv-skins-body" style="padding:14px"></div>
+        <div class="fmv-skins-footer" style="display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid #eee">
+          <button type="button" class="fmv-save"
+            style="background:#2f67ff;color:#fff;border:1px solid #2f67ff;border-radius:8px;padding:8px 14px;cursor:pointer">
+            Сохранить
+          </button>
+          <span class="fmv-status" style="margin-left:8px;font-size:14px;color:#666"></span>
+        </div>
+      </details>
+    `;
+    box.appendChild(wrap);
+    return wrap.querySelector('.fmv-skins-body');
+  }
+
+  (async () => {
+    // 1) URL-гейт: только /profile.php?id=N и никаких других параметров
+    if (location.pathname !== '/profile.php') return;
+    const sp = new URLSearchParams(location.search);
+    if (!sp.has('id') || [...sp.keys()].some(k => k !== 'id')) return;
+
+    const id = (sp.get('id') || '').trim();
+    if (!id) return;
+
+    const group_ids = window.SKIN?.GroupID || [];
+
+    if (typeof window.ensureAllowed === 'function') {
+      const ok = await window.ensureAllowed(group_ids);
+      if (!ok) return; // не в нужной группе — выходим тихо
+    } else {
+      return; // подстраховка: нет функции — никому не показываем
+    }
+
+    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
+      console.error('[profile_runner_json] skinAdmin.load не найден.');
+      return;
+    }
+
+    const { status, initialData, save, targetUserId } = await window.skinAdmin.load(id);
+    if (status !== 'ok' && status !== 'ок') {
+      console.error('[profile_runner_json] Не удалось загрузить данные со скинами');
+      return;
+    }
+
+    const mount = await waitMount();
+
+    let getData = null;
+    if (typeof window.setupSkinsJSON === 'function') {
+      try {
+        const api = await window.setupSkinsJSON(mount, { initialData });
+        if (api && typeof api.getData === 'function') getData = api.getData;
+      } catch (e) {
+        console.error('setupSkinsJSON() error:', e);
+      }
+    }
+
+    if (!getData) {
+      console.error('[profile_runner_json] Не удалось инициализировать панели');
+      return;
+    }
+
+    const panelRoot = document.getElementById('fmv-skins-panel');
+    const btnSave  = panelRoot?.querySelector('.fmv-save');
+    const statusEl = panelRoot?.querySelector('.fmv-status');
+    if (!btnSave) return;
+
+    btnSave.addEventListener('click', async () => {
+      try {
+        if (statusEl) {
+          statusEl.textContent = 'Сохраняю…';
+          statusEl.style.color = '#666';
+        }
+
+        const jsonData = getData ? getData() : null;
+        if (!jsonData) {
+          if (statusEl) {
+            statusEl.textContent = 'Нечего сохранять';
+            statusEl.style.color = '#c24141';
+          }
+          return;
+        }
+
+        let r = null;
+        if (typeof save === 'function') {
+          r = await save(jsonData);
+        } else {
+          if (statusEl) {
+            statusEl.textContent = 'Нет функции сохранения';
+            statusEl.style.color = '#c24141';
+          }
+          return;
+        }
+
+        const ok = !!(r && (r.ok || r.status === 'saved' || r.status === 'успешно' || r.status === 'ok'));
+
+        if (statusEl) {
+          if (ok) {
+            statusEl.textContent = '✓ Успешно сохранено';
+            statusEl.style.color = '#16a34a';
+            // перезагрузка через 1 секунду
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            statusEl.textContent = 'Ошибка сохранения';
+            statusEl.style.color = '#c24141';
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        if (statusEl) {
+          statusEl.textContent = 'Ошибка сохранения';
+          statusEl.style.color = '#c24141';
+        }
+      }
+    });
+  })();
 })();
 /*!
  * money-upd-slim.js — один экспорт: getFieldValue({ doc, fieldId }) -> string
@@ -3251,176 +3271,6 @@ async function FMVeditTextareaOnly(name, newHtml) {
   (document.readyState === "loading")
     ? document.addEventListener("DOMContentLoaded", run, { once: true })
     : run();
-})();
-// profile_runner.js — запуск панелей со страницы профиля (EDIT-режим)
-(function () {
-  'use strict';
-
-  if (window.__profileRunnerMounted) return;
-  window.__profileRunnerMounted = true;
-
-  const qs = (sel, root = document) => root.querySelector(sel);
-  function onReady() {
-    return new Promise((res) => {
-      if (document.readyState === 'complete' || document.readyState === 'interactive') return res();
-      document.addEventListener('DOMContentLoaded', () => res(), { once: true });
-    });
-  }
-  function getProfileIdFromURL() {
-    const u = new URL(location.href);
-    const id = u.searchParams.get('id');
-    return id ? String(id).trim() : '';
-  }
-  function normalizeHtml(s) {
-    return String(s || '')
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .replace(/&quot;/g, '"')  // приводим кавычки
-      .replace(/>\s+</g, '><')  // убираем пробелы между тегами
-      .replace(/[ \t\n]+/g, ' ')// схлопываем пробелы/таб/переносы
-      .replace(/\s*=\s*/g, '=') // чистим пробелы вокруг =
-      .trim();
-  }
-
-  async function waitMount() {
-    await onReady();
-    const box = qs('#viewprofile .container') || qs('#viewprofile') || qs('#pun-main') || document.body;
-    const wrap = document.createElement('div');
-    wrap.id = 'fmv-skins-panel';
-    wrap.style.margin = '16px 0';
-    wrap.innerHTML = `
-       <details open style="border:1px solid #d6d6de;border-radius:10px;background:#fff">
-        <summary style="list-style:none;padding:10px 14px;border-bottom:1px solid #e8e8ef;border-radius:10px;font-weight:600;background:#f6f7fb;cursor:pointer">
-          Обновление скинов
-        </summary>
-        <div class="fmv-skins-body" style="padding:14px"></div>
-        <div class="fmv-skins-footer" style="display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid #eee">
-          <button type="button" class="fmv-save"
-            style="background:#2f67ff;color:#fff;border:1px solid #2f67ff;border-radius:8px;padding:8px 14px;cursor:pointer">
-            Сохранить
-          </button>
-          <span class="fmv-status" style="margin-left:8px;font-size:14px;color:#666"></span>
-        </div>
-      </details>
-    `;
-    box.appendChild(wrap);
-    return wrap.querySelector('.fmv-skins-body');
-  }
-
-  (async () => {
-    // 1) URL-гейт: только /profile.php?id=N и никаких других параметров
-    if (location.pathname !== '/profile.php') return;
-    const sp = new URLSearchParams(location.search);
-    if (!sp.has('id') || [...sp.keys()].some(k => k !== 'id')) return;
-  
-    const id = (sp.get('id') || '').trim();
-    if (!id) return;
-  
-    const group_ids = window.SKIN?.GroupID || [];
-
-    if (typeof window.ensureAllowed === 'function') {
-      const ok = await window.ensureAllowed(group_ids);
-      if (!ok) return; // не в нужной группе — выходим тихо
-    } else {
-      return; // подстраховка: нет функции — никому не показываем
-    }
-
-    if (!window.skinAdmin || typeof window.skinAdmin.load !== 'function') {
-      console.error('[profile_runner] skinAdmin.load не найден.');
-      return;
-    }
-
-    const { status, initialHtml, save, targetUserId } = await window.skinAdmin.load(id);
-    if (status !== 'ok' && status !== 'ок') {
-      console.error('[profile_runner] Не удалось загрузить страницу со скинами');
-      return;
-    }
-
-    const mount = await waitMount();
-
-    let build = null;
-    if (typeof window.setupSkins === 'function') {
-      try {
-        const api = await window.setupSkins(mount, initialHtml);
-        if (api && typeof api.build === 'function') build = api.build;
-      } catch (e) {
-        console.error('setupSkins() error:', e);
-      }
-    }
-
-    if (!build) {
-      console.error('[profile_runner] Не удалось инициализировать панели');
-      return;
-    }
-
-    const panelRoot = document.getElementById('fmv-skins-panel');
-    const btnSave  = panelRoot?.querySelector('.fmv-save');
-    const statusEl = panelRoot?.querySelector('.fmv-status');
-    if (!btnSave) return;
-
-    const pageName = `usr${(targetUserId || id)}_skin`;
-
-    btnSave.addEventListener('click', async () => {
-      try {
-        if (statusEl) {
-          statusEl.textContent = 'Сохраняю…';
-          statusEl.style.color = '#666';
-        }
-        const finalHtml = build ? build() : '';
-        if (!finalHtml) {
-          if (statusEl) {
-            statusEl.textContent = 'Нечего сохранять';
-            statusEl.style.color = '#c24141';
-          }
-          return;
-        }
-
-        let r = null;
-        if (typeof window.FMVeditTextareaOnly === 'function') {
-          r = await window.FMVeditTextareaOnly(pageName, finalHtml);
-        } else if (typeof save === 'function') {
-          r = await save(finalHtml);
-        } else {
-          if (statusEl) {
-            statusEl.textContent = 'Нет функции сохранения';
-            statusEl.style.color = '#c24141';
-          }
-          return;
-        }
-
-        let ok = !!(r && (r.ok || r.status === 'saved' || r.status === 'успешно' || r.status === 'ok'));
-
-        if (!ok && window.skinAdmin && typeof window.skinAdmin.load === 'function') {
-          try {
-            const check = await window.skinAdmin.load(id);
-            if (check && (check.status === 'ok' || check.status === 'ок')) {
-              ok = normalizeHtml(check.initialHtml) === normalizeHtml(finalHtml);
-            }
-          } catch (e) {
-            console.warn('[profile_runner] verify failed:', e);
-          }
-        }
-
-        if (statusEl) {
-          if (ok) {
-            statusEl.textContent = '✓ Успешно сохранено';
-            statusEl.style.color = '#16a34a';
-            // перезагрузка через 1 секунду
-            setTimeout(() => location.reload(), 1000);
-          } else {
-            statusEl.textContent = 'Ошибка сохранения';
-            statusEl.style.color = '#c24141';
-          }
-        }
-      } catch (e) {
-        console.error(e);
-        if (statusEl) {
-          statusEl.textContent = 'Ошибка сохранения';
-          statusEl.style.color = '#c24141';
-        }
-      }
-    });
-  })();
 })();
 /* ================== КОНСТАНТЫ UI ================== */
 const IP_ROWS = 1;        // сколько строк карточек видно без скролла
@@ -3807,147 +3657,6 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
       btnWidth: 44,
     });
   }
-})();
-// skin_set_up.js
-// setupSkins(container, initialHtml, opts?) -> Promise<{ build(fullHtml?) => string, panels }>
-
-(function () {
-  'use strict';
-
-  /**
-   * @param {HTMLElement} container         куда рисовать панели
-   * @param {string}      initialHtml       ПОЛНЫЙ HTML из textarea админки
-   * @param {Object=}     opts
-   *   @param {boolean=}  opts.withHeaders  показывать заголовки секций (по умолчанию true)
-   *   @param {boolean=}  opts.startOpen    панели раскрыты при старте (по умолчанию false)
-   *
-   * @returns {Promise<{ build: (fullHtmlOpt?:string)=>string, panels: { plashka:any, icon:any, back:any, gift:any } }>}
-   */
-  async function setupSkins(container, initialHtml, opts = {}) {
-    if (!container || !(container instanceof HTMLElement)) {
-      throw new Error('[setupSkins] container обязателен и должен быть HTMLElement');
-    }
-    if (typeof window.createChoicePanel !== 'function') {
-      throw new Error('[setupSkins] createChoicePanel не найден. Подключите файл с панелью раньше.');
-    }
-
-    if (window.__skinsSetupMounted) {
-      return window.__skinsSetupMounted;
-    }
-
-    const withHeaders = opts.withHeaders ?? true;
-    const startOpen   = opts.startOpen   ?? false;
-
-    // --- тянем библиотеки через fetchCardsWrappedClean
-    const SKIN = window.SKIN;
-
-    // если SKIN не объявлен — выходим и логируем предупреждение
-    if (!SKIN) {
-      console.warn('[setupSkins] window.SKIN не найден — прекращаю выполнение.');
-      return;
-    }
-
-    // --- тянем библиотеки через fetchCardsWrappedClean
-    let [libPlashka0, libIcon0, libBack0, libGift0, libCoupon0] = await Promise.all([
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID, { isCoupon: true }),
-    ]);
-
-    // подстраховка от null/undefined
-    libPlashka0 = Array.isArray(libPlashka0) ? libPlashka0 : [];
-    libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
-    libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
-    libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
-    libCoupon0  = Array.isArray(libCoupon0)  ? libCoupon0  : [];
-
-    // --- контейнер под панели
-    let grid = container.querySelector('.skins-setup-grid');
-    if (!grid) {
-      grid = document.createElement('div');
-      grid.className = 'skins-setup-grid';
-      grid.style.display = 'grid';
-      grid.style.gridTemplateColumns = '1fr';
-      grid.style.gap = '16px';
-      container.appendChild(grid);
-    }
-
-    // --- панели
-    const panelGift = window.createChoicePanel({
-      title: withHeaders ? 'Подарки' : undefined,
-      targetClass: '_gift',
-      library: libGift0,
-      mountEl: grid,
-      initialHtml,
-      external: true,
-      startOpen,
-      allowMultiAdd: true
-    });
-
-    const panelCoupon = window.createChoicePanel({
-      title: withHeaders ? 'Купоны' : undefined,
-      targetClass: '_coupon',
-      library: libCoupon0,
-      mountEl: grid,
-      initialHtml,
-      external: true,
-      startOpen,
-      allowMultiAdd: true,
-      expirableAttr: 'data-expired-date'  // добавляем поддержку даты истечения
-    });
-
-    const panelPlashka = window.createChoicePanel({
-      title: withHeaders ? 'Плашки' : undefined,
-      targetClass: '_plashka',
-      library: libPlashka0,
-      mountEl: grid,
-      initialHtml,
-      external: true,
-      startOpen
-    });
-
-    const panelIcon = window.createChoicePanel({
-      title: withHeaders ? 'Иконки' : undefined,
-      targetClass: '_icon',
-      library: libIcon0,
-      mountEl: grid,
-      initialHtml,
-      external: true,
-      startOpen
-    });
-
-    const panelBack = window.createChoicePanel({
-      title: withHeaders ? 'Фон' : undefined,
-      targetClass: '_background',
-      library: libBack0,
-      mountEl: grid,
-      initialHtml,
-      external: true,
-      startOpen
-    });
-
-    // --- builder
-    function build(fullHtmlOpt) {
-      let current = (typeof fullHtmlOpt === 'string') ? fullHtmlOpt : (initialHtml || '');
-      if (panelPlashka?.builder) current = panelPlashka.builder(current);
-      if (panelIcon?.builder)    current = panelIcon.builder(current);
-      if (panelBack?.builder)    current = panelBack.builder(current);
-      if (panelGift?.builder)    current = panelGift.builder(current);
-      if (panelCoupon?.builder)  current = panelCoupon.builder(current);
-      return current;
-    }
-
-    const api = {
-      build,
-      panels: { plashka: panelPlashka, icon: panelIcon, back: panelBack, gift: panelGift, coupon: panelCoupon},
-    };
-    window.__skinsSetupMounted = api;
-    return api;
-  }
-
-  window.setupSkins = setupSkins;
 })();
 /**
  * @typedef {Object} ReplaceFieldResult

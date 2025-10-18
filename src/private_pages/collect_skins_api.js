@@ -65,13 +65,13 @@
 
     for (const [key, label] of Object.entries(apiLabels)) {
       try {
-        const data = await window.FMVbank.storageGet(userId, label);
-        log(`${key} данные:`, data);
+        const response = await window.FMVbank.storageGet(userId, label);
+        log(`${key} ответ:`, response);
 
-        // Данные хранятся в формате { "user_id": [...] }
-        const userData = data?.[String(userId)];
-        if (Array.isArray(userData)) {
-          result[key] = userData;
+        // Новый формат: { last_update_ts, data: [...] }
+        if (response && typeof response === 'object' && Array.isArray(response.data)) {
+          result[key] = response.data;
+          log(`${key} загружено ${response.data.length} элементов`);
         }
       } catch (e) {
         console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);
@@ -102,37 +102,14 @@
         continue;
       }
 
-      let html = '';
-      items.forEach(item => {
-        const attrs = [
-          `title="${escapeHtml(item.title || '')}"`,
-          `data-id="${escapeHtml(item.id || '')}"`
-        ];
-
-        // Добавляем все data-* атрибуты
-        Object.keys(item).forEach(k => {
-          if (k !== 'title' && k !== 'id' && k !== 'content') {
-            const attrName = 'data-' + k.replace(/_/g, '-');
-            attrs.push(`${attrName}="${escapeHtml(item[k] || '')}"`);
-          }
-        });
-
-        html += `<div class="item" ${attrs.join(' ')}>${item.content || ''}</div>`;
-      });
+      // Просто берём content напрямую из каждого элемента
+      const html = items.map(item => item.content || '').join('\n');
 
       target.innerHTML = html;
       log(`Вставлено ${items.length} элементов в ${selector}`);
     }
   }
 
-  function escapeHtml(str) {
-    return String(str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
 
   /**
    * Находит scope вокруг персонажа

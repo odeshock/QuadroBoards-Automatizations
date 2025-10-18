@@ -59,13 +59,15 @@
 
     for (const [key, label] of Object.entries(apiLabels)) {
       try {
-        const data = await window.FMVbank.storageGet(userId, label);
-        console.log(`[admin_bridge_api] ${key} данные:`, data);
+        const response = await window.FMVbank.storageGet(userId, label);
+        console.log(`[admin_bridge_api] ${key} ответ:`, response);
 
-        // Данные хранятся в формате { "user_id": [...] }
-        const userData = data?.[String(userId)];
-        if (Array.isArray(userData)) {
-          result[key] = userData;
+        // Новый формат: { last_update_ts, data: [...] }
+        if (response && typeof response === 'object' && Array.isArray(response.data)) {
+          result[key] = response.data;
+          console.log(`[admin_bridge_api] ${key} загружено ${response.data.length} элементов, last_update_ts: ${response.last_update_ts}`);
+        } else {
+          console.warn(`[admin_bridge_api] ${key} данные в неправильном формате:`, response);
         }
       } catch (e) {
         console.error(`[admin_bridge_api] Ошибка загрузки ${key}:`, e);
@@ -99,9 +101,10 @@
     for (const [key, label] of Object.entries(apiLabels)) {
       const categoryData = jsonData[key] || [];
 
-      // Формируем данные в формате { "user_id": [...] }
+      // Формируем данные в новом формате: { last_update_ts, data: [...] }
       const saveData = {
-        [String(userId)]: categoryData
+        last_update_ts: Math.floor(Date.now() / 1000), // timestamp в секундах
+        data: categoryData
       };
 
       try {

@@ -53,14 +53,14 @@ async function loadSkinsFromAPI(userId) {
 
   for (const [key, label] of Object.entries(apiLabels)) {
     try {
-      const data = await window.FMVbank.storageGet(userId, label);
-      console.log(`[get_skin_api] ${key} данные:`, data);
+      const response = await window.FMVbank.storageGet(userId, label);
+      console.log(`[get_skin_api] ${key} ответ:`, response);
 
-      // Данные хранятся в формате { "user_id": [...] }
-      const userData = data?.[String(userId)];
-      if (Array.isArray(userData)) {
+      // Новый формат: { last_update_ts, data: [...] }
+      if (response && typeof response === 'object' && Array.isArray(response.data)) {
         // Конвертируем каждый item в HTML
-        result[key] = userData.map(item => item.content || '').filter(Boolean);
+        result[key] = response.data.map(item => item.content || '').filter(Boolean);
+        console.log(`[get_skin_api] ${key} загружено ${response.data.length} элементов`);
       }
     } catch (e) {
       console.error(`[get_skin_api] Ошибка загрузки ${key}:`, e);

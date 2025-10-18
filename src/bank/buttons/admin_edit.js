@@ -270,7 +270,7 @@
 
       // Обработчик клика
       btn.addEventListener('click', async () => {
-        console.log(`[adminEdit] Вызов bankCommentEditFromBackup с NEW_ADMIN_EDIT=true`);
+        console.log(`[adminEdit] Вызов bankCommentEditFromBackup с NEW_IS_ADMIN_TO_EDIT=true`);
         if (status) {
           status.textContent = 'Выполняю…';
           status.style.color = '#555';
@@ -279,7 +279,7 @@
 
         try {
           if (typeof window.bankCommentEditFromBackup === 'function') {
-            await window.bankCommentEditFromBackup(usr_id, ts, comment_id, current_bank, { NEW_ADMIN_EDIT: true });
+            await window.bankCommentEditFromBackup(usr_id, ts, comment_id, current_bank, { NEW_IS_ADMIN_TO_EDIT: true });
             if (status) {
               status.textContent = '✅ Готово';
               status.style.color = 'green';

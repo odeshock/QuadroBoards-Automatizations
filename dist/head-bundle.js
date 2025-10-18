@@ -4685,6 +4685,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const checkRedirect = () => {
           try {
             const currentUrl = editIframe.contentWindow.location.href;
+            console.log("🔍 [EDIT] Проверяем URL iframe:", currentUrl);
             if (currentUrl.includes('/viewtopic.php?')) {
               redirectUrl = currentUrl;
               redirectDetected = true;
@@ -4701,7 +4702,7 @@ document.addEventListener("DOMContentLoaded", () => {
               window.location.href = redirectUrl;
             }
           } catch (err) {
-            // Игнорируем CORS ошибки
+            console.log("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);
           }
         };
 

@@ -5,24 +5,39 @@
   'use strict';
 
   /**
-   * Определяет user_id из .modal_script
-   * Приоритет: data-main-user_id > data-id
+   * Загружает страницу /pages/usrN и извлекает user_id из .modal_script
+   * Приоритет: data-main-user_id > N из URL
    */
-  function getUserIdFromModalScript() {
-    const modalScript = document.querySelector('.modal_script');
-    if (!modalScript) return null;
+  async function getUserIdFromPage(profileId) {
+    try {
+      const pageUrl = `/pages/usr${profileId}`;
+      const response = await fetch(pageUrl);
+      if (!response.ok) {
+        console.error(`[admin_bridge_json] Не удалось загрузить ${pageUrl}`);
+        return Number(profileId); // fallback на profileId
+      }
 
-    const mainUserId = modalScript.getAttribute('data-main-user_id');
-    if (mainUserId && mainUserId.trim()) {
-      return Number(mainUserId.trim());
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      const modalScript = doc.querySelector('.modal_script');
+      if (!modalScript) {
+        console.warn(`[admin_bridge_json] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+        return Number(profileId);
+      }
+
+      const mainUserId = modalScript.getAttribute('data-main-user_id');
+      if (mainUserId && mainUserId.trim()) {
+        return Number(mainUserId.trim());
+      }
+
+      // Если data-main-user_id не указан, используем profileId
+      return Number(profileId);
+    } catch (err) {
+      console.error('[admin_bridge_json] Ошибка загрузки страницы:', err);
+      return Number(profileId);
     }
-
-    const dataId = modalScript.getAttribute('data-id');
-    if (dataId && dataId.trim()) {
-      return Number(dataId.trim());
-    }
-
-    return null;
   }
 
   /**
@@ -143,7 +158,8 @@
    * @returns {Promise<object>} { status, visibleData, invisibleData, save, targetUserId }
    */
   async function load(profileId, libraryIds) {
-    const targetUserId = getUserIdFromModalScript() || Number(profileId);
+    // Загружаем страницу /pages/usrN и извлекаем правильный userId
+    const targetUserId = await getUserIdFromPage(profileId);
 
     if (!targetUserId) {
       return {

@@ -103,7 +103,7 @@
 
     const results = [];
     for (const u of users) {
-      const data = byUser[u.id];
+      const data = byUser[u.id]["episodes"];
       if (!data) {
         results.push({ id: u.id, status: "нет данных (пользователь не найден в хроно-коллекции)" });
         continue;
@@ -195,7 +195,7 @@
         const lines = [];
         for (const r of (results || [])) {
           const info = normalizeInfoStatus(r?.status);
-          // if (!info) continue; // нас интересуют только проблемные
+          if (!info) continue; // нас интересуют только проблемные
           const id = String(r?.id || '');
           const name = nameMap.get(id) || id;
           lines.push(`${userLinkHtml(id, name)} — ${FMV.escapeHtml(info)}`);

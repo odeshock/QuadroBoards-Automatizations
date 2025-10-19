@@ -77,7 +77,7 @@
   }
 
   // публичные функции
-  async function storageGet(NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+  async function storageGet(NEEDED_USER_ID = 1, { api_key_label = "fmv_bank_info_" }) {
     const API_KEY = api_key_label + NEEDED_USER_ID;
     const json = await callStorage("storage.get", {}, NEEDED_USER_ID, api_key_label);
     const parsed = parseStorage(json, API_KEY);

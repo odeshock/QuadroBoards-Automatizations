@@ -2092,7 +2092,8 @@ export function renderLog(log) {
     buyBtn.type = 'button';
     buyBtn.className = 'button primary';
     buyBtn.id = 'buy-button';
-    buyBtn.textContent = 'Купить';
+    // Если COMMENT_ID определён, это режим редактирования
+    buyBtn.textContent = (typeof window.COMMENT_ID !== 'undefined') ? 'Редактировать' : 'Купить';
     buyBtn.addEventListener('click', () => {
       // Проверяем баланс перед отправкой
       const currentBank = typeof window.CURRENT_BANK === 'number' && Number.isFinite(window.CURRENT_BANK)

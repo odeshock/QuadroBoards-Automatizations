@@ -1005,15 +1005,6 @@ function checkAndRestoreBackup() {
             restoreFromBackup(backupData);
             renderLog(log);
 
-            // Переименовываем кнопку "Купить" в "Редактировать" ПОСЛЕ renderLog
-            const buyBtn = document.getElementById('buy-button');
-            if (buyBtn) {
-              buyBtn.textContent = 'Редактировать';
-              console.log('✅ Кнопка переименована в "Редактировать"');
-            } else {
-              console.error('❌ Кнопка #buy-button не найдена');
-            }
-
             // Обновляем контроль доступа после изменения IS_ADMIN
             initializeAccessControl();
             console.log('✅ Контроль доступа обновлён (IS_ADMIN:', window.IS_ADMIN, ')');

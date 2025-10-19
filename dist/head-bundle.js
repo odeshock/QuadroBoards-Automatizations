@@ -3612,7 +3612,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // публичные функции
-  async function storageGet(NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+  async function storageGet(NEEDED_USER_ID = 1, { api_key_label = "fmv_bank_info_" }) {
     const API_KEY = api_key_label + NEEDED_USER_ID;
     const json = await callStorage("storage.get", {}, NEEDED_USER_ID, api_key_label);
     const parsed = parseStorage(json, API_KEY);
@@ -3695,8 +3695,9 @@ function formatBankText(data) {
   // 7) Нумерованный список ссылок
   const incomeIds = [
     "form-income-needrequest",
+    "form-income-ep-personal",
+    "form-income-ep-plot",
     "form-income-contest",
-    "form-income-avatar",
     "form-income-avatar",
     "form-income-design-other",
     "form-income-run-contest",
@@ -4779,6 +4780,19 @@ function queueMessage(iframeReadyP, buildMessage /* () => object */, label = "me
   });
 }
 
+// отправляет сообщение немедленно, минуя очередь (для bankCommentEditFromBackup)
+function sendMessageImmediately(iframeReadyP, buildMessage /* () => object */, label = "message") {
+  iframeReadyP.then((iframeWindow) => {
+    const msg = buildMessage();
+    if (msg) {
+      iframeWindow.postMessage(msg, IFRAME_ORIGIN);
+      console.log(`🟢 [IMMEDIATE] ${label}:`, msg.type || "(no type)");
+    } else {
+      console.log(`⚪ [SKIP]  ${label}: empty message`);
+    }
+  }).catch(err => console.warn("sendMessageImmediately skipped:", err?.message || err));
+}
+
 /* =============== отправка пост-списков (внутри очереди) =============== */
 async function sendPosts(iframeWindow, { seedPosts, label, forums, type, is_ads = false, title_prefix = "" }) {
   try {
@@ -4938,14 +4952,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const BACKUP_DATA = current_storage[ts];
     console.log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
 
-    queueMessage(iframeReadyP, () => ({
+    // Отправляем НЕМЕДЛЕННО, минуя очередь
+    sendMessageImmediately(iframeReadyP, () => ({
       type: BankPostMessagesType.comment_info,
       NEW_COMMENT_TIMESTAMP: ts,
       NEW_COMMENT_ID,
       NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
       NEW_IS_ADMIN_TO_EDIT
     }), "comment_info");
-    queueMessage(iframeReadyP, () => ({
+    sendMessageImmediately(iframeReadyP, () => ({
       type: BankPostMessagesType.backup_data,
       BACKUP_DATA
     }), "backup_data");

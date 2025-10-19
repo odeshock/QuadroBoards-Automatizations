@@ -844,6 +844,13 @@ $(function() {
         // Объединяем: сначала видимые, потом невидимые
         const mergedData = [...visible, ...invisible];
 
+        // ВАЖНО: Сохраняем только если есть данные для этой категории
+        // Иначе пустой массив перезапишет существующие данные в других категориях
+        if (mergedData.length === 0) {
+          console.log(`[admin_bridge_json] Пропускаю сохранение ${key} — нет данных`);
+          continue;
+        }
+
         const saveData = {
           last_update_ts: Math.floor(Date.now() / 1000),
           data: mergedData
@@ -854,6 +861,7 @@ $(function() {
           console.error(`[admin_bridge_json] Не удалось сохранить ${key}`);
           return false;
         }
+        console.log(`[admin_bridge_json] Сохранено ${key}: ${mergedData.length} элементов`);
       }
       return true;
     } catch (err) {

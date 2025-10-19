@@ -1650,14 +1650,14 @@ async function collectSkinSets() {
   'use strict';
 
   // Проверяем наличие нужных полей
-  if (!window.SKIN || !window.SKIN.GroupID || !window.SKIN.LogFieldID) {
-    console.warn('[button_create_storage] Требуется window.SKIN с GroupID и LogFieldID');
+  if (!window.PROFILE_CHECK || !window.PROFILE_CHECK.GroupID || !window.SKIN || !window.PROFILE_CHECK.ForumID || !window.SKIN.LogFieldID) {
+    console.warn('[button_create_storage] Требуется window.PROFILE_CHECK с GroupID, ForumID и window.SKIN с LogFieldID');
     return;
   }
 
-  const GID = window.SKIN.GroupID.map(Number);
+  const GID = window.PROFILE_CHECK.GroupID.map(Number);
   const LOG_FIELD_ID = window.SKIN.LogFieldID;
-  const AMS_FORUM_ID = window.FORUMS_IDS?.Ams || [];
+  const AMS_FORUM_ID = window.PROFILE_CHECK.ForumID || [];
 
   if (!window.FMV) window.FMV = {};
 
@@ -1852,8 +1852,8 @@ async function collectSkinSets() {
       showLink: false,
 
       async onClick(api) {
-        const setStatus = api?.setStatus || (() => {});
-        const setDetails = api?.setDetails || (() => {});
+        const setStatus = api?.setStatus || (() => { });
+        const setDetails = api?.setDetails || (() => { });
 
         // Находим контейнер с кнопкой
         const button = document.querySelector('.fmv-forum-button');

@@ -78,7 +78,23 @@ echo "/* MODULE 10: bank/parent/fetch_user_coupons.js */" >> dist/head-bundle.js
 cat src/bank/parent/fetch_user_coupons.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
-echo "/* MODULE 11: bank/parent/messages.js */" >> dist/head-bundle.js
+echo "/* MODULE 11.1: bank/parent/messages-utils.js */" >> dist/head-bundle.js
+cat src/bank/parent/messages-utils.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 11.2: bank/parent/messages-config.js */" >> dist/head-bundle.js
+cat src/bank/parent/messages-config.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 11.3: bank/parent/messages-queue.js */" >> dist/head-bundle.js
+cat src/bank/parent/messages-queue.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 11.4: bank/parent/messages-scrapers.js */" >> dist/head-bundle.js
+cat src/bank/parent/messages-scrapers.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
+echo "/* MODULE 11.5: bank/parent/messages.js */" >> dist/head-bundle.js
 cat src/bank/parent/messages.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 

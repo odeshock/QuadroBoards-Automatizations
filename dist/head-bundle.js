@@ -117,6 +117,16 @@ var SKIN = { // для работы с библиотекой скинов
 
   const FMV = (window.FMV = window.FMV || {});
 
+  /* ===== Система логирования ===== */
+  const DEBUG = true; // false чтобы отключить все log()
+
+  const log = DEBUG ? console.log.bind(console) : () => {};
+  const warn = DEBUG ? console.warn.bind(console) : () => {};
+  const error = DEBUG ? console.error.bind(console) : () => {};
+  const table = DEBUG ? console.table.bind(console) : () => {};
+  const groupCollapsed = DEBUG ? console.groupCollapsed.bind(console) : () => {};
+  const groupEnd = DEBUG ? console.groupEnd.bind(console) : () => {};
+
   /* ---------- tiny utils ---------- */
   /**
    * Экранирование HTML-символов
@@ -518,7 +528,7 @@ var SKIN = { // для работы с библиотекой скинов
       const api = window.MainUsrFieldResolver?.getFieldValue;
       if (api) {
         try { return await api({ doc, fieldId: 6 }); } // pa-fld6
-        catch (e) { console.warn("[fetchProfileInfo] getFieldValue error:", e); }
+        catch (e) { warn("[fetchProfileInfo] getFieldValue error:", e); }
       }
       // фолбэк, если код 2 недоступен
       const strong = txt("li#pa-fld6 strong");
@@ -657,7 +667,7 @@ var SKIN = { // для работы с библиотекой скинов
       ].filter(([_, v]) => v !== '');
 
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
-      console.log("[scrapePosts] search params:", `?${query}`);
+      log("[scrapePosts] search params:", `?${query}`);
       return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
@@ -868,7 +878,7 @@ var SKIN = { // для работы с библиотекой скинов
     const pageSignature = (items) => hash(items.join("\n"));
 
     const buildUrl = (p) => {
-      console.log("[scrapePosts] keywords:", `${keywordsRaw}`);
+      log("[scrapePosts] keywords:", `${keywordsRaw}`);
       const params = [
         ['action', 'search'],
         ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],
@@ -883,7 +893,7 @@ var SKIN = { // для работы с библиотекой скинов
       ].filter(([_, v]) => v !== '');
 
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
-      console.log("[scrapePosts] search params:", `?${query}`);
+      log("[scrapePosts] search params:", `?${query}`);
       return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
@@ -1003,7 +1013,7 @@ var SKIN = { // для работы с библиотекой скинов
         const firstLinks = await window.scrapeTopicFirstPostLinks(author, forumsArr, { maxPages, delayMs });
         excludeFirstPosts = new Set(firstLinks.map(toPidHashFormat));
       } catch (e) {
-        console.warn('[scrapePosts] cannot preload first-post links:', e);
+        warn('[scrapePosts] cannot preload first-post links:', e);
       }
     }
 
@@ -1011,24 +1021,24 @@ var SKIN = { // для работы с библиотекой скинов
     const extractPosts = (doc) => {
       const all = [...doc.querySelectorAll(".post")].map(extractOne);
 
-      console.groupCollapsed(`[scrapePosts] Найдено ${all.length} постов на странице`);
+      groupCollapsed(`[scrapePosts] Найдено ${all.length} постов на странице`);
       for (const p of all) {
-        console.log("→", p.title, "| символов:", p.symbols_num, "| src:", p.src);
+        log("→", p.title, "| символов:", p.symbols_num, "| src:", p.src);
       }
-      console.groupEnd();
+      groupEnd();
 
       let list = all.filter(p => titleMatchesPrefix(p.title));
 
-      console.groupCollapsed(`[scrapePosts] После фильтрации title_prefix='${title_prefix}' → ${list.length} постов`);
+      groupCollapsed(`[scrapePosts] После фильтрации title_prefix='${title_prefix}' → ${list.length} постов`);
       for (const p of list) {
-        console.log("✓", p.title, "| символов:", p.symbols_num, "| src:", p.src);
+        log("✓", p.title, "| символов:", p.symbols_num, "| src:", p.src);
       }
-      console.groupEnd();
+      groupEnd();
 
       if (comments_only && excludeFirstPosts.size) {
         const before = list.length;
         list = list.filter(p => !excludeFirstPosts.has(p.src));
-        console.log(`[scrapePosts] comments_only: исключено ${before - list.length} первых постов тем`);
+        log(`[scrapePosts] comments_only: исключено ${before - list.length} первых постов тем`);
       }
 
       return list;
@@ -1074,7 +1084,7 @@ var SKIN = { // для работы с библиотекой скинов
 
           // 2) только для прошедших проверяем last_src
           if (lastSrcKeys.size && lastSrcKeys.has(post.src)) {
-            console.log(`[scrapePosts] найден last_src (после фильтра по длине): ${post.src}, остановка`);
+            log(`[scrapePosts] найден last_src (после фильтра по длине): ${post.src}, остановка`);
             return finalize(acc);
           }
 
@@ -1097,9 +1107,9 @@ var SKIN = { // для работы с библиотекой скинов
     // ------ финализация: reverse + вывод ------
     function finalize(arr) {
       const finalArr = arr.slice().reverse();
-      console.log(finalArr);
+      log(finalArr);
       try {
-        console.table(finalArr.map(r => ({
+        table(finalArr.map(r => ({
           title: r.title,
           src: r.src,
           symbols_num: r.symbols_num,
@@ -1107,7 +1117,7 @@ var SKIN = { // для работы с библиотекой скинов
           textPreview: r.text.slice(0, 120).replace(/\s+/g, " "),
           date: r.date_ts
         })));
-      } catch { console.log(finalArr); }
+      } catch { log(finalArr); }
       window.__scrapedPosts = finalArr;
       return finalArr;
     }
@@ -4603,300 +4613,341 @@ async function fetchUserCoupons() {
 // Экспортируем в window
 window.fetchUserCoupons = fetchUserCoupons;
 
-/* MODULE 11: bank/parent/messages.js */
-/* =============== система логирования =============== */
-const DEBUG = true; // false чтобы отключить все log()
+/* MODULE 11.1: bank/parent/messages-utils.js */
+/* =============== MESSAGES UTILS MODULE =============== */
+(function() {
+  'use strict';
 
-const log = DEBUG ? console.log.bind(console) : () => {};
-const warn = DEBUG ? console.warn.bind(console) : () => {};
-const error = DEBUG ? console.error.bind(console) : () => {};
+  /* =============== система логирования =============== */
+  const DEBUG = true; // false чтобы отключить все log()
 
-/* =============== базовые утилиты: delay + timeout + retry с логами =============== */
-let preScrapeBarrier = Promise.resolve(true);
-const delay = (ms) => new Promise(r => setTimeout(r, ms));
+  window.BankMessagesLog = DEBUG ? console.log.bind(console) : () => {};
+  window.BankMessagesWarn = DEBUG ? console.warn.bind(console) : () => {};
+  window.BankMessagesError = DEBUG ? console.error.bind(console) : () => {};
 
-async function withTimeout(promise, ms, label = "request") {
-  let to;
-  const t = new Promise((_, rej) => { to = setTimeout(() => rej(new Error(`${label} timeout after ${ms} ms`)), ms); });
-  try { return await Promise.race([promise, t]); }
-  finally { clearTimeout(to); }
-}
+  /* =============== базовые утилиты: delay + timeout + retry =============== */
+  window.BankPreScrapeBarrier = Promise.resolve(true);
 
-async function retry(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeoutMs = 15000 } = {}, label = "request") {
-  let lastErr;
-  log(`🟦 [STEP] ${label} start`);
-  for (let i = 0; i < retries; i++) {
-    try {
-      const res = await withTimeout(fn(), timeoutMs, label);
-      log(`✅ [OK]   ${label} success (try ${i + 1}/${retries})`);
-      return res;
-    } catch (e) {
-      lastErr = e;
-      const isLast = i === retries - 1;
-      if (isLast) {
-        warn(`❌ [ERROR] ${label} failed after ${retries} tries:`, e?.message || e);
-        break;
-      }
-      const jitter = 0.8 + Math.random() * 0.4;  // 0.8—1.2
-      const backoff = Math.min(baseDelay * 2 ** i, maxDelay) * jitter;
-      log(`⚠️  [RETRY] ${label} try ${i + 1} failed: ${e?.message || e}. Waiting ${Math.round(backoff)}ms before retry...`);
-      await delay(backoff);
-    }
-  }
-  throw lastErr;
-}
+  window.BankDelay = (ms) => new Promise(r => setTimeout(r, ms));
 
-/* =============== конфиг пауз (чтобы не казаться ботом) =============== */
-// пауза между СКРЕЙПАМИ (запросами к сайту)
-const SCRAPE_BASE_GAP_MS = 500;
-const SCRAPE_JITTER_MS = 800;
-// пауза между ОТПРАВКАМИ в iframe
-const SEND_BASE_GAP_MS = 900;
-const SEND_JITTER_MS = 500;
+  window.BankWithTimeout = async function(promise, ms, label = "request") {
+    let to;
+    const t = new Promise((_, rej) => { to = setTimeout(() => rej(new Error(`${label} timeout after ${ms} ms`)), ms); });
+    try { return await Promise.race([promise, t]); }
+    finally { clearTimeout(to); }
+  };
 
-function humanPause(base, jitter, reason = "pause") {
-  const gap = base + Math.floor(Math.random() * jitter);
-  log(`🟨 [WAIT] ${reason}: ${gap}ms`);
-  return delay(gap);
-}
-
-/* =============== константы и словари =============== */
-const IFRAME_ORIGIN = "https://forumscripts.ru";
-
-const BankPrefix = {
-  ads: "Реклама",
-  bank: "Гринготтс"
-};
-
-const BankForums = {
-  ads: window.FORUMS_IDS?.Ads || [0],
-  bank: window.FORUMS_IDS?.Bank || [0],
-  personal_posts: window.FORUMS_IDS?.PersonalPosts || [0],
-  plot_posts: window.FORUMS_IDS?.PlotPosts || [0]
-};
-
-const BankLabel = {
-  ads: "— Каждая рекламная листовка",
-  banner_mayak: "— Баннер FMV в подписи на Маяке",
-  banner_reno: "— Баннер FMV в подписи на Рено",
-  first_post: "— Первый пост на профиле",
-  message100: "— Каждые 100 сообщений",
-  positive100: "— Каждые 100 позитива",
-  reputation100: "— Каждые 100 репутации",
-  month: "— Каждый игровой месяц",
-  personal_posts: "— Каждый личный пост",
-  plot_posts: "— Каждый сюжетный пост",
-};
-
-const BankPostMessagesType = {
-  ads: "ADS_POSTS",
-  backup_data: "BACKUP_DATA",
-  banner_mayak: "BANNER_MAYAK_FLAG",
-  banner_reno: "BANNER_RENO_FLAG",
-  comment_info: "COMMENT_INFO",
-  coupons: "PERSONAL_DISCOUNTS",
-  first_post: "FIRST_POST_FLAG",
-  first_post_missed: "FIRST_POST_MISSED_FLAG",
-  skin: "SKIN",
-  personal_posts: "PERSONAL_POSTS",
-  plot_posts: "PLOT_POSTS",
-  profile_info: "PROFILE_INFO",
-  user_info: "USER_INFO",
-  users_list: "USERS_LIST",
-};
-
-const BankSkinFieldID = window.SKIN?.LibraryFieldID || 0;
-
-const BankSkinPostID = {
-  Plashka: window.SKIN?.LibraryPlashkaPostID || [],
-  Icon: window.SKIN?.LibraryIconPostID || [],
-  Back: window.SKIN?.LibraryBackPostID || [],
-  Gift: window.SKIN?.LibraryGiftPostID || []
-}
-
-
-/* =============== сервис: дата, готовность iframe =============== */
-function getBankToday() {
-  const d = new Date();
-  return [d.getFullYear(), d.getMonth() + 1, d.getDate()];
-}
-
-function waitForIframeReady(origin) {
-  return new Promise((resolve) => {
-    function onMsg(e) {
-      if (e.origin !== origin) return;
-      if (e.data?.type !== "IFRAME_READY") return;
-      window.removeEventListener("message", onMsg);
-      const w = e.source;
-      w.postMessage({ type: "IFRAME_ACK" }, origin);
-      log("✅ [IFRAME] ACK sent, iframe ready");
-      resolve(w);
-    }
-    window.addEventListener("message", onMsg);
-    log("🟦 [STEP] waiting for IFRAME_READY…");
-  });
-}
-
-/* =============== очередь отправок (rate limit на postMessage) =============== */
-const sendQueue = [];
-let sending = false;
-
-async function processQueue() {
-  if (sending) return;
-  sending = true;
-  log(`🟦 [STEP] send queue started (items: ${sendQueue.length})`);
-  try {
-    while (sendQueue.length) {
-      const task = sendQueue.shift();
+  window.BankRetry = async function(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeoutMs = 15000 } = {}, label = "request") {
+    let lastErr;
+    window.BankMessagesLog("🟦 [STEP] " + label + " start");
+    for (let i = 0; i < retries; i++) {
       try {
-        await task();
+        const res = await window.BankWithTimeout(fn(), timeoutMs, label);
+        window.BankMessagesLog("✅ [OK]   " + label + " success (try " + (i + 1) + "/" + retries + ")");
+        return res;
       } catch (e) {
-        warn("❌ [ERROR] send task failed:", e?.message || e);
+        lastErr = e;
+        const isLast = i === retries - 1;
+        if (isLast) {
+          window.BankMessagesWarn("❌ [ERROR] " + label + " failed after " + retries + " tries:", e?.message || e);
+          break;
+        }
+        const jitter = 0.8 + Math.random() * 0.4;  // 0.8—1.2
+        const backoff = Math.min(baseDelay * 2 ** i, maxDelay) * jitter;
+        window.BankMessagesLog("⚠️  [RETRY] " + label + " try " + (i + 1) + " failed: " + (e?.message || e) + ". Waiting " + Math.round(backoff) + "ms before retry...");
+        await window.BankDelay(backoff);
       }
-      await humanPause(SEND_BASE_GAP_MS, SEND_JITTER_MS, "gap between sends");
     }
-  } finally {
-    sending = false;
-    log("✅ [OK]   send queue drained");
-  }
-}
+    throw lastErr;
+  };
 
-// добавляет задачу отправки произвольной работы, зависящей от iframe
-function queueJob(iframeReadyP, jobFactory /* (iframeWindow) => Promise<void> */) {
-  iframeReadyP.then((iframeWindow) => {
-    sendQueue.push(async () => {
-      const startedAt = Date.now();
-      log("🟪 [QUEUE] job started");
-      await jobFactory(iframeWindow);
-      log(`🟩 [SENT]  job done in ${Date.now() - startedAt}ms`);
+  /* =============== конфиг пауз (чтобы не казаться ботом) =============== */
+  window.SCRAPE_BASE_GAP_MS = 500;
+  window.SCRAPE_JITTER_MS = 800;
+  window.SEND_BASE_GAP_MS = 900;
+  window.SEND_JITTER_MS = 500;
+
+  window.BankHumanPause = function(base, jitter, reason = "pause") {
+    const gap = base + Math.floor(Math.random() * jitter);
+    window.BankMessagesLog("🟨 [WAIT] " + reason + ": " + gap + "ms");
+    return window.BankDelay(gap);
+  };
+
+  /* =============== сервис: дата, готовность iframe =============== */
+  window.BankGetToday = function() {
+    const d = new Date();
+    return [d.getFullYear(), d.getMonth() + 1, d.getDate()];
+  };
+
+  window.BankWaitForIframeReady = function(origin) {
+    return new Promise((resolve) => {
+      function onMsg(e) {
+        if (e.origin !== origin) return;
+        if (e.data?.type !== "IFRAME_READY") return;
+        window.removeEventListener("message", onMsg);
+        const w = e.source;
+        w.postMessage({ type: "IFRAME_ACK" }, origin);
+        window.BankMessagesLog("✅ [IFRAME] ACK sent, iframe ready");
+        resolve(w);
+      }
+      window.addEventListener("message", onMsg);
+      window.BankMessagesLog("🟦 [STEP] waiting for IFRAME_READY…");
     });
-    log(`🟪 [QUEUE] job enqueued (size: ${sendQueue.length})`);
-    processQueue();
-  }).catch(err => warn("queueJob skipped:", err?.message || err));
-}
+  };
 
-// добавляет задачу отправки простого сообщения
-function queueMessage(iframeReadyP, buildMessage /* () => object */, label = "message") {
-  queueJob(iframeReadyP, async (iframeWindow) => {
-    const msg = buildMessage();
-    if (msg) {
-      iframeWindow.postMessage(msg, IFRAME_ORIGIN);
-      log(`🟩 [SENT]  ${label}:`, msg.type || "(no type)");
-    } else {
-      log(`⚪ [SKIP]  ${label}: empty message`);
+  window.BankMessagesLog("✅ [MODULE] messages-utils.js loaded");
+})();
+
+/* MODULE 11.2: bank/parent/messages-config.js */
+/* =============== MESSAGES CONFIG MODULE =============== */
+(function() {
+  'use strict';
+
+  window.BANK_IFRAME_ORIGIN = "https://forumscripts.ru";
+
+  window.BankPrefix = {
+    ads: "Реклама",
+    bank: "Гринготтс"
+  };
+
+  window.BankForums = {
+    ads: window.FORUMS_IDS?.Ads || [0],
+    bank: window.FORUMS_IDS?.Bank || [0],
+    personal_posts: window.FORUMS_IDS?.PersonalPosts || [0],
+    plot_posts: window.FORUMS_IDS?.PlotPosts || [0]
+  };
+
+  window.BankLabel = {
+    ads: "— Каждая рекламная листовка",
+    banner_mayak: "— Баннер FMV в подписи на Маяке",
+    banner_reno: "— Баннер FMV в подписи на Рено",
+    first_post: "— Первый пост на профиле",
+    message100: "— Каждые 100 сообщений",
+    positive100: "— Каждые 100 позитива",
+    reputation100: "— Каждые 100 репутации",
+    month: "— Каждый игровой месяц",
+    personal_posts: "— Каждый личный пост",
+    plot_posts: "— Каждый сюжетный пост",
+  };
+
+  window.BankPostMessagesType = {
+    ads: "ADS_POSTS",
+    backup_data: "BACKUP_DATA",
+    banner_mayak: "BANNER_MAYAK_FLAG",
+    banner_reno: "BANNER_RENO_FLAG",
+    comment_info: "COMMENT_INFO",
+    coupons: "PERSONAL_DISCOUNTS",
+    first_post: "FIRST_POST_FLAG",
+    first_post_missed: "FIRST_POST_MISSED_FLAG",
+    skin: "SKIN",
+    personal_posts: "PERSONAL_POSTS",
+    plot_posts: "PLOT_POSTS",
+    profile_info: "PROFILE_INFO",
+    user_info: "USER_INFO",
+    users_list: "USERS_LIST",
+  };
+
+  window.BankSkinFieldID = window.SKIN?.LibraryFieldID || 0;
+
+  window.BankSkinPostID = {
+    Plashka: window.SKIN?.LibraryPlashkaPostID || [],
+    Icon: window.SKIN?.LibraryIconPostID || [],
+    Back: window.SKIN?.LibraryBackPostID || [],
+    Gift: window.SKIN?.LibraryGiftPostID || []
+  };
+
+  if (window.BankMessagesLog) {
+    window.BankMessagesLog("✅ [MODULE] messages-config.js loaded");
+  }
+})();
+
+/* MODULE 11.3: bank/parent/messages-queue.js */
+/* =============== MESSAGES QUEUE MODULE =============== */
+(function() {
+  'use strict';
+
+  const sendQueue = [];
+  let sending = false;
+
+  async function processQueue() {
+    if (sending) return;
+    sending = true;
+    const queueLen = sendQueue.length;
+    window.BankMessagesLog("🟦 [STEP] send queue started (items: " + queueLen + ")");
+    try {
+      while (sendQueue.length) {
+        const task = sendQueue.shift();
+        try {
+          await task();
+        } catch (e) {
+          window.BankMessagesWarn("❌ [ERROR] send task failed:", e?.message || e);
+        }
+        await window.BankHumanPause(window.SEND_BASE_GAP_MS, window.SEND_JITTER_MS, "gap between sends");
+      }
+    } finally {
+      sending = false;
+      window.BankMessagesLog("✅ [OK]   send queue drained");
     }
-  });
-}
+  }
 
-// отправляет сообщение немедленно, минуя очередь (для bankCommentEditFromBackup)
-function sendMessageImmediately(iframeReadyP, buildMessage /* () => object */, label = "message") {
-  iframeReadyP.then((iframeWindow) => {
-    const msg = buildMessage();
-    if (msg) {
-      iframeWindow.postMessage(msg, IFRAME_ORIGIN);
-      log(`🟢 [IMMEDIATE] ${label}:`, msg.type || "(no type)");
-    } else {
-      log(`⚪ [SKIP]  ${label}: empty message`);
-    }
-  }).catch(err => warn("sendMessageImmediately skipped:", err?.message || err));
-}
+  // добавляет задачу отправки произвольной работы, зависящей от iframe
+  window.BankQueueJob = function(iframeReadyP, jobFactory) {
+    iframeReadyP.then((iframeWindow) => {
+      sendQueue.push(async () => {
+        const startedAt = Date.now();
+        window.BankMessagesLog("🟪 [QUEUE] job started");
+        await jobFactory(iframeWindow);
+        const duration = Date.now() - startedAt;
+        window.BankMessagesLog("🟩 [SENT]  job done in " + duration + "ms");
+      });
+      const queueSize = sendQueue.length;
+      window.BankMessagesLog("🟪 [QUEUE] job enqueued (size: " + queueSize + ")");
+      processQueue();
+    }).catch(err => window.BankMessagesWarn("queueJob skipped:", err?.message || err));
+  };
 
-/* =============== отправка пост-списков (внутри очереди) =============== */
-async function sendPosts(iframeWindow, { seedPosts, label, forums, type, is_ads = false, title_prefix = "" }) {
-  try {
-    // Проходимся по всем постам и собираем ссылки из каждого
-    const allRawLinks = [];
+  // добавляет задачу отправки простого сообщения
+  window.BankQueueMessage = function(iframeReadyP, buildMessage, label) {
+    label = label || "message";
+    window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
+      const msg = buildMessage();
+      if (msg) {
+        iframeWindow.postMessage(msg, window.BANK_IFRAME_ORIGIN);
+        window.BankMessagesLog("🟩 [SENT]  " + label + ":", msg.type || "(no type)");
+      } else {
+        window.BankMessagesLog("⚪ [SKIP]  " + label + ": empty message");
+      }
+    });
+  };
 
-    if (Array.isArray(seedPosts)) {
-      for (const post of seedPosts) {
-        const posts_html = (post && typeof post.html === "string") ? post.html : "";
+  // отправляет сообщение немедленно, минуя очередь (для bankCommentEditFromBackup)
+  window.BankSendMessageImmediately = function(iframeReadyP, buildMessage, label) {
+    label = label || "message";
+    iframeReadyP.then((iframeWindow) => {
+      const msg = buildMessage();
+      if (msg) {
+        iframeWindow.postMessage(msg, window.BANK_IFRAME_ORIGIN);
+        window.BankMessagesLog("🟢 [IMMEDIATE] " + label + ":", msg.type || "(no type)");
+      } else {
+        window.BankMessagesLog("⚪ [SKIP]  " + label + ": empty message");
+      }
+    }).catch(err => window.BankMessagesWarn("sendMessageImmediately skipped:", err?.message || err));
+  };
 
-        const rawLinks = posts_html
-          ? getBlockquoteTextFromHtml(posts_html, label, 'link')
-          : null;
+  if (window.BankMessagesLog) {
+    window.BankMessagesLog("✅ [MODULE] messages-queue.js loaded");
+  }
+})();
 
-        if (Array.isArray(rawLinks)) {
-          allRawLinks.push(...rawLinks);
-        } else if (typeof rawLinks === "string" && rawLinks.trim() !== "") {
-          allRawLinks.push(rawLinks);
+/* MODULE 11.4: bank/parent/messages-scrapers.js */
+/* =============== MESSAGES SCRAPERS MODULE =============== */
+(function() {
+  'use strict';
+
+  const SITE_URL = window.location.origin;
+
+  /* =============== отправка пост-списков (внутри очереди) =============== */
+  window.BankSendPosts = async function(iframeWindow, { seedPosts, label, forums, type, is_ads = false, title_prefix = "" }) {
+    try {
+      // Проходимся по всем постам и собираем ссылки из каждого
+      const allRawLinks = [];
+
+      if (Array.isArray(seedPosts)) {
+        for (const post of seedPosts) {
+          const posts_html = (post && typeof post.html === "string") ? post.html : "";
+
+          const rawLinks = posts_html
+            ? getBlockquoteTextFromHtml(posts_html, label, 'link')
+            : null;
+
+          if (Array.isArray(rawLinks)) {
+            allRawLinks.push(...rawLinks);
+          } else if (typeof rawLinks === "string" && rawLinks.trim() !== "") {
+            allRawLinks.push(rawLinks);
+          }
         }
       }
+
+      const used_posts_links = allRawLinks;
+
+      const used_posts = used_posts_links
+        .filter((link) => typeof link === "string" && link.includes("/viewtopic.php?"))
+        .map((link) => link.split("/viewtopic.php?")[1]);
+
+      window.BankMessagesLog("🟦 [STEP] scrape new posts for " + type + " (filter used_posts: " + used_posts.length + ")");
+      const new_posts_raw = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, forums, { last_src: used_posts, comments_only: true, title_prefix }),
+        { retries: 4, baseDelay: 800, maxDelay: 8000, timeoutMs: 18000 },
+        "scrapePosts(" + type + ")"
+      );
+
+      const new_posts = Array.isArray(new_posts_raw)
+        ? new_posts_raw.map((item) => ({
+          src: SITE_URL + "/viewtopic.php?" + item.src,
+          text: item.title,
+          ...(is_ads ? {} : { symbols_num: item.symbols_num }),
+        }))
+        : [];
+
+      iframeWindow.postMessage({ type: type, posts: new_posts }, window.BANK_IFRAME_ORIGIN);
+      window.BankMessagesLog("🟩 [SENT]  " + type + ": " + new_posts.length + " item(s)");
+    } catch (e) {
+      window.BankMessagesWarn("❌ [ERROR] sendPosts(" + type + ") failed after retries:", e?.message || e);
     }
+  };
 
-    const used_posts_links = allRawLinks;
+  /* =============== получение нового актуального значения (внутри очереди) =============== */
+  window.BankGetLastValue = async function(default_value, { label, is_month = false }) {
+    try {
+      const seed = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
+          stopOnNthPost: 1,
+          keywords: label.split(" ").join(" AND "),
+        }),
+        { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
+        "scrapePosts(personal_seed)"
+      );
 
-    const used_posts = used_posts_links
-      .filter((link) => typeof link === "string" && link.includes("/viewtopic.php?"))
-      .map((link) => link.split("/viewtopic.php?")[1]);
+      const _origScrapePosts = window.scrapePosts?.bind(window);
+      if (typeof _origScrapePosts === "function") {
+        window.scrapePosts = async (...args) => {
+          await (window.preScrapeBarrier ?? window.BankPreScrapeBarrier ?? Promise.resolve());
+          return _origScrapePosts(...args);
+        };
+      }
 
-    log(`🟦 [STEP] scrape new posts for ${type} (filter used_posts: ${used_posts.length})`);
-    const new_posts_raw = await retry(
-      () => window.scrapePosts(window.UserLogin, forums, { last_src: used_posts, comments_only: true, title_prefix }),
-      { retries: 4, baseDelay: 800, maxDelay: 8000, timeoutMs: 18000 },
-      `scrapePosts(${type})`
-    );
+      const first = Array.isArray(seed) ? seed[0] : null;
+      const posts_html = (first && typeof first.html === "string") ? first.html : "";
 
-    const new_posts = Array.isArray(new_posts_raw)
-      ? new_posts_raw.map((item) => ({
-        src: `${SITE_URL}/viewtopic.php?${item.src}`,
-        text: item.title,
-        ...(is_ads ? {} : { symbols_num: item.symbols_num }),
-      }))
-      : [];
+      const rawLinks = posts_html
+        ? getBlockquoteTextFromHtml(posts_html, label, 'last_value')
+        : null;
 
-    iframeWindow.postMessage({ type, posts: new_posts }, IFRAME_ORIGIN);
-    log(`🟩 [SENT]  ${type}: ${new_posts.length} item(s)`);
-  } catch (e) {
-    warn(`❌ [ERROR] sendPosts(${type}) failed after retries:`, e?.message || e);
+      let last_value;
+
+      if (rawLinks == null) {
+        last_value = default_value;
+      } else if (is_month == true) {
+        last_value = rawLinks.trim().split("-").map(Number);
+      } else {
+        last_value = Number(rawLinks.trim());
+      }
+
+      window.BankMessagesLog("🟩 [FOUND] Новое значение " + label + ": " + last_value);
+      return last_value;
+    } catch (e) {
+      window.BankMessagesWarn("❌ [ERROR] getLastValue(" + label + ") failed after retries:", e?.message || e);
+      return null;
+    }
+  };
+
+  if (window.BankMessagesLog) {
+    window.BankMessagesLog("✅ [MODULE] messages-scrapers.js loaded");
   }
-}
+})();
 
-/* =============== получение нового актуального значения (внутри очереди) =============== */
-async function getLastValue(default_value, { label, is_month = false }) {
-  try {
-    const seed = await retry(
-      () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-        title_prefix: BankPrefix.bank,
-        stopOnNthPost: 1,
-        keywords: label.split(" ").join(" AND "),
-      }),
-      { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
-      "scrapePosts(personal_seed)"
-    );
-
-    const _origScrapePosts = window.scrapePosts?.bind(window);
-    if (typeof _origScrapePosts === "function") {
-      window.scrapePosts = async (...args) => {
-        await (window.preScrapeBarrier ?? preScrapeBarrier ?? Promise.resolve()); // ← гарантированная суммарная задержка до всех scrapePosts
-        return _origScrapePosts(...args);  // ← дальше — как было, со всеми retry/timeout
-      };
-    }
-
-    const first = Array.isArray(seed) ? seed[0] : null;
-    const posts_html = (first && typeof first.html === "string") ? first.html : "";
-
-    const rawLinks = posts_html
-      ? getBlockquoteTextFromHtml(posts_html, label, 'last_value')
-      : null;
-
-    let last_value;
-
-    if (rawLinks == null) {
-      last_value = default_value;
-    } else if (is_month == true) {
-      last_value = rawLinks.trim().split("-").map(Number);
-    } else {
-      last_value = Number(rawLinks.trim());
-    }
-
-    log(`🟩 [FOUND] Новое значение ${label}: ${last_value}`);
-    return last_value;
-  } catch (e) {
-    warn(`❌ [ERROR] getLastValue(${label}) failed after retries:`, e?.message || e);
-    return null;
-  }
-}
-
+/* MODULE 11.5: bank/parent/messages.js */
 /* =============== основной поток: СКРЕЙПЫ ПОСЛЕДОВАТЕЛЬНО + ОТПРАВКИ С ОЧЕРЕДЬЮ =============== */
 document.addEventListener("DOMContentLoaded", () => {
   const headTitle = document.querySelector("head > title")?.textContent || "";
@@ -4905,27 +4956,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
-  preScrapeBarrier = (async () => {
-    // log("🟨 [WAIT] pre-scrape barrier: 5000ms");
-    // await delay(5000);
-    // log("🟢 [GO]   pre-scrape barrier passed");
+  window.BankPreScrapeBarrier = (async () => {
+    // window.BankMessagesLog("🟨 [WAIT] pre-scrape barrier: 5000ms");
+    // await window.BankDelay(5000);
+    // window.BankMessagesLog("🟢 [GO]   pre-scrape barrier passed");
     return true;
   })();
-  window.preScrapeBarrier = preScrapeBarrier;
+  window.preScrapeBarrier = window.BankPreScrapeBarrier;
 
   const textArea = document.querySelector('textarea[name="req_message"]');
-  const iframeReadyP = waitForIframeReady(IFRAME_ORIGIN);
+  const iframeReadyP = window.BankWaitForIframeReady(window.BANK_IFRAME_ORIGIN);
 
   // Функция для редактирования комментариев из backup
   async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_IS_ADMIN_TO_EDIT = false } = {}) {
-    log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
+    window.BankMessagesLog(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
 
     // Проверка на bank_ams_done для всех (включая админов)
     const commentContent = document.querySelector(`#p${NEW_COMMENT_ID}-content`);
     if (commentContent) {
       const hasAmsDone = commentContent.querySelector('bank_ams_done');
       if (hasAmsDone) {
-        warn('⚠️ [BACKUP] Обнаружен bank_ams_done, редактирование запрещено');
+        window.BankMessagesWarn('⚠️ [BACKUP] Обнаружен bank_ams_done, редактирование запрещено');
         alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
         return;
       }
@@ -4935,7 +4986,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!NEW_IS_ADMIN_TO_EDIT) {
       // 1. Проверка на NEW_COMMENT_ID = 0
       if (NEW_COMMENT_ID === 0) {
-        error('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
+        window.BankMessagesError('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
         alert("Извините! Произошла ошибка. Пожалуйста, обратитесь в Приёмную.");
         return;
       }
@@ -4945,32 +4996,32 @@ document.addEventListener("DOMContentLoaded", () => {
         const hasAmsCheck = commentContent.querySelector('bank_ams_check');
 
         if (hasAmsCheck) {
-          warn('⚠️ [BACKUP] Обнаружен bank_ams_check, редактирование запрещено');
+          window.BankMessagesWarn('⚠️ [BACKUP] Обнаружен bank_ams_check, редактирование запрещено');
           alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
         }
       } else {
-        warn(`⚠️ [BACKUP] Элемент #p${NEW_COMMENT_ID}-content не найден`);
+        window.BankMessagesWarn(`⚠️ [BACKUP] Элемент #p${NEW_COMMENT_ID}-content не найден`);
       }
     }
 
     const current_storage = await FMVbank.storageGet(user_id, 'fmv_bank_info_');
-    log(`🟦 [BACKUP] current_storage:`, current_storage);
+    window.BankMessagesLog(`🟦 [BACKUP] current_storage:`, current_storage);
 
     const BACKUP_DATA = current_storage[ts];
-    log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
+    window.BankMessagesLog(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
 
     // Отправляем НЕМЕДЛЕННО, минуя очередь
     if (BACKUP_DATA) {
-      sendMessageImmediately(iframeReadyP, () => ({
-        type: BankPostMessagesType.comment_info,
+      window.BankSendMessageImmediately(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.comment_info,
         NEW_COMMENT_TIMESTAMP: ts,
         NEW_COMMENT_ID,
         NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
         NEW_IS_ADMIN_TO_EDIT
       }), "comment_info");
-      sendMessageImmediately(iframeReadyP, () => ({
-        type: BankPostMessagesType.backup_data,
+      window.BankSendMessageImmediately(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.backup_data,
         BACKUP_DATA
       }), "backup_data");
 
@@ -4978,9 +5029,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const topicPost = document.querySelector("div.post.topicpost");
       if (topicPost) {
         topicPost.scrollIntoView({ behavior: "smooth", block: "start" });
-        log("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
+        window.BankMessagesLog("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
       } else {
-        warn("⚠️ [BACKUP] div.post.topicpost не найден");
+        window.BankMessagesWarn("⚠️ [BACKUP] div.post.topicpost не найден");
       }
     }
   }
@@ -4989,8 +5040,8 @@ document.addEventListener("DOMContentLoaded", () => {
   window.bankCommentEditFromBackup = bankCommentEditFromBackup;
 
   // user_info — можно отправить сразу после готовности iframe (без данных)
-  queueMessage(iframeReadyP, () => ({
-    type: BankPostMessagesType.user_info,
+  window.BankQueueMessage(iframeReadyP, () => ({
+    type: window.BankPostMessagesType.user_info,
     user_id: window.UserID,
     user_name: window.UserLogin,
     is_admin: window.UserID == 2
@@ -4999,25 +5050,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // Загрузка данных скинов и купонов (async)
   (async () => {
     try {
-      const skin_data_plashka = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Plashka);
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Plashka");
+      const skin_data_plashka = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Plashka);
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Plashka");
 
-      const skin_data_icon = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Icon);
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Icon");
+      const skin_data_icon = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Icon);
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Icon");
 
-      const skin_data_back = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Back);
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Back");
+      const skin_data_back = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Back);
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Back");
 
-      const skin_data_gift = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Gift);
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Gift");
+      const skin_data_gift = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Gift);
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Gift");
 
-      log("[SKIN]", skin_data_plashka,
+      window.BankMessagesLog("[SKIN]", skin_data_plashka,
         skin_data_icon,
         skin_data_back,
         skin_data_gift);
 
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.skin,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.skin,
         skin_data_plashka,
         skin_data_icon,
         skin_data_back,
@@ -5026,23 +5077,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const coupons_data = await fetchUserCoupons();
 
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.coupons,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.coupons,
         coupons_data
       }), "coupons_data");
 
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between Coupons");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between Coupons");
     } catch (e) {
-      warn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
+      window.BankMessagesWarn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
     }
   })();
 
   // обработчик PURCHASE
   window.addEventListener("message", async (e) => {
-    if (e.origin !== IFRAME_ORIGIN) return;
+    if (e.origin !== window.BANK_IFRAME_ORIGIN) return;
     if (!e.data || e.data.type !== "PURCHASE") return;
 
-    log("🟦 [STEP] PURCHASE received");
+    window.BankMessagesLog("🟦 [STEP] PURCHASE received");
     const encode = encodeJSON(e.data);
     const newText = formatBankText(e.data);
     const ts = e.data.timestamp;
@@ -5057,9 +5108,9 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         if (button) {
           button.click();
-          log("🟩 [SENT]  PURCHASE form submitted");
+          window.BankMessagesLog("🟩 [SENT]  PURCHASE form submitted");
         } else {
-          warn("❌ [ERROR] Submit button not found.");
+          window.BankMessagesWarn("❌ [ERROR] Submit button not found.");
         }
       }
     }
@@ -5067,10 +5118,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // обработчик EDIT_PURCHASE
   window.addEventListener("message", async (e) => {
-    if (e.origin !== IFRAME_ORIGIN) return;
+    if (e.origin !== window.BANK_IFRAME_ORIGIN) return;
     if (!e.data || e.data.type !== "EDIT_PURCHASE") return;
 
-    log("🟦 [STEP] EDIT_PURCHASE received");
+    window.BankMessagesLog("🟦 [STEP] EDIT_PURCHASE received");
     const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
     const newText = formatBankText(e.data);
     const ts = e.data.timestamp;
@@ -5081,7 +5132,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const admin_flag = (!is_admin_to_edit) ? "" : "[FMVbankAmsCheck]";
 
     // Открываем страницу редактирования в скрытом iframe
-    log("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
+    window.BankMessagesLog("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
 
     const editIframe = document.createElement('iframe');
     editIframe.style.display = 'none';
@@ -5098,14 +5149,14 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
         if (!iframeTextArea || !iframeSubmitButton) {
-          warn("❌ [ERROR] Не найдена форма редактирования в iframe");
+          window.BankMessagesWarn("❌ [ERROR] Не найдена форма редактирования в iframe");
           editIframe.remove();
           return;
         }
 
         // Проверяем наличие [FMVbankAmsDone] если это НЕ админ-редактирование
         if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsDone]')) {
-          warn("⚠️ [EDIT] Обнаружен [FMVbankAmsDone], редактирование запрещено");
+          window.BankMessagesWarn("⚠️ [EDIT] Обнаружен [FMVbankAmsDone], редактирование запрещено");
           editIframe.remove();
           alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
@@ -5113,7 +5164,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Проверяем наличие [FMVbankAmsCheck] если это НЕ админ-редактирование
         if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsCheck]')) {
-          warn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck], редактирование запрещено");
+          window.BankMessagesWarn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck], редактирование запрещено");
           editIframe.remove();
           alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
@@ -5133,7 +5184,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Вставляем текст
         iframeTextArea.value = `${admin_flag}[FMVbank]${ts}[/FMVbank]${newText}`;
-        log("✅ [EDIT] Текст вставлен в форму редактирования");
+        window.BankMessagesLog("✅ [EDIT] Текст вставлен в форму редактирования");
 
         // Отслеживаем редирект после отправки
         let redirectUrl = null;
@@ -5143,11 +5194,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const checkRedirect = () => {
           try {
             const currentUrl = editIframe.contentWindow.location.href;
-            log("🔍 [EDIT] Проверяем URL iframe:", currentUrl);
+            window.BankMessagesLog("🔍 [EDIT] Проверяем URL iframe:", currentUrl);
             if (currentUrl.includes('/viewtopic.php?')) {
               redirectUrl = currentUrl;
               redirectDetected = true;
-              log("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
+              window.BankMessagesLog("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
 
               // Очищаем интервал
               clearInterval(redirectCheckInterval);
@@ -5156,11 +5207,11 @@ document.addEventListener("DOMContentLoaded", () => {
               editIframe.remove();
 
               // Переходим в основном окне (принудительная перезагрузка)
-              log("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
+              window.BankMessagesLog("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
               window.location.reload();
             }
           } catch (err) {
-            log("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);
+            window.BankMessagesLog("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);
           }
         };
 
@@ -5171,24 +5222,24 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => {
           clearInterval(redirectCheckInterval);
           if (!redirectDetected) {
-            warn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
+            window.BankMessagesWarn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
             editIframe.remove();
           }
         }, 10000);
 
         // Отправляем форму
         iframeSubmitButton.click();
-        log("🟩 [SENT] EDIT_PURCHASE form submitted в iframe");
+        window.BankMessagesLog("🟩 [SENT] EDIT_PURCHASE form submitted в iframe");
 
       } catch (error) {
-        error("❌ [ERROR] Ошибка при работе с iframe:", error);
+        window.BankMessagesError("❌ [ERROR] Ошибка при работе с iframe:", error);
         editIframe.remove();
       }
     };
 
     // Обработка ошибки загрузки iframe
     editIframe.onerror = function () {
-      error("❌ [ERROR] Не удалось загрузить страницу редактирования");
+      window.BankMessagesError("❌ [ERROR] Не удалось загрузить страницу редактирования");
       editIframe.remove();
     };
   });
@@ -5197,38 +5248,38 @@ document.addEventListener("DOMContentLoaded", () => {
   (async () => {
     try {
       // 1) USERS_LIST
-      const BankUsersList = await retry(
+      const BankUsersList = await window.BankRetry(
         () => scrapeUsers(),
         { retries: 2, baseDelay: 700, maxDelay: 6000, timeoutMs: 15000 },
         "scrapeUsers"
       );
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.users_list,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.users_list,
         users_list: BankUsersList
       }), "users_list");
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (users_list)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (users_list)");
 
       // 2) PROFILE_INFO
-      const BankProfileInfo = await retry(
+      const BankProfileInfo = await window.BankRetry(
         () => fetchProfileInfo(),
         { retries: 4, baseDelay: 900, maxDelay: 9000, timeoutMs: 20000 },
         "fetchProfileInfo"
       );
 
       // последовательно (ретраи уже внутри getLastValue), плюс пауза между вызовами
-      const msg100_old = await getLastValue(0, { label: BankLabel.message100 });
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between getLastValue (msg100_old)");
+      const msg100_old = await window.BankGetLastValue(0, { label: window.BankLabel.message100 });
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between getLastValue (msg100_old)");
 
-      const rep100_old = await getLastValue(0, { label: BankLabel.reputation100 });
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between getLastValue (rep100_old)");
+      const rep100_old = await window.BankGetLastValue(0, { label: window.BankLabel.reputation100 });
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between getLastValue (rep100_old)");
 
-      const pos100_old = await getLastValue(0, { label: BankLabel.positive100 });
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between getLastValue (pos100_old)");
+      const pos100_old = await window.BankGetLastValue(0, { label: window.BankLabel.positive100 });
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between getLastValue (pos100_old)");
 
-      const month_old = await getLastValue(BankProfileInfo.date, { label: BankLabel.month, is_month: true });
+      const month_old = await window.BankGetLastValue(BankProfileInfo.date, { label: window.BankLabel.month, is_month: true });
 
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.profile_info,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.profile_info,
         msg100_old,
         msg100_new: BankProfileInfo.messages,
         rep100_old,
@@ -5236,134 +5287,134 @@ document.addEventListener("DOMContentLoaded", () => {
         pos100_old,
         pos100_new: BankProfileInfo.positive,
         month_old,
-        month_new: getBankToday(),
+        month_new: window.BankGetToday(),
         money: BankProfileInfo.money
       }), "profile_info");
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between getLastValue (pos100_old)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between getLastValue (pos100_old)");
 
       // 3) BANNER_MAYAK_FLAG
-      const coms_banner_mayak = await retry(
-        () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-          title_prefix: BankPrefix.bank,
+      const coms_banner_mayak = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
-          keywords: BankLabel.banner_mayak.split(" ").join(" AND "),
+          keywords: window.BankLabel.banner_mayak.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 800, maxDelay: 7000, timeoutMs: 15000 },
         "scrapePosts(banner_mayak)"
       );
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.banner_mayak,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.banner_mayak,
         banner_mayak_flag: Array.isArray(coms_banner_mayak) ? coms_banner_mayak.length === 0 : true
       }), "banner_mayak_flag");
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (banner_mayak)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (banner_mayak)");
 
       // 4) BANNER_RENO_FLAG
-      const coms_banner_reno = await retry(
-        () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-          title_prefix: BankPrefix.bank,
+      const coms_banner_reno = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
-          keywords: BankLabel.banner_reno.split(" ").join(" AND "),
+          keywords: window.BankLabel.banner_reno.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 800, maxDelay: 7000, timeoutMs: 15000 },
         "scrapePosts(banner_reno)"
       );
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.banner_reno,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.banner_reno,
         banner_reno_flag: Array.isArray(coms_banner_reno) ? coms_banner_reno.length === 0 : true
       }), "banner_reno_flag");
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (banner_reno)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (banner_reno)");
 
       // 5) ADS_POSTS (seed -> sendPosts)
-      const ads_seed = await retry(
-        () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-          title_prefix: BankPrefix.bank,
+      const ads_seed = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
-          keywords: BankLabel.ads.split(" ").join(" AND "),
+          keywords: window.BankLabel.ads.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
         "scrapePosts(ads_seed)"
       );
-      queueJob(iframeReadyP, async (iframeWindow) => {
-        await sendPosts(iframeWindow, {
+      window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
+        await window.BankSendPosts(iframeWindow, {
           seedPosts: ads_seed,
-          label: BankLabel.ads,
-          forums: BankForums.ads,
-          type: BankPostMessagesType.ads,
+          label: window.BankLabel.ads,
+          forums: window.BankForums.ads,
+          type: window.BankPostMessagesType.ads,
           is_ads: true,
-          title_prefix: BankPrefix.ads
+          title_prefix: window.BankPrefix.ads
         });
       });
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (ads)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (ads)");
 
       // 6) FIRST_POST_FLAG
-      const first_post_coms = await retry(
-        () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-          title_prefix: BankPrefix.bank,
+      const first_post_coms = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
-          keywords: BankLabel.first_post.split(" ").join(" AND "),
+          keywords: window.BankLabel.first_post.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 15000 },
         "scrapePosts(first_post)"
       );
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.first_post,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.first_post,
         first_post_flag: Array.isArray(first_post_coms) ? first_post_coms.length === 0 : true
       }), "first_post_flag");
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (first_post)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (first_post)");
 
       // 7) PERSONAL_POSTS
-      const personal_seed = await retry(
-        () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-          title_prefix: BankPrefix.bank,
+      const personal_seed = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
-          keywords: BankLabel.personal_posts.split(" ").join(" AND "),
+          keywords: window.BankLabel.personal_posts.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
         "scrapePosts(personal_seed)"
       );
-      queueJob(iframeReadyP, async (iframeWindow) => {
-        await sendPosts(iframeWindow, {
+      window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
+        await window.BankSendPosts(iframeWindow, {
           seedPosts: personal_seed,
-          label: BankLabel.personal_posts,
-          forums: BankForums.personal_posts,
-          type: BankPostMessagesType.personal_posts,
+          label: window.BankLabel.personal_posts,
+          forums: window.BankForums.personal_posts,
+          type: window.BankPostMessagesType.personal_posts,
           is_ads: false
         });
       });
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (personal)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (personal)");
 
       // 8) PLOT_POSTS
-      const plot_seed = await retry(
-        () => window.scrapePosts(window.UserLogin, BankForums.bank, {
-          title_prefix: BankPrefix.bank,
+      const plot_seed = await window.BankRetry(
+        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+          title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 10,
-          keywords: BankLabel.plot_posts.split(" ").join(" AND "),
+          keywords: window.BankLabel.plot_posts.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
         "scrapePosts(plot_seed)"
       );
-      queueJob(iframeReadyP, async (iframeWindow) => {
-        await sendPosts(iframeWindow, {
+      window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
+        await window.BankSendPosts(iframeWindow, {
           seedPosts: plot_seed,
-          label: BankLabel.plot_posts,
-          forums: BankForums.plot_posts,
-          type: BankPostMessagesType.plot_posts,
+          label: window.BankLabel.plot_posts,
+          forums: window.BankForums.plot_posts,
+          type: window.BankPostMessagesType.plot_posts,
           is_ads: false
         });
       });
-      await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between scrapes (plot)");
+      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between scrapes (plot)");
 
       // 9) FIRST_POST_MISSED_FLAG — после personal/plot
-      queueMessage(iframeReadyP, () => ({
-        type: BankPostMessagesType.first_post_missed,
+      window.BankQueueMessage(iframeReadyP, () => ({
+        type: window.BankPostMessagesType.first_post_missed,
         first_post_missed_flag:
           (Array.isArray(personal_seed) && personal_seed.length > 0) ||
           (Array.isArray(plot_seed) && plot_seed.length > 0)
       }), "first_post_missed_flag");
 
-      log("🏁 [DONE] sequential scrape+send flow finished");
+      window.BankMessagesLog("🏁 [DONE] sequential scrape+send flow finished");
     } catch (e) {
-      warn("❌ [ERROR] Sequential scrape flow aborted:", e?.message || e);
+      window.BankMessagesWarn("❌ [ERROR] Sequential scrape flow aborted:", e?.message || e);
     }
   })();
 });

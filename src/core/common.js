@@ -4,6 +4,16 @@
 
   const FMV = (window.FMV = window.FMV || {});
 
+  /* ===== Система логирования ===== */
+  const DEBUG = true; // false чтобы отключить все log()
+
+  const log = DEBUG ? console.log.bind(console) : () => {};
+  const warn = DEBUG ? console.warn.bind(console) : () => {};
+  const error = DEBUG ? console.error.bind(console) : () => {};
+  const table = DEBUG ? console.table.bind(console) : () => {};
+  const groupCollapsed = DEBUG ? console.groupCollapsed.bind(console) : () => {};
+  const groupEnd = DEBUG ? console.groupEnd.bind(console) : () => {};
+
   /* ---------- tiny utils ---------- */
   /**
    * Экранирование HTML-символов
@@ -405,7 +415,7 @@
       const api = window.MainUsrFieldResolver?.getFieldValue;
       if (api) {
         try { return await api({ doc, fieldId: 6 }); } // pa-fld6
-        catch (e) { console.warn("[fetchProfileInfo] getFieldValue error:", e); }
+        catch (e) { warn("[fetchProfileInfo] getFieldValue error:", e); }
       }
       // фолбэк, если код 2 недоступен
       const strong = txt("li#pa-fld6 strong");
@@ -544,7 +554,7 @@
       ].filter(([_, v]) => v !== '');
 
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
-      console.log("[scrapePosts] search params:", `?${query}`);
+      log("[scrapePosts] search params:", `?${query}`);
       return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
@@ -755,7 +765,7 @@
     const pageSignature = (items) => hash(items.join("\n"));
 
     const buildUrl = (p) => {
-      console.log("[scrapePosts] keywords:", `${keywordsRaw}`);
+      log("[scrapePosts] keywords:", `${keywordsRaw}`);
       const params = [
         ['action', 'search'],
         ['keywords', keywordsRaw ? encodeForSearch(keywordsRaw.trim()) : ''],
@@ -770,7 +780,7 @@
       ].filter(([_, v]) => v !== '');
 
       const query = params.map(([k, v]) => `${k}=${v}`).join('&');
-      console.log("[scrapePosts] search params:", `?${query}`);
+      log("[scrapePosts] search params:", `?${query}`);
       return new URL(`${basePath}?${query}`, location.origin).toString();
     };
 
@@ -890,7 +900,7 @@
         const firstLinks = await window.scrapeTopicFirstPostLinks(author, forumsArr, { maxPages, delayMs });
         excludeFirstPosts = new Set(firstLinks.map(toPidHashFormat));
       } catch (e) {
-        console.warn('[scrapePosts] cannot preload first-post links:', e);
+        warn('[scrapePosts] cannot preload first-post links:', e);
       }
     }
 
@@ -898,24 +908,24 @@
     const extractPosts = (doc) => {
       const all = [...doc.querySelectorAll(".post")].map(extractOne);
 
-      console.groupCollapsed(`[scrapePosts] Найдено ${all.length} постов на странице`);
+      groupCollapsed(`[scrapePosts] Найдено ${all.length} постов на странице`);
       for (const p of all) {
-        console.log("→", p.title, "| символов:", p.symbols_num, "| src:", p.src);
+        log("→", p.title, "| символов:", p.symbols_num, "| src:", p.src);
       }
-      console.groupEnd();
+      groupEnd();
 
       let list = all.filter(p => titleMatchesPrefix(p.title));
 
-      console.groupCollapsed(`[scrapePosts] После фильтрации title_prefix='${title_prefix}' → ${list.length} постов`);
+      groupCollapsed(`[scrapePosts] После фильтрации title_prefix='${title_prefix}' → ${list.length} постов`);
       for (const p of list) {
-        console.log("✓", p.title, "| символов:", p.symbols_num, "| src:", p.src);
+        log("✓", p.title, "| символов:", p.symbols_num, "| src:", p.src);
       }
-      console.groupEnd();
+      groupEnd();
 
       if (comments_only && excludeFirstPosts.size) {
         const before = list.length;
         list = list.filter(p => !excludeFirstPosts.has(p.src));
-        console.log(`[scrapePosts] comments_only: исключено ${before - list.length} первых постов тем`);
+        log(`[scrapePosts] comments_only: исключено ${before - list.length} первых постов тем`);
       }
 
       return list;
@@ -961,7 +971,7 @@
 
           // 2) только для прошедших проверяем last_src
           if (lastSrcKeys.size && lastSrcKeys.has(post.src)) {
-            console.log(`[scrapePosts] найден last_src (после фильтра по длине): ${post.src}, остановка`);
+            log(`[scrapePosts] найден last_src (после фильтра по длине): ${post.src}, остановка`);
             return finalize(acc);
           }
 
@@ -984,9 +994,9 @@
     // ------ финализация: reverse + вывод ------
     function finalize(arr) {
       const finalArr = arr.slice().reverse();
-      console.log(finalArr);
+      log(finalArr);
       try {
-        console.table(finalArr.map(r => ({
+        table(finalArr.map(r => ({
           title: r.title,
           src: r.src,
           symbols_num: r.symbols_num,
@@ -994,7 +1004,7 @@
           textPreview: r.text.slice(0, 120).replace(/\s+/g, " "),
           date: r.date_ts
         })));
-      } catch { console.log(finalArr); }
+      } catch { log(finalArr); }
       window.__scrapedPosts = finalArr;
       return finalArr;
     }

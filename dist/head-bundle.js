@@ -106,6 +106,7 @@ var SKIN = { // для работы с библиотекой скинов
   LibraryIconPostID: [135], // ID комментариев с иконками
   LibraryBackPostID: [136], // ID комментариев с фонами
   LibraryCouponPostID: [222], // ID комментариев с купонами
+  LogFieldID: 55, // ID темы, где хранятся логи скинов
   PlashkaFieldID: PROFILE_FIELDS.PlashkaID, // ID поля с плашками в профиле
   IconFieldID: PROFILE_FIELDS.IconID, // ID поля с иконками в профиле
   BackFieldID: PROFILE_FIELDS.BackgroundID, // ID поля с фонами в профиле 

@@ -348,25 +348,27 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
 
     // Отправляем НЕМЕДЛЕННО, минуя очередь
-    sendMessageImmediately(iframeReadyP, () => ({
-      type: BankPostMessagesType.comment_info,
-      NEW_COMMENT_TIMESTAMP: ts,
-      NEW_COMMENT_ID,
-      NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
-      NEW_IS_ADMIN_TO_EDIT
-    }), "comment_info");
-    sendMessageImmediately(iframeReadyP, () => ({
-      type: BankPostMessagesType.backup_data,
-      BACKUP_DATA
-    }), "backup_data");
+    if (BACKUP_DATA) {
+      sendMessageImmediately(iframeReadyP, () => ({
+        type: BankPostMessagesType.comment_info,
+        NEW_COMMENT_TIMESTAMP: ts,
+        NEW_COMMENT_ID,
+        NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
+        NEW_IS_ADMIN_TO_EDIT
+      }), "comment_info");
+      sendMessageImmediately(iframeReadyP, () => ({
+        type: BankPostMessagesType.backup_data,
+        BACKUP_DATA
+      }), "backup_data");
 
-    // Скроллим страницу к div.post.topicpost
-    const topicPost = document.querySelector("div.post.topicpost");
-    if (topicPost) {
-      topicPost.scrollIntoView({ behavior: "smooth", block: "start" });
-      console.log("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
-    } else {
-      console.warn("⚠️ [BACKUP] div.post.topicpost не найден");
+      // Скроллим страницу к div.post.topicpost
+      const topicPost = document.querySelector("div.post.topicpost");
+      if (topicPost) {
+        topicPost.scrollIntoView({ behavior: "smooth", block: "start" });
+        console.log("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
+      } else {
+        console.warn("⚠️ [BACKUP] div.post.topicpost не найден");
+      }
     }
   }
 

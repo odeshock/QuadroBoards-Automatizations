@@ -48,7 +48,7 @@
   })();
 
   // базовый вызов
-  async function callStorage(method, payload = {}, NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+  async function callStorage(method, payload = {}, NEEDED_USER_ID = 1, api_key_label) {
     const API_KEY = api_key_label + NEEDED_USER_ID;
 
     if (method === "storage.get") {
@@ -77,20 +77,25 @@
   }
 
   // публичные функции
-  async function storageGet(NEEDED_USER_ID = 1, { api_key_label = "fmv_bank_info_" }) {
+  async function storageGet(NEEDED_USER_ID = 1, api_key_label) {
     const API_KEY = api_key_label + NEEDED_USER_ID;
     const json = await callStorage("storage.get", {}, NEEDED_USER_ID, api_key_label);
     const parsed = parseStorage(json, API_KEY);
     return parsed;
   }
 
-  async function storageSet(valueObj, NEEDED_USER_ID = 1, { api_key_label = "fmv_bank_info_" }) {
+  async function storageSet(valueObj, NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+    console.log('[FMVbank] 🔵 storageSet вызван: NEEDED_USER_ID=', NEEDED_USER_ID, 'api_key_label=', api_key_label);
+    console.log('[FMVbank] 🔵 Итоговый API_KEY будет:', api_key_label + NEEDED_USER_ID);
+
     if (!valueObj || typeof valueObj !== "object" || Array.isArray(valueObj)) {
       console.log("[FMVbank] storageSet: ожидался объект JSON");
       return false;
     }
     const stringValue = JSON.stringify(valueObj);
+    console.log('[FMVbank] 🔵 Отправляю в storage.set, длина данных:', stringValue.length);
     await callStorage("storage.set", { value: stringValue }, NEEDED_USER_ID, api_key_label);
+    console.log('[FMVbank] 🔵 storage.set завершён успешно');
     return true;
   }
 

@@ -1856,14 +1856,12 @@ async function collectSkinSets() {
         const setDetails = api?.setDetails || (() => { });
 
         // Находим контейнер с кнопкой
-        const button = document.querySelector('.fmv-forum-button');
-        if (!button) {
+        const container = document.querySelector('div.post.topicpost');
+        if (!container) {
           setStatus('Ошибка');
-          setDetails('Не найден контейнер кнопки');
+          setDetails('Не найден контейнер div.post.topicpost');
           return;
         }
-
-        const container = button.closest('.container, div[class*="container"]') || document;
 
         // Извлекаем userId из профиля
         const userId = getUserIdFromProfile(container);

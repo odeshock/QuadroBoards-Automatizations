@@ -3619,7 +3619,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return parsed;
   }
 
-  async function storageSet(valueObj, NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
+  async function storageSet(valueObj, NEEDED_USER_ID = 1, { api_key_label = "fmv_bank_info_" }) {
     if (!valueObj || typeof valueObj !== "object" || Array.isArray(valueObj)) {
       console.log("[FMVbank] storageSet: ожидался объект JSON");
       return false;

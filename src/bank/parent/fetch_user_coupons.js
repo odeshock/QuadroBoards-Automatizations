@@ -119,6 +119,7 @@ async function fetchUserCoupons() {
   let response;
   try {
     response = await window.FMVbank.storageGet(userId, 'coupon_');
+    console.log(response.data);
     console.log('[fetchUserCoupons] API ответ:', response);
   } catch (error) {
     console.error('[fetchUserCoupons] Ошибка загрузки из API:', error);

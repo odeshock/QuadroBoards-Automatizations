@@ -35,7 +35,7 @@ async function retry(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeou
 
 /* =============== конфиг пауз (чтобы не казаться ботом) =============== */
 // пауза между СКРЕЙПАМИ (запросами к сайту)
-const SCRAPE_BASE_GAP_MS = 1000;
+const SCRAPE_BASE_GAP_MS = 500;
 const SCRAPE_JITTER_MS = 800;
 // пауза между ОТПРАВКАМИ в iframe
 const SEND_BASE_GAP_MS = 900;

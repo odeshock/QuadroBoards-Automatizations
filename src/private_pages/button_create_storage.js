@@ -68,6 +68,7 @@
     const html = await response.text();
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
+    console.log('doc', doc)
 
     // 2. Находим textarea и CSRF токен
     const textarea = doc.querySelector('textarea#main-reply[name="req_message"]');
@@ -81,6 +82,8 @@
 
     // 3. Формируем содержимое комментария
     const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
+
+    console.log('profileUrl', profileUrl);
 
     // 4. Отправляем форму
     const formData = new FormData();

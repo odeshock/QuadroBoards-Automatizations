@@ -341,7 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    const current_storage = await FMVbank.storageGet(user_id);
+    const current_storage = await FMVbank.storageGet(user_id, 'fmv_bank_info_');
     console.log(`🟦 [BACKUP] current_storage:`, current_storage);
 
     const BACKUP_DATA = current_storage[ts];
@@ -431,9 +431,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const encode = encodeJSON(e.data);
     const newText = formatBankText(e.data);
     const ts = e.data.timestamp;
-    const current_storage = await FMVbank.storageGet(window.UserID);
+    const current_storage = await FMVbank.storageGet(window.UserID, 'fmv_bank_info_');
     current_storage[ts] = e.data;
-    const storage_set_flag = FMVbank.storageSet(current_storage, window.UserID);
+    const storage_set_flag = FMVbank.storageSet(current_storage, window.UserID, 'fmv_bank_info_');
     if (!storage_set_flag) { alert("Попробуйте нажать на кнопку еще раз."); } else {
       if (textArea) {
         textArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
@@ -505,10 +505,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Сохраняем данные в storage ПОСЛЕ проверки
-        const current_storage = await FMVbank.storageGet(comment_user_id);
+        const current_storage = await FMVbank.storageGet(comment_user_id, 'fmv_bank_info_');
         current_storage[ts] = e.data;
         delete current_storage[comment_ts];
-        const storage_set_flag = FMVbank.storageSet(current_storage, comment_user_id);
+        const storage_set_flag = FMVbank.storageSet(current_storage, comment_user_id, 'fmv_bank_info_');
 
         if (!storage_set_flag) {
           editIframe.remove();

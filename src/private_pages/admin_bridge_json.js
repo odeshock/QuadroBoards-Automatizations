@@ -117,6 +117,10 @@
    * @returns {Promise<boolean>}
    */
   async function saveAllDataToAPI(userId, visibleData, invisibleData) {
+    console.log('[admin_bridge_json] 🔥 СОХРАНЕНИЕ ДЛЯ userId:', userId);
+    console.log('[admin_bridge_json] 🔥 visibleData:', JSON.parse(JSON.stringify(visibleData)));
+    console.log('[admin_bridge_json] 🔥 invisibleData:', JSON.parse(JSON.stringify(invisibleData)));
+
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageSet не найден');
       return false;
@@ -124,6 +128,10 @@
 
     try {
       for (const [key, label] of Object.entries(apiLabels)) {
+        console.log('[admin_bridge_json] 📦 Обрабатываю категорию:', key, 'label:', label);
+        console.log('[admin_bridge_json]   visibleData[' + key + ']:', JSON.parse(JSON.stringify(visibleData[key] || [])));
+        console.log('[admin_bridge_json]   invisibleData[' + key + ']:', JSON.parse(JSON.stringify(invisibleData[key] || [])));
+
         // Видимые элементы из панели (помечаем is_visible: true)
         const visible = (visibleData[key] || []).map(item => ({ ...item, is_visible: true }));
 
@@ -133,10 +141,12 @@
         // Объединяем: сначала видимые, потом невидимые
         const mergedData = [...visible, ...invisible];
 
+        console.log('[admin_bridge_json]   mergedData длина:', mergedData.length);
+
         // ВАЖНО: Сохраняем только если есть данные для этой категории
         // Иначе пустой массив перезапишет существующие данные в других категориях
         if (mergedData.length === 0) {
-          console.log(`[admin_bridge_json] Пропускаю сохранение ${key} — нет данных`);
+          console.log('[admin_bridge_json]   ⏭️  Пропускаю сохранение ' + key + ' — нет данных');
           continue;
         }
 
@@ -145,12 +155,15 @@
           data: mergedData
         };
 
+        console.log('[admin_bridge_json]   💾 Сохраняю в API: userId=' + userId + ', label=' + label);
+        console.log('[admin_bridge_json]   💾 Данные:', JSON.parse(JSON.stringify(saveData)));
+
         const result = await window.FMVbank.storageSet(saveData, userId, label);
         if (!result) {
-          console.error(`[admin_bridge_json] Не удалось сохранить ${key}`);
+          console.error('[admin_bridge_json] ❌ Не удалось сохранить ' + key);
           return false;
         }
-        console.log(`[admin_bridge_json] Сохранено ${key}: ${mergedData.length} элементов`);
+        console.log('[admin_bridge_json]   ✅ Сохранено ' + key + ': ' + mergedData.length + ' элементов');
       }
       return true;
     } catch (err) {

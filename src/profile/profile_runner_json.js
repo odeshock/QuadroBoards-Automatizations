@@ -139,8 +139,8 @@
           if (ok) {
             statusEl.textContent = '✓ Успешно сохранено';
             statusEl.style.color = '#16a34a';
-            // перезагрузка через 1 секунду
-            setTimeout(() => location.reload(), 1000);
+            // перезагрузка отключена для отладки
+            // setTimeout(() => location.reload(), 1000);
           } else {
             statusEl.textContent = 'Ошибка сохранения';
             statusEl.style.color = '#c24141';

@@ -53,13 +53,15 @@ cat src/form/*.js >> dist/body-bundle.js
 echo "" >> dist/body-bundle.js
 echo "/* Profile */" >> dist/body-bundle.js
 # Загружаем JSON-панели в правильном порядке
+cat src/profile/fetch_libraries.js >> dist/body-bundle.js
 cat src/profile/create_choice_panel_json.js >> dist/body-bundle.js
 cat src/profile/skin_set_up_json.js >> dist/body-bundle.js
 cat src/profile/profile_runner_json.js >> dist/body-bundle.js
 # Остальные файлы из profile (кроме уже загруженных и старых версий)
 for file in src/profile/*.js; do
   filename=$(basename "$file")
-  if [ "$filename" != "create_choice_panel_json.js" ] && \
+  if [ "$filename" != "fetch_libraries.js" ] && \
+     [ "$filename" != "create_choice_panel_json.js" ] && \
      [ "$filename" != "skin_set_up_json.js" ] && \
      [ "$filename" != "profile_runner_json.js" ] && \
      [ "$filename" != "create_choice_panel.js" ] && \

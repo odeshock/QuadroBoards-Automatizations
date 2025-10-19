@@ -5,7 +5,7 @@
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const CHRONO_TARGET_SEL = '.chrono_info';
   const DEBUG = true;
-  const API_KEY_LABEL = 'chrono_';
+  const API_KEY_LABEL = 'info_'; // Теперь используем единый ключ info_
 
   // ====================
 
@@ -18,13 +18,21 @@
     }
   }
 
-  // Получение данных хронологии из API
+  // Получение данных хронологии из API (из единого объекта info_)
   async function fetchChronoFromApi(userId) {
     requireFMVbank();
     try {
-      const data = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
-      log('Получены данные для userId', userId, ':', data);
-      return data;
+      const fullData = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
+      log('Получены данные для userId', userId, ':', fullData);
+
+      // Извлекаем только chrono из полного объекта
+      if (fullData && typeof fullData === 'object' && fullData.chrono) {
+        log('Извлечены данные chrono:', fullData.chrono);
+        return fullData.chrono;
+      }
+
+      log('Данные chrono не найдены в API');
+      return null;
     } catch (e) {
       console.error(`[collect_api] Ошибка получения данных для userId ${userId}:`, e);
       return null;

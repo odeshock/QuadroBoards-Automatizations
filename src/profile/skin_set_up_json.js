@@ -29,30 +29,19 @@
     const startOpen   = opts.startOpen   ?? false;
     const initialData = opts.initialData || {};
 
-    // --- тянем библиотеки через fetchCardsWrappedClean
-    const SKIN = window.SKIN;
-
-    // если SKIN не объявлен — выходим и логируем предупреждение
-    if (!SKIN) {
-      console.warn('[setupSkinsJSON] window.SKIN не найден — прекращаю выполнение.');
+    // Проверка наличия fetchAllLibraries
+    if (typeof window.fetchAllLibraries !== 'function') {
+      console.error('[setupSkinsJSON] window.fetchAllLibraries не найдена. Подключите fetch_libraries.js');
       return;
     }
 
-    // --- тянем библиотеки через fetchCardsWrappedClean
-    let [libPlashka0, libIcon0, libBack0, libGift0, libCoupon0] = await Promise.all([
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID, { isCoupon: true }),
-    ]);
-
-    // подстраховка от null/undefined
-    libPlashka0 = Array.isArray(libPlashka0) ? libPlashka0 : [];
-    libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
-    libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
-    libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
-    libCoupon0  = Array.isArray(libCoupon0)  ? libCoupon0  : [];
+    // Загружаем все библиотеки
+    const libraries = await window.fetchAllLibraries();
+    const libPlashka0 = libraries.plashka;
+    const libIcon0 = libraries.icon;
+    const libBack0 = libraries.back;
+    const libGift0 = libraries.gift;
+    const libCoupon0 = libraries.coupon;
 
     // --- контейнер под панели
     let grid = container.querySelector('.skins-setup-grid');

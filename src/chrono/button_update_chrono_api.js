@@ -1,5 +1,6 @@
 // button_update_chrono_api.js
-// Сохраняет хронологию пользователей через FMVbank.storageSet с api_key_label = 'chrono_'
+// Сохраняет хронологию пользователей в единый объект info_<userId>
+// ВАЖНО: Делает GET сначала, затем обновляет только chrono и last_timestamp
 // Использует collectChronoByUser для сбора данных по всем пользователям.
 
 // === КНОПКА: массовое сохранение хронологии в API ===
@@ -35,32 +36,51 @@
 
   /** ============================
    *  Точечное сохранение данных одного пользователя через API
+   *  ВАЖНО: Сначала GET, затем частичное обновление chrono + last_timestamp
    *  ============================ */
   /**
   * @param {string|number} userId
-  * @param {Object} data - данные хронологии для этого пользователя
+  * @param {Object} chronoData - данные хронологии для этого пользователя
   * @returns {Promise<{id:string,status:string}>}
   */
-  async function saveChronoToApi(userId, data) {
+  async function saveChronoToApi(userId, chronoData) {
+    const FMVbankStorageGet = requireFn("FMVbank.storageGet");
     const FMVbankStorageSet = requireFn("FMVbank.storageSet");
 
     const id = String(userId);
 
     // Проверяем данные
-    if (!data || typeof data !== 'object') {
+    if (!chronoData || typeof chronoData !== 'object') {
       return { id, status: "нет данных для сохранения" };
     }
 
-    // Сохраняем через FMVbank.storageSet с api_key_label = 'chrono_'
-    let res;
     try {
-      res = await FMVbankStorageSet(data, Number(id), 'chrono_');
+      // ШАГ 1: Сначала получаем текущие данные из API (единый объект info_)
+      const currentData = await FMVbankStorageGet(Number(id), 'info_');
+
+      // Если данных нет, создаём пустой объект
+      const baseData = currentData && typeof currentData === 'object' ? currentData : {};
+
+      // ШАГ 2: Обновляем только chrono и last_timestamp
+      baseData.chrono = chronoData;
+      baseData.last_timestamp = Math.floor(Date.now() / 1000);
+
+      // Убеждаемся, что остальные поля существуют (на случай, если это первое сохранение)
+      if (!baseData.gift) baseData.gift = [];
+      if (!baseData.coupon) baseData.coupon = [];
+      if (!baseData.icon) baseData.icon = [];
+      if (!baseData.plashka) baseData.plashka = [];
+      if (!baseData.background) baseData.background = [];
+      if (baseData.comment_id === undefined) baseData.comment_id = null;
+
+      // ШАГ 3: Сохраняем весь объект обратно
+      const res = await FMVbankStorageSet(baseData, Number(id), 'info_');
+
+      const saved = normalizeSaveStatus(res);
+      return { id, status: saved };
     } catch (e) {
       return { id, status: `ошибка сохранения: ${e?.message || e}` };
     }
-
-    const saved = normalizeSaveStatus(res);
-    return { id, status: saved };
   };
 
   /** ============================

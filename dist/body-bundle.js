@@ -752,22 +752,11 @@ $(function() {
   }
 
   /**
-   * Маппинг категорий → API labels
-   */
-  const apiLabels = {
-    icon: 'icon_',
-    plashka: 'plashka_',
-    background: 'background_',
-    gift: 'gift_',
-    coupon: 'coupon_'
-  };
-
-  /**
-   * Загружает данные из API для всех категорий
+   * Загружает данные из API (единый объект info_<userId>)
    * Помечает каждый элемент is_visible в зависимости от наличия в библиотеке
    * @param {number} userId
    * @param {object} libraryIds - { icon: Set, plashka: Set, ... }
-   * @returns {Promise<object>} { visible: { icon: [], ... }, invisible: { icon: [], ... } }
+   * @returns {Promise<object>} { visible: { icon: [], ... }, invisible: { icon: [], ... }, chrono: {}, comment_id: null }
    */
   async function loadAllDataFromAPI(userId, libraryIds) {
     const visible = {
@@ -786,63 +775,89 @@ $(function() {
       coupon: []
     };
 
+    let chrono = {};
+    let comment_id = null;
+
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageGet не найден');
-      return { visible, invisible };
+      return { visible, invisible, chrono, comment_id };
     }
 
-    for (const [key, label] of Object.entries(apiLabels)) {
-      try {
-        const response = await window.FMVbank.storageGet(userId, label);
+    try {
+      // Загружаем единый объект info_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'info_');
 
-        // Формат: { last_update_ts, data: [...] }
-        if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          const libIds = libraryIds[key] || new Set();
-
-          response.data.forEach(item => {
-            const isInLibrary = libIds.has(String(item.id));
-            const markedItem = { ...item, is_visible: isInLibrary };
-
-            if (isInLibrary) {
-              visible[key].push(markedItem);
-            } else {
-              invisible[key].push(markedItem);
-            }
-          });
-        }
-      } catch (err) {
-        console.error(`[admin_bridge_json] Ошибка загрузки ${key}:`, err);
+      if (!response || typeof response !== 'object') {
+        console.warn('[admin_bridge_json] Нет данных в API для userId=' + userId);
+        return { visible, invisible, chrono, comment_id };
       }
+
+      // Извлекаем chrono и comment_id
+      chrono = response.chrono || {};
+      comment_id = response.comment_id || null;
+
+      // Обрабатываем категории скинов
+      const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+
+      for (const key of categories) {
+        const items = response[key] || [];
+        if (!Array.isArray(items)) continue;
+
+        const libIds = libraryIds[key] || new Set();
+
+        items.forEach(item => {
+          const isInLibrary = libIds.has(String(item.id));
+          const markedItem = { ...item, is_visible: isInLibrary };
+
+          if (isInLibrary) {
+            visible[key].push(markedItem);
+          } else {
+            invisible[key].push(markedItem);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('[admin_bridge_json] Ошибка загрузки данных:', err);
     }
 
-    return { visible, invisible };
+    return { visible, invisible, chrono, comment_id };
   }
 
   /**
-   * Сохраняет данные в API для всех категорий
-   * Объединяет данные из панели + невидимые элементы
+   * Сохраняет данные в API (единый объект info_<userId>)
+   * ВАЖНО: Сначала делает GET, затем частично обновляет данные и сохраняет обратно
    *
    * @param {number} userId
    * @param {object} visibleData - { icon: [], plashka: [], ... } данные из панели
    * @param {object} invisibleData - { icon: [], plashka: [], ... } невидимые элементы
+   * @param {object} existingChrono - существующие данные chrono (не изменяем)
+   * @param {number|null} existingCommentId - существующий comment_id (не изменяем)
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, visibleData, invisibleData) {
+  async function saveAllDataToAPI(userId, visibleData, invisibleData, existingChrono, existingCommentId) {
     console.log('[admin_bridge_json] 🔥 СОХРАНЕНИЕ ДЛЯ userId:', userId);
     console.log('[admin_bridge_json] 🔥 visibleData:', JSON.parse(JSON.stringify(visibleData)));
     console.log('[admin_bridge_json] 🔥 invisibleData:', JSON.parse(JSON.stringify(invisibleData)));
 
-    if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
-      console.error('[admin_bridge_json] FMVbank.storageSet не найден');
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function' || typeof window.FMVbank.storageSet !== 'function') {
+      console.error('[admin_bridge_json] FMVbank.storageGet или storageSet не найдены');
       return false;
     }
 
     try {
-      for (const [key, label] of Object.entries(apiLabels)) {
-        console.log('[admin_bridge_json] 📦 Обрабатываю категорию:', key, 'label:', label);
-        console.log('[admin_bridge_json]   visibleData[' + key + ']:', JSON.parse(JSON.stringify(visibleData[key] || [])));
-        console.log('[admin_bridge_json]   invisibleData[' + key + ']:', JSON.parse(JSON.stringify(invisibleData[key] || [])));
+      // ШАГ 1: Сначала получаем текущие данные из API
+      console.log('[admin_bridge_json] 📥 Загружаю текущие данные из API...');
+      const currentData = await window.FMVbank.storageGet(userId, 'info_');
 
+      // Если данных нет, создаём пустой объект
+      const baseData = currentData && typeof currentData === 'object' ? currentData : {};
+
+      console.log('[admin_bridge_json] 📥 Текущие данные из API:', JSON.parse(JSON.stringify(baseData)));
+
+      // ШАГ 2: Обновляем только категории скинов
+      const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+
+      for (const key of categories) {
         // Видимые элементы из панели (помечаем is_visible: true)
         const visible = (visibleData[key] || []).map(item => ({ ...item, is_visible: true }));
 
@@ -852,30 +867,29 @@ $(function() {
         // Объединяем: сначала видимые, потом невидимые
         const mergedData = [...visible, ...invisible];
 
-        console.log('[admin_bridge_json]   mergedData длина:', mergedData.length);
+        console.log('[admin_bridge_json] 📦 ' + key + ': ' + mergedData.length + ' элементов');
 
-        // ВАЖНО: Сохраняем только если есть данные для этой категории
-        // Иначе пустой массив перезапишет существующие данные в других категориях
-        if (mergedData.length === 0) {
-          console.log('[admin_bridge_json]   ⏭️  Пропускаю сохранение ' + key + ' — нет данных');
-          continue;
-        }
-
-        const saveData = {
-          last_update_ts: Math.floor(Date.now() / 1000),
-          data: mergedData
-        };
-
-        console.log('[admin_bridge_json]   💾 Сохраняю в API: userId=' + userId + ', label=' + label);
-        console.log('[admin_bridge_json]   💾 Данные:', JSON.parse(JSON.stringify(saveData)));
-
-        const result = await window.FMVbank.storageSet(saveData, userId, label);
-        if (!result) {
-          console.error('[admin_bridge_json] ❌ Не удалось сохранить ' + key);
-          return false;
-        }
-        console.log('[admin_bridge_json]   ✅ Сохранено ' + key + ': ' + mergedData.length + ' элементов');
+        // Сохраняем в базовый объект (даже если пустой массив)
+        baseData[key] = mergedData;
       }
+
+      // ШАГ 3: Сохраняем chrono и comment_id (не изменяем, берём из существующих)
+      baseData.chrono = existingChrono || baseData.chrono || {};
+      baseData.comment_id = existingCommentId !== undefined ? existingCommentId : (baseData.comment_id || null);
+
+      // ШАГ 4: Обновляем last_timestamp
+      baseData.last_timestamp = Math.floor(Date.now() / 1000);
+
+      console.log('[admin_bridge_json] 💾 Финальный объект для сохранения:', JSON.parse(JSON.stringify(baseData)));
+
+      // ШАГ 5: Сохраняем весь объект
+      const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
+      if (!result) {
+        console.error('[admin_bridge_json] ❌ Не удалось сохранить данные');
+        return false;
+      }
+
+      console.log('[admin_bridge_json] ✅ Данные успешно сохранены');
       return true;
     } catch (err) {
       console.error('[admin_bridge_json] Ошибка сохранения:', err);
@@ -887,7 +901,7 @@ $(function() {
    * Главная функция load
    * @param {string} profileId - id из URL (/profile.php?id=N)
    * @param {object} libraryIds - { icon: Set, plashka: Set, ... }
-   * @returns {Promise<object>} { status, visibleData, invisibleData, save, targetUserId }
+   * @returns {Promise<object>} { status, visibleData, invisibleData, chrono, comment_id, save, targetUserId }
    */
   async function load(profileId, libraryIds) {
     // Загружаем страницу /pages/usrN и извлекаем правильный userId
@@ -898,13 +912,15 @@ $(function() {
         status: 'error',
         visibleData: {},
         invisibleData: {},
+        chrono: {},
+        comment_id: null,
         save: null,
         targetUserId: null
       };
     }
 
     // Загружаем данные из API и помечаем is_visible
-    const { visible, invisible } = await loadAllDataFromAPI(targetUserId, libraryIds);
+    const { visible, invisible, chrono, comment_id } = await loadAllDataFromAPI(targetUserId, libraryIds);
 
     /**
      * Функция сохранения
@@ -912,7 +928,7 @@ $(function() {
      * @returns {Promise<object>} { ok, status }
      */
     async function save(newVisibleData) {
-      const success = await saveAllDataToAPI(targetUserId, newVisibleData, invisible);
+      const success = await saveAllDataToAPI(targetUserId, newVisibleData, invisible, chrono, comment_id);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'
@@ -923,6 +939,8 @@ $(function() {
       status: 'ok',
       visibleData: visible,
       invisibleData: invisible,
+      chrono: chrono,
+      comment_id: comment_id,
       save,
       targetUserId
     };
@@ -1330,7 +1348,7 @@ async function collectSkinSets() {
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const CHRONO_TARGET_SEL = '.chrono_info';
   const DEBUG = true;
-  const API_KEY_LABEL = 'chrono_';
+  const API_KEY_LABEL = 'info_'; // Теперь используем единый ключ info_
 
   // ====================
 
@@ -1343,13 +1361,21 @@ async function collectSkinSets() {
     }
   }
 
-  // Получение данных хронологии из API
+  // Получение данных хронологии из API (из единого объекта info_)
   async function fetchChronoFromApi(userId) {
     requireFMVbank();
     try {
-      const data = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
-      log('Получены данные для userId', userId, ':', data);
-      return data;
+      const fullData = await window.FMVbank.storageGet(Number(userId), API_KEY_LABEL);
+      log('Получены данные для userId', userId, ':', fullData);
+
+      // Извлекаем только chrono из полного объекта
+      if (fullData && typeof fullData === 'object' && fullData.chrono) {
+        log('Извлечены данные chrono:', fullData.chrono);
+        return fullData.chrono;
+      }
+
+      log('Данные chrono не найдены в API');
+      return null;
     } catch (e) {
       console.error(`[collect_api] Ошибка получения данных для userId ${userId}:`, e);
       return null;
@@ -2697,6 +2723,66 @@ async function FMVeditTextareaOnly(name, newHtml) {
 })();
 
 /* Profile */
+// fetch_libraries.js — Загрузка библиотек (плашки, иконки, фон, подарки, купоны)
+
+/**
+ * Загружает все библиотеки из window.SKIN
+ * @returns {Promise<Object>} { plashka: [], icon: [], back: [], gift: [], coupon: [] }
+ */
+async function fetchAllLibraries() {
+  const SKIN = window.SKIN;
+
+  // Проверка наличия SKIN
+  if (!SKIN) {
+    console.warn('[fetchAllLibraries] window.SKIN не найден');
+    return {
+      plashka: [],
+      icon: [],
+      back: [],
+      gift: [],
+      coupon: []
+    };
+  }
+
+  // Проверка наличия fetchCardsWrappedClean
+  if (typeof fetchCardsWrappedClean !== 'function') {
+    console.error('[fetchAllLibraries] fetchCardsWrappedClean не найдена');
+    return {
+      plashka: [],
+      icon: [],
+      back: [],
+      gift: [],
+      coupon: []
+    };
+  }
+
+  // Загружаем все библиотеки параллельно
+  let [libPlashka, libIcon, libBack, libGift, libCoupon] = await Promise.all([
+    fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
+    fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
+    fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
+    fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
+    fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID, { isCoupon: true })
+  ]);
+
+  // Подстраховка от null/undefined
+  libPlashka = Array.isArray(libPlashka) ? libPlashka : [];
+  libIcon    = Array.isArray(libIcon)    ? libIcon    : [];
+  libBack    = Array.isArray(libBack)    ? libBack    : [];
+  libGift    = Array.isArray(libGift)    ? libGift    : [];
+  libCoupon  = Array.isArray(libCoupon)  ? libCoupon  : [];
+
+  return {
+    plashka: libPlashka,
+    icon: libIcon,
+    back: libBack,
+    gift: libGift,
+    coupon: libCoupon
+  };
+}
+
+// Экспортируем в window
+window.fetchAllLibraries = fetchAllLibraries;
 // Admin: универсальные панели выбора (JSON-режим для API)
 // createChoicePanelJSON({ title, targetClass, library, ...opts })
 // Возвращает { getData(), init(jsonArray) }
@@ -3125,30 +3211,19 @@ async function FMVeditTextareaOnly(name, newHtml) {
     const startOpen   = opts.startOpen   ?? false;
     const initialData = opts.initialData || {};
 
-    // --- тянем библиотеки через fetchCardsWrappedClean
-    const SKIN = window.SKIN;
-
-    // если SKIN не объявлен — выходим и логируем предупреждение
-    if (!SKIN) {
-      console.warn('[setupSkinsJSON] window.SKIN не найден — прекращаю выполнение.');
+    // Проверка наличия fetchAllLibraries
+    if (typeof window.fetchAllLibraries !== 'function') {
+      console.error('[setupSkinsJSON] window.fetchAllLibraries не найдена. Подключите fetch_libraries.js');
       return;
     }
 
-    // --- тянем библиотеки через fetchCardsWrappedClean
-    let [libPlashka0, libIcon0, libBack0, libGift0, libCoupon0] = await Promise.all([
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryPlashkaPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryIconPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryBackPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryGiftPostID),
-      fetchCardsWrappedClean(SKIN.LibraryFieldID, SKIN.LibraryCouponPostID, { isCoupon: true }),
-    ]);
-
-    // подстраховка от null/undefined
-    libPlashka0 = Array.isArray(libPlashka0) ? libPlashka0 : [];
-    libIcon0    = Array.isArray(libIcon0)    ? libIcon0    : [];
-    libBack0    = Array.isArray(libBack0)    ? libBack0    : [];
-    libGift0    = Array.isArray(libGift0)    ? libGift0    : [];
-    libCoupon0  = Array.isArray(libCoupon0)  ? libCoupon0  : [];
+    // Загружаем все библиотеки
+    const libraries = await window.fetchAllLibraries();
+    const libPlashka0 = libraries.plashka;
+    const libIcon0 = libraries.icon;
+    const libBack0 = libraries.back;
+    const libGift0 = libraries.gift;
+    const libCoupon0 = libraries.coupon;
 
     // --- контейнер под панели
     let grid = container.querySelector('.skins-setup-grid');
@@ -6133,7 +6208,8 @@ async function collectChronoByUser(opts = {}) {
   });
 })();
 // button_update_chrono_api.js
-// Сохраняет хронологию пользователей через FMVbank.storageSet с api_key_label = 'chrono_'
+// Сохраняет хронологию пользователей в единый объект info_<userId>
+// ВАЖНО: Делает GET сначала, затем обновляет только chrono и last_timestamp
 // Использует collectChronoByUser для сбора данных по всем пользователям.
 
 // === КНОПКА: массовое сохранение хронологии в API ===
@@ -6169,32 +6245,51 @@ async function collectChronoByUser(opts = {}) {
 
   /** ============================
    *  Точечное сохранение данных одного пользователя через API
+   *  ВАЖНО: Сначала GET, затем частичное обновление chrono + last_timestamp
    *  ============================ */
   /**
   * @param {string|number} userId
-  * @param {Object} data - данные хронологии для этого пользователя
+  * @param {Object} chronoData - данные хронологии для этого пользователя
   * @returns {Promise<{id:string,status:string}>}
   */
-  async function saveChronoToApi(userId, data) {
+  async function saveChronoToApi(userId, chronoData) {
+    const FMVbankStorageGet = requireFn("FMVbank.storageGet");
     const FMVbankStorageSet = requireFn("FMVbank.storageSet");
 
     const id = String(userId);
 
     // Проверяем данные
-    if (!data || typeof data !== 'object') {
+    if (!chronoData || typeof chronoData !== 'object') {
       return { id, status: "нет данных для сохранения" };
     }
 
-    // Сохраняем через FMVbank.storageSet с api_key_label = 'chrono_'
-    let res;
     try {
-      res = await FMVbankStorageSet(data, Number(id), 'chrono_');
+      // ШАГ 1: Сначала получаем текущие данные из API (единый объект info_)
+      const currentData = await FMVbankStorageGet(Number(id), 'info_');
+
+      // Если данных нет, создаём пустой объект
+      const baseData = currentData && typeof currentData === 'object' ? currentData : {};
+
+      // ШАГ 2: Обновляем только chrono и last_timestamp
+      baseData.chrono = chronoData;
+      baseData.last_timestamp = Math.floor(Date.now() / 1000);
+
+      // Убеждаемся, что остальные поля существуют (на случай, если это первое сохранение)
+      if (!baseData.gift) baseData.gift = [];
+      if (!baseData.coupon) baseData.coupon = [];
+      if (!baseData.icon) baseData.icon = [];
+      if (!baseData.plashka) baseData.plashka = [];
+      if (!baseData.background) baseData.background = [];
+      if (baseData.comment_id === undefined) baseData.comment_id = null;
+
+      // ШАГ 3: Сохраняем весь объект обратно
+      const res = await FMVbankStorageSet(baseData, Number(id), 'info_');
+
+      const saved = normalizeSaveStatus(res);
+      return { id, status: saved };
     } catch (e) {
       return { id, status: `ошибка сохранения: ${e?.message || e}` };
     }
-
-    const saved = normalizeSaveStatus(res);
-    return { id, status: saved };
   };
 
   /** ============================

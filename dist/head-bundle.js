@@ -99,6 +99,7 @@ var BANK_CHECK = { // для проверки банковских операц�
 
 var SKIN = { // для работы с библиотекой скинов
   GroupID: [GROUP_IDS.Admin], // кому из групп разрешено назначать в хранилище скины
+  LibraryForumID: FORUMS_IDS.AmsForumID, //  // в каком форуме расположены админские темы
   LibraryFieldID: 41, // ID темы с библиотекой
   LibraryGiftPostID: [133], // ID комментариев с подарками
   LibraryPlashkaPostID: [134], // ID комментариев с плашками
@@ -4530,26 +4531,34 @@ async function fetchUserCoupons() {
 
   const today = getTodayMoscow();
 
-  // Загружаем купоны из API
+  // Загружаем данные из API (единый объект info_)
   let response;
   try {
-    response = await window.FMVbank.storageGet(userId, 'coupon_');
-    console.log(response.data);
+    response = await window.FMVbank.storageGet(userId, 'info_');
     console.log('[fetchUserCoupons] API ответ:', response);
   } catch (error) {
     console.error('[fetchUserCoupons] Ошибка загрузки из API:', error);
     return [];
   }
 
-  // Новый формат: { last_update_ts, data: [...] }
-  if (!response || typeof response !== 'object' || !Array.isArray(response.data)) {
+  // Новый формат: { chrono: {}, gift: [], coupon: [], icon: [], plashka: [], background: [], comment_id: null, last_timestamp: ... }
+  if (!response || typeof response !== 'object') {
     console.warn('[fetchUserCoupons] Неверный формат ответа API');
     return [];
   }
 
+  // Извлекаем купоны из объекта
+  const couponData = response.coupon || [];
+  if (!Array.isArray(couponData)) {
+    console.warn('[fetchUserCoupons] response.coupon не является массивом');
+    return [];
+  }
+
+  console.log('[fetchUserCoupons] Купоны из API:', couponData);
+
   const coupons = [];
 
-  response.data.forEach(item => {
+  couponData.forEach(item => {
     // Пропускаем невидимые элементы
     if (item.is_visible === false) {
       console.log(`[fetchUserCoupons] Пропущен невидимый купон id=${item.id}`);

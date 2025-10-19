@@ -1,3 +1,10 @@
+/* =============== система логирования =============== */
+const DEBUG = true; // false чтобы отключить все log()
+
+const log = DEBUG ? console.log.bind(console) : () => {};
+const warn = DEBUG ? console.warn.bind(console) : () => {};
+const error = DEBUG ? console.error.bind(console) : () => {};
+
 /* =============== базовые утилиты: delay + timeout + retry с логами =============== */
 let preScrapeBarrier = Promise.resolve(true);
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
@@ -11,22 +18,22 @@ async function withTimeout(promise, ms, label = "request") {
 
 async function retry(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeoutMs = 15000 } = {}, label = "request") {
   let lastErr;
-  console.log(`🟦 [STEP] ${label} start`);
+  log(`🟦 [STEP] ${label} start`);
   for (let i = 0; i < retries; i++) {
     try {
       const res = await withTimeout(fn(), timeoutMs, label);
-      console.log(`✅ [OK]   ${label} success (try ${i + 1}/${retries})`);
+      log(`✅ [OK]   ${label} success (try ${i + 1}/${retries})`);
       return res;
     } catch (e) {
       lastErr = e;
       const isLast = i === retries - 1;
       if (isLast) {
-        console.warn(`❌ [ERROR] ${label} failed after ${retries} tries:`, e?.message || e);
+        warn(`❌ [ERROR] ${label} failed after ${retries} tries:`, e?.message || e);
         break;
       }
       const jitter = 0.8 + Math.random() * 0.4;  // 0.8—1.2
       const backoff = Math.min(baseDelay * 2 ** i, maxDelay) * jitter;
-      console.log(`⚠️  [RETRY] ${label} try ${i + 1} failed: ${e?.message || e}. Waiting ${Math.round(backoff)}ms before retry...`);
+      log(`⚠️  [RETRY] ${label} try ${i + 1} failed: ${e?.message || e}. Waiting ${Math.round(backoff)}ms before retry...`);
       await delay(backoff);
     }
   }
@@ -43,7 +50,7 @@ const SEND_JITTER_MS = 500;
 
 function humanPause(base, jitter, reason = "pause") {
   const gap = base + Math.floor(Math.random() * jitter);
-  console.log(`🟨 [WAIT] ${reason}: ${gap}ms`);
+  log(`🟨 [WAIT] ${reason}: ${gap}ms`);
   return delay(gap);
 }
 
@@ -116,11 +123,11 @@ function waitForIframeReady(origin) {
       window.removeEventListener("message", onMsg);
       const w = e.source;
       w.postMessage({ type: "IFRAME_ACK" }, origin);
-      console.log("✅ [IFRAME] ACK sent, iframe ready");
+      log("✅ [IFRAME] ACK sent, iframe ready");
       resolve(w);
     }
     window.addEventListener("message", onMsg);
-    console.log("🟦 [STEP] waiting for IFRAME_READY…");
+    log("🟦 [STEP] waiting for IFRAME_READY…");
   });
 }
 
@@ -131,20 +138,20 @@ let sending = false;
 async function processQueue() {
   if (sending) return;
   sending = true;
-  console.log(`🟦 [STEP] send queue started (items: ${sendQueue.length})`);
+  log(`🟦 [STEP] send queue started (items: ${sendQueue.length})`);
   try {
     while (sendQueue.length) {
       const task = sendQueue.shift();
       try {
         await task();
       } catch (e) {
-        console.warn("❌ [ERROR] send task failed:", e?.message || e);
+        warn("❌ [ERROR] send task failed:", e?.message || e);
       }
       await humanPause(SEND_BASE_GAP_MS, SEND_JITTER_MS, "gap between sends");
     }
   } finally {
     sending = false;
-    console.log("✅ [OK]   send queue drained");
+    log("✅ [OK]   send queue drained");
   }
 }
 
@@ -153,13 +160,13 @@ function queueJob(iframeReadyP, jobFactory /* (iframeWindow) => Promise<void> */
   iframeReadyP.then((iframeWindow) => {
     sendQueue.push(async () => {
       const startedAt = Date.now();
-      console.log("🟪 [QUEUE] job started");
+      log("🟪 [QUEUE] job started");
       await jobFactory(iframeWindow);
-      console.log(`🟩 [SENT]  job done in ${Date.now() - startedAt}ms`);
+      log(`🟩 [SENT]  job done in ${Date.now() - startedAt}ms`);
     });
-    console.log(`🟪 [QUEUE] job enqueued (size: ${sendQueue.length})`);
+    log(`🟪 [QUEUE] job enqueued (size: ${sendQueue.length})`);
     processQueue();
-  }).catch(err => console.warn("queueJob skipped:", err?.message || err));
+  }).catch(err => warn("queueJob skipped:", err?.message || err));
 }
 
 // добавляет задачу отправки простого сообщения
@@ -168,9 +175,9 @@ function queueMessage(iframeReadyP, buildMessage /* () => object */, label = "me
     const msg = buildMessage();
     if (msg) {
       iframeWindow.postMessage(msg, IFRAME_ORIGIN);
-      console.log(`🟩 [SENT]  ${label}:`, msg.type || "(no type)");
+      log(`🟩 [SENT]  ${label}:`, msg.type || "(no type)");
     } else {
-      console.log(`⚪ [SKIP]  ${label}: empty message`);
+      log(`⚪ [SKIP]  ${label}: empty message`);
     }
   });
 }
@@ -181,11 +188,11 @@ function sendMessageImmediately(iframeReadyP, buildMessage /* () => object */, l
     const msg = buildMessage();
     if (msg) {
       iframeWindow.postMessage(msg, IFRAME_ORIGIN);
-      console.log(`🟢 [IMMEDIATE] ${label}:`, msg.type || "(no type)");
+      log(`🟢 [IMMEDIATE] ${label}:`, msg.type || "(no type)");
     } else {
-      console.log(`⚪ [SKIP]  ${label}: empty message`);
+      log(`⚪ [SKIP]  ${label}: empty message`);
     }
-  }).catch(err => console.warn("sendMessageImmediately skipped:", err?.message || err));
+  }).catch(err => warn("sendMessageImmediately skipped:", err?.message || err));
 }
 
 /* =============== отправка пост-списков (внутри очереди) =============== */
@@ -216,7 +223,7 @@ async function sendPosts(iframeWindow, { seedPosts, label, forums, type, is_ads 
       .filter((link) => typeof link === "string" && link.includes("/viewtopic.php?"))
       .map((link) => link.split("/viewtopic.php?")[1]);
 
-    console.log(`🟦 [STEP] scrape new posts for ${type} (filter used_posts: ${used_posts.length})`);
+    log(`🟦 [STEP] scrape new posts for ${type} (filter used_posts: ${used_posts.length})`);
     const new_posts_raw = await retry(
       () => window.scrapePosts(window.UserLogin, forums, { last_src: used_posts, comments_only: true, title_prefix }),
       { retries: 4, baseDelay: 800, maxDelay: 8000, timeoutMs: 18000 },
@@ -232,9 +239,9 @@ async function sendPosts(iframeWindow, { seedPosts, label, forums, type, is_ads 
       : [];
 
     iframeWindow.postMessage({ type, posts: new_posts }, IFRAME_ORIGIN);
-    console.log(`🟩 [SENT]  ${type}: ${new_posts.length} item(s)`);
+    log(`🟩 [SENT]  ${type}: ${new_posts.length} item(s)`);
   } catch (e) {
-    console.warn(`❌ [ERROR] sendPosts(${type}) failed after retries:`, e?.message || e);
+    warn(`❌ [ERROR] sendPosts(${type}) failed after retries:`, e?.message || e);
   }
 }
 
@@ -276,10 +283,10 @@ async function getLastValue(default_value, { label, is_month = false }) {
       last_value = Number(rawLinks.trim());
     }
 
-    console.log(`🟩 [FOUND] Новое значение ${label}: ${last_value}`);
+    log(`🟩 [FOUND] Новое значение ${label}: ${last_value}`);
     return last_value;
   } catch (e) {
-    console.warn(`❌ [ERROR] getLastValue(${label}) failed after retries:`, e?.message || e);
+    warn(`❌ [ERROR] getLastValue(${label}) failed after retries:`, e?.message || e);
     return null;
   }
 }
@@ -293,9 +300,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
   preScrapeBarrier = (async () => {
-    // console.log("🟨 [WAIT] pre-scrape barrier: 5000ms");
+    // log("🟨 [WAIT] pre-scrape barrier: 5000ms");
     // await delay(5000);
-    // console.log("🟢 [GO]   pre-scrape barrier passed");
+    // log("🟢 [GO]   pre-scrape barrier passed");
     return true;
   })();
   window.preScrapeBarrier = preScrapeBarrier;
@@ -305,14 +312,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Функция для редактирования комментариев из backup
   async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_IS_ADMIN_TO_EDIT = false } = {}) {
-    console.log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
+    log(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
 
     // Проверка на bank_ams_done для всех (включая админов)
     const commentContent = document.querySelector(`#p${NEW_COMMENT_ID}-content`);
     if (commentContent) {
       const hasAmsDone = commentContent.querySelector('bank_ams_done');
       if (hasAmsDone) {
-        console.warn('⚠️ [BACKUP] Обнаружен bank_ams_done, редактирование запрещено');
+        warn('⚠️ [BACKUP] Обнаружен bank_ams_done, редактирование запрещено');
         alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
         return;
       }
@@ -322,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!NEW_IS_ADMIN_TO_EDIT) {
       // 1. Проверка на NEW_COMMENT_ID = 0
       if (NEW_COMMENT_ID === 0) {
-        console.error('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
+        error('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
         alert("Извините! Произошла ошибка. Пожалуйста, обратитесь в Приёмную.");
         return;
       }
@@ -332,20 +339,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const hasAmsCheck = commentContent.querySelector('bank_ams_check');
 
         if (hasAmsCheck) {
-          console.warn('⚠️ [BACKUP] Обнаружен bank_ams_check, редактирование запрещено');
+          warn('⚠️ [BACKUP] Обнаружен bank_ams_check, редактирование запрещено');
           alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
         }
       } else {
-        console.warn(`⚠️ [BACKUP] Элемент #p${NEW_COMMENT_ID}-content не найден`);
+        warn(`⚠️ [BACKUP] Элемент #p${NEW_COMMENT_ID}-content не найден`);
       }
     }
 
     const current_storage = await FMVbank.storageGet(user_id, 'fmv_bank_info_');
-    console.log(`🟦 [BACKUP] current_storage:`, current_storage);
+    log(`🟦 [BACKUP] current_storage:`, current_storage);
 
     const BACKUP_DATA = current_storage[ts];
-    console.log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
+    log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
 
     // Отправляем НЕМЕДЛЕННО, минуя очередь
     if (BACKUP_DATA) {
@@ -365,9 +372,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const topicPost = document.querySelector("div.post.topicpost");
       if (topicPost) {
         topicPost.scrollIntoView({ behavior: "smooth", block: "start" });
-        console.log("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
+        log("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
       } else {
-        console.warn("⚠️ [BACKUP] div.post.topicpost не найден");
+        warn("⚠️ [BACKUP] div.post.topicpost не найден");
       }
     }
   }
@@ -398,7 +405,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const skin_data_gift = await fetchDesignItems(BankSkinFieldID, BankSkinPostID.Gift);
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between BankSkin Gift");
 
-      console.log("skin!!!", skin_data_plashka,
+      log("[SKIN]", skin_data_plashka,
         skin_data_icon,
         skin_data_back,
         skin_data_gift);
@@ -420,7 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await humanPause(SCRAPE_BASE_GAP_MS, SCRAPE_JITTER_MS, "between Coupons");
     } catch (e) {
-      console.warn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
+      warn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
     }
   })();
 
@@ -429,7 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.origin !== IFRAME_ORIGIN) return;
     if (!e.data || e.data.type !== "PURCHASE") return;
 
-    console.log("🟦 [STEP] PURCHASE received");
+    log("🟦 [STEP] PURCHASE received");
     const encode = encodeJSON(e.data);
     const newText = formatBankText(e.data);
     const ts = e.data.timestamp;
@@ -444,9 +451,9 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         if (button) {
           button.click();
-          console.log("🟩 [SENT]  PURCHASE form submitted");
+          log("🟩 [SENT]  PURCHASE form submitted");
         } else {
-          console.warn("❌ [ERROR] Submit button not found.");
+          warn("❌ [ERROR] Submit button not found.");
         }
       }
     }
@@ -457,7 +464,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.origin !== IFRAME_ORIGIN) return;
     if (!e.data || e.data.type !== "EDIT_PURCHASE") return;
 
-    console.log("🟦 [STEP] EDIT_PURCHASE received");
+    log("🟦 [STEP] EDIT_PURCHASE received");
     const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
     const newText = formatBankText(e.data);
     const ts = e.data.timestamp;
@@ -468,7 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const admin_flag = (!is_admin_to_edit) ? "" : "[FMVbankAmsCheck]";
 
     // Открываем страницу редактирования в скрытом iframe
-    console.log("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
+    log("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
 
     const editIframe = document.createElement('iframe');
     editIframe.style.display = 'none';
@@ -485,14 +492,14 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
         if (!iframeTextArea || !iframeSubmitButton) {
-          console.warn("❌ [ERROR] Не найдена форма редактирования в iframe");
+          warn("❌ [ERROR] Не найдена форма редактирования в iframe");
           editIframe.remove();
           return;
         }
 
         // Проверяем наличие [FMVbankAmsDone] если это НЕ админ-редактирование
         if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsDone]')) {
-          console.warn("⚠️ [EDIT] Обнаружен [FMVbankAmsDone], редактирование запрещено");
+          warn("⚠️ [EDIT] Обнаружен [FMVbankAmsDone], редактирование запрещено");
           editIframe.remove();
           alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
@@ -500,7 +507,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Проверяем наличие [FMVbankAmsCheck] если это НЕ админ-редактирование
         if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsCheck]')) {
-          console.warn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck], редактирование запрещено");
+          warn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck], редактирование запрещено");
           editIframe.remove();
           alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
           return;
@@ -520,7 +527,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Вставляем текст
         iframeTextArea.value = `${admin_flag}[FMVbank]${ts}[/FMVbank]${newText}`;
-        console.log("✅ [EDIT] Текст вставлен в форму редактирования");
+        log("✅ [EDIT] Текст вставлен в форму редактирования");
 
         // Отслеживаем редирект после отправки
         let redirectUrl = null;
@@ -530,11 +537,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const checkRedirect = () => {
           try {
             const currentUrl = editIframe.contentWindow.location.href;
-            console.log("🔍 [EDIT] Проверяем URL iframe:", currentUrl);
+            log("🔍 [EDIT] Проверяем URL iframe:", currentUrl);
             if (currentUrl.includes('/viewtopic.php?')) {
               redirectUrl = currentUrl;
               redirectDetected = true;
-              console.log("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
+              log("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
 
               // Очищаем интервал
               clearInterval(redirectCheckInterval);
@@ -543,11 +550,11 @@ document.addEventListener("DOMContentLoaded", () => {
               editIframe.remove();
 
               // Переходим в основном окне (принудительная перезагрузка)
-              console.log("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
+              log("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
               window.location.reload();
             }
           } catch (err) {
-            console.log("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);
+            log("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);
           }
         };
 
@@ -558,24 +565,24 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => {
           clearInterval(redirectCheckInterval);
           if (!redirectDetected) {
-            console.warn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
+            warn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
             editIframe.remove();
           }
         }, 10000);
 
         // Отправляем форму
         iframeSubmitButton.click();
-        console.log("🟩 [SENT] EDIT_PURCHASE form submitted в iframe");
+        log("🟩 [SENT] EDIT_PURCHASE form submitted в iframe");
 
       } catch (error) {
-        console.error("❌ [ERROR] Ошибка при работе с iframe:", error);
+        error("❌ [ERROR] Ошибка при работе с iframe:", error);
         editIframe.remove();
       }
     };
 
     // Обработка ошибки загрузки iframe
     editIframe.onerror = function () {
-      console.error("❌ [ERROR] Не удалось загрузить страницу редактирования");
+      error("❌ [ERROR] Не удалось загрузить страницу редактирования");
       editIframe.remove();
     };
   });
@@ -748,9 +755,9 @@ document.addEventListener("DOMContentLoaded", () => {
           (Array.isArray(plot_seed) && plot_seed.length > 0)
       }), "first_post_missed_flag");
 
-      console.log("🏁 [DONE] sequential scrape+send flow finished");
+      log("🏁 [DONE] sequential scrape+send flow finished");
     } catch (e) {
-      console.warn("❌ [ERROR] Sequential scrape flow aborted:", e?.message || e);
+      warn("❌ [ERROR] Sequential scrape flow aborted:", e?.message || e);
     }
   })();
 });

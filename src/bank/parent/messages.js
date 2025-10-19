@@ -175,6 +175,19 @@ function queueMessage(iframeReadyP, buildMessage /* () => object */, label = "me
   });
 }
 
+// отправляет сообщение немедленно, минуя очередь (для bankCommentEditFromBackup)
+function sendMessageImmediately(iframeReadyP, buildMessage /* () => object */, label = "message") {
+  iframeReadyP.then((iframeWindow) => {
+    const msg = buildMessage();
+    if (msg) {
+      iframeWindow.postMessage(msg, IFRAME_ORIGIN);
+      console.log(`🟢 [IMMEDIATE] ${label}:`, msg.type || "(no type)");
+    } else {
+      console.log(`⚪ [SKIP]  ${label}: empty message`);
+    }
+  }).catch(err => console.warn("sendMessageImmediately skipped:", err?.message || err));
+}
+
 /* =============== отправка пост-списков (внутри очереди) =============== */
 async function sendPosts(iframeWindow, { seedPosts, label, forums, type, is_ads = false, title_prefix = "" }) {
   try {
@@ -334,14 +347,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const BACKUP_DATA = current_storage[ts];
     console.log(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
 
-    queueMessage(iframeReadyP, () => ({
+    // Отправляем НЕМЕДЛЕННО, минуя очередь
+    sendMessageImmediately(iframeReadyP, () => ({
       type: BankPostMessagesType.comment_info,
       NEW_COMMENT_TIMESTAMP: ts,
       NEW_COMMENT_ID,
       NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
       NEW_IS_ADMIN_TO_EDIT
     }), "comment_info");
-    queueMessage(iframeReadyP, () => ({
+    sendMessageImmediately(iframeReadyP, () => ({
       type: BankPostMessagesType.backup_data,
       BACKUP_DATA
     }), "backup_data");

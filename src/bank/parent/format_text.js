@@ -45,8 +45,9 @@ function formatBankText(data) {
   // 7) Нумерованный список ссылок
   const incomeIds = [
     "form-income-needrequest",
+    "form-income-ep-personal",
+    "form-income-ep-plot",
     "form-income-contest",
-    "form-income-avatar",
     "form-income-avatar",
     "form-income-design-other",
     "form-income-run-contest",

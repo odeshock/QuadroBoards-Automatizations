@@ -51,7 +51,6 @@ export function groupOperationsByRecipient(backupData) {
     'form-exp-thirdchar',           // Третий и следующие персонажи
     'form-exp-changechar',          // Смена персонажа
     'form-exp-refuse',              // Отказ от персонажа
-    'personal-coupon',              // Купоны
     'gift-discount'                 // Автоскидки
   ];
 
@@ -66,7 +65,7 @@ export function groupOperationsByRecipient(backupData) {
     }
 
     // Пропускаем операции типа 'discount', 'coupon', 'adjustment'
-    if (['discount', 'coupon', 'adjustment'].includes(operation.type)) {
+    if (['discount', 'adjustment'].includes(operation.type)) {
       console.log('[groupByRecipient] Пропущен тип операции:', operation.type, operation.title);
       return;
     }

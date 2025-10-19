@@ -2,28 +2,35 @@
 // groupByRecipient.js — Группировка операций по получателям
 // ============================================================================
 
+/* ===== Система логирования ===== */
+const DEBUG = true; // false чтобы отключить все console.log()
+
+const log = DEBUG ? console.log.bind(console) : () => { };
+const warn = DEBUG ? console.warn.bind(console) : () => { };
+const error = DEBUG ? console.error.bind(console) : () => { };
+
 /**
  * Создаёт из BACKUP_DATA словарь операций, сгруппированных по получателям
  * @param {Object} backupData - объект с данными из BACKUP_DATA
  * @returns {Object} объект вида { "recipient_id": [operations], "recipient_id": [operations], ... }
  */
 export function groupOperationsByRecipient(backupData) {
-  console.log('[groupByRecipient] Входные данные:', backupData);
-  console.log('[groupByRecipient] backupData существует?', !!backupData);
-  console.log('[groupByRecipient] backupData.fullData существует?', !!backupData?.fullData);
-  console.log('[groupByRecipient] backupData.fullData:', backupData?.fullData);
+  log('[groupByRecipient] Входные данные:', backupData);
+  log('[groupByRecipient] backupData существует?', !!backupData);
+  log('[groupByRecipient] backupData.fullData существует?', !!backupData?.fullData);
+  log('[groupByRecipient] backupData.fullData:', backupData?.fullData);
 
   if (!backupData || !backupData.fullData) {
-    console.warn('[groupByRecipient] Некорректные данные backup');
+    warn('[groupByRecipient] Некорректные данные backup');
     return [];
   }
 
   // Извлекаем USER_ID из environment
   const defaultUserId = backupData.environment?.USER_ID || 0;
-  console.log('[groupByRecipient] defaultUserId:', defaultUserId);
+  log('[groupByRecipient] defaultUserId:', defaultUserId);
 
   if (!defaultUserId) {
-    console.warn('[groupByRecipient] USER_ID не найден в backupData.environment');
+    warn('[groupByRecipient] USER_ID не найден в backupData.environment');
     return [];
   }
 
@@ -60,13 +67,13 @@ export function groupOperationsByRecipient(backupData) {
   backupData.fullData.forEach((operation) => {
     // Пропускаем исключённые операции по form_id
     if (excludedForms.includes(operation.form_id)) {
-      console.log('[groupByRecipient] Пропущена операция:', operation.form_id, operation.title);
+      log('[groupByRecipient] Пропущена операция:', operation.form_id, operation.title);
       return;
     }
 
     // Пропускаем операции типа 'discount', 'coupon', 'adjustment'
     if (['discount', 'adjustment'].includes(operation.type)) {
-      console.log('[groupByRecipient] Пропущен тип операции:', operation.type, operation.title);
+      log('[groupByRecipient] Пропущен тип операции:', operation.type, operation.title);
       return;
     }
     // Для каждой записи (entry) в операции
@@ -157,7 +164,7 @@ export function groupOperationsByRecipient(backupData) {
   });
 
   // Возвращаем словарь как есть (без преобразования в массив)
-  console.log('[groupByRecipient] Сгруппированные данные:', grouped);
+  log('[groupByRecipient] Сгруппированные данные:', grouped);
   return grouped;
 }
 
@@ -184,16 +191,20 @@ function createTitle(from, wish) {
 }
 
 /**
- * Группирует операции из результата groupOperationsByRecipient по категориям
- * @param {Object} groupedData - Результат работы groupOperationsByRecipient
- * @param {Object} backupData - Оригинальные данные из BACKUP_DATA (для доступа к totalSum и USER_ID)
+ * Группирует операции по категориям (подарки, иконки, плашки, фон, купоны)
+ * Автоматически вызывает groupOperationsByRecipient внутри
+ * @param {Object} backupData - Оригинальные данные из BACKUP_DATA
  * @returns {Object} { byRecipient: {...}, customByRecipient: {...} }
  */
-export function groupByRecipientWithGifts(groupedData, backupData) {
-  if (!groupedData || typeof groupedData !== 'object') {
-    console.warn('[groupByRecipientWithGifts] Входные данные невалидны:', groupedData);
+export function groupByRecipientWithGifts(backupData) {
+  if (!backupData || typeof backupData !== 'object') {
+    warn('[groupByRecipientWithGifts] Входные данные невалидны:', backupData);
     return { byRecipient: {}, customByRecipient: {} };
   }
+
+  // Сначала группируем операции по получателям
+  const groupedData = groupOperationsByRecipient(backupData);
+  log('[groupByRecipientWithGifts] groupedData после groupOperationsByRecipient:', groupedData);
 
   const byRecipient = {};
   const customByRecipient = {};
@@ -202,7 +213,7 @@ export function groupByRecipientWithGifts(groupedData, backupData) {
   const userId = backupData?.environment?.USER_ID ? String(backupData.environment.USER_ID) : null;
   const totalSum = backupData?.totalSum ? Number(backupData.totalSum) : 0;
 
-  // Маппинг form_id на категории
+  // Маппинг form_id на категории (подарки и оформление из коллекций и кастомные)
   const formToCategory = {
     'form-gift-collection': 'gift',
     'form-icon-collection': 'icon',
@@ -297,7 +308,7 @@ export function groupByRecipientWithGifts(groupedData, backupData) {
   // Добавляем totalSum к amount получателя с USER_ID
   if (userId && byRecipient[userId]) {
     byRecipient[userId].amount += totalSum;
-    console.log(`[groupByRecipientWithGifts] Добавлен totalSum (${totalSum}) к получателю ${userId}`);
+    log('[groupByRecipientWithGifts] Добавлен totalSum (' + totalSum + ') к получателю ' + userId);
   }
 
   // Удаляем получателей из byRecipient, у которых всё пусто
@@ -316,7 +327,7 @@ export function groupByRecipientWithGifts(groupedData, backupData) {
     }
   }
 
-  console.log('[groupByRecipientWithGifts] Результат группировки:', {
+  log('[groupByRecipientWithGifts] Результат группировки:', {
     byRecipient,
     customByRecipient
   });

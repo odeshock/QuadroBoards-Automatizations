@@ -854,6 +854,15 @@ $(function() {
 
       console.log('[admin_bridge_json] 📥 Текущие данные из API:', JSON.parse(JSON.stringify(baseData)));
 
+      // ПРОВЕРКА: comment_id должен быть указан
+      const commentId = baseData.comment_id || existingCommentId;
+      if (!commentId) {
+        alert('Укажите id комментария для юзера.');
+        console.error('[admin_bridge_json] ❌ comment_id не указан');
+        return false;
+      }
+      console.log('[admin_bridge_json] ✅ comment_id:', commentId);
+
       // ШАГ 2: Обновляем только категории скинов
       const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
@@ -889,10 +898,104 @@ $(function() {
         return false;
       }
 
-      console.log('[admin_bridge_json] ✅ Данные успешно сохранены');
+      console.log('[admin_bridge_json] ✅ Данные успешно сохранены в API');
+
+      // ШАГ 6: Обновляем комментарий на форуме
+      console.log('[admin_bridge_json] 📝 Обновляю комментарий #' + commentId);
+      const commentUpdated = await updateCommentWithSkins(commentId, baseData);
+      if (!commentUpdated) {
+        console.error('[admin_bridge_json] ❌ Не удалось обновить комментарий');
+        return false;
+      }
+
+      console.log('[admin_bridge_json] ✅ Комментарий успешно обновлён');
       return true;
     } catch (err) {
       console.error('[admin_bridge_json] Ошибка сохранения:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Обновляет комментарий на форуме с данными скинов
+   * @param {number} commentId - ID комментария
+   * @param {object} data - Полный объект данных (с категориями скинов)
+   * @returns {Promise<boolean>}
+   */
+  async function updateCommentWithSkins(commentId, data) {
+    try {
+      // Подготавливаем данные для комментария (только скины, без content)
+      const skinsForComment = {};
+      const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+
+      for (const key of categories) {
+        const items = data[key] || [];
+        // Удаляем поле content из каждого элемента
+        skinsForComment[key] = items.map(item => {
+          const cleanItem = { ...item };
+          delete cleanItem.content;
+          return cleanItem;
+        });
+      }
+
+      const commentData = JSON.stringify(skinsForComment, null, 2);
+
+      // Переходим на страницу редактирования комментария
+      const editUrl = '/edit.php?id=' + commentId;
+      console.log('[admin_bridge_json] 🌐 Открываю:', editUrl);
+
+      const response = await fetch(editUrl, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        console.error('[admin_bridge_json] Не удалось загрузить страницу редактирования');
+        return false;
+      }
+
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Находим textarea
+      const textarea = doc.querySelector('textarea[name="req_message"]');
+      if (!textarea) {
+        console.error('[admin_bridge_json] textarea не найдена на странице редактирования');
+        return false;
+      }
+
+      // Обновляем содержимое textarea
+      const newContent = commentData;
+
+      // Получаем CSRF токен
+      const csrfInput = doc.querySelector('input[name="csrf_token"]');
+      const csrfToken = csrfInput ? csrfInput.value : '';
+
+      // Отправляем форму
+      const formData = new FormData();
+      formData.append('req_message', newContent);
+      formData.append('submit', 'Отправить');
+      if (csrfToken) {
+        formData.append('csrf_token', csrfToken);
+      }
+
+      console.log('[admin_bridge_json] 📤 Отправляю форму редактирования');
+
+      const submitResponse = await fetch(editUrl, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!submitResponse.ok) {
+        console.error('[admin_bridge_json] Ошибка отправки формы');
+        return false;
+      }
+
+      console.log('[admin_bridge_json] ✅ Форма успешно отправлена');
+      return true;
+    } catch (err) {
+      console.error('[admin_bridge_json] Ошибка обновления комментария:', err);
       return false;
     }
   }

@@ -14,7 +14,7 @@
     return;
   }
 
-  const LIBRARY_FORUM_ID = [window.SKIN.LibraryFieldID];
+  const LIBRARY_FORUM_ID = [window.SKIN.LibraryForumID];
   const GID = window.SKIN.GroupID || [];
 
   console.log('[button_load_library] LIBRARY_FORUM_ID:', LIBRARY_FORUM_ID);

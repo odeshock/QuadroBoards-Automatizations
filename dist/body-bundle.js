@@ -2098,6 +2098,8 @@ async function collectSkinSets() {
   async function loadLibraryPost(postId, isCoupon = false) {
     try {
       const url = `/viewtopic.php?pid=${postId}`;
+      console.log(`[button_load_library] Загружаю URL: ${url}`);
+
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Не удалось загрузить пост ${postId}`);
@@ -2109,6 +2111,16 @@ async function collectSkinSets() {
 
       // Ищем все article.card в посте
       const articles = doc.querySelectorAll('article.card');
+      console.log(`[button_load_library] Найдено article.card: ${articles.length}`);
+
+      // Проверим, есть ли вообще какие-то article
+      const allArticles = doc.querySelectorAll('article');
+      console.log(`[button_load_library] Всего article: ${allArticles.length}`);
+
+      // Проверим, есть ли элементы с классом card
+      const allCards = doc.querySelectorAll('.card');
+      console.log(`[button_load_library] Всего .card: ${allCards.length}`);
+
       const items = [];
 
       for (const article of articles) {

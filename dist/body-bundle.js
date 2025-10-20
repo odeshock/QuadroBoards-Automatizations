@@ -1977,6 +1977,256 @@ async function collectSkinSets() {
     console.warn('[button_create_storage] createForumButton не найдена');
   }
 })();
+// button_load_library.js
+// Кнопка "Подгрузить библиотеку" для загрузки данных из постов библиотеки в API
+
+(() => {
+  'use strict';
+
+  // Проверяем наличие нужных полей
+  if (!window.SKIN || !window.SKIN.LibraryFieldID) {
+    console.warn('[button_load_library] Требуется window.SKIN с LibraryFieldID');
+    return;
+  }
+
+  const LIBRARY_FORUM_ID = [window.SKIN.LibraryFieldID];
+  const GID = window.SKIN.GroupID || [];
+
+  // ID постов библиотеки
+  const LIBRARY_POSTS = {
+    gift: window.SKIN.LibraryGiftPostID || [],
+    plashka: window.SKIN.LibraryPlashkaPostID || [],
+    icon: window.SKIN.LibraryIconPostID || [],
+    background: window.SKIN.LibraryBackPostID || [],
+    coupon: window.SKIN.LibraryCouponPostID || []
+  };
+
+  /**
+   * Парсит article.card для обычных скинов (gift, plashka, icon, background)
+   */
+  function parseCardArticle(article) {
+    const idEl = article.querySelector('.id');
+    const contentEl = article.querySelector('.content');
+    const descEl = article.querySelector('.desc');
+
+    if (!idEl) return null;
+
+    const id = idEl.textContent.trim();
+    if (!id) return null;
+
+    const item = {
+      id: id,
+      content: contentEl ? contentEl.innerHTML : '',
+      title: descEl ? descEl.textContent.trim() : ''
+    };
+
+    // Проверяем классы
+    if (article.classList.contains('hidden')) {
+      item.hidden = true;
+    } else {
+      item.hidden = false;
+    }
+
+    if (article.classList.contains('custom')) {
+      item.custom = true;
+    } else {
+      item.custom = false;
+    }
+
+    return item;
+  }
+
+  /**
+   * Парсит article.card для купонов
+   */
+  function parseCouponArticle(article) {
+    const idEl = article.querySelector('.id');
+    const contentEl = article.querySelector('.content');
+    const descEl = article.querySelector('.desc');
+    const titleEl = article.querySelector('.title');
+    const typeEl = article.querySelector('.type');
+    const formEl = article.querySelector('.form');
+    const valueEl = article.querySelector('.value');
+
+    if (!idEl) return null;
+
+    const id = idEl.textContent.trim();
+    if (!id) return null;
+
+    const item = {
+      id: id,
+      content: contentEl ? contentEl.innerHTML : '',
+      title: descEl ? descEl.textContent.trim() : ''
+    };
+
+    // Дополнительные поля для купонов (могут отсутствовать)
+    if (titleEl) {
+      item.system_title = titleEl.textContent.trim();
+    }
+
+    if (typeEl) {
+      item.type = typeEl.textContent.trim();
+    }
+
+    if (formEl) {
+      item.form = formEl.textContent.trim();
+    }
+
+    if (valueEl) {
+      const val = valueEl.textContent.trim();
+      const numVal = Number(val);
+      if (!isNaN(numVal)) {
+        item.value = numVal;
+      }
+    }
+
+    // У купонов НЕТ полей hidden и custom
+
+    return item;
+  }
+
+  /**
+   * Загружает и парсит пост библиотеки
+   */
+  async function loadLibraryPost(postId, isCoupon = false) {
+    try {
+      const url = `/viewtopic.php?pid=${postId}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Не удалось загрузить пост ${postId}`);
+      }
+
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Ищем все article.card в посте
+      const articles = doc.querySelectorAll('article.card');
+      const items = [];
+
+      for (const article of articles) {
+        const item = isCoupon ? parseCouponArticle(article) : parseCardArticle(article);
+        if (item) {
+          items.push(item);
+        }
+      }
+
+      return items;
+    } catch (error) {
+      console.error(`[button_load_library] Ошибка загрузки поста ${postId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Собирает данные из всех постов библиотеки
+   */
+  async function collectLibraryData() {
+    const result = {
+      gift: [],
+      plashka: [],
+      icon: [],
+      background: [],
+      coupon: []
+    };
+
+    for (const [category, postIds] of Object.entries(LIBRARY_POSTS)) {
+      if (!Array.isArray(postIds) || postIds.length === 0) {
+        console.log(`[button_load_library] Нет постов для категории ${category}`);
+        continue;
+      }
+
+      const isCoupon = category === 'coupon';
+
+      for (const postId of postIds) {
+        console.log(`[button_load_library] Загружаю пост ${postId} для ${category}...`);
+        const items = await loadLibraryPost(postId, isCoupon);
+        result[category].push(...items);
+        console.log(`[button_load_library] Загружено ${items.length} элементов из поста ${postId}`);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Сохраняет данные библиотеки в API
+   */
+  async function saveLibraryToAPI(data) {
+    if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
+      throw new Error('FMVbank.storageSet не найден');
+    }
+
+    const saveData = {
+      ...data,
+      last_timestamp: Math.floor(Date.now() / 1000)
+    };
+
+    console.log('[button_load_library] Сохраняю данные в API:', saveData);
+
+    // Сохраняем с userId=1 и api_key_label='library_skin_'
+    const result = await window.FMVbank.storageSet(saveData, 1, 'library_skin_');
+
+    if (!result) {
+      throw new Error('Не удалось сохранить данные в API');
+    }
+
+    return true;
+  }
+
+  // Создаём кнопку
+  if (typeof window.createForumButton === 'function') {
+    window.createForumButton({
+      allowedGroups: GID,
+      allowedForums: LIBRARY_FORUM_ID,
+      label: 'Подгрузить библиотеку',
+      order: 1,
+      showStatus: true,
+      showDetails: true,
+      showLink: false,
+
+      async onClick(api) {
+        const setStatus = api?.setStatus || (() => { });
+        const setDetails = api?.setDetails || (() => { });
+
+        try {
+          setStatus('Собираю данные...');
+          setDetails('');
+
+          // Собираем данные из постов
+          const libraryData = await collectLibraryData();
+
+          // Подсчитываем общее количество элементов
+          const total = Object.values(libraryData).reduce((sum, arr) => sum + arr.length, 0);
+
+          if (total === 0) {
+            setStatus('Готово');
+            setDetails('Не найдено элементов в постах библиотеки');
+            return;
+          }
+
+          setStatus('Сохраняю...');
+
+          // Сохраняем в API
+          await saveLibraryToAPI(libraryData);
+
+          setStatus('Готово');
+          const details = Object.entries(libraryData)
+            .map(([key, arr]) => `${key}: ${arr.length} шт.`)
+            .join('<br>');
+          setDetails(`Загружено элементов:<br>${details}<br>Всего: ${total}`);
+
+        } catch (error) {
+          setStatus('Ошибка');
+          setDetails(error?.message || String(error));
+          console.error('[button_load_library] Ошибка:', error);
+        }
+      }
+    });
+  } else {
+    console.warn('[button_load_library] createForumButton не найдена');
+  }
+})();
 // chrono_filter.js — модульная, корне-изолированная версия
 (() => {
   function makeFilterAPI(root) {

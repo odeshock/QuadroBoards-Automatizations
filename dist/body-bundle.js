@@ -1699,72 +1699,106 @@ async function collectSkinSets() {
   }
 
   /**
-   * Создаёт комментарий в теме логов
+   * Создаёт комментарий в теме логов через iframe
    */
   async function createCommentInLog(userId) {
-    const topicUrl = '/viewtopic.php?id=' + LOG_FIELD_ID;
+    return new Promise((resolve, reject) => {
+      const topicUrl = '/viewtopic.php?id=' + LOG_FIELD_ID;
+      const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
 
-    // 1. Загружаем страницу темы
-    const response = await fetch(topicUrl, { credentials: 'include' });
-    if (!response.ok) {
-      throw new Error('Не удалось загрузить тему логов');
-    }
+      console.log('[button_create_storage] Создаём iframe для топика:', topicUrl);
 
-    const html = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    console.log('doc', doc)
+      // Создаём iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = topicUrl;
+      document.body.appendChild(iframe);
 
-    // 2. Находим textarea и CSRF токен
-    const textarea = doc.querySelector('textarea#main-reply[name="req_message"]');
-    const csrfInput = doc.querySelector('input[name="csrf_token"]');
+      // Таймаут на случай зависания
+      const timeout = setTimeout(() => {
+        iframe.remove();
+        reject(new Error('Таймаут создания комментария (10 секунд)'));
+      }, 10000);
 
-    if (!textarea) {
-      throw new Error('textarea не найдена на странице темы');
-    }
+      // Ждём загрузки iframe
+      iframe.onload = function() {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const textarea = iframeDoc.querySelector('textarea#main-reply[name="req_message"]');
+          const submitButton = iframeDoc.querySelector('input[type="submit"][name="submit"]');
 
-    const csrfToken = csrfInput ? csrfInput.value : '';
+          if (!textarea || !submitButton) {
+            clearTimeout(timeout);
+            iframe.remove();
+            reject(new Error('Не найдена форма ответа в теме логов'));
+            return;
+          }
 
-    // 3. Формируем содержимое комментария
-    const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
+          // Вставляем текст
+          textarea.value = profileUrl;
+          console.log('[button_create_storage] Текст вставлен в textarea:', profileUrl);
 
-    console.log('profileUrl', profileUrl);
+          // Отслеживаем редирект
+          let redirectDetected = false;
+          const redirectCheckInterval = setInterval(() => {
+            try {
+              const currentUrl = iframe.contentWindow.location.href;
 
-    // 4. Отправляем форму
-    const formData = new FormData();
-    formData.append('req_message', profileUrl);
-    formData.append('submit', 'Отправить');
-    if (csrfToken) {
-      formData.append('csrf_token', csrfToken);
-    }
+              // Проверяем редирект на страницу с pid
+              if (currentUrl.includes('/viewtopic.php?') && currentUrl.includes('pid=')) {
+                clearTimeout(timeout);
+                clearInterval(redirectCheckInterval);
+                redirectDetected = true;
 
-    console.log('[button_create_storage] Отправляю комментарий для userId=' + userId);
+                console.log('[button_create_storage] Обнаружен редирект:', currentUrl);
 
-    const submitResponse = await fetch(topicUrl, {
-      method: 'POST',
-      credentials: 'include',
-      body: formData,
-      redirect: 'manual' // Не следуем редиректу автоматически
+                // Парсим comment_id из URL
+                const match = currentUrl.match(/[?&]pid=(\d+)/);
+                if (!match) {
+                  iframe.remove();
+                  reject(new Error('Не удалось извлечь comment_id из URL: ' + currentUrl));
+                  return;
+                }
+
+                const commentId = Number(match[1]);
+                console.log('[button_create_storage] Создан комментарий с ID:', commentId);
+
+                iframe.remove();
+                resolve(commentId);
+              }
+            } catch (err) {
+              // CORS ошибка - игнорируем
+            }
+          }, 500);
+
+          // Останавливаем проверку через 10 секунд
+          setTimeout(() => {
+            clearInterval(redirectCheckInterval);
+            if (!redirectDetected) {
+              clearTimeout(timeout);
+              iframe.remove();
+              reject(new Error('Редирект не обнаружен за 10 секунд'));
+            }
+          }, 10000);
+
+          // Отправляем форму
+          console.log('[button_create_storage] Нажимаю кнопку отправки');
+          submitButton.click();
+
+        } catch (error) {
+          clearTimeout(timeout);
+          iframe.remove();
+          reject(error);
+        }
+      };
+
+      // Обработка ошибки загрузки iframe
+      iframe.onerror = function() {
+        clearTimeout(timeout);
+        iframe.remove();
+        reject(new Error('Не удалось загрузить страницу темы'));
+      };
     });
-
-    // 5. Получаем URL редиректа
-    const redirectUrl = submitResponse.headers.get('Location');
-    if (!redirectUrl) {
-      throw new Error('Не получен URL редиректа после создания комментария');
-    }
-
-    console.log('[button_create_storage] Редирект на:', redirectUrl);
-
-    // 6. Парсим comment_id из URL вида /viewtopic.php?pid=<COMMENT_ID>
-    const match = redirectUrl.match(/[?&]pid=(\d+)/);
-    if (!match) {
-      throw new Error('Не удалось извлечь comment_id из URL: ' + redirectUrl);
-    }
-
-    const commentId = Number(match[1]);
-    console.log('[button_create_storage] Создан комментарий с ID:', commentId);
-
-    return commentId;
   }
 
   /**

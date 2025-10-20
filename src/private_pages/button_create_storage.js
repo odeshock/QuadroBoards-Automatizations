@@ -69,72 +69,82 @@
       iframe.src = topicUrl;
       document.body.appendChild(iframe);
 
+      // Флаг, чтобы избежать повторной отправки
+      let formSubmitted = false;
+
       // Таймаут на случай зависания
       const timeout = setTimeout(() => {
         iframe.remove();
         reject(new Error('Таймаут создания комментария (10 секунд)'));
       }, 10000);
 
+      // Отслеживаем редирект ДО первой загрузки iframe
+      let redirectDetected = false;
+      const redirectCheckInterval = setInterval(() => {
+        try {
+          const currentUrl = iframe.contentWindow.location.href;
+
+          // Проверяем редирект на страницу с pid
+          if (currentUrl.includes('/viewtopic.php?') && currentUrl.includes('pid=')) {
+            clearTimeout(timeout);
+            clearInterval(redirectCheckInterval);
+            redirectDetected = true;
+
+            console.log('[button_create_storage] Обнаружен редирект:', currentUrl);
+
+            // Парсим comment_id из URL
+            const match = currentUrl.match(/[?&]pid=(\d+)/);
+            if (!match) {
+              iframe.remove();
+              reject(new Error('Не удалось извлечь comment_id из URL: ' + currentUrl));
+              return;
+            }
+
+            const commentId = Number(match[1]);
+            console.log('[button_create_storage] Создан комментарий с ID:', commentId);
+
+            iframe.remove();
+            resolve(commentId);
+          }
+        } catch (err) {
+          // CORS ошибка - игнорируем
+        }
+      }, 500);
+
+      // Останавливаем проверку через 10 секунд
+      setTimeout(() => {
+        clearInterval(redirectCheckInterval);
+        if (!redirectDetected) {
+          clearTimeout(timeout);
+          iframe.remove();
+          reject(new Error('Редирект не обнаружен за 10 секунд'));
+        }
+      }, 10000);
+
       // Ждём загрузки iframe
       iframe.onload = function() {
+        // Если форма уже отправлена, игнорируем повторные загрузки
+        if (formSubmitted) {
+          console.log('[button_create_storage] Форма уже отправлена, игнорируем onload');
+          return;
+        }
+
         try {
           const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
           const textarea = iframeDoc.querySelector('textarea#main-reply[name="req_message"]');
           const submitButton = iframeDoc.querySelector('input[type="submit"][name="submit"]');
 
           if (!textarea || !submitButton) {
-            clearTimeout(timeout);
-            iframe.remove();
-            reject(new Error('Не найдена форма ответа в теме логов'));
+            console.log('[button_create_storage] Форма не найдена, возможно это редирект');
             return;
           }
+
+          // Помечаем, что форма отправлена
+          formSubmitted = true;
 
           // Вставляем текст
           textarea.value = profileUrl;
           console.log('[button_create_storage] Текст вставлен в textarea:', profileUrl);
-
-          // Отслеживаем редирект
-          let redirectDetected = false;
-          const redirectCheckInterval = setInterval(() => {
-            try {
-              const currentUrl = iframe.contentWindow.location.href;
-
-              // Проверяем редирект на страницу с pid
-              if (currentUrl.includes('/viewtopic.php?') && currentUrl.includes('pid=')) {
-                clearTimeout(timeout);
-                clearInterval(redirectCheckInterval);
-                redirectDetected = true;
-
-                console.log('[button_create_storage] Обнаружен редирект:', currentUrl);
-
-                // Парсим comment_id из URL
-                const match = currentUrl.match(/[?&]pid=(\d+)/);
-                if (!match) {
-                  iframe.remove();
-                  reject(new Error('Не удалось извлечь comment_id из URL: ' + currentUrl));
-                  return;
-                }
-
-                const commentId = Number(match[1]);
-                console.log('[button_create_storage] Создан комментарий с ID:', commentId);
-
-                iframe.remove();
-                resolve(commentId);
-              }
-            } catch (err) {
-              // CORS ошибка - игнорируем
-            }
-          }, 500);
-
-          // Останавливаем проверку через 10 секунд
-          setTimeout(() => {
-            clearInterval(redirectCheckInterval);
-            if (!redirectDetected) {
-              clearTimeout(timeout);
-              iframe.remove();
-              reject(new Error('Редирект не обнаружен за 10 секунд'));
-            }
-          }, 10000);
 
           // Отправляем форму
           console.log('[button_create_storage] Нажимаю кнопку отправки');
@@ -142,6 +152,7 @@
 
         } catch (error) {
           clearTimeout(timeout);
+          clearInterval(redirectCheckInterval);
           iframe.remove();
           reject(error);
         }
@@ -150,6 +161,7 @@
       // Обработка ошибки загрузки iframe
       iframe.onerror = function() {
         clearTimeout(timeout);
+        clearInterval(redirectCheckInterval);
         iframe.remove();
         reject(new Error('Не удалось загрузить страницу темы'));
       };

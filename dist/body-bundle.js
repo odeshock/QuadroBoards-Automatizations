@@ -1714,101 +1714,122 @@ async function collectSkinSets() {
       iframe.src = topicUrl;
       document.body.appendChild(iframe);
 
-      // Флаг, чтобы избежать повторной отправки
-      let formSubmitted = false;
+      // Счетчик загрузок iframe
+      let onloadCount = 0;
 
       // Таймаут на случай зависания
       const timeout = setTimeout(() => {
         iframe.remove();
-        reject(new Error('Таймаут создания комментария (10 секунд)'));
-      }, 10000);
-
-      // Отслеживаем редирект ДО первой загрузки iframe
-      let redirectDetected = false;
-      const redirectCheckInterval = setInterval(() => {
-        try {
-          const currentUrl = iframe.contentWindow.location.href;
-          const currentPathname = iframe.contentWindow.location.pathname;
-          const currentSearch = iframe.contentWindow.location.search;
-          const currentHash = iframe.contentWindow.location.hash;
-
-          console.log('[button_create_storage] === URL CHECK ===');
-          console.log('[button_create_storage] Full URL:', currentUrl);
-          console.log('[button_create_storage] Pathname:', currentPathname);
-          console.log('[button_create_storage] Search:', currentSearch);
-          console.log('[button_create_storage] Hash:', currentHash);
-
-          // Проверяем редирект на страницу с pid
-          if (currentUrl.includes('/viewtopic.php?') && currentUrl.includes('pid=')) {
-            clearTimeout(timeout);
-            clearInterval(redirectCheckInterval);
-            redirectDetected = true;
-
-            console.log('[button_create_storage] ✅ Обнаружен редирект с pid!');
-
-            // Парсим comment_id из URL
-            const match = currentUrl.match(/[?&]pid=(\d+)/);
-            if (!match) {
-              iframe.remove();
-              reject(new Error('Не удалось извлечь comment_id из URL: ' + currentUrl));
-              return;
-            }
-
-            const commentId = Number(match[1]);
-            console.log('[button_create_storage] ✅ Создан комментарий с ID:', commentId);
-
-            iframe.remove();
-            resolve(commentId);
-          }
-        } catch (err) {
-          console.log('[button_create_storage] ⚠️ CORS или ошибка доступа к iframe:', err.message);
-        }
-      }, 500);
-
-      // Останавливаем проверку через 10 секунд
-      setTimeout(() => {
-        clearInterval(redirectCheckInterval);
-        if (!redirectDetected) {
-          clearTimeout(timeout);
-          iframe.remove();
-          reject(new Error('Редирект не обнаружен за 10 секунд'));
-        }
-      }, 10000);
+        reject(new Error('Таймаут создания комментария (15 секунд)'));
+      }, 15000);
 
       // Ждём загрузки iframe
       iframe.onload = function() {
-        // Если форма уже отправлена, игнорируем повторные загрузки
-        if (formSubmitted) {
-          console.log('[button_create_storage] Форма уже отправлена, игнорируем onload');
+        onloadCount++;
+        console.log('[button_create_storage] onload событие #' + onloadCount);
+
+        // Первая загрузка - форма ответа
+        if (onloadCount === 1) {
+          try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            const textarea = iframeDoc.querySelector('textarea#main-reply[name="req_message"]');
+            const submitButton = iframeDoc.querySelector('input[type="submit"][name="submit"]');
+
+            if (!textarea || !submitButton) {
+              clearTimeout(timeout);
+              iframe.remove();
+              reject(new Error('Не найдена форма ответа в теме логов'));
+              return;
+            }
+
+            // Вставляем текст
+            textarea.value = profileUrl;
+            console.log('[button_create_storage] Текст вставлен в textarea:', profileUrl);
+
+            // Отправляем форму
+            console.log('[button_create_storage] Нажимаю кнопку отправки');
+            submitButton.click();
+
+          } catch (error) {
+            clearTimeout(timeout);
+            iframe.remove();
+            reject(error);
+          }
           return;
         }
 
-        try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          const textarea = iframeDoc.querySelector('textarea#main-reply[name="req_message"]');
-          const submitButton = iframeDoc.querySelector('input[type="submit"][name="submit"]');
+        // Вторая загрузка - страница после редиректа
+        if (onloadCount === 2) {
+          console.log('[button_create_storage] Вторая загрузка - пытаемся извлечь comment_id');
 
-          if (!textarea || !submitButton) {
-            console.log('[button_create_storage] Форма не найдена, возможно это редирект');
-            return;
+          try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+            // Пытаемся найти созданный комментарий по классу
+            // В rusff комментарии имеют id вида "p<comment_id>"
+            const posts = iframeDoc.querySelectorAll('div.post[id^="p"]');
+            console.log('[button_create_storage] Найдено постов с id:', posts.length);
+
+            if (posts.length > 0) {
+              // Берем последний пост (свежесозданный)
+              const lastPost = posts[posts.length - 1];
+              const postId = lastPost.id; // Например "p12345"
+              console.log('[button_create_storage] ID последнего поста:', postId);
+
+              const match = postId.match(/^p(\d+)$/);
+              if (match) {
+                const commentId = Number(match[1]);
+                console.log('[button_create_storage] ✅ Извлечён comment_id:', commentId);
+
+                clearTimeout(timeout);
+                iframe.remove();
+                resolve(commentId);
+                return;
+              }
+            }
+
+            // Если не нашли по div.post, пробуем через URL (может быть доступен)
+            try {
+              const currentUrl = iframe.contentWindow.location.href;
+              console.log('[button_create_storage] URL после редиректа:', currentUrl);
+
+              // Ищем pid в параметрах
+              const pidMatch = currentUrl.match(/[?&]pid=(\d+)/);
+              if (pidMatch) {
+                const commentId = Number(pidMatch[1]);
+                console.log('[button_create_storage] ✅ Извлечён comment_id из URL:', commentId);
+
+                clearTimeout(timeout);
+                iframe.remove();
+                resolve(commentId);
+                return;
+              }
+
+              // Ищем якорь #p123
+              const anchorMatch = currentUrl.match(/#p(\d+)/);
+              if (anchorMatch) {
+                const commentId = Number(anchorMatch[1]);
+                console.log('[button_create_storage] ✅ Извлечён comment_id из якоря:', commentId);
+
+                clearTimeout(timeout);
+                iframe.remove();
+                resolve(commentId);
+                return;
+              }
+            } catch (urlError) {
+              console.log('[button_create_storage] Не удалось прочитать URL (CORS):', urlError.message);
+            }
+
+            // Не нашли comment_id
+            clearTimeout(timeout);
+            iframe.remove();
+            reject(new Error('Не удалось извлечь comment_id после создания комментария'));
+
+          } catch (error) {
+            clearTimeout(timeout);
+            iframe.remove();
+            reject(error);
           }
-
-          // Помечаем, что форма отправлена
-          formSubmitted = true;
-
-          // Вставляем текст
-          textarea.value = profileUrl;
-          console.log('[button_create_storage] Текст вставлен в textarea:', profileUrl);
-
-          // Отправляем форму
-          console.log('[button_create_storage] Нажимаю кнопку отправки');
-          submitButton.click();
-
-        } catch (error) {
-          clearTimeout(timeout);
-          clearInterval(redirectCheckInterval);
-          iframe.remove();
-          reject(error);
         }
       };
 

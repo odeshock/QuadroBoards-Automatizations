@@ -2023,7 +2023,7 @@ async function collectSkinSets() {
 
     const item = {
       id: id,
-      content: contentEl ? contentEl.innerHTML : '',
+      content: contentEl ? contentEl.innerHTML.trim() : '',
       title: descEl ? descEl.textContent.trim() : ''
     };
 
@@ -2062,28 +2062,39 @@ async function collectSkinSets() {
 
     const item = {
       id: id,
-      content: contentEl ? contentEl.innerHTML : '',
+      content: contentEl ? contentEl.innerHTML.trim() : '',
       title: descEl ? descEl.textContent.trim() : ''
     };
 
     // Дополнительные поля для купонов (могут отсутствовать)
     if (titleEl) {
-      item.system_title = titleEl.textContent.trim();
+      const titleText = titleEl.textContent.trim();
+      if (titleText) {
+        item.system_title = titleText;
+      }
     }
 
     if (typeEl) {
-      item.type = typeEl.textContent.trim();
+      const typeText = typeEl.textContent.trim();
+      if (typeText) {
+        item.type = typeText;
+      }
     }
 
     if (formEl) {
-      item.form = formEl.textContent.trim();
+      const formText = formEl.textContent.trim();
+      if (formText) {
+        item.form = formText;
+      }
     }
 
     if (valueEl) {
       const val = valueEl.textContent.trim();
-      const numVal = Number(val);
-      if (!isNaN(numVal)) {
-        item.value = numVal;
+      if (val) {
+        const numVal = Number(val);
+        if (!isNaN(numVal)) {
+          item.value = numVal;
+        }
       }
     }
 

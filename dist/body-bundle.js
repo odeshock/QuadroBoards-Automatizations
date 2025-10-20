@@ -917,87 +917,102 @@ $(function() {
   }
 
   /**
-   * Обновляет комментарий на форуме с данными скинов
+   * Обновляет комментарий на форуме с данными скинов через iframe
    * @param {number} commentId - ID комментария
    * @param {object} data - Полный объект данных (с категориями скинов)
    * @returns {Promise<boolean>}
    */
   async function updateCommentWithSkins(commentId, data) {
-    try {
-      // Подготавливаем данные для комментария (только скины, без content)
-      const skinsForComment = {};
-      const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+    return new Promise((resolve, reject) => {
+      try {
+        // Подготавливаем данные для комментария (только скины, без content)
+        const skinsForComment = {};
+        const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
-      for (const key of categories) {
-        const items = data[key] || [];
-        // Удаляем поле content из каждого элемента
-        skinsForComment[key] = items.map(item => {
-          const cleanItem = { ...item };
-          delete cleanItem.content;
-          return cleanItem;
-        });
+        for (const key of categories) {
+          const items = data[key] || [];
+          // Удаляем поле content из каждого элемента
+          skinsForComment[key] = items.map(item => {
+            const cleanItem = { ...item };
+            delete cleanItem.content;
+            return cleanItem;
+          });
+        }
+
+        const commentData = JSON.stringify(skinsForComment, null, 2);
+        const editUrl = '/edit.php?id=' + commentId;
+
+        console.log('[admin_bridge_json] 🌐 Создаём iframe для редактирования комментария:', editUrl);
+
+        // Создаём скрытый iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = editUrl;
+        document.body.appendChild(iframe);
+
+        // Таймаут на случай зависания
+        const timeout = setTimeout(() => {
+          iframe.remove();
+          reject(new Error('Таймаут обновления комментария (10 секунд)'));
+        }, 10000);
+
+        // Счетчик загрузок
+        let onloadCount = 0;
+
+        iframe.onload = function() {
+          onloadCount++;
+          console.log('[admin_bridge_json] iframe onload #' + onloadCount);
+
+          // Первая загрузка - форма редактирования
+          if (onloadCount === 1) {
+            try {
+              const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+              const textarea = iframeDoc.querySelector('textarea[name="req_message"]');
+              const submitButton = iframeDoc.querySelector('input[type="submit"][name="submit"]');
+
+              if (!textarea || !submitButton) {
+                clearTimeout(timeout);
+                iframe.remove();
+                reject(new Error('Форма редактирования не найдена'));
+                return;
+              }
+
+              // Вставляем данные в textarea
+              textarea.value = commentData;
+              console.log('[admin_bridge_json] 📝 Данные вставлены в форму, длина:', commentData.length);
+
+              // Отправляем форму
+              console.log('[admin_bridge_json] 📤 Нажимаю кнопку отправки');
+              submitButton.click();
+
+            } catch (error) {
+              clearTimeout(timeout);
+              iframe.remove();
+              reject(error);
+            }
+            return;
+          }
+
+          // Вторая загрузка - после редиректа
+          if (onloadCount === 2) {
+            console.log('[admin_bridge_json] ✅ Форма успешно отправлена, комментарий обновлён');
+            clearTimeout(timeout);
+            iframe.remove();
+            resolve(true);
+          }
+        };
+
+        iframe.onerror = function() {
+          clearTimeout(timeout);
+          iframe.remove();
+          reject(new Error('Не удалось загрузить страницу редактирования'));
+        };
+
+      } catch (err) {
+        console.error('[admin_bridge_json] Ошибка обновления комментария:', err);
+        reject(err);
       }
-
-      const commentData = JSON.stringify(skinsForComment, null, 2);
-
-      // Переходим на страницу редактирования комментария
-      const editUrl = '/edit.php?id=' + commentId;
-      console.log('[admin_bridge_json] 🌐 Открываю:', editUrl);
-
-      const response = await fetch(editUrl, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        console.error('[admin_bridge_json] Не удалось загрузить страницу редактирования');
-        return false;
-      }
-
-      const html = await response.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // Находим textarea
-      const textarea = doc.querySelector('textarea[name="req_message"]');
-      if (!textarea) {
-        console.error('[admin_bridge_json] textarea не найдена на странице редактирования');
-        return false;
-      }
-
-      // Обновляем содержимое textarea
-      const newContent = commentData;
-
-      // Получаем CSRF токен
-      const csrfInput = doc.querySelector('input[name="csrf_token"]');
-      const csrfToken = csrfInput ? csrfInput.value : '';
-
-      // Отправляем форму
-      const formData = new FormData();
-      formData.append('req_message', newContent);
-      formData.append('submit', 'Отправить');
-      if (csrfToken) {
-        formData.append('csrf_token', csrfToken);
-      }
-
-      console.log('[admin_bridge_json] 📤 Отправляю форму редактирования');
-
-      const submitResponse = await fetch(editUrl, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
-
-      if (!submitResponse.ok) {
-        console.error('[admin_bridge_json] Ошибка отправки формы');
-        return false;
-      }
-
-      console.log('[admin_bridge_json] ✅ Форма успешно отправлена');
-      return true;
-    } catch (err) {
-      console.error('[admin_bridge_json] Ошибка обновления комментария:', err);
-      return false;
-    }
+    });
   }
 
   /**
@@ -1122,26 +1137,36 @@ async function loadSkinsFromAPI(userId) {
     backs: []
   };
 
-  const apiLabels = {
-    icons: 'icon_',
-    plashki: 'plashka_',
-    backs: 'background_'
-  };
+  try {
+    // Загружаем единый объект info_<userId>
+    const response = await window.FMVbank.storageGet(userId, 'info_');
+    console.log('[get_skin_api] info_ ответ:', response);
 
-  for (const [key, label] of Object.entries(apiLabels)) {
-    try {
-      const response = await window.FMVbank.storageGet(userId, label);
-      console.log(`[get_skin_api] ${key} ответ:`, response);
-
-      // Новый формат: { last_update_ts, data: [...] }
-      if (response && typeof response === 'object' && Array.isArray(response.data)) {
-        // Конвертируем каждый item в HTML
-        result[key] = response.data.map(item => item.content || '').filter(Boolean);
-        console.log(`[get_skin_api] ${key} загружено ${response.data.length} элементов`);
-      }
-    } catch (e) {
-      console.error(`[get_skin_api] Ошибка загрузки ${key}:`, e);
+    if (!response || typeof response !== 'object') {
+      console.warn('[get_skin_api] Нет данных в info_ для userId:', userId);
+      return result;
     }
+
+    // Маппинг ключей API -> результат
+    const mapping = {
+      icon: 'icons',
+      plashka: 'plashki',
+      background: 'backs'
+    };
+
+    for (const [apiKey, resultKey] of Object.entries(mapping)) {
+      const items = response[apiKey];
+      if (Array.isArray(items)) {
+        // Конвертируем каждый item в HTML
+        result[resultKey] = items.map(item => item.content || '').filter(Boolean);
+        console.log(`[get_skin_api] ${resultKey} загружено ${items.length} элементов`);
+      } else {
+        console.log(`[get_skin_api] ${resultKey} отсутствует или не массив`);
+      }
+    }
+
+  } catch (e) {
+    console.error('[get_skin_api] Ошибка загрузки данных:', e);
   }
 
   console.log('[get_skin_api] Результат:', result);

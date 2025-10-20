@@ -49,29 +49,31 @@
       coupon: []
     };
 
-    const apiLabels = {
-      icon: 'icon_',
-      plashka: 'plashka_',
-      background: 'background_',
-      gift: 'gift_',
-      coupon: 'coupon_'
-    };
+    try {
+      // Загружаем единый объект info_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'info_');
+      console.log('[admin_bridge_api] info_ ответ:', response);
 
-    for (const [key, label] of Object.entries(apiLabels)) {
-      try {
-        const response = await window.FMVbank.storageGet(userId, label);
-        console.log(`[admin_bridge_api] ${key} ответ:`, response);
-
-        // Новый формат: { last_update_ts, data: [...] }
-        if (response && typeof response === 'object' && Array.isArray(response.data)) {
-          result[key] = response.data;
-          console.log(`[admin_bridge_api] ${key} загружено ${response.data.length} элементов, last_update_ts: ${response.last_update_ts}`);
-        } else {
-          console.warn(`[admin_bridge_api] ${key} данные в неправильном формате:`, response);
-        }
-      } catch (e) {
-        console.error(`[admin_bridge_api] Ошибка загрузки ${key}:`, e);
+      if (!response || typeof response !== 'object') {
+        console.warn('[admin_bridge_api] Нет данных в info_ для userId:', userId);
+        return result;
       }
+
+      // Извлекаем каждую категорию из единого объекта
+      const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+
+      for (const key of categories) {
+        const items = response[key];
+        if (Array.isArray(items)) {
+          result[key] = items;
+          console.log(`[admin_bridge_api] ${key} загружено ${items.length} элементов`);
+        } else {
+          console.warn(`[admin_bridge_api] ${key} отсутствует или не массив`);
+        }
+      }
+
+    } catch (e) {
+      console.error('[admin_bridge_api] Ошибка загрузки данных:', e);
     }
 
     console.log('[admin_bridge_api] Все данные загружены:', result);
@@ -79,49 +81,52 @@
   }
 
   /**
-   * Сохраняет данные в API для всех категорий
+   * Сохраняет данные в API (единый объект info_<userId>)
+   * ВАЖНО: Сначала делает GET, затем частично обновляет данные и сохраняет обратно
    */
   async function saveAllDataToAPI(userId, jsonData) {
     console.log('[admin_bridge_api] Сохраняю данные в API для userId:', userId, jsonData);
 
-    if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
-      throw new Error('FMVbank.storageSet не найден');
+    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function' || typeof window.FMVbank.storageSet !== 'function') {
+      throw new Error('FMVbank.storageGet или storageSet не найдены');
     }
 
-    const apiLabels = {
-      icon: 'icon_',
-      plashka: 'plashka_',
-      background: 'background_',
-      gift: 'gift_',
-      coupon: 'coupon_'
-    };
+    try {
+      // ШАГ 1: Сначала получаем текущие данные из API
+      console.log('[admin_bridge_api] 📥 Загружаю текущие данные из API...');
+      const currentData = await window.FMVbank.storageGet(userId, 'info_');
 
-    const results = {};
+      // Если данных нет, создаём пустой объект
+      const baseData = currentData && typeof currentData === 'object' ? currentData : {};
 
-    for (const [key, label] of Object.entries(apiLabels)) {
-      const categoryData = jsonData[key] || [];
+      console.log('[admin_bridge_api] 📥 Текущие данные из API:', JSON.parse(JSON.stringify(baseData)));
 
-      // Формируем данные в новом формате: { last_update_ts, data: [...] }
-      const saveData = {
-        last_update_ts: Math.floor(Date.now() / 1000), // timestamp в секундах
-        data: categoryData
-      };
+      // ШАГ 2: Обновляем только категории скинов, сохраняя chrono и comment_id
+      baseData.icon = jsonData.icon || [];
+      baseData.plashka = jsonData.plashka || [];
+      baseData.background = jsonData.background || [];
+      baseData.gift = jsonData.gift || [];
+      baseData.coupon = jsonData.coupon || [];
 
-      try {
-        const result = await window.FMVbank.storageSet(saveData, userId, label);
-        results[key] = result;
-        console.log(`[admin_bridge_api] ${key} сохранено:`, result);
-      } catch (e) {
-        console.error(`[admin_bridge_api] Ошибка сохранения ${key}:`, e);
-        results[key] = false;
-      }
+      // Сохраняем chrono и comment_id, если они есть
+      if (!baseData.chrono) baseData.chrono = {};
+      if (!baseData.comment_id) baseData.comment_id = null;
+
+      // ШАГ 3: Обновляем last_timestamp
+      baseData.last_timestamp = Math.floor(Date.now() / 1000);
+
+      console.log('[admin_bridge_api] 📤 Данные для сохранения:', JSON.parse(JSON.stringify(baseData)));
+
+      // ШАГ 4: Сохраняем обратно
+      const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
+
+      console.log('[admin_bridge_api] ✅ Результат сохранения:', result);
+      return result === true;
+
+    } catch (e) {
+      console.error('[admin_bridge_api] ❌ Ошибка сохранения:', e);
+      return false;
     }
-
-    // Проверяем, все ли успешно
-    const allSuccess = Object.values(results).every(r => r === true);
-    console.log('[admin_bridge_api] Результаты сохранения:', results, 'Все успешно:', allSuccess);
-
-    return allSuccess;
   }
 
   async function loadSkinAdmin(userId) {

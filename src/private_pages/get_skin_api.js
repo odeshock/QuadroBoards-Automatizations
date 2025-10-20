@@ -68,26 +68,36 @@ async function loadSkinsFromAPI(userId) {
     backs: []
   };
 
-  const apiLabels = {
-    icons: 'icon_',
-    plashki: 'plashka_',
-    backs: 'background_'
-  };
+  try {
+    // Загружаем единый объект info_<userId>
+    const response = await window.FMVbank.storageGet(userId, 'info_');
+    console.log('[get_skin_api] info_ ответ:', response);
 
-  for (const [key, label] of Object.entries(apiLabels)) {
-    try {
-      const response = await window.FMVbank.storageGet(userId, label);
-      console.log(`[get_skin_api] ${key} ответ:`, response);
-
-      // Новый формат: { last_update_ts, data: [...] }
-      if (response && typeof response === 'object' && Array.isArray(response.data)) {
-        // Конвертируем каждый item в HTML
-        result[key] = response.data.map(item => item.content || '').filter(Boolean);
-        console.log(`[get_skin_api] ${key} загружено ${response.data.length} элементов`);
-      }
-    } catch (e) {
-      console.error(`[get_skin_api] Ошибка загрузки ${key}:`, e);
+    if (!response || typeof response !== 'object') {
+      console.warn('[get_skin_api] Нет данных в info_ для userId:', userId);
+      return result;
     }
+
+    // Маппинг ключей API -> результат
+    const mapping = {
+      icon: 'icons',
+      plashka: 'plashki',
+      background: 'backs'
+    };
+
+    for (const [apiKey, resultKey] of Object.entries(mapping)) {
+      const items = response[apiKey];
+      if (Array.isArray(items)) {
+        // Конвертируем каждый item в HTML
+        result[resultKey] = items.map(item => item.content || '').filter(Boolean);
+        console.log(`[get_skin_api] ${resultKey} загружено ${items.length} элементов`);
+      } else {
+        console.log(`[get_skin_api] ${resultKey} отсутствует или не массив`);
+      }
+    }
+
+  } catch (e) {
+    console.error('[get_skin_api] Ошибка загрузки данных:', e);
   }
 
   console.log('[get_skin_api] Результат:', result);

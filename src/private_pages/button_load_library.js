@@ -61,6 +61,12 @@
       item.custom = false;
     }
 
+    if (article.classList.contains('system')) {
+      item.system = true;
+    } else {
+      item.system = false;
+    }
+
     return item;
   }
 

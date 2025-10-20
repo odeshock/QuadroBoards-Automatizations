@@ -166,9 +166,34 @@ if (!window.hasOwnProperty('SKIN_DATA_GIFT')) {
 
 function _getGiftItems() {
   if (_giftItemsCache) return _giftItemsCache;
-  const customItem = { id: 'custom', icon: '✨' };
+
+  const customItem = { id: 'custom', icon: '✨', custom: true };
   const skinData = window.SKIN_DATA_GIFT || [];
-  _giftItemsCache = [customItem, ...skinData];
+  const isAdmin = window.IS_ADMIN === true;
+  const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
+  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
+
+  let filteredItems;
+
+  if (isAdmin || isAdminToEdit) {
+    if (isEditingRecord) {
+      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+      filteredItems = skinData.filter(item =>
+        item.hidden !== true || item.custom === true || item.system === true
+      );
+    } else {
+      // Начальная загрузка админом: показываем всё
+      filteredItems = skinData;
+    }
+  } else {
+    // Обычный пользователь: только hidden: false И custom: false И system: false
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true && item.custom !== true && item.system !== true
+    );
+  }
+
+  // Всегда добавляем customItem в начало
+  _giftItemsCache = [customItem, ...filteredItems];
   return _giftItemsCache;
 }
 
@@ -209,9 +234,34 @@ if (!window.hasOwnProperty('SKIN_DATA_ICON')) {
 
 function _getIconItems() {
   if (_iconItemsCache) return _iconItemsCache;
-  const customItem = { id: 'custom', icon: '✨' };
+
+  const customItem = { id: 'custom', icon: '✨', custom: true };
   const skinData = window.SKIN_DATA_ICON || [];
-  _iconItemsCache = [customItem, ...skinData];
+  const isAdmin = window.IS_ADMIN === true;
+  const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
+  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
+
+  let filteredItems;
+
+  if (isAdmin || isAdminToEdit) {
+    if (isEditingRecord) {
+      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+      filteredItems = skinData.filter(item =>
+        item.hidden !== true || item.custom === true || item.system === true
+      );
+    } else {
+      // Начальная загрузка админом: показываем всё
+      filteredItems = skinData;
+    }
+  } else {
+    // Обычный пользователь: только hidden: false И custom: false И system: false
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true && item.custom !== true && item.system !== true
+    );
+  }
+
+  // Всегда добавляем customItem в начало
+  _iconItemsCache = [customItem, ...filteredItems];
   return _iconItemsCache;
 }
 
@@ -249,9 +299,34 @@ if (!window.hasOwnProperty('SKIN_DATA_PLASHKA')) {
 
 function _getBadgeItems() {
   if (_badgeItemsCache) return _badgeItemsCache;
-  const customItem = { id: 'custom', icon: '✨' };
+
+  const customItem = { id: 'custom', icon: '✨', custom: true };
   const skinData = window.SKIN_DATA_PLASHKA || [];
-  _badgeItemsCache = [customItem, ...skinData];
+  const isAdmin = window.IS_ADMIN === true;
+  const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
+  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
+
+  let filteredItems;
+
+  if (isAdmin || isAdminToEdit) {
+    if (isEditingRecord) {
+      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+      filteredItems = skinData.filter(item =>
+        item.hidden !== true || item.custom === true || item.system === true
+      );
+    } else {
+      // Начальная загрузка админом: показываем всё
+      filteredItems = skinData;
+    }
+  } else {
+    // Обычный пользователь: только hidden: false И custom: false И system: false
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true && item.custom !== true && item.system !== true
+    );
+  }
+
+  // Всегда добавляем customItem в начало
+  _badgeItemsCache = [customItem, ...filteredItems];
   return _badgeItemsCache;
 }
 
@@ -289,9 +364,34 @@ if (!window.hasOwnProperty('SKIN_DATA_BACK')) {
 
 function _getBackgroundItems() {
   if (_backgroundItemsCache) return _backgroundItemsCache;
-  const customItem = { id: 'custom', icon: '✨' };
+
+  const customItem = { id: 'custom', icon: '✨', custom: true };
   const skinData = window.SKIN_DATA_BACK || [];
-  _backgroundItemsCache = [customItem, ...skinData];
+  const isAdmin = window.IS_ADMIN === true;
+  const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
+  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
+
+  let filteredItems;
+
+  if (isAdmin || isAdminToEdit) {
+    if (isEditingRecord) {
+      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+      filteredItems = skinData.filter(item =>
+        item.hidden !== true || item.custom === true || item.system === true
+      );
+    } else {
+      // Начальная загрузка админом: показываем всё
+      filteredItems = skinData;
+    }
+  } else {
+    // Обычный пользователь: только hidden: false И custom: false И system: false
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true && item.custom !== true && item.system !== true
+    );
+  }
+
+  // Всегда добавляем customItem в начало
+  _backgroundItemsCache = [customItem, ...filteredItems];
   return _backgroundItemsCache;
 }
 

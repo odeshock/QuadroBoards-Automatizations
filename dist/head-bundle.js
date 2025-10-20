@@ -4435,8 +4435,8 @@ async function fetchLibraryItems() {
   }
 
   // Конвертируем API формат в формат для банка
-  // API: {id, content, title, hidden, custom}
-  // Bank: {id, icon, hidden, custom} где icon = content
+  // API: {id, content, title, hidden, custom, system}
+  // Bank: {id, icon, hidden, custom, system} где icon = content
   const convertToLibraryFormat = (items) => {
     return (items || [])
       .filter(item => item.hidden !== true)
@@ -4446,9 +4446,10 @@ async function fetchLibraryItems() {
           icon: item.content || ''
         };
 
-        // Добавляем hidden и custom если они есть
+        // Добавляем hidden, custom и system если они есть
         if (item.hidden !== undefined) result.hidden = item.hidden;
         if (item.custom !== undefined) result.custom = item.custom;
+        if (item.system !== undefined) result.system = item.system;
 
         return result;
       });

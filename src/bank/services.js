@@ -207,6 +207,14 @@ export function restoreFromBackup(backupData) {
   window.IS_ADMIN_TO_EDIT = window.NEW_IS_ADMIN_TO_EDIT;
   console.log('💾 IS_ADMIN_TO_EDIT сохранён:', window.IS_ADMIN_TO_EDIT);
 
+  // Сбрасываем кэши скинов при изменении IS_ADMIN_TO_EDIT
+  // чтобы фильтрация пересчиталась с новыми правами
+  window._SKIN_DATA_GIFT = window._SKIN_DATA_GIFT;
+  window._SKIN_DATA_ICON = window._SKIN_DATA_ICON;
+  window._SKIN_DATA_PLASHKA = window._SKIN_DATA_PLASHKA;
+  window._SKIN_DATA_BACK = window._SKIN_DATA_BACK;
+  console.log('🔄 Кэши скинов сброшены для пересчёта фильтрации');
+
   // Если было редактирование (BACKUP_DATA был указан), присваиваем COMMENT_ID, CURRENT_BANK и COMMENT_TIMESTAMP
   if (typeof window.NEW_COMMENT_ID !== 'undefined') {
     window.COMMENT_ID = window.NEW_COMMENT_ID;

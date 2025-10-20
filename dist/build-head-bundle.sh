@@ -74,6 +74,10 @@ echo "/* MODULE 9: bank/parent/fetch_design_items.js.js */" >> dist/head-bundle.
 cat src/bank/parent/fetch_design_items.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
+echo "/* MODULE 9.5: bank/parent/fetch_library_items.js */" >> dist/head-bundle.js
+cat src/bank/parent/fetch_library_items.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
 echo "/* MODULE 10: bank/parent/fetch_user_coupons.js */" >> dist/head-bundle.js
 cat src/bank/parent/fetch_user_coupons.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js

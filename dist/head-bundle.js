@@ -4414,6 +4414,75 @@ async function fetchDesignItems(topic_id, comment_ids) {
 
 window.fetchDesignItems = fetchDesignItems;
 
+/* MODULE 9.5: bank/parent/fetch_library_items.js */
+/**
+ * Загружает фоны/иконки/плашки/подарки/купоны из API (library_skin_1).
+ * @returns {Promise<{plashka: Array, icon: Array, back: Array, gift: Array, coupon: Array}>}
+ */
+async function fetchLibraryItems() {
+  // Загружаем из API
+  const libraryData = await window.FMVbank.storageGet(1, 'library_skin_');
+
+  if (!libraryData || typeof libraryData !== 'object') {
+    console.warn('[fetchLibraryItems] library_skin_1 не найдена в API, возвращаем пустые массивы');
+    return {
+      plashka: [],
+      icon: [],
+      back: [],
+      gift: [],
+      coupon: []
+    };
+  }
+
+  // Конвертируем API формат в формат для банка
+  // API: {id, content, title, hidden, custom}
+  // Bank: {id, icon, hidden, custom} где icon = content
+  const convertToLibraryFormat = (items) => {
+    return (items || [])
+      .filter(item => item.hidden !== true)
+      .map(item => {
+        const result = {
+          id: item.id,
+          icon: item.content || ''
+        };
+
+        // Добавляем hidden и custom если они есть
+        if (item.hidden !== undefined) result.hidden = item.hidden;
+        if (item.custom !== undefined) result.custom = item.custom;
+
+        return result;
+      });
+  };
+
+  // Купоны имеют дополнительные поля: system_title, type, form, value
+  const convertCouponsToLibraryFormat = (items) => {
+    return (items || []).map(item => {
+      const result = {
+        id: item.id,
+        icon: item.content || ''
+      };
+
+      // Добавляем дополнительные поля если они есть
+      if (item.system_title) result.system_title = item.system_title;
+      if (item.type) result.type = item.type;
+      if (item.form) result.form = item.form;
+      if (item.value !== undefined) result.value = item.value;
+
+      return result;
+    });
+  };
+
+  return {
+    plashka: convertToLibraryFormat(libraryData.plashka),
+    icon: convertToLibraryFormat(libraryData.icon),
+    back: convertToLibraryFormat(libraryData.background),
+    gift: convertToLibraryFormat(libraryData.gift),
+    coupon: convertCouponsToLibraryFormat(libraryData.coupon)
+  };
+}
+
+window.fetchLibraryItems = fetchLibraryItems;
+
 /* MODULE 10: bank/parent/fetch_user_coupons.js */
 const typeRank = { item: 0, fixed: 1 };
 const rankType = t => (t in typeRank ? typeRank[t] : 2);
@@ -5062,44 +5131,28 @@ document.addEventListener("DOMContentLoaded", () => {
     is_admin: window.UserID == 2
   }), "user_info");
 
-  // Загрузка данных скинов и купонов (async)
+  // Загрузка данных скинов и купонов из API (async)
   (async () => {
     try {
-      const skin_data_plashka = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Plashka);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Plashka");
+      // Загружаем библиотеку из API
+      const libraryItems = await fetchLibraryItems();
 
-      const skin_data_icon = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Icon);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Icon");
-
-      const skin_data_back = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Back);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Back");
-
-      const skin_data_gift = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Gift);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Gift");
-
-      window.BankMessagesLog("[SKIN]", skin_data_plashka,
-        skin_data_icon,
-        skin_data_back,
-        skin_data_gift);
+      window.BankMessagesLog("[SKIN from API]", libraryItems);
 
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.skin,
-        skin_data_plashka,
-        skin_data_icon,
-        skin_data_back,
-        skin_data_gift
+        skin_data_plashka: libraryItems.plashka,
+        skin_data_icon: libraryItems.icon,
+        skin_data_back: libraryItems.back,
+        skin_data_gift: libraryItems.gift
       }), "skin_data");
-
-      const coupons_data = await fetchUserCoupons();
 
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.coupons,
-        coupons_data
+        coupons_data: libraryItems.coupon
       }), "coupons_data");
-
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between Coupons");
     } catch (e) {
-      window.BankMessagesWarn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
+      window.BankMessagesWarn("❌ [ERROR] Skin/Coupons loading from API failed:", e?.message || e);
     }
   })();
 

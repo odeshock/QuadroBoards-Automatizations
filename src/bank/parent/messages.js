@@ -97,44 +97,28 @@ document.addEventListener("DOMContentLoaded", () => {
     is_admin: window.UserID == 2
   }), "user_info");
 
-  // Загрузка данных скинов и купонов (async)
+  // Загрузка данных скинов и купонов из API (async)
   (async () => {
     try {
-      const skin_data_plashka = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Plashka);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Plashka");
+      // Загружаем библиотеку из API
+      const libraryItems = await fetchLibraryItems();
 
-      const skin_data_icon = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Icon);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Icon");
-
-      const skin_data_back = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Back);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Back");
-
-      const skin_data_gift = await fetchDesignItems(window.BankSkinFieldID, window.BankSkinPostID.Gift);
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between BankSkin Gift");
-
-      window.BankMessagesLog("[SKIN]", skin_data_plashka,
-        skin_data_icon,
-        skin_data_back,
-        skin_data_gift);
+      window.BankMessagesLog("[SKIN from API]", libraryItems);
 
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.skin,
-        skin_data_plashka,
-        skin_data_icon,
-        skin_data_back,
-        skin_data_gift
+        skin_data_plashka: libraryItems.plashka,
+        skin_data_icon: libraryItems.icon,
+        skin_data_back: libraryItems.back,
+        skin_data_gift: libraryItems.gift
       }), "skin_data");
-
-      const coupons_data = await fetchUserCoupons();
 
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.coupons,
-        coupons_data
+        coupons_data: libraryItems.coupon
       }), "coupons_data");
-
-      await window.BankHumanPause(window.SCRAPE_BASE_GAP_MS, window.SCRAPE_JITTER_MS, "between Coupons");
     } catch (e) {
-      window.BankMessagesWarn("❌ [ERROR] Skin/Coupons loading failed:", e?.message || e);
+      window.BankMessagesWarn("❌ [ERROR] Skin/Coupons loading from API failed:", e?.message || e);
     }
   })();
 

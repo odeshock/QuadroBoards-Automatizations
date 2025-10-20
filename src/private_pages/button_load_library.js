@@ -118,7 +118,7 @@
    */
   async function loadLibraryPost(postId, isCoupon = false) {
     try {
-      const url = `/viewtopic.php?pid=${postId}`;
+      const url = `/viewtopic.php?pid=${postId}#p${postId}`;
       console.log(`[button_load_library] Загружаю URL: ${url}`);
 
       const response = await fetch(url);
@@ -130,17 +130,18 @@
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
-      // Ищем все article.card в посте
-      const articles = doc.querySelectorAll('article.card');
+      // Ищем конкретный пост по ID: #p<postId>-content
+      const postContent = doc.querySelector(`#p${postId}-content`);
+      if (!postContent) {
+        console.warn(`[button_load_library] Не найден #p${postId}-content`);
+        return [];
+      }
+
+      console.log(`[button_load_library] Найден #p${postId}-content`);
+
+      // Ищем все article.card внутри этого поста
+      const articles = postContent.querySelectorAll('article.card');
       console.log(`[button_load_library] Найдено article.card: ${articles.length}`);
-
-      // Проверим, есть ли вообще какие-то article
-      const allArticles = doc.querySelectorAll('article');
-      console.log(`[button_load_library] Всего article: ${allArticles.length}`);
-
-      // Проверим, есть ли элементы с классом card
-      const allCards = doc.querySelectorAll('.card');
-      console.log(`[button_load_library] Всего .card: ${allCards.length}`);
 
       const items = [];
 

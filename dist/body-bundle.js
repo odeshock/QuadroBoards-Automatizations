@@ -898,7 +898,7 @@ $(function() {
 
       // ШАГ 6: Обновляем комментарий на форуме
       console.log('[admin_bridge_json] 📝 Обновляю комментарий #' + commentId);
-      const commentUpdated = await updateCommentWithSkins(commentId, baseData);
+      const commentUpdated = await updateCommentWithSkins(commentId, userId, baseData);
       if (!commentUpdated) {
         console.error('[admin_bridge_json] ❌ Не удалось обновить комментарий');
         return false;
@@ -915,10 +915,11 @@ $(function() {
   /**
    * Обновляет комментарий на форуме с данными скинов через iframe
    * @param {number} commentId - ID комментария
+   * @param {number} userId - ID пользователя (для ссылки на профиль)
    * @param {object} data - Полный объект данных (с категориями скинов)
    * @returns {Promise<boolean>}
    */
-  async function updateCommentWithSkins(commentId, data) {
+  async function updateCommentWithSkins(commentId, userId, data) {
     return new Promise((resolve, reject) => {
       try {
         // Подготавливаем данные для комментария (только скины, без content)
@@ -935,7 +936,13 @@ $(function() {
           });
         }
 
-        const commentData = JSON.stringify(skinsForComment, null, 2);
+        // JSON минифицированный (без отступов и переносов)
+        const commentJson = JSON.stringify(skinsForComment);
+
+        // Ссылка на профиль + JSON
+        const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
+        const commentData = profileUrl + '\n' + commentJson;
+
         const editUrl = '/edit.php?id=' + commentId;
 
         console.log('[admin_bridge_json] 🌐 Создаём iframe для редактирования комментария:', editUrl);

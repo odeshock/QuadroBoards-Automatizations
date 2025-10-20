@@ -83,6 +83,15 @@
       const redirectCheckInterval = setInterval(() => {
         try {
           const currentUrl = iframe.contentWindow.location.href;
+          const currentPathname = iframe.contentWindow.location.pathname;
+          const currentSearch = iframe.contentWindow.location.search;
+          const currentHash = iframe.contentWindow.location.hash;
+
+          console.log('[button_create_storage] === URL CHECK ===');
+          console.log('[button_create_storage] Full URL:', currentUrl);
+          console.log('[button_create_storage] Pathname:', currentPathname);
+          console.log('[button_create_storage] Search:', currentSearch);
+          console.log('[button_create_storage] Hash:', currentHash);
 
           // Проверяем редирект на страницу с pid
           if (currentUrl.includes('/viewtopic.php?') && currentUrl.includes('pid=')) {
@@ -90,7 +99,7 @@
             clearInterval(redirectCheckInterval);
             redirectDetected = true;
 
-            console.log('[button_create_storage] Обнаружен редирект:', currentUrl);
+            console.log('[button_create_storage] ✅ Обнаружен редирект с pid!');
 
             // Парсим comment_id из URL
             const match = currentUrl.match(/[?&]pid=(\d+)/);
@@ -101,13 +110,13 @@
             }
 
             const commentId = Number(match[1]);
-            console.log('[button_create_storage] Создан комментарий с ID:', commentId);
+            console.log('[button_create_storage] ✅ Создан комментарий с ID:', commentId);
 
             iframe.remove();
             resolve(commentId);
           }
         } catch (err) {
-          // CORS ошибка - игнорируем
+          console.log('[button_create_storage] ⚠️ CORS или ошибка доступа к iframe:', err.message);
         }
       }, 500);
 

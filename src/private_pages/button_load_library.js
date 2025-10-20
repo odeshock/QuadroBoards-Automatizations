@@ -4,14 +4,21 @@
 (() => {
   'use strict';
 
+  console.log('[button_load_library] Скрипт загружен');
+  console.log('[button_load_library] window.SKIN:', window.SKIN);
+
   // Проверяем наличие нужных полей
   if (!window.SKIN || !window.SKIN.LibraryFieldID) {
     console.warn('[button_load_library] Требуется window.SKIN с LibraryFieldID');
+    console.warn('[button_load_library] window.SKIN:', window.SKIN);
     return;
   }
 
   const LIBRARY_FORUM_ID = [window.SKIN.LibraryFieldID];
   const GID = window.SKIN.GroupID || [];
+
+  console.log('[button_load_library] LIBRARY_FORUM_ID:', LIBRARY_FORUM_ID);
+  console.log('[button_load_library] GID:', GID);
 
   // ID постов библиотеки
   const LIBRARY_POSTS = {
@@ -196,7 +203,14 @@
   }
 
   // Создаём кнопку
+  console.log('[button_load_library] Проверяем createForumButton:', typeof window.createForumButton);
   if (typeof window.createForumButton === 'function') {
+    console.log('[button_load_library] Создаём кнопку с параметрами:', {
+      allowedGroups: GID,
+      allowedForums: LIBRARY_FORUM_ID,
+      label: 'Подгрузить библиотеку'
+    });
+
     window.createForumButton({
       allowedGroups: GID,
       allowedForums: LIBRARY_FORUM_ID,
@@ -244,7 +258,10 @@
         }
       }
     });
+    console.log('[button_load_library] Кнопка создана');
   } else {
     console.warn('[button_load_library] createForumButton не найдена');
   }
+
+  console.log('[button_load_library] Инициализация завершена');
 })();

@@ -68,44 +68,40 @@
       coupon: []
     };
 
-    const apiLabels = {
-      icon: 'icon_',
-      plashka: 'plashka_',
-      background: 'background_',
-      gift: 'gift_',
-      coupon: 'coupon_'
-    };
+    try {
+      // Загружаем единый объект info_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'info_');
+      log('info_ ответ:', response);
 
-    // Загружаем все категории ПАРАЛЛЕЛЬНО для скорости
-    const promises = Object.entries(apiLabels).map(async ([key, label]) => {
-      try {
-        const response = await window.FMVbank.storageGet(userId, label);
-        log(`${key} ответ:`, response);
+      if (!response || typeof response !== 'object') {
+        log('Нет данных в info_ для userId', userId);
+        return result;
+      }
 
-        // Новый формат: { last_update_ts, data: [...] }
-        if (response && typeof response === 'object' && Array.isArray(response.data)) {
+      // Извлекаем каждую категорию из единого объекта
+      const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+
+      categories.forEach(key => {
+        const items = response[key];
+
+        if (Array.isArray(items)) {
           // Фильтруем только видимые элементы (is_visible !== false)
-          const filtered = response.data.filter(item => item.is_visible !== false);
-          log(`${key} загружено ${filtered.length} видимых элементов из ${response.data.length}`);
-          return { key, data: filtered };
+          const filtered = items.filter(item => item.is_visible !== false);
+          result[key] = filtered;
+          log(`${key} загружено ${filtered.length} видимых элементов из ${items.length}`);
+        } else {
+          log(`${key} отсутствует или не массив`);
+          result[key] = [];
         }
-      } catch (e) {
-        console.error(`[collect_skins_api] Ошибка загрузки ${key}:`, e);
-      }
-      return { key, data: [] };
-    });
+      });
 
-    const responses = await Promise.all(promises);
+      log('Все данные загружены:', result);
+      return result;
 
-    // Собираем результаты
-    responses.forEach(({ key, data }) => {
-      if (key && data) {
-        result[key] = data;
-      }
-    });
-
-    log('Все данные загружены:', result);
-    return result;
+    } catch (e) {
+      console.error('[collect_skins_api] Ошибка загрузки данных:', e);
+      return result;
+    }
   }
 
   /**

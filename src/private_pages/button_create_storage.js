@@ -215,21 +215,13 @@
       currentData = {};
     }
 
-    // Обновляем только comment_id и last_timestamp
+    // Обновляем ТОЛЬКО comment_id и last_timestamp, всё остальное НЕ ТРОГАЕМ!
     const baseData = currentData && typeof currentData === 'object' ? currentData : {};
 
     baseData.comment_id = commentId;
     baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
-    // Убеждаемся, что остальные поля существуют
-    if (!baseData.chrono) baseData.chrono = {};
-    if (!baseData.gift) baseData.gift = [];
-    if (!baseData.coupon) baseData.coupon = [];
-    if (!baseData.icon) baseData.icon = [];
-    if (!baseData.plashka) baseData.plashka = [];
-    if (!baseData.background) baseData.background = [];
-
-    // Сохраняем
+    // Сохраняем (все остальные поля остаются как есть из GET)
     const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
     if (!result) {
       throw new Error('Не удалось сохранить данные в API');

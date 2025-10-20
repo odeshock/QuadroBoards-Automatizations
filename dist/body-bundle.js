@@ -825,16 +825,14 @@ $(function() {
 
   /**
    * Сохраняет данные в API (единый объект info_<userId>)
-   * ВАЖНО: Сначала делает GET, затем частично обновляет данные и сохраняет обратно
+   * ВАЖНО: Сначала делает GET, затем частично обновляет только категории скинов, сохраняя chrono и comment_id
    *
    * @param {number} userId
    * @param {object} visibleData - { icon: [], plashka: [], ... } данные из панели
    * @param {object} invisibleData - { icon: [], plashka: [], ... } невидимые элементы
-   * @param {object} existingChrono - существующие данные chrono (не изменяем)
-   * @param {number|null} existingCommentId - существующий comment_id (не изменяем)
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, visibleData, invisibleData, existingChrono, existingCommentId) {
+  async function saveAllDataToAPI(userId, visibleData, invisibleData) {
     console.log('[admin_bridge_json] 🔥 СОХРАНЕНИЕ ДЛЯ userId:', userId);
     console.log('[admin_bridge_json] 🔥 visibleData:', JSON.parse(JSON.stringify(visibleData)));
     console.log('[admin_bridge_json] 🔥 invisibleData:', JSON.parse(JSON.stringify(invisibleData)));
@@ -854,8 +852,8 @@ $(function() {
 
       console.log('[admin_bridge_json] 📥 Текущие данные из API:', JSON.parse(JSON.stringify(baseData)));
 
-      // ПРОВЕРКА: comment_id должен быть указан
-      const commentId = baseData.comment_id || existingCommentId;
+      // ПРОВЕРКА: comment_id должен быть указан (берём из текущих данных API)
+      const commentId = baseData.comment_id;
       if (!commentId) {
         alert('Укажите id комментария для юзера.');
         console.error('[admin_bridge_json] ❌ comment_id не указан');
@@ -882,9 +880,7 @@ $(function() {
         baseData[key] = mergedData;
       }
 
-      // ШАГ 3: Сохраняем chrono и comment_id (не изменяем, берём из существующих)
-      baseData.chrono = existingChrono || baseData.chrono || {};
-      baseData.comment_id = existingCommentId !== undefined ? existingCommentId : (baseData.comment_id || null);
+      // ШАГ 3: НЕ трогаем chrono и comment_id - они остаются как есть из GET!
 
       // ШАГ 4: Обновляем last_timestamp
       baseData.last_timestamp = Math.floor(Date.now() / 1000);
@@ -1046,7 +1042,8 @@ $(function() {
      * @returns {Promise<object>} { ok, status }
      */
     async function save(newVisibleData) {
-      const success = await saveAllDataToAPI(targetUserId, newVisibleData, invisible, chrono, comment_id);
+      // invisible данные тоже нужно сохранить (элементы с is_visible: false)
+      const success = await saveAllDataToAPI(targetUserId, newVisibleData, invisible);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'
@@ -1881,21 +1878,13 @@ async function collectSkinSets() {
       currentData = {};
     }
 
-    // Обновляем только comment_id и last_timestamp
+    // Обновляем ТОЛЬКО comment_id и last_timestamp, всё остальное НЕ ТРОГАЕМ!
     const baseData = currentData && typeof currentData === 'object' ? currentData : {};
 
     baseData.comment_id = commentId;
     baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
-    // Убеждаемся, что остальные поля существуют
-    if (!baseData.chrono) baseData.chrono = {};
-    if (!baseData.gift) baseData.gift = [];
-    if (!baseData.coupon) baseData.coupon = [];
-    if (!baseData.icon) baseData.icon = [];
-    if (!baseData.plashka) baseData.plashka = [];
-    if (!baseData.background) baseData.background = [];
-
-    // Сохраняем
+    // Сохраняем (все остальные поля остаются как есть из GET)
     const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
     if (!result) {
       throw new Error('Не удалось сохранить данные в API');
@@ -6711,19 +6700,11 @@ async function collectChronoByUser(opts = {}) {
       // Если данных нет, создаём пустой объект
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
 
-      // ШАГ 2: Обновляем только chrono и last_timestamp
+      // ШАГ 2: Обновляем ТОЛЬКО chrono и last_timestamp, всё остальное НЕ ТРОГАЕМ!
       baseData.chrono = chronoData;
       baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
-      // Убеждаемся, что остальные поля существуют (на случай, если это первое сохранение)
-      if (!baseData.gift) baseData.gift = [];
-      if (!baseData.coupon) baseData.coupon = [];
-      if (!baseData.icon) baseData.icon = [];
-      if (!baseData.plashka) baseData.plashka = [];
-      if (!baseData.background) baseData.background = [];
-      if (baseData.comment_id === undefined) baseData.comment_id = null;
-
-      // ШАГ 3: Сохраняем весь объект обратно
+      // ШАГ 3: Сохраняем весь объект обратно (с сохранением всех остальных полей как есть)
       const res = await FMVbankStorageSet(baseData, Number(id), 'info_');
 
       const saved = normalizeSaveStatus(res);

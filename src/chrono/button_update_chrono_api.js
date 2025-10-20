@@ -61,19 +61,11 @@
       // Если данных нет, создаём пустой объект
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
 
-      // ШАГ 2: Обновляем только chrono и last_timestamp
+      // ШАГ 2: Обновляем ТОЛЬКО chrono и last_timestamp, всё остальное НЕ ТРОГАЕМ!
       baseData.chrono = chronoData;
       baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
-      // Убеждаемся, что остальные поля существуют (на случай, если это первое сохранение)
-      if (!baseData.gift) baseData.gift = [];
-      if (!baseData.coupon) baseData.coupon = [];
-      if (!baseData.icon) baseData.icon = [];
-      if (!baseData.plashka) baseData.plashka = [];
-      if (!baseData.background) baseData.background = [];
-      if (baseData.comment_id === undefined) baseData.comment_id = null;
-
-      // ШАГ 3: Сохраняем весь объект обратно
+      // ШАГ 3: Сохраняем весь объект обратно (с сохранением всех остальных полей как есть)
       const res = await FMVbankStorageSet(baseData, Number(id), 'info_');
 
       const saved = normalizeSaveStatus(res);

@@ -134,6 +134,36 @@
   }
 
   /**
+   * Загружает HTML с правильной кодировкой
+   */
+  async function smartFetchHtml(url) {
+    const res = await fetch(url, { credentials: 'include' });
+    const buf = await res.arrayBuffer();
+
+    const tryDec = enc => {
+      try {
+        return new TextDecoder(enc).decode(buf);
+      } catch {
+        return null;
+      }
+    };
+
+    // Пробуем UTF-8 и Windows-1251
+    const utf = tryDec('utf-8') ?? '';
+    const cp = tryDec('windows-1251') ?? '';
+
+    // Считаем количество �� (replacement characters)
+    const bad = s => (s.match(/\uFFFD/g) || []).length;
+
+    if (bad(cp) && !bad(utf)) return utf;
+    if (bad(utf) && !bad(cp)) return cp;
+
+    // Считаем кириллицу
+    const cyr = s => (s.match(/[\u0400-\u04FF]/g) || []).length;
+    return cyr(cp) > cyr(utf) ? cp : utf;
+  }
+
+  /**
    * Загружает и парсит пост библиотеки
    */
   async function loadLibraryPost(postId, isCoupon = false) {
@@ -141,12 +171,7 @@
       const url = `/viewtopic.php?pid=${postId}#p${postId}`;
       console.log(`[button_load_library] Загружаю URL: ${url}`);
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Не удалось загрузить пост ${postId}`);
-      }
-
-      const html = await response.text();
+      const html = await smartFetchHtml(url);
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 

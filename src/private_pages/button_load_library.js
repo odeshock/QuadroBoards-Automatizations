@@ -114,6 +114,15 @@
   }
 
   /**
+   * Декодирует HTML entities
+   */
+  function decodeEntities(str) {
+    const div = document.createElement('div');
+    div.innerHTML = String(str ?? '');
+    return div.textContent || div.innerText || '';
+  }
+
+  /**
    * Загружает и парсит пост библиотеки
    */
   async function loadLibraryPost(postId, isCoupon = false) {
@@ -139,8 +148,24 @@
 
       console.log(`[button_load_library] Найден #p${postId}-content`);
 
-      // Ищем все article.card внутри этого поста
-      const articles = postContent.querySelectorAll('article.card');
+      // Ищем script[type="text/html"] внутри поста
+      const scripts = [...postContent.querySelectorAll('script[type="text/html"]')];
+      console.log(`[button_load_library] Найдено script[type="text/html"]: ${scripts.length}`);
+
+      if (!scripts.length) {
+        console.warn(`[button_load_library] Нет script[type="text/html"] в посте ${postId}`);
+        return [];
+      }
+
+      // Извлекаем и декодируем HTML из скриптов
+      const combined = scripts.map(s => s.textContent || s.innerHTML || '').join('\n');
+      const decoded = decodeEntities(combined).replace(/\u00A0/g, ' ');
+
+      // Парсим декодированный HTML
+      const innerDoc = parser.parseFromString(decoded, 'text/html');
+
+      // Ищем article.card внутри #grid
+      const articles = innerDoc.querySelectorAll('#grid article.card');
       console.log(`[button_load_library] Найдено article.card: ${articles.length}`);
 
       const items = [];

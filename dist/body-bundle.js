@@ -954,14 +954,14 @@ $(function() {
   async function updateCommentWithSkins(commentId, userId, data) {
     return new Promise((resolve, reject) => {
       try {
-        // Подготавливаем данные для комментария (только скины, без content)
-        const skinsForComment = {};
+        // Подготавливаем данные для комментария (весь объект data, но без content в элементах)
+        const dataForComment = { ...data };
         const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
         for (const key of categories) {
           const items = data[key] || [];
           // Удаляем поле content из каждого элемента
-          skinsForComment[key] = items.map(item => {
+          dataForComment[key] = items.map(item => {
             const cleanItem = { ...item };
             delete cleanItem.content;
             return cleanItem;
@@ -969,7 +969,7 @@ $(function() {
         }
 
         // JSON минифицированный (без отступов и переносов)
-        const commentJson = JSON.stringify(skinsForComment);
+        const commentJson = JSON.stringify(dataForComment);
 
         // Ссылка на профиль + JSON
         const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
@@ -1171,12 +1171,12 @@ async function loadSkinsFromAPI(userId) {
   };
 
   try {
-    // Загружаем единый объект info_<userId>
-    const response = await window.FMVbank.storageGet(userId, 'info_');
-    console.log('[get_skin_api] info_ ответ:', response);
+    // Загружаем единый объект skin_<userId>
+    const response = await window.FMVbank.storageGet(userId, 'skin_');
+    console.log('[get_skin_api] skin_ ответ:', response);
 
     if (!response || typeof response !== 'object') {
-      console.warn('[get_skin_api] Нет данных в info_ для userId:', userId);
+      console.warn('[get_skin_api] Нет данных в skin_ для userId:', userId);
       return result;
     }
 
@@ -1302,12 +1302,12 @@ async function collectSkinSets() {
     };
 
     try {
-      // Загружаем единый объект info_<userId>
-      const response = await window.FMVbank.storageGet(userId, 'info_');
-      log('info_ ответ:', response);
+      // Загружаем единый объект skin_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'skin_');
+      log('skin_ ответ:', response);
 
       if (!response || typeof response !== 'object') {
-        log('Нет данных в info_ для userId', userId);
+        log('Нет данных в skin_ для userId', userId);
         return result;
       }
 
@@ -1505,7 +1505,7 @@ async function collectSkinSets() {
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const CHRONO_TARGET_SEL = '.chrono_info';
   const DEBUG = true;
-  const API_KEY_LABEL = 'info_'; // Теперь используем единый ключ info_
+  const API_KEY_LABEL = 'chrono_'; // Используем ключ chrono_ для хронологии
 
   // ====================
 

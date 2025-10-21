@@ -243,14 +243,14 @@
   async function updateCommentWithSkins(commentId, userId, data) {
     return new Promise((resolve, reject) => {
       try {
-        // Подготавливаем данные для комментария (только скины, без content)
-        const skinsForComment = {};
+        // Подготавливаем данные для комментария (весь объект data, но без content в элементах)
+        const dataForComment = { ...data };
         const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
         for (const key of categories) {
           const items = data[key] || [];
           // Удаляем поле content из каждого элемента
-          skinsForComment[key] = items.map(item => {
+          dataForComment[key] = items.map(item => {
             const cleanItem = { ...item };
             delete cleanItem.content;
             return cleanItem;
@@ -258,7 +258,7 @@
         }
 
         // JSON минифицированный (без отступов и переносов)
-        const commentJson = JSON.stringify(skinsForComment);
+        const commentJson = JSON.stringify(dataForComment);
 
         // Ссылка на профиль + JSON
         const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;

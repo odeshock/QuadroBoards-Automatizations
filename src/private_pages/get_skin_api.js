@@ -69,12 +69,12 @@ async function loadSkinsFromAPI(userId) {
   };
 
   try {
-    // Загружаем единый объект info_<userId>
-    const response = await window.FMVbank.storageGet(userId, 'info_');
-    console.log('[get_skin_api] info_ ответ:', response);
+    // Загружаем единый объект skin_<userId>
+    const response = await window.FMVbank.storageGet(userId, 'skin_');
+    console.log('[get_skin_api] skin_ ответ:', response);
 
     if (!response || typeof response !== 'object') {
-      console.warn('[get_skin_api] Нет данных в info_ для userId:', userId);
+      console.warn('[get_skin_api] Нет данных в skin_ для userId:', userId);
       return result;
     }
 

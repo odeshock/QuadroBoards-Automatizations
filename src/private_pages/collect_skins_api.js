@@ -69,12 +69,12 @@
     };
 
     try {
-      // Загружаем единый объект info_<userId>
-      const response = await window.FMVbank.storageGet(userId, 'info_');
-      log('info_ ответ:', response);
+      // Загружаем единый объект skin_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'skin_');
+      log('skin_ ответ:', response);
 
       if (!response || typeof response !== 'object') {
-        log('Нет данных в info_ для userId', userId);
+        log('Нет данных в skin_ для userId', userId);
         return result;
       }
 

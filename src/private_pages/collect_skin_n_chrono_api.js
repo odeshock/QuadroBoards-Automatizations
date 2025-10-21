@@ -5,7 +5,7 @@
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const CHRONO_TARGET_SEL = '.chrono_info';
   const DEBUG = true;
-  const API_KEY_LABEL = 'info_'; // Теперь используем единый ключ info_
+  const API_KEY_LABEL = 'chrono_'; // Используем ключ chrono_ для хронологии
 
   // ====================
 

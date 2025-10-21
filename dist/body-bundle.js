@@ -752,22 +752,14 @@ $(function() {
   }
 
   /**
-   * Загружает данные из API (единый объект info_<userId>)
-   * Помечает каждый элемент is_visible в зависимости от наличия в библиотеке
+   * Загружает данные из API (единый объект skin_<userId>)
+   * Фильтрует истекшие купоны (expired_date < today)
    * @param {number} userId
    * @param {object} libraryIds - { icon: Set, plashka: Set, ... }
-   * @returns {Promise<object>} { visible: { icon: [], ... }, invisible: { icon: [], ... }, chrono: {}, comment_id: null }
+   * @returns {Promise<object>} { data: { icon: [], ... }, chrono: {}, comment_id: null }
    */
   async function loadAllDataFromAPI(userId, libraryIds) {
-    const visible = {
-      icon: [],
-      plashka: [],
-      background: [],
-      gift: [],
-      coupon: []
-    };
-
-    const invisible = {
+    const data = {
       icon: [],
       plashka: [],
       background: [],
@@ -780,8 +772,24 @@ $(function() {
 
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageGet не найден');
-      return { visible, invisible, chrono, comment_id };
+      return { data, chrono, comment_id };
     }
+
+    // Функция для получения текущей даты в МСК (yyyy-mm-dd)
+    const getTodayMoscow = () => {
+      const now = new Date();
+      const moscowOffset = 3 * 60; // UTC+3
+      const localOffset = now.getTimezoneOffset(); // минуты от UTC
+      const moscowTime = new Date(now.getTime() + (moscowOffset + localOffset) * 60000);
+
+      const year = moscowTime.getFullYear();
+      const month = String(moscowTime.getMonth() + 1).padStart(2, '0');
+      const day = String(moscowTime.getDate()).padStart(2, '0');
+
+      return `${year}-${month}-${day}`;
+    };
+
+    const today = getTodayMoscow();
 
     try {
       // Загружаем единый объект skin_<userId>
@@ -789,7 +797,7 @@ $(function() {
 
       if (!response || typeof response !== 'object') {
         console.warn('[admin_bridge_json] Нет данных в API для userId=' + userId);
-        return { visible, invisible, chrono, comment_id };
+        return { data, chrono, comment_id };
       }
 
       // Извлекаем chrono и comment_id
@@ -803,44 +811,59 @@ $(function() {
         const items = response[key] || [];
         if (!Array.isArray(items)) continue;
 
-        const libIds = libraryIds[key] || new Set();
-
         items.forEach(item => {
-          const isInLibrary = libIds.has(String(item.id));
-          const markedItem = { ...item, is_visible: isInLibrary };
-
-          if (isInLibrary) {
-            visible[key].push(markedItem);
-          } else {
-            invisible[key].push(markedItem);
+          // Для купонов: фильтруем истекшие (expired_date < today)
+          if (key === 'coupon' && item.expired_date) {
+            if (item.expired_date < today) {
+              console.log(`[admin_bridge_json] Пропущен истекший купон: ${item.id}, expired_date=${item.expired_date} < ${today}`);
+              return; // Пропускаем истекший купон
+            }
           }
+
+          // Добавляем элемент в данные (все элементы видимы)
+          data[key].push(item);
         });
       }
     } catch (err) {
       console.error('[admin_bridge_json] Ошибка загрузки данных:', err);
     }
 
-    return { visible, invisible, chrono, comment_id };
+    return { data, chrono, comment_id };
   }
 
   /**
-   * Сохраняет данные в API (единый объект info_<userId>)
+   * Сохраняет данные в API (единый объект skin_<userId>)
    * ВАЖНО: Сначала делает GET, затем частично обновляет только категории скинов, сохраняя chrono и comment_id
+   * Удаляет истекшие купоны (expired_date < today)
    *
    * @param {number} userId
-   * @param {object} visibleData - { icon: [], plashka: [], ... } данные из панели
-   * @param {object} invisibleData - { icon: [], plashka: [], ... } невидимые элементы
+   * @param {object} skinData - { icon: [], plashka: [], ... } данные из панели
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, visibleData, invisibleData) {
+  async function saveAllDataToAPI(userId, skinData) {
     console.log('[admin_bridge_json] 🔥 СОХРАНЕНИЕ ДЛЯ userId:', userId);
-    console.log('[admin_bridge_json] 🔥 visibleData:', JSON.parse(JSON.stringify(visibleData)));
-    console.log('[admin_bridge_json] 🔥 invisibleData:', JSON.parse(JSON.stringify(invisibleData)));
+    console.log('[admin_bridge_json] 🔥 skinData:', JSON.parse(JSON.stringify(skinData)));
 
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function' || typeof window.FMVbank.storageSet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageGet или storageSet не найдены');
       return false;
     }
+
+    // Функция для получения текущей даты в МСК (yyyy-mm-dd)
+    const getTodayMoscow = () => {
+      const now = new Date();
+      const moscowOffset = 3 * 60; // UTC+3
+      const localOffset = now.getTimezoneOffset(); // минуты от UTC
+      const moscowTime = new Date(now.getTime() + (moscowOffset + localOffset) * 60000);
+
+      const year = moscowTime.getFullYear();
+      const month = String(moscowTime.getMonth() + 1).padStart(2, '0');
+      const day = String(moscowTime.getDate()).padStart(2, '0');
+
+      return `${year}-${month}-${day}`;
+    };
+
+    const today = getTodayMoscow();
 
     try {
       // ШАГ 1: Сначала получаем текущие данные из API
@@ -865,19 +888,28 @@ $(function() {
       const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
       for (const key of categories) {
-        // Видимые элементы из панели (помечаем is_visible: true)
-        const visible = (visibleData[key] || []).map(item => ({ ...item, is_visible: true }));
+        let items = skinData[key] || [];
 
-        // Невидимые элементы (уже помечены is_visible: false)
-        const invisible = invisibleData[key] || [];
+        // Для купонов: удаляем истекшие (expired_date < today)
+        if (key === 'coupon') {
+          const before = items.length;
+          items = items.filter(item => {
+            if (item.expired_date && item.expired_date < today) {
+              console.log(`[admin_bridge_json] Удалён истекший купон: ${item.id}, expired_date=${item.expired_date} < ${today}`);
+              return false;
+            }
+            return true;
+          });
+          const after = items.length;
+          if (before !== after) {
+            console.log(`[admin_bridge_json] 🗑️ Купоны: удалено ${before - after} истекших`);
+          }
+        }
 
-        // Объединяем: сначала видимые, потом невидимые
-        const mergedData = [...visible, ...invisible];
-
-        console.log('[admin_bridge_json] 📦 ' + key + ': ' + mergedData.length + ' элементов');
+        console.log('[admin_bridge_json] 📦 ' + key + ': ' + items.length + ' элементов');
 
         // Сохраняем в базовый объект (даже если пустой массив)
-        baseData[key] = mergedData;
+        baseData[key] = items;
       }
 
       // ШАГ 3: НЕ трогаем chrono и comment_id - они остаются как есть из GET!
@@ -1032,7 +1064,6 @@ $(function() {
       return {
         status: 'error',
         visibleData: {},
-        invisibleData: {},
         chrono: {},
         comment_id: null,
         save: null,
@@ -1040,17 +1071,16 @@ $(function() {
       };
     }
 
-    // Загружаем данные из API и помечаем is_visible
-    const { visible, invisible, chrono, comment_id } = await loadAllDataFromAPI(targetUserId, libraryIds);
+    // Загружаем данные из API (фильтруем истекшие купоны)
+    const { data, chrono, comment_id } = await loadAllDataFromAPI(targetUserId, libraryIds);
 
     /**
      * Функция сохранения
-     * @param {object} newVisibleData - { icon: [], plashka: [], ... } данные из панели
+     * @param {object} skinData - { icon: [], plashka: [], ... } данные из панели
      * @returns {Promise<object>} { ok, status }
      */
-    async function save(newVisibleData) {
-      // invisible данные тоже нужно сохранить (элементы с is_visible: false)
-      const success = await saveAllDataToAPI(targetUserId, newVisibleData, invisible);
+    async function save(skinData) {
+      const success = await saveAllDataToAPI(targetUserId, skinData);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'
@@ -1059,8 +1089,7 @@ $(function() {
 
     return {
       status: 'ok',
-      visibleData: visible,
-      invisibleData: invisible,
+      visibleData: data,
       chrono: chrono,
       comment_id: comment_id,
       save,
@@ -1698,7 +1727,7 @@ async function collectSkinSets() {
   }
 
   /**
-   * Проверяет наличие comment_id в info_<userId>
+   * Проверяет наличие comment_id в skin_<userId>
    * @returns {Promise<{exists: boolean, commentId: number|null}>}
    */
   async function checkCommentId(userId) {
@@ -1707,7 +1736,7 @@ async function collectSkinSets() {
     }
 
     try {
-      const data = await window.FMVbank.storageGet(userId, 'info_');
+      const data = await window.FMVbank.storageGet(userId, 'skin_');
 
       // Если data существует и comment_id указан
       if (data && typeof data === 'object' && data.comment_id) {
@@ -1869,7 +1898,7 @@ async function collectSkinSets() {
   }
 
   /**
-   * Сохраняет comment_id в info_<userId>
+   * Сохраняет comment_id в skin_<userId>
    */
   async function saveCommentId(userId, commentId) {
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function' || typeof window.FMVbank.storageSet !== 'function') {
@@ -1879,7 +1908,7 @@ async function collectSkinSets() {
     // Делаем GET сначала
     let currentData;
     try {
-      currentData = await window.FMVbank.storageGet(userId, 'info_');
+      currentData = await window.FMVbank.storageGet(userId, 'skin_');
     } catch (error) {
       console.log('[button_create_storage] Данные не найдены, создаём новый объект');
       currentData = {};
@@ -1892,7 +1921,7 @@ async function collectSkinSets() {
     baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
     // Сохраняем (все остальные поля остаются как есть из GET)
-    const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
+    const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
     if (!result) {
       throw new Error('Не удалось сохранить данные в API');
     }

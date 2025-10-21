@@ -28,7 +28,7 @@
   }
 
   /**
-   * Проверяет наличие comment_id в info_<userId>
+   * Проверяет наличие comment_id в skin_<userId>
    * @returns {Promise<{exists: boolean, commentId: number|null}>}
    */
   async function checkCommentId(userId) {
@@ -37,7 +37,7 @@
     }
 
     try {
-      const data = await window.FMVbank.storageGet(userId, 'info_');
+      const data = await window.FMVbank.storageGet(userId, 'skin_');
 
       // Если data существует и comment_id указан
       if (data && typeof data === 'object' && data.comment_id) {
@@ -199,7 +199,7 @@
   }
 
   /**
-   * Сохраняет comment_id в info_<userId>
+   * Сохраняет comment_id в skin_<userId>
    */
   async function saveCommentId(userId, commentId) {
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function' || typeof window.FMVbank.storageSet !== 'function') {
@@ -209,7 +209,7 @@
     // Делаем GET сначала
     let currentData;
     try {
-      currentData = await window.FMVbank.storageGet(userId, 'info_');
+      currentData = await window.FMVbank.storageGet(userId, 'skin_');
     } catch (error) {
       console.log('[button_create_storage] Данные не найдены, создаём новый объект');
       currentData = {};
@@ -222,7 +222,7 @@
     baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
     // Сохраняем (все остальные поля остаются как есть из GET)
-    const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
+    const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
     if (!result) {
       throw new Error('Не удалось сохранить данные в API');
     }

@@ -4462,21 +4462,20 @@ async function fetchLibraryItems() {
         });
       } else {
         // Обычные скины: {id, content, t, h, c, s}
-        const items = data.items
-          .filter(item => item.h !== 1) // Фильтруем hidden
-          .map(item => {
-            const converted = {
-              id: item.id,
-              icon: item.content || ''
-            };
+        // НЕ фильтруем hidden здесь - фильтрация происходит в data.js в зависимости от IS_ADMIN
+        const items = data.items.map(item => {
+          const converted = {
+            id: item.id,
+            icon: item.content || ''
+          };
 
-            // Конвертируем 1/0 в true/false
-            if (item.h !== undefined) converted.hidden = item.h === 1;
-            if (item.c !== undefined) converted.custom = item.c === 1;
-            if (item.s !== undefined) converted.system = item.s === 1;
+          // Конвертируем 1/0 в true/false
+          if (item.h !== undefined) converted.hidden = item.h === 1;
+          if (item.c !== undefined) converted.custom = item.c === 1;
+          if (item.s !== undefined) converted.system = item.s === 1;
 
-            return converted;
-          });
+          return converted;
+        });
 
         // Сопоставляем категории с ключами результата
         const targetKey = category === 'background' ? 'back' : category;

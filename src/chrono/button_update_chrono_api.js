@@ -55,8 +55,8 @@
     }
 
     try {
-      // ШАГ 1: Сначала получаем текущие данные из API (единый объект info_)
-      const currentData = await FMVbankStorageGet(Number(id), 'info_');
+      // ШАГ 1: Сначала получаем текущие данные из API (единый объект chrono_)
+      const currentData = await FMVbankStorageGet(Number(id), 'chrono_');
 
       // Если данных нет, создаём пустой объект
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
@@ -66,7 +66,7 @@
       baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
       // ШАГ 3: Сохраняем весь объект обратно (с сохранением всех остальных полей как есть)
-      const res = await FMVbankStorageSet(baseData, Number(id), 'info_');
+      const res = await FMVbankStorageSet(baseData, Number(id), 'chrono_');
 
       const saved = normalizeSaveStatus(res);
       return { id, status: saved };

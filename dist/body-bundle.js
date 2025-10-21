@@ -784,8 +784,8 @@ $(function() {
     }
 
     try {
-      // Загружаем единый объект info_<userId>
-      const response = await window.FMVbank.storageGet(userId, 'info_');
+      // Загружаем единый объект skin_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'skin_');
 
       if (!response || typeof response !== 'object') {
         console.warn('[admin_bridge_json] Нет данных в API для userId=' + userId);
@@ -845,7 +845,7 @@ $(function() {
     try {
       // ШАГ 1: Сначала получаем текущие данные из API
       console.log('[admin_bridge_json] 📥 Загружаю текущие данные из API...');
-      const currentData = await window.FMVbank.storageGet(userId, 'info_');
+      const currentData = await window.FMVbank.storageGet(userId, 'skin_');
 
       // Если данных нет, создаём пустой объект
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
@@ -888,7 +888,7 @@ $(function() {
       console.log('[admin_bridge_json] 💾 Финальный объект для сохранения:', JSON.parse(JSON.stringify(baseData)));
 
       // ШАГ 5: Сохраняем весь объект
-      const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
+      const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
       if (!result) {
         console.error('[admin_bridge_json] ❌ Не удалось сохранить данные');
         return false;
@@ -4267,8 +4267,7 @@ window.fetchAllLibraries = fetchAllLibraries;
           if (ok) {
             statusEl.textContent = '✓ Успешно сохранено';
             statusEl.style.color = '#16a34a';
-            // перезагрузка отключена для отладки
-            // setTimeout(() => location.reload(), 1000);
+            setTimeout(() => location.reload(), 1000);
           } else {
             statusEl.textContent = 'Ошибка сохранения';
             statusEl.style.color = '#c24141';
@@ -7070,8 +7069,8 @@ async function collectChronoByUser(opts = {}) {
     }
 
     try {
-      // ШАГ 1: Сначала получаем текущие данные из API (единый объект info_)
-      const currentData = await FMVbankStorageGet(Number(id), 'info_');
+      // ШАГ 1: Сначала получаем текущие данные из API (единый объект chrono_)
+      const currentData = await FMVbankStorageGet(Number(id), 'chrono_');
 
       // Если данных нет, создаём пустой объект
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
@@ -7081,7 +7080,7 @@ async function collectChronoByUser(opts = {}) {
       baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
       // ШАГ 3: Сохраняем весь объект обратно (с сохранением всех остальных полей как есть)
-      const res = await FMVbankStorageSet(baseData, Number(id), 'info_');
+      const res = await FMVbankStorageSet(baseData, Number(id), 'chrono_');
 
       const saved = normalizeSaveStatus(res);
       return { id, status: saved };

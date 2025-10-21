@@ -115,10 +115,10 @@ async function fetchUserCoupons() {
 
   const today = getTodayMoscow();
 
-  // Загружаем данные из API (единый объект info_)
+  // Загружаем данные из API (единый объект skin_)
   let response;
   try {
-    response = await window.FMVbank.storageGet(userId, 'info_');
+    response = await window.FMVbank.storageGet(userId, 'skin_');
     console.log('[fetchUserCoupons] API ответ:', response);
   } catch (error) {
     console.error('[fetchUserCoupons] Ошибка загрузки из API:', error);

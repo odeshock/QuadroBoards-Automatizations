@@ -17,78 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const textArea = document.querySelector('textarea[name="req_message"]');
   const iframeReadyP = window.BankWaitForIframeReady(window.BANK_IFRAME_ORIGIN);
 
-  // Функция для редактирования комментариев из backup
-  async function bankCommentEditFromBackup(user_id, ts, NEW_COMMENT_ID = 0, current_bank = 0, { NEW_IS_ADMIN_TO_EDIT = false } = {}) {
-    window.BankMessagesLog(`🟦 [BACKUP] bankCommentEditFromBackup called: user_id=${user_id}, ts=${ts}, comment_id=${NEW_COMMENT_ID}, current_bank=${current_bank}, NEW_IS_ADMIN_TO_EDIT=${NEW_IS_ADMIN_TO_EDIT}`);
-
-    // Проверка на bank_ams_done для всех (включая админов)
-    const commentContent = document.querySelector(`#p${NEW_COMMENT_ID}-content`);
-    if (commentContent) {
-      const hasAmsDone = commentContent.querySelector('bank_ams_done');
-      if (hasAmsDone) {
-        window.BankMessagesWarn('⚠️ [BACKUP] Обнаружен bank_ams_done, редактирование запрещено');
-        alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
-        return;
-      }
-    }
-
-    // Проверки для НЕ-админ редактирования
-    if (!NEW_IS_ADMIN_TO_EDIT) {
-      // 1. Проверка на NEW_COMMENT_ID = 0
-      if (NEW_COMMENT_ID === 0) {
-        window.BankMessagesError('❌ [BACKUP] NEW_COMMENT_ID = 0, редактирование невозможно');
-        alert("Извините! Произошла ошибка. Пожалуйста, обратитесь в Приёмную.");
-        return;
-      }
-
-      // 2. Проверка на наличие bank_ams_check
-      if (commentContent) {
-        const hasAmsCheck = commentContent.querySelector('bank_ams_check');
-
-        if (hasAmsCheck) {
-          window.BankMessagesWarn('⚠️ [BACKUP] Обнаружен bank_ams_check, редактирование запрещено');
-          alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
-          return;
-        }
-      } else {
-        window.BankMessagesWarn(`⚠️ [BACKUP] Элемент #p${NEW_COMMENT_ID}-content не найден`);
-      }
-    }
-
-    const current_storage = await FMVbank.storageGet(user_id, 'fmv_bank_info_');
-    window.BankMessagesLog(`🟦 [BACKUP] current_storage:`, current_storage);
-
-    const BACKUP_DATA = current_storage[ts];
-    window.BankMessagesLog(`🟦 [BACKUP] BACKUP_DATA for ts=${ts}:`, BACKUP_DATA);
-
-    // Отправляем НЕМЕДЛЕННО, минуя очередь
-    if (BACKUP_DATA) {
-      window.BankSendMessageImmediately(iframeReadyP, () => ({
-        type: window.BankPostMessagesType.comment_info,
-        NEW_COMMENT_TIMESTAMP: ts,
-        NEW_COMMENT_ID,
-        NEW_CURRENT_BANK: (Number(window.user_id) == 2) ? 99999999 : current_bank,
-        NEW_IS_ADMIN_TO_EDIT
-      }), "comment_info");
-      window.BankSendMessageImmediately(iframeReadyP, () => ({
-        type: window.BankPostMessagesType.backup_data,
-        BACKUP_DATA
-      }), "backup_data");
-
-      // Скроллим страницу к div.post.topicpost
-      const topicPost = document.querySelector("div.post.topicpost");
-      if (topicPost) {
-        topicPost.scrollIntoView({ behavior: "smooth", block: "start" });
-        window.BankMessagesLog("🟦 [BACKUP] Скролл к div.post.topicpost выполнен");
-      } else {
-        window.BankMessagesWarn("⚠️ [BACKUP] div.post.topicpost не найден");
-      }
-    }
-  }
-
-  // Экспортируем функцию в глобальную область видимости для использования в onclick
-  window.bankCommentEditFromBackup = bankCommentEditFromBackup;
-
   // user_info — можно отправить сразу после готовности iframe (без данных)
   window.BankQueueMessage(iframeReadyP, () => ({
     type: window.BankPostMessagesType.user_info,
@@ -141,152 +69,18 @@ document.addEventListener("DOMContentLoaded", () => {
     window.BankMessagesLog("🟦 [STEP] PURCHASE received");
     const encode = encodeJSON(e.data);
     const newText = formatBankText(e.data);
-    const ts = e.data.timestamp;
-    const current_storage = await FMVbank.storageGet(window.UserID, 'fmv_bank_info_');
-    current_storage[ts] = e.data;
-    const storage_set_flag = FMVbank.storageSet(current_storage, window.UserID, 'fmv_bank_info_');
-    if (!storage_set_flag) { alert("Попробуйте нажать на кнопку еще раз."); } else {
-      if (textArea) {
-        textArea.value = `[FMVbank]${ts}[/FMVbank]${newText}`;
-        const button = document.querySelector(
-          'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
-        );
-        if (button) {
-          button.click();
-          window.BankMessagesLog("🟩 [SENT]  PURCHASE form submitted");
-        } else {
-          window.BankMessagesWarn("❌ [ERROR] Submit button not found.");
-        }
-      }
+
+    textArea.value = `${newText}`;
+    const button = document.querySelector(
+      'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
+    );
+    if (button) {
+      button.click();
+      window.BankMessagesLog("🟩 [SENT]  PURCHASE form submitted");
+    } else {
+      window.BankMessagesWarn("❌ [ERROR] Submit button not found.");
     }
-  });
 
-  // обработчик EDIT_PURCHASE
-  window.addEventListener("message", async (e) => {
-    if (e.origin !== window.BANK_IFRAME_ORIGIN) return;
-    if (!e.data || e.data.type !== "EDIT_PURCHASE") return;
-
-    window.BankMessagesLog("🟦 [STEP] EDIT_PURCHASE received");
-    const SITE_URL = (window.SITE_URL || location.origin).replace(/\/+$/, '');
-    const newText = formatBankText(e.data);
-    const ts = e.data.timestamp;
-    const comment_ts = e.data.comment_timestamp;
-    const comment_id = e.data.comment_id;
-    const comment_user_id = e.data.comment_user_id;
-    const is_admin_to_edit = e.data.is_admin_to_edit || false;
-    const admin_flag = (!is_admin_to_edit) ? "" : "[FMVbankAmsCheck]";
-
-    // Открываем страницу редактирования в скрытом iframe
-    window.BankMessagesLog("🟦 [EDIT] Открываем страницу редактирования комментария:", comment_id);
-
-    const editIframe = document.createElement('iframe');
-    editIframe.style.display = 'none';
-    editIframe.src = `${SITE_URL}/edit.php?id=${comment_id}`;
-    document.body.appendChild(editIframe);
-
-    // Ждём загрузки iframe и отправляем форму
-    editIframe.onload = async function () {
-      try {
-        const iframeDoc = editIframe.contentDocument || editIframe.contentWindow.document;
-        const iframeTextArea = iframeDoc.querySelector('textarea[name="req_message"]');
-        const iframeSubmitButton = iframeDoc.querySelector(
-          'input[type="submit"].button.submit[name="submit"][value="Отправить"][accesskey="s"]'
-        );
-
-        if (!iframeTextArea || !iframeSubmitButton) {
-          window.BankMessagesWarn("❌ [ERROR] Не найдена форма редактирования в iframe");
-          editIframe.remove();
-          return;
-        }
-
-        // Проверяем наличие [FMVbankAmsDone] если это НЕ админ-редактирование
-        if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsDone]')) {
-          window.BankMessagesWarn("⚠️ [EDIT] Обнаружен [FMVbankAmsDone], редактирование запрещено");
-          editIframe.remove();
-          alert("Извините! Администратор уже обработал Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
-          return;
-        }
-
-        // Проверяем наличие [FMVbankAmsCheck] если это НЕ админ-редактирование
-        if (!is_admin_to_edit && iframeTextArea.value.includes('[FMVbankAmsCheck]')) {
-          window.BankMessagesWarn("⚠️ [EDIT] Обнаружен [FMVbankAmsCheck], редактирование запрещено");
-          editIframe.remove();
-          alert("Извините! Администратор уже начал обрабатывать Вашу запись в банке. Пожалуйста, обратитесь в Приёмную, если нужно будет внести изменения.");
-          return;
-        }
-
-        // Сохраняем данные в storage ПОСЛЕ проверки
-        const current_storage = await FMVbank.storageGet(comment_user_id, 'fmv_bank_info_');
-        current_storage[ts] = e.data;
-        delete current_storage[comment_ts];
-        const storage_set_flag = FMVbank.storageSet(current_storage, comment_user_id, 'fmv_bank_info_');
-
-        if (!storage_set_flag) {
-          editIframe.remove();
-          alert("Попробуйте нажать на кнопку еще раз.");
-          return;
-        }
-
-        // Вставляем текст
-        iframeTextArea.value = `${admin_flag}[FMVbank]${ts}[/FMVbank]${newText}`;
-        window.BankMessagesLog("✅ [EDIT] Текст вставлен в форму редактирования");
-
-        // Отслеживаем редирект после отправки
-        let redirectUrl = null;
-        let redirectDetected = false;
-        let redirectCheckInterval;
-
-        const checkRedirect = () => {
-          try {
-            const currentUrl = editIframe.contentWindow.location.href;
-            window.BankMessagesLog("🔍 [EDIT] Проверяем URL iframe:", currentUrl);
-            if (currentUrl.includes('/viewtopic.php?')) {
-              redirectUrl = currentUrl;
-              redirectDetected = true;
-              window.BankMessagesLog("✅ [EDIT] Обнаружен редирект на:", redirectUrl);
-
-              // Очищаем интервал
-              clearInterval(redirectCheckInterval);
-
-              // Удаляем iframe
-              editIframe.remove();
-
-              // Переходим в основном окне (принудительная перезагрузка)
-              window.BankMessagesLog("🟩 [EDIT] Переходим по ссылке:", redirectUrl);
-              window.location.reload();
-            }
-          } catch (err) {
-            window.BankMessagesLog("⚠️ [EDIT] CORS или другая ошибка при проверке redirect:", err.message);
-          }
-        };
-
-        // Проверяем редирект каждые 500ms
-        redirectCheckInterval = setInterval(checkRedirect, 500);
-
-        // Останавливаем проверку через 10 секунд
-        setTimeout(() => {
-          clearInterval(redirectCheckInterval);
-          if (!redirectDetected) {
-            window.BankMessagesWarn("⚠️ [EDIT] Редирект не обнаружен за 10 секунд");
-            editIframe.remove();
-          }
-        }, 10000);
-
-        // Отправляем форму
-        iframeSubmitButton.click();
-        window.BankMessagesLog("🟩 [SENT] EDIT_PURCHASE form submitted в iframe");
-
-      } catch (error) {
-        window.BankMessagesError("❌ [ERROR] Ошибка при работе с iframe:", error);
-        editIframe.remove();
-      }
-    };
-
-    // Обработка ошибки загрузки iframe
-    editIframe.onerror = function () {
-      window.BankMessagesError("❌ [ERROR] Не удалось загрузить страницу редактирования");
-      editIframe.remove();
-    };
   });
 
   // === ПОСЛЕДОВАТЕЛЬНАЯ ЛЕНТА СКРЕЙПОВ ===

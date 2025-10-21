@@ -73,8 +73,8 @@
     }
 
     try {
-      // Загружаем единый объект info_<userId>
-      const response = await window.FMVbank.storageGet(userId, 'info_');
+      // Загружаем единый объект skin_<userId>
+      const response = await window.FMVbank.storageGet(userId, 'skin_');
 
       if (!response || typeof response !== 'object') {
         console.warn('[admin_bridge_json] Нет данных в API для userId=' + userId);
@@ -134,7 +134,7 @@
     try {
       // ШАГ 1: Сначала получаем текущие данные из API
       console.log('[admin_bridge_json] 📥 Загружаю текущие данные из API...');
-      const currentData = await window.FMVbank.storageGet(userId, 'info_');
+      const currentData = await window.FMVbank.storageGet(userId, 'skin_');
 
       // Если данных нет, создаём пустой объект
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
@@ -177,7 +177,7 @@
       console.log('[admin_bridge_json] 💾 Финальный объект для сохранения:', JSON.parse(JSON.stringify(baseData)));
 
       // ШАГ 5: Сохраняем весь объект
-      const result = await window.FMVbank.storageSet(baseData, userId, 'info_');
+      const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
       if (!result) {
         console.error('[admin_bridge_json] ❌ Не удалось сохранить данные');
         return false;

@@ -5139,10 +5139,10 @@ document.addEventListener("DOMContentLoaded", () => {
     is_admin: window.UserID == 2
   }), "user_info");
 
-  // Загрузка данных скинов и купонов из API (async)
+  // Загрузка данных скинов из API (async)
   (async () => {
     try {
-      // Загружаем библиотеку из API
+      // Загружаем библиотеку скинов из API (library_icon_1, library_plashka_1, и т.д.)
       const libraryItems = await fetchLibraryItems();
 
       window.BankMessagesLog("[SKIN from API]", libraryItems);
@@ -5154,13 +5154,24 @@ document.addEventListener("DOMContentLoaded", () => {
         skin_data_back: libraryItems.back,
         skin_data_gift: libraryItems.gift
       }), "skin_data");
+    } catch (e) {
+      window.BankMessagesWarn("❌ [ERROR] Skin loading from API failed:", e?.message || e);
+    }
+  })();
+
+  // Загрузка персональных купонов пользователя из info_<userId> (async)
+  (async () => {
+    try {
+      const userCoupons = await fetchUserCoupons();
+
+      window.BankMessagesLog("[COUPONS from info_]", userCoupons);
 
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.coupons,
-        coupons_data: libraryItems.coupon
+        coupons_data: userCoupons
       }), "coupons_data");
     } catch (e) {
-      window.BankMessagesWarn("❌ [ERROR] Skin/Coupons loading from API failed:", e?.message || e);
+      window.BankMessagesWarn("❌ [ERROR] Coupons loading from info_ failed:", e?.message || e);
     }
   })();
 

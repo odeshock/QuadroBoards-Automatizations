@@ -301,7 +301,17 @@ export const ADMIN_ALLOWED_ITEMS = [
   FORM_INCOME_POST_OF,     // 'Пост полумесяца'
   FORM_INCOME_EPISODE_OF,  // 'Эпизод полумесяца'
   FORM_INCOME_ACTIVIST,    // 'Активист полумесяца'
-  FORM_INCOME_AMS          // 'Выдать денежку дополнительно'
+  FORM_INCOME_AMS,         // 'Выдать денежку дополнительно'
+  // Подарки
+  FORM_GIFT_PRESENT,       // 'Подарок из коллекции'
+  FORM_GIFT_CUSTOM,        // 'Индивидуальный подарок'
+  // Оформление
+  FORM_ICON_PRESENT,       // 'Иконка из коллекции'
+  FORM_ICON_CUSTOM,        // 'Индивидуальная иконка'
+  FORM_BADGE_PRESENT,      // 'Плашка из коллекции'
+  FORM_BADGE_CUSTOM,       // 'Индивидуальная плашка'
+  FORM_BG_PRESENT,         // 'Фон из коллекции'
+  FORM_BG_CUSTOM           // 'Индивидуальный фон'
 ];
 
 export const ADMIN_RECIPIENT_MULTI_FORMS = [

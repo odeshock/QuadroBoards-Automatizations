@@ -73,6 +73,7 @@ export const FORM_EXP_BONUS2M1 = 'form-exp-bonus2m1';
 export const FORM_EXP_BONUS1M3 = 'form-exp-bonus1m3';
 export const FORM_EXP_BONUS2M3 = 'form-exp-bonus2m3';
 export const FORM_EXP_THIRDCHAR = 'form-exp-thirdchar';
+export const FORM_EXP_CHANGEAPP = 'form-exp-changeapp';
 export const FORM_EXP_CHANGECHAR = 'form-exp-changechar';
 export const FORM_EXP_REFUSE = 'form-exp-refuse';
 export const FORM_EXP_CLEAN = 'form-exp-clean';
@@ -181,6 +182,7 @@ export const BANNER_FORMS = [
 
 // Формы смены персонажа и первого поста
 export const CHARACTER_CHANGE_FORMS = [
+  toSelector(FORM_EXP_CHANGEAPP),
   toSelector(FORM_EXP_CHANGECHAR),
   toSelector(FORM_INCOME_FIRSTPOST)
 ];

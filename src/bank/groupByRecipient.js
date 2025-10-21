@@ -56,6 +56,7 @@ export function groupOperationsByRecipient(backupData) {
     'form-income-banner-reno',      // Баннер FMV в подписи на Рено
     'form-income-banner-mayak',     // Баннер FMV в подписи на Маяке
     'form-exp-thirdchar',           // Третий и следующие персонажи
+    'form-exp-changeapp',           // Смена внешности
     'form-exp-changechar',          // Смена персонажа
     'form-exp-refuse',              // Отказ от персонажа
     'gift-discount'                 // Автоскидки

@@ -3743,7 +3743,7 @@ function formatBankText(data) {
 
   // 10) Необычные расходы
   const thirdCharIds = ["form-exp-thirdchar"];
-  const changeCharIds = ["form-exp-changechar"];
+  const changeCharIds = ["form-exp-changeapp", "form-exp-changechar"];
   const refuseIds = ["form-exp-refuse"];
   const transferIds = ["form-exp-transfer"];
 

@@ -171,20 +171,15 @@ function _getGiftItems() {
   const skinData = window.SKIN_DATA_GIFT || [];
   const isAdmin = window.IS_ADMIN === true;
   const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
-  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
 
   let filteredItems;
 
   if (isAdmin || isAdminToEdit) {
-    if (isEditingRecord) {
-      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
-      filteredItems = skinData.filter(item =>
-        item.hidden !== true || item.custom === true || item.system === true
-      );
-    } else {
-      // Начальная загрузка админом: показываем всё
-      filteredItems = skinData;
-    }
+    // Админ (и при начальной загрузке, и при редактировании):
+    // hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true || item.custom === true || item.system === true
+    );
   } else {
     // Обычный пользователь: только hidden: false И custom: false И system: false
     filteredItems = skinData.filter(item =>
@@ -239,20 +234,15 @@ function _getIconItems() {
   const skinData = window.SKIN_DATA_ICON || [];
   const isAdmin = window.IS_ADMIN === true;
   const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
-  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
 
   let filteredItems;
 
   if (isAdmin || isAdminToEdit) {
-    if (isEditingRecord) {
-      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
-      filteredItems = skinData.filter(item =>
-        item.hidden !== true || item.custom === true || item.system === true
-      );
-    } else {
-      // Начальная загрузка админом: показываем всё
-      filteredItems = skinData;
-    }
+    // Админ (и при начальной загрузке, и при редактировании):
+    // hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true || item.custom === true || item.system === true
+    );
   } else {
     // Обычный пользователь: только hidden: false И custom: false И system: false
     filteredItems = skinData.filter(item =>
@@ -304,20 +294,15 @@ function _getBadgeItems() {
   const skinData = window.SKIN_DATA_PLASHKA || [];
   const isAdmin = window.IS_ADMIN === true;
   const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
-  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
 
   let filteredItems;
 
   if (isAdmin || isAdminToEdit) {
-    if (isEditingRecord) {
-      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
-      filteredItems = skinData.filter(item =>
-        item.hidden !== true || item.custom === true || item.system === true
-      );
-    } else {
-      // Начальная загрузка админом: показываем всё
-      filteredItems = skinData;
-    }
+    // Админ (и при начальной загрузке, и при редактировании):
+    // hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true || item.custom === true || item.system === true
+    );
   } else {
     // Обычный пользователь: только hidden: false И custom: false И system: false
     filteredItems = skinData.filter(item =>
@@ -369,20 +354,15 @@ function _getBackgroundItems() {
   const skinData = window.SKIN_DATA_BACK || [];
   const isAdmin = window.IS_ADMIN === true;
   const isAdminToEdit = window.IS_ADMIN_TO_EDIT === true;
-  const isEditingRecord = typeof window.BACKUP_DATA !== 'undefined';
 
   let filteredItems;
 
   if (isAdmin || isAdminToEdit) {
-    if (isEditingRecord) {
-      // Редактирование записи админом: hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
-      filteredItems = skinData.filter(item =>
-        item.hidden !== true || item.custom === true || item.system === true
-      );
-    } else {
-      // Начальная загрузка админом: показываем всё
-      filteredItems = skinData;
-    }
+    // Админ (и при начальной загрузке, и при редактировании):
+    // hidden: false ИЛИ (hidden: true И custom: true) ИЛИ (hidden: true И system: true)
+    filteredItems = skinData.filter(item =>
+      item.hidden !== true || item.custom === true || item.system === true
+    );
   } else {
     // Обычный пользователь: только hidden: false И custom: false И system: false
     filteredItems = skinData.filter(item =>

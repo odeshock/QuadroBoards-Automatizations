@@ -2,6 +2,9 @@
 // groupByRecipient.js — Группировка операций по получателям
 // ============================================================================
 
+(function() {
+  'use strict';
+
 /* ===== Система логирования ===== */
 const DEBUG = true; // false чтобы отключить все console.log()
 
@@ -14,7 +17,7 @@ const error = DEBUG ? console.error.bind(console) : () => { };
  * @param {Object} backupData - объект с данными из BACKUP_DATA
  * @returns {Object} объект вида { "recipient_id": [operations], "recipient_id": [operations], ... }
  */
-export function groupOperationsByRecipient(backupData) {
+function groupOperationsByRecipient(backupData) {
   log('[groupByRecipient] Входные данные:', backupData);
   log('[groupByRecipient] backupData существует?', !!backupData);
   log('[groupByRecipient] backupData.fullData существует?', !!backupData?.fullData);
@@ -328,7 +331,7 @@ async function checkIfCouponExists(userId, systemId) {
  * @param {Object} backupData - Оригинальные данные из BACKUP_DATA
  * @returns {Promise<Array>} - массив объектов { recipient_id, amount, items[] }
  */
-export async function groupByRecipientWithGifts(backupData) {
+async function groupByRecipientWithGifts(backupData) {
   if (!backupData || typeof backupData !== 'object') {
     warn('[groupByRecipientWithGifts] Входные данные невалидны:', backupData);
     return [];
@@ -519,3 +522,5 @@ if (typeof window !== 'undefined') {
   window.groupOperationsByRecipient = groupOperationsByRecipient;
   window.groupByRecipientWithGifts = groupByRecipientWithGifts;
 }
+
+})(); // Закрываем IIFE

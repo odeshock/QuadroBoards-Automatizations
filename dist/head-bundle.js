@@ -3157,6 +3157,919 @@ document.addEventListener("DOMContentLoaded", () => {
   window.createAdminEditButtons = createAdminEditButtons;
 })();
 
+/* MODULE 7.24: bank/groupByRecipient.js */
+// ============================================================================
+// groupByRecipient.js — Группировка операций по получателям
+// ============================================================================
+
+/* ===== Система логирования ===== */
+const DEBUG = true; // false чтобы отключить все console.log()
+
+const log = DEBUG ? console.log.bind(console) : () => { };
+const warn = DEBUG ? console.warn.bind(console) : () => { };
+const error = DEBUG ? console.error.bind(console) : () => { };
+
+/**
+ * Создаёт из BACKUP_DATA словарь операций, сгруппированных по получателям
+ * @param {Object} backupData - объект с данными из BACKUP_DATA
+ * @returns {Object} объект вида { "recipient_id": [operations], "recipient_id": [operations], ... }
+ */
+export function groupOperationsByRecipient(backupData) {
+  log('[groupByRecipient] Входные данные:', backupData);
+  log('[groupByRecipient] backupData существует?', !!backupData);
+  log('[groupByRecipient] backupData.fullData существует?', !!backupData?.fullData);
+  log('[groupByRecipient] backupData.fullData:', backupData?.fullData);
+
+  if (!backupData || !backupData.fullData) {
+    warn('[groupByRecipient] Некорректные данные backup');
+    return [];
+  }
+
+  // Извлекаем USER_ID из environment
+  const defaultUserId = backupData.environment?.USER_ID || 0;
+  log('[groupByRecipient] defaultUserId:', defaultUserId);
+
+  if (!defaultUserId) {
+    warn('[groupByRecipient] USER_ID не найден в backupData.environment');
+    return [];
+  }
+
+  // Список form_id операций, которые нужно исключить
+  const excludedForms = [
+    'form-income-needrequest',      // Размещение заявки на нужного
+    'form-income-firstpost',        // Первый пост на профиле
+    'form-income-personalpost',     // Каждый личный пост
+    'form-income-plotpost',         // Каждый сюжетный пост
+    'form-income-ep-personal',      // Завершённый личный эпизод
+    'form-income-ep-plot',          // Завершённый сюжетный эпизод
+    'form-income-100msgs',          // Каждые 100 сообщений
+    'form-income-100rep',           // Каждые 100 репутации
+    'form-income-100pos',           // Каждые 100 позитива
+    'form-income-month',            // Каждый игровой месяц
+    'form-income-flyer',            // Каждая рекламная листовка
+    'form-income-contest',          // Участие в конкурсе
+    'form-income-avatar',           // Аватарка для другого игрока
+    'form-income-design-other',     // Другой дизайн для другого игрока
+    'form-income-run-contest',      // Проведение конкурса
+    'form-income-mastering',        // Мастеринг сюжета
+    'form-income-rpgtop',           // Голос в RPG-top
+    'form-income-banner-reno',      // Баннер FMV в подписи на Рено
+    'form-income-banner-mayak',     // Баннер FMV в подписи на Маяке
+    'form-exp-thirdchar',           // Третий и следующие персонажи
+    'form-exp-changeapp',           // Смена внешности
+    'form-exp-changechar',          // Смена персонажа
+    'form-exp-refuse',              // Отказ от персонажа
+    'gift-discount'                 // Автоскидки
+  ];
+
+  // Словарь для группировки: { recipient_id: [operations] }
+  const grouped = {};
+
+  backupData.fullData.forEach((operation) => {
+    // Пропускаем исключённые операции по form_id
+    if (excludedForms.includes(operation.form_id)) {
+      log('[groupByRecipient] Пропущена операция:', operation.form_id, operation.title);
+      return;
+    }
+
+    // Пропускаем операции типа 'discount', 'coupon', 'adjustment'
+    if (['discount', 'adjustment'].includes(operation.type)) {
+      log('[groupByRecipient] Пропущен тип операции:', operation.type, operation.title);
+      return;
+    }
+    // Для каждой записи (entry) в операции
+    operation.entries.forEach((entry) => {
+      const data = entry.data || {};
+
+      // Извлекаем всех получателей из entry.data
+      const recipientKeys = Object.keys(data).filter(k => /^recipient_\d+$/.test(k));
+
+      if (recipientKeys.length > 0) {
+        // Если есть получатели - группируем по каждому
+        recipientKeys.forEach(key => {
+          const recipientId = Number(data[key]) || 0;
+          if (recipientId > 0) {
+            if (!grouped[recipientId]) {
+              grouped[recipientId] = [];
+            }
+
+            // Извлекаем индекс получателя из ключа (например, "recipient_1" -> "1")
+            const index = key.match(/^recipient_(\d+)$/)?.[1];
+
+            // Создаём объект с данными только для этого получателя
+            const recipientData = {};
+
+            // Добавляем amount_N, если есть
+            if (index && data[`amount_${index}`] !== undefined) {
+              recipientData.amount = data[`amount_${index}`];
+            }
+
+            // Добавляем quantity_N, если есть
+            if (index && data[`quantity_${index}`] !== undefined) {
+              recipientData.quantity = data[`quantity_${index}`];
+            }
+
+            // Добавляем thousand_N, если есть
+            if (index && data[`thousand_${index}`] !== undefined) {
+              recipientData.thousand = data[`thousand_${index}`];
+            }
+
+            // Добавляем from_N, если есть (для подарков)
+            if (index && data[`from_${index}`] !== undefined) {
+              recipientData.from = data[`from_${index}`];
+            }
+
+            // Добавляем wish_N, если есть (для подарков)
+            if (index && data[`wish_${index}`] !== undefined) {
+              recipientData.wish = data[`wish_${index}`];
+            }
+
+            // Добавляем gift_id_N, если есть (для подарков)
+            if (index && data[`gift_id_${index}`] !== undefined) {
+              recipientData.gift_id = data[`gift_id_${index}`];
+            }
+
+            grouped[recipientId].push({
+              form_id: operation.form_id,
+              title: operation.title,
+              type: operation.type,
+              kind: operation.kind,
+              price: operation.price,
+              bonus: operation.bonus,
+              mode: operation.mode,
+              modalAmount: operation.modalAmount,
+              entry_data: recipientData,
+              entry_key: key
+            });
+          }
+        });
+      } else {
+        // Нет получателей - относим к USER_ID
+        if (!grouped[defaultUserId]) {
+          grouped[defaultUserId] = [];
+        }
+        grouped[defaultUserId].push({
+          form_id: operation.form_id,
+          title: operation.title,
+          type: operation.type,
+          kind: operation.kind,
+          price: operation.price,
+          bonus: operation.bonus,
+          mode: operation.mode,
+          modalAmount: operation.modalAmount,
+          entry_data: data,
+          entry_key: null
+        });
+      }
+    });
+  });
+
+  // Возвращаем словарь как есть (без преобразования в массив)
+  log('[groupByRecipient] Сгруппированные данные:', grouped);
+  return grouped;
+}
+
+// ============================================================================
+// Группировка по категориям (подарки, оформление, купоны)
+// ============================================================================
+
+/**
+ * Формирует title из from и wish
+ * @param {string} from - От кого
+ * @param {string} wish - Пожелание
+ * @returns {string|undefined} - Сформированный title или undefined
+ */
+function createTitle(from, wish) {
+  const fromTrimmed = (from || '').trim();
+  const wishTrimmed = (wish || '').trim();
+
+  if (fromTrimmed !== '' && wishTrimmed !== '') {
+    return `${fromTrimmed}: ${wishTrimmed}`;
+  } else if (fromTrimmed !== '' || wishTrimmed !== '') {
+    return `${fromTrimmed}${wishTrimmed}`;
+  }
+  return undefined;
+}
+
+/**
+ * Загружает страницу /pages/usrN и извлекает user_id из .modal_script
+ * Приоритет: data-main-user_id > N из URL
+ */
+async function getUserIdFromPage(profileId) {
+  try {
+    const pageUrl = `/pages/usr${profileId}`;
+    const response = await fetch(pageUrl);
+    if (!response.ok) {
+      warn(`[groupByRecipient] Не удалось загрузить ${pageUrl}`);
+      return Number(profileId);
+    }
+
+    const html = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const modalScript = doc.querySelector('.modal_script');
+    if (!modalScript) {
+      warn(`[groupByRecipient] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+      return Number(profileId);
+    }
+
+    const mainUserId = modalScript.getAttribute('data-main-user_id');
+    if (mainUserId && mainUserId.trim()) {
+      log(`[groupByRecipient] Найден data-main-user_id=${mainUserId} для profileId=${profileId}`);
+      return Number(mainUserId.trim());
+    }
+
+    // Если data-main-user_id не указан, используем profileId
+    return Number(profileId);
+  } catch (err) {
+    error('[groupByRecipient] Ошибка загрузки страницы:', err);
+    return Number(profileId);
+  }
+}
+
+/**
+ * Проверяет есть ли у пользователя в API уже указанный gift_id
+ * @param {number} userId - ID пользователя
+ * @param {string} category - Категория (icon, plashka, background, gift)
+ * @param {string} giftId - ID элемента для проверки
+ * @returns {Promise<boolean>} - true если элемент уже существует
+ */
+async function checkIfItemExists(userId, category, giftId) {
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    warn('[groupByRecipient] FMVbank.storageGet недоступен');
+    return false;
+  }
+
+  try {
+    const data = await window.FMVbank.storageGet(userId, 'info_');
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const items = data[category] || [];
+    if (!Array.isArray(items)) {
+      return false;
+    }
+
+    // Проверяем есть ли элемент с таким id
+    return items.some(item => String(item.id) === String(giftId));
+  } catch (err) {
+    error(`[groupByRecipient] Ошибка проверки существования ${category}/${giftId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Проверяет существует ли gift_id в библиотеке
+ * @param {string} category - Категория (icon, plashka, background, gift)
+ * @param {string} giftId - ID элемента для проверки
+ * @returns {Promise<boolean>} - true если элемент существует в библиотеке
+ */
+async function checkIfItemInLibrary(category, giftId) {
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    warn('[groupByRecipient] FMVbank.storageGet недоступен');
+    return false;
+  }
+
+  try {
+    // Конвертируем category в название библиотеки
+    const libraryName = category === 'plashka' ? 'plashka' : category;
+    const data = await window.FMVbank.storageGet(1, `library_${libraryName}_`);
+
+    if (!data || !data.items || !Array.isArray(data.items)) {
+      warn(`[groupByRecipient] library_${libraryName}_1 не найдена или пуста`);
+      return false;
+    }
+
+    // Проверяем есть ли элемент с таким id
+    return data.items.some(item => String(item.id) === String(giftId));
+  } catch (err) {
+    error(`[groupByRecipient] Ошибка проверки библиотеки ${category}/${giftId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Проверяет существует ли купон с данным system_id у пользователя в info_
+ * @param {number} userId - ID пользователя
+ * @param {string} systemId - system_id купона (соответствует id в info_)
+ * @returns {Promise<boolean>} - true если купон существует
+ */
+async function checkIfCouponExists(userId, systemId) {
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    warn('[groupByRecipient] FMVbank.storageGet недоступен');
+    return false;
+  }
+
+  try {
+    const data = await window.FMVbank.storageGet(userId, 'info_');
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const coupons = data.coupon || [];
+    if (!Array.isArray(coupons)) {
+      return false;
+    }
+
+    // Проверяем есть ли купон с таким id
+    return coupons.some(coupon => String(coupon.id) === String(systemId));
+  } catch (err) {
+    error(`[groupByRecipient] Ошибка проверки существования купона ${systemId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Группирует операции по категориям (подарки, иконки, плашки, фон, купоны)
+ * Автоматически вызывает groupOperationsByRecipient внутри
+ * С резолвингом data-main-user_id и проверками дубликатов
+ * @param {Object} backupData - Оригинальные данные из BACKUP_DATA
+ * @returns {Promise<Array>} - массив объектов { recipient_id, amount, items[] }
+ */
+export async function groupByRecipientWithGifts(backupData) {
+  if (!backupData || typeof backupData !== 'object') {
+    warn('[groupByRecipientWithGifts] Входные данные невалидны:', backupData);
+    return [];
+  }
+
+  // Сначала группируем операции по получателям
+  const groupedData = groupOperationsByRecipient(backupData);
+  log('[groupByRecipientWithGifts] groupedData после groupOperationsByRecipient:', groupedData);
+
+  // Получаем USER_ID и totalSum из backupData
+  const userId = backupData?.environment?.USER_ID ? Number(backupData.environment.USER_ID) : 0;
+  const totalSum = backupData?.totalSum ? Number(backupData.totalSum) : 0;
+
+  // Маппинг form_id на категории
+  const formToCategory = {
+    'form-gift-collection': 'gift',
+    'form-icon-collection': 'icon',
+    'form-badge-collection': 'plashka',
+    'form-back-collection': 'background',
+    'form-gift-custom': 'gift',
+    'form-icon-custom': 'icon',
+    'form-badge-custom': 'plashka',
+    'form-back-custom': 'background'
+  };
+
+  // Временная группировка по originalRecipientId
+  const tempByRecipient = {};
+
+  // Шаг 1: Обрабатываем каждого получателя и собираем items
+  for (const [recipientId, operations] of Object.entries(groupedData)) {
+    if (!Array.isArray(operations) || operations.length === 0) {
+      continue;
+    }
+
+    if (!tempByRecipient[recipientId]) {
+      tempByRecipient[recipientId] = {
+        amount: 0,
+        items: []
+      };
+    }
+
+    // Обрабатываем каждую операцию
+    for (const operation of operations) {
+      const formId = operation.form_id;
+      const isCustom = formId && formId.includes('-custom');
+      const category = formToCategory[formId];
+      const entryData = operation.entry_data || {};
+      const customTitle = createTitle(entryData.from, entryData.wish);
+
+      // Создаём item
+      const item = {
+        form_id: formId,
+        title: operation.title,
+        category: category || null,
+        is_custom: isCustom
+      };
+
+      // Суммируем amount
+      if (entryData.amount !== undefined && entryData.amount !== null) {
+        const amount = Number(entryData.amount);
+        if (!isNaN(amount)) {
+          tempByRecipient[recipientId].amount += amount;
+          item.amount = amount;
+        }
+      }
+
+      // Для подарков/оформления (и custom, и collection)
+      if (category) {
+        item.gift_id = entryData.gift_id || null;
+        if (customTitle) {
+          item.custom_title = customTitle;
+        }
+        tempByRecipient[recipientId].items.push(item);
+      } else {
+        // Для прочих операций (купоны, покупки и т.д.)
+        // Добавляем gift_id для всех (включая купоны)
+        item.gift_id = entryData.gift_id || null;
+
+        // Только персональные скидки (купоны) помечаем для удаления
+        if (operation.type === 'coupon') {
+          item.type = 'coupon';
+          item.remove = true; // Купоны снимаются (используются)
+        }
+
+        const quantity = Number(entryData.quantity) || 1;
+
+        // Добавляем quantity раз
+        for (let i = 0; i < quantity; i++) {
+          tempByRecipient[recipientId].items.push({ ...item });
+        }
+      }
+    }
+  }
+
+  log('[groupByRecipientWithGifts] Временная группировка:', tempByRecipient);
+
+  // Шаг 2: Резолвим data-main-user_id для всех получателей
+  const recipientMapping = {}; // originalId -> mainUserId
+  const uniqueRecipientIds = Object.keys(tempByRecipient).map(Number);
+
+  for (const recipientId of uniqueRecipientIds) {
+    const mainUserId = await getUserIdFromPage(recipientId);
+    recipientMapping[recipientId] = mainUserId;
+    log(`[groupByRecipientWithGifts] Маппинг: ${recipientId} -> ${mainUserId}`);
+  }
+
+  // Шаг 3: Перегруппировываем по mainUserId и объединяем данные
+  const finalByRecipient = {};
+
+  for (const [originalId, data] of Object.entries(tempByRecipient)) {
+    const mainId = recipientMapping[Number(originalId)];
+
+    if (!finalByRecipient[mainId]) {
+      finalByRecipient[mainId] = {
+        recipient_id: mainId,
+        amount: 0,
+        items: []
+      };
+    }
+
+    // Суммируем amount и объединяем items
+    finalByRecipient[mainId].amount += data.amount;
+    finalByRecipient[mainId].items.push(...data.items);
+  }
+
+  // Добавляем totalSum к userId
+  if (userId && finalByRecipient[userId]) {
+    finalByRecipient[userId].amount += totalSum;
+    log(`[groupByRecipientWithGifts] Добавлен totalSum (${totalSum}) к получателю ${userId}`);
+  }
+
+  // Шаг 4: Проверяем дубликаты в API и помечаем ошибки
+  for (const [recipientId, data] of Object.entries(finalByRecipient)) {
+    for (const item of data.items) {
+      // Проверка 1: custom без выбранного ID
+      if (item.is_custom && item.category && item.gift_id === 'custom') {
+        item.error = 'not_selected_custom';
+        error(`[groupByRecipientWithGifts] Найден custom без ID для recipient ${recipientId}:`, item);
+        continue;
+      }
+
+      // Проверка 2: для купонов с remove: true проверяем существование в info_
+      if (item.remove === true && item.type === 'coupon') {
+        if (!item.gift_id) {
+          item.error = 'not_selected_custom';
+          error(`[groupByRecipientWithGifts] Купон без gift_id для recipient ${recipientId}:`, item);
+          continue;
+        }
+
+        const couponExists = await checkIfCouponExists(Number(recipientId), item.gift_id);
+        if (!couponExists) {
+          item.error = 'coupon_not_exists';
+          warn(`[groupByRecipientWithGifts] Купон с system_id ${item.gift_id} не найден у recipient ${recipientId}`);
+        }
+        continue; // Для купонов другие проверки не нужны
+      }
+
+      // Проверка 3: gift_id существует в библиотеке (только для подарков/оформления)
+      if (item.category && item.gift_id && item.gift_id !== 'custom') {
+        const inLibrary = await checkIfItemInLibrary(item.category, item.gift_id);
+        if (!inLibrary) {
+          item.error = 'not_in_library';
+          warn(`[groupByRecipientWithGifts] ID ${item.gift_id} не найден в библиотеке ${item.category} для recipient ${recipientId}`);
+          continue; // Пропускаем проверку дубликатов если элемента нет в библиотеке
+        }
+
+        // Проверка 4: дубликаты в API пользователя
+        const exists = await checkIfItemExists(Number(recipientId), item.category, item.gift_id);
+        if (exists) {
+          item.error = 'already_exists';
+          warn(`[groupByRecipientWithGifts] Дубликат ${item.category}/${item.gift_id} для recipient ${recipientId}`);
+        }
+      }
+    }
+  }
+
+  // Шаг 5: Конвертируем в массив и фильтруем пустые
+  const result = Object.values(finalByRecipient).filter(recipient => {
+    return recipient.amount !== 0 || recipient.items.length > 0;
+  });
+
+  log('[groupByRecipientWithGifts] Финальный результат:', result);
+  return result;
+}
+
+// Экспортируем функции в window для использования вне модулей
+if (typeof window !== 'undefined') {
+  window.groupOperationsByRecipient = groupOperationsByRecipient;
+  window.groupByRecipientWithGifts = groupByRecipientWithGifts;
+}
+
+/* MODULE 7.25: bank/buttons/admin_autocheck.js */
+/**
+ * Кнопка "Автопроверка"
+ * Проверяет данные из BACKUP_DATA через groupByRecipientWithGifts
+ */
+
+(function () {
+  'use strict';
+
+  // Проверяем, что заголовок страницы начинается с "Гринготтс"
+  if (!document.title.startsWith('Гринготтс')) {
+    return;
+  }
+
+  /**
+   * Извлекает данные из поста для автопроверки
+   */
+  async function getPostData(post) {
+    // Извлекаем usr_id из профиля
+    const profileLink = post.querySelector('.pl-email.profile a');
+    const profileUrl = profileLink ? new URL(profileLink.href) : null;
+    const usr_id = profileUrl ? Number(profileUrl.searchParams.get("id")) || 0 : 0;
+
+    // Извлекаем ts из тега <bank_data>
+    const bankData = post.querySelector('bank_data');
+    const ts = bankData ? Number(bankData.textContent.trim()) || 0 : 0;
+
+    return { usr_id, ts };
+  }
+
+  /**
+   * Форматирует результат автопроверки
+   */
+  function formatCheckResult(result) {
+    if (!Array.isArray(result) || result.length === 0) {
+      return 'Нет данных для проверки';
+    }
+
+    const lines = [];
+
+    result.forEach(recipient => {
+      const recipientId = recipient.recipient_id;
+      const amount = recipient.amount || 0;
+      const items = recipient.items || [];
+
+      lines.push(`\n📋 Получатель usr${recipientId}:`);
+
+      if (amount !== 0) {
+        lines.push(`  💰 Баланс: ${amount > 0 ? '+' : ''}${amount}`);
+      }
+
+      if (items.length > 0) {
+        items.forEach(item => {
+          const prefix = item.error ? '  ❌' : '  ✅';
+
+          if (item.remove) {
+            // Купон для удаления
+            lines.push(`${prefix} Удалить купон: ${item.title || item.form_id || 'Неизвестный купон'}`);
+            if (item.error) {
+              lines.push(`     ⚠️ Ошибка: ${item.error}`);
+            }
+          } else if (item.category) {
+            // Подарок/оформление
+            const categoryName = {
+              'gift': 'Подарок',
+              'icon': 'Иконка',
+              'plashka': 'Плашка',
+              'background': 'Фон'
+            }[item.category] || item.category;
+
+            lines.push(`${prefix} ${categoryName}: ${item.title || item.form_id || 'Неизвестный'}`);
+
+            if (item.custom_title) {
+              lines.push(`     💬 "${item.custom_title}"`);
+            }
+
+            if (item.error) {
+              const errorText = {
+                'not_selected_custom': 'Не выбран элемент для индивидуального подарка',
+                'not_in_library': 'Элемент не найден в библиотеке',
+                'already_exists': 'Элемент уже есть у получателя',
+                'coupon_not_exists': 'Купон не найден у получателя'
+              }[item.error] || item.error;
+
+              lines.push(`     ⚠️ Ошибка: ${errorText}`);
+            }
+          } else {
+            // Прочие операции
+            lines.push(`${prefix} ${item.title || item.form_id || 'Операция'}`);
+            if (item.amount) {
+              lines.push(`     💰 Сумма: ${item.amount}`);
+            }
+            if (item.error) {
+              lines.push(`     ⚠️ Ошибка: ${item.error}`);
+            }
+          }
+        });
+      }
+    });
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Создаёт кнопку автопроверки для каждого поста
+   */
+  async function createAutoCheckButtons(opts) {
+    const {
+      allowedGroups = [],
+      allowedForums = [],
+      allowedUsers = [],
+      label = 'Автопроверка',
+      containerSelector = '.ams_info',
+      order = 1,
+      postSelector = 'div.post',
+      showStatus = true,
+      showDetails = true,
+    } = opts || {};
+
+    console.log(`[adminAutoCheck] "${label}": Вызов с параметрами:`, { allowedGroups, allowedForums, allowedUsers });
+
+    // Проверяем заголовок страницы
+    if (!document.title.startsWith('Гринготтс')) {
+      console.log(`[adminAutoCheck] "${label}": Страница не Гринготтс, выход`);
+      return;
+    }
+
+    // Ждём события gringotts:ready
+    if (!window.__gringotts_ready) {
+      console.log(`[adminAutoCheck] "${label}": Ждём события gringotts:ready`);
+      await new Promise(r => window.addEventListener('gringotts:ready', r, { once: true }));
+    } else {
+      console.log(`[adminAutoCheck] "${label}": gringotts уже готов`);
+    }
+
+    const gid = typeof window.getCurrentGroupId === 'function'
+      ? window.getCurrentGroupId()
+      : NaN;
+
+    console.log(`[adminAutoCheck] "${label}": текущая группа = ${gid}, разрешённые = [${allowedGroups}]`);
+
+    // Проверка группы
+    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) {
+      console.log(`[adminAutoCheck] "${label}": allowedGroups пустой, выход`);
+      return;
+    }
+    if (!allowedGroups.map(Number).includes(Number(gid))) {
+      console.log(`[adminAutoCheck] "${label}": группа ${gid} не в списке, выход`);
+      return;
+    }
+
+    // Проверка форума
+    if (!Array.isArray(allowedForums) || allowedForums.length === 0) {
+      console.log(`[adminAutoCheck] "${label}": allowedForums пустой, выход`);
+      return;
+    }
+
+    // Проверка форума через isAllowedForum
+    const isAllowedForum = (forumIds) => {
+      const allow = (forumIds || []).map(String);
+      const crumbs = document.querySelector('.container.crumbs');
+
+      const matchIn = (root) => Array.from(root.querySelectorAll('a[href]')).some(a => {
+        try {
+          const u = new URL(a.getAttribute('href'), location.href);
+          if (!u.pathname.includes('viewforum.php')) return false;
+          const id = (u.searchParams.get('id') || '').trim();
+          return id && allow.includes(id);
+        } catch { return false; }
+      });
+
+      if (crumbs && matchIn(crumbs)) return true;
+      if (matchIn(document)) return true;
+
+      const bodyForumId = document.body?.dataset?.forumId;
+      if (bodyForumId && allow.includes(String(bodyForumId))) return true;
+
+      return false;
+    };
+
+    if (!isAllowedForum(allowedForums)) {
+      console.log(`[adminAutoCheck] "${label}": форум не разрешён, выход`);
+      return;
+    }
+
+    // Проверка пользователей
+    if (Array.isArray(allowedUsers) && allowedUsers.length > 0) {
+      const uid = Number(window.UserID);
+      console.log(`[adminAutoCheck] "${label}": текущий UserID = ${uid}, разрешённые = [${allowedUsers}]`);
+      if (!allowedUsers.map(Number).includes(uid)) {
+        console.log(`[adminAutoCheck] "${label}": пользователь ${uid} не в списке, выход`);
+        return;
+      }
+    }
+
+    // Находим все подходящие посты
+    const posts = document.querySelectorAll(postSelector);
+    console.log(`[adminAutoCheck] "${label}": Найдено постов: ${posts.length}`);
+
+    let addedCount = 0;
+    for (let index = 0; index < posts.length; index++) {
+      const post = posts[index];
+
+      // Пропускаем topicpost
+      if (post.classList.contains('topicpost')) continue;
+
+      const postContent = post.querySelector('.post-content');
+      if (!postContent) continue;
+
+      // Проверяем, что ЕСТЬ bank_ams_check, но НЕТ bank_ams_done
+      const hasAmsCheck = postContent.querySelector('bank_ams_check');
+      const hasAmsDone = postContent.querySelector('bank_ams_done');
+      if (!hasAmsCheck || hasAmsDone) {
+        console.log(`[adminAutoCheck] "${label}": Пост ${index}: hasAmsCheck=${!!hasAmsCheck}, hasAmsDone=${!!hasAmsDone}, пропуск`);
+        continue;
+      }
+
+      const container = postContent.querySelector(containerSelector);
+      if (!container) continue;
+
+      // Проверяем, не добавлена ли уже кнопка
+      if (container.querySelector(`[data-post-button-label="${label}"]`)) continue;
+
+      const postData = await getPostData(post);
+      console.log(`[adminAutoCheck] "${label}": Пост ${index}: getPostData вернул:`, postData);
+
+      const { usr_id, ts } = postData;
+      if (!usr_id || !ts) {
+        console.log(`[adminAutoCheck] "${label}": Пост ${index}: проверка не прошла - usr_id=${usr_id}, ts=${ts}`);
+        continue;
+      }
+
+      console.log(`[adminAutoCheck] "${label}": Пост ${index}: данные OK - usr_id=${usr_id}, ts=${ts}`);
+
+      // Создаём UI
+      const wrap = document.createElement('div');
+      wrap.dataset.order = order;
+      wrap.dataset.postButtonLabel = label;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'button';
+      btn.textContent = label;
+
+      const status = showStatus ? document.createElement('span') : null;
+      if (status) {
+        status.style.marginLeft = '10px';
+        status.style.fontSize = '14px';
+        status.style.color = '#555';
+      }
+
+      const details = showDetails ? document.createElement('details') : null;
+      let pre = null;
+      if (details) {
+        details.style.marginTop = '6px';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Показать подробности';
+        summary.style.cursor = 'pointer';
+        pre = document.createElement('pre');
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.style.margin = '6px 0 0';
+        pre.style.fontSize = '12px';
+        details.appendChild(summary);
+        details.appendChild(pre);
+      }
+
+      wrap.appendChild(btn);
+      if (status) wrap.appendChild(status);
+      if (details) wrap.appendChild(details);
+
+      // Вставка по order
+      const siblings = Array.from(container.querySelectorAll('div[data-order]'));
+      const next = siblings.find(el => Number(el.dataset.order) > Number(order));
+      if (next) container.insertBefore(wrap, next);
+      else container.appendChild(wrap);
+
+      // Обработчик клика
+      btn.addEventListener('click', async () => {
+        console.log(`[adminAutoCheck] Начало автопроверки для usr_id=${usr_id}, ts=${ts}`);
+        if (status) {
+          status.textContent = 'Проверяю…';
+          status.style.color = '#555';
+        }
+        if (pre) pre.textContent = '';
+
+        try {
+          // Получаем данные из storage
+          if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+            throw new Error('FMVbank.storageGet недоступен');
+          }
+
+          const current_storage = await window.FMVbank.storageGet(usr_id, 'fmv_bank_info_');
+          const BACKUP_DATA = current_storage[ts];
+
+          if (!BACKUP_DATA) {
+            throw new Error('BACKUP_DATA не найден');
+          }
+
+          console.log('[adminAutoCheck] BACKUP_DATA:', BACKUP_DATA);
+
+          // Вызываем groupByRecipientWithGifts
+          if (typeof window.groupByRecipientWithGifts !== 'function') {
+            throw new Error('Функция groupByRecipientWithGifts недоступна');
+          }
+
+          const result = await window.groupByRecipientWithGifts(BACKUP_DATA);
+          console.log('[adminAutoCheck] Результат проверки:', result);
+
+          // Проверяем на ошибки
+          let hasErrors = false;
+          if (Array.isArray(result)) {
+            for (const recipient of result) {
+              if (Array.isArray(recipient.items)) {
+                for (const item of recipient.items) {
+                  if (item.error) {
+                    hasErrors = true;
+                    break;
+                  }
+                }
+              }
+              if (hasErrors) break;
+            }
+          }
+
+          // Обновляем статус
+          if (status) {
+            if (hasErrors) {
+              status.textContent = '⚠️ Найдены ошибки';
+              status.style.color = 'orange';
+            } else {
+              status.textContent = '✅ ОК';
+              status.style.color = 'green';
+            }
+          }
+
+          // Обновляем детали
+          if (pre) {
+            pre.textContent = formatCheckResult(result);
+          }
+
+          // Автоматически открываем детали если есть ошибки
+          if (hasErrors && details) {
+            details.open = true;
+          }
+
+        } catch (err) {
+          if (status) {
+            status.textContent = '✖ Ошибка';
+            status.style.color = 'red';
+          }
+          if (pre) pre.textContent = (err && err.message) ? err.message : String(err);
+          console.error('[adminAutoCheck] Ошибка:', err);
+        }
+      });
+
+      addedCount++;
+    }
+
+    console.log(`[adminAutoCheck] "${label}": Добавлено кнопок: ${addedCount}`);
+  }
+
+  // Инициализация
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  async function init() {
+    await createAutoCheckButtons({
+      allowedGroups: (window.BANK_CHECK?.GroupID) || [],
+      allowedForums: (window.BANK_CHECK?.ForumID) || [],
+      allowedUsers: (window.BANK_CHECK?.UserID) || [],
+      label: 'Автопроверка',
+      order: 1, // Перед кнопкой "Внести правки" (order: 2)
+      containerSelector: '.ams_info',
+      postSelector: 'div.post',
+    });
+  }
+
+  // Слушаем событие обновления кнопок
+  window.addEventListener('bank:buttons:refresh', () => {
+    console.log('[adminAutoCheck] Получено событие bank:buttons:refresh, пересоздаём кнопки');
+    init();
+  });
+
+  // Экспортируем функцию
+  window.createAutoCheckButtons = createAutoCheckButtons;
+})();
+
 /* MODULE 7.3: bank/buttons/no_edits_needed.js */
 /**
  * Кнопка "В правках не нуждается"

@@ -192,55 +192,181 @@ function createTitle(from, wish) {
 }
 
 /**
+ * Загружает страницу /pages/usrN и извлекает user_id из .modal_script
+ * Приоритет: data-main-user_id > N из URL
+ */
+async function getUserIdFromPage(profileId) {
+  try {
+    const pageUrl = `/pages/usr${profileId}`;
+    const response = await fetch(pageUrl);
+    if (!response.ok) {
+      warn(`[groupByRecipient] Не удалось загрузить ${pageUrl}`);
+      return Number(profileId);
+    }
+
+    const html = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const modalScript = doc.querySelector('.modal_script');
+    if (!modalScript) {
+      warn(`[groupByRecipient] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+      return Number(profileId);
+    }
+
+    const mainUserId = modalScript.getAttribute('data-main-user_id');
+    if (mainUserId && mainUserId.trim()) {
+      log(`[groupByRecipient] Найден data-main-user_id=${mainUserId} для profileId=${profileId}`);
+      return Number(mainUserId.trim());
+    }
+
+    // Если data-main-user_id не указан, используем profileId
+    return Number(profileId);
+  } catch (err) {
+    error('[groupByRecipient] Ошибка загрузки страницы:', err);
+    return Number(profileId);
+  }
+}
+
+/**
+ * Проверяет есть ли у пользователя в API уже указанный gift_id
+ * @param {number} userId - ID пользователя
+ * @param {string} category - Категория (icon, plashka, background, gift)
+ * @param {string} giftId - ID элемента для проверки
+ * @returns {Promise<boolean>} - true если элемент уже существует
+ */
+async function checkIfItemExists(userId, category, giftId) {
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    warn('[groupByRecipient] FMVbank.storageGet недоступен');
+    return false;
+  }
+
+  try {
+    const data = await window.FMVbank.storageGet(userId, 'info_');
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const items = data[category] || [];
+    if (!Array.isArray(items)) {
+      return false;
+    }
+
+    // Проверяем есть ли элемент с таким id
+    return items.some(item => String(item.id) === String(giftId));
+  } catch (err) {
+    error(`[groupByRecipient] Ошибка проверки существования ${category}/${giftId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Проверяет существует ли gift_id в библиотеке
+ * @param {string} category - Категория (icon, plashka, background, gift)
+ * @param {string} giftId - ID элемента для проверки
+ * @returns {Promise<boolean>} - true если элемент существует в библиотеке
+ */
+async function checkIfItemInLibrary(category, giftId) {
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    warn('[groupByRecipient] FMVbank.storageGet недоступен');
+    return false;
+  }
+
+  try {
+    // Конвертируем category в название библиотеки
+    const libraryName = category === 'plashka' ? 'plashka' : category;
+    const data = await window.FMVbank.storageGet(1, `library_${libraryName}_`);
+
+    if (!data || !data.items || !Array.isArray(data.items)) {
+      warn(`[groupByRecipient] library_${libraryName}_1 не найдена или пуста`);
+      return false;
+    }
+
+    // Проверяем есть ли элемент с таким id
+    return data.items.some(item => String(item.id) === String(giftId));
+  } catch (err) {
+    error(`[groupByRecipient] Ошибка проверки библиотеки ${category}/${giftId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Проверяет существует ли купон с данным system_id у пользователя в info_
+ * @param {number} userId - ID пользователя
+ * @param {string} systemId - system_id купона (соответствует id в info_)
+ * @returns {Promise<boolean>} - true если купон существует
+ */
+async function checkIfCouponExists(userId, systemId) {
+  if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
+    warn('[groupByRecipient] FMVbank.storageGet недоступен');
+    return false;
+  }
+
+  try {
+    const data = await window.FMVbank.storageGet(userId, 'info_');
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const coupons = data.coupon || [];
+    if (!Array.isArray(coupons)) {
+      return false;
+    }
+
+    // Проверяем есть ли купон с таким id
+    return coupons.some(coupon => String(coupon.id) === String(systemId));
+  } catch (err) {
+    error(`[groupByRecipient] Ошибка проверки существования купона ${systemId}:`, err);
+    return false;
+  }
+}
+
+/**
  * Группирует операции по категориям (подарки, иконки, плашки, фон, купоны)
  * Автоматически вызывает groupOperationsByRecipient внутри
+ * С резолвингом data-main-user_id и проверками дубликатов
  * @param {Object} backupData - Оригинальные данные из BACKUP_DATA
- * @returns {Object} { byRecipient: {...}, customByRecipient: {...} }
+ * @returns {Promise<Array>} - массив объектов { recipient_id, amount, items[] }
  */
-export function groupByRecipientWithGifts(backupData) {
+export async function groupByRecipientWithGifts(backupData) {
   if (!backupData || typeof backupData !== 'object') {
     warn('[groupByRecipientWithGifts] Входные данные невалидны:', backupData);
-    return { byRecipient: {}, customByRecipient: {} };
+    return [];
   }
 
   // Сначала группируем операции по получателям
   const groupedData = groupOperationsByRecipient(backupData);
   log('[groupByRecipientWithGifts] groupedData после groupOperationsByRecipient:', groupedData);
 
-  const byRecipient = {};
-  const customByRecipient = {};
-
   // Получаем USER_ID и totalSum из backupData
-  const userId = backupData?.environment?.USER_ID ? String(backupData.environment.USER_ID) : null;
+  const userId = backupData?.environment?.USER_ID ? Number(backupData.environment.USER_ID) : 0;
   const totalSum = backupData?.totalSum ? Number(backupData.totalSum) : 0;
 
-  // Маппинг form_id на категории (подарки и оформление из коллекций и кастомные)
+  // Маппинг form_id на категории
   const formToCategory = {
     'form-gift-collection': 'gift',
     'form-icon-collection': 'icon',
-    'form-badge-collection': 'badge',
-    'form-back-collection': 'back',
+    'form-badge-collection': 'plashka',
+    'form-back-collection': 'background',
     'form-gift-custom': 'gift',
     'form-icon-custom': 'icon',
-    'form-badge-custom': 'badge',
-    'form-back-custom': 'back'
+    'form-badge-custom': 'plashka',
+    'form-back-custom': 'background'
   };
 
-  // Обрабатываем каждого получателя
+  // Временная группировка по originalRecipientId
+  const tempByRecipient = {};
+
+  // Шаг 1: Обрабатываем каждого получателя и собираем items
   for (const [recipientId, operations] of Object.entries(groupedData)) {
     if (!Array.isArray(operations) || operations.length === 0) {
       continue;
     }
 
-    // Инициализируем структуру для получателя
-    if (!byRecipient[recipientId]) {
-      byRecipient[recipientId] = {
+    if (!tempByRecipient[recipientId]) {
+      tempByRecipient[recipientId] = {
         amount: 0,
-        gift: [],
-        icon: [],
-        badge: [],
-        back: [],
-        coupon: []
+        items: []
       };
     }
 
@@ -250,88 +376,146 @@ export function groupByRecipientWithGifts(backupData) {
       const isCustom = formId && formId.includes('-custom');
       const category = formToCategory[formId];
       const entryData = operation.entry_data || {};
-      const title = createTitle(entryData.from, entryData.wish);
+      const customTitle = createTitle(entryData.from, entryData.wish);
 
-      // Если это custom форма - добавляем в отдельную структуру по получателям
-      if (isCustom && category) {
-        // Инициализируем структуру для получателя в customByRecipient
-        if (!customByRecipient[recipientId]) {
-          customByRecipient[recipientId] = {
-            gift: [],
-            icon: [],
-            badge: [],
-            back: []
-          };
-        }
+      // Создаём item
+      const item = {
+        form_id: formId,
+        title: operation.title,
+        category: category || null,
+        is_custom: isCustom
+      };
 
-        const customItem = {
-          gift_id: entryData.gift_id || '',
-          title
-        };
-        customByRecipient[recipientId][category].push(customItem);
-        continue;
-      }
-
-      // Суммируем amount для получателя
+      // Суммируем amount
       if (entryData.amount !== undefined && entryData.amount !== null) {
         const amount = Number(entryData.amount);
         if (!isNaN(amount)) {
-          byRecipient[recipientId].amount += amount;
+          tempByRecipient[recipientId].amount += amount;
+          item.amount = amount;
         }
       }
 
-      // Если это подарок/оформление из коллекции - добавляем в соответствующую категорию
-      if (category && !isCustom) {
-        const item = {
-          gift_id: entryData.gift_id || '',
-          title
-        };
-        byRecipient[recipientId][category].push(item);
+      // Для подарков/оформления (и custom, и collection)
+      if (category) {
+        item.gift_id = entryData.gift_id || null;
+        if (customTitle) {
+          item.custom_title = customTitle;
+        }
+        tempByRecipient[recipientId].items.push(item);
+      } else {
+        // Для прочих операций (купоны, покупки и т.д.)
+        // Добавляем gift_id для всех (включая купоны)
+        item.gift_id = entryData.gift_id || null;
+
+        // Только персональные скидки (купоны) помечаем для удаления
+        if (operation.type === 'coupon') {
+          item.type = 'coupon';
+          item.remove = true; // Купоны снимаются (используются)
+        }
+
+        const quantity = Number(entryData.quantity) || 1;
+
+        // Добавляем quantity раз
+        for (let i = 0; i < quantity; i++) {
+          tempByRecipient[recipientId].items.push({ ...item });
+        }
+      }
+    }
+  }
+
+  log('[groupByRecipientWithGifts] Временная группировка:', tempByRecipient);
+
+  // Шаг 2: Резолвим data-main-user_id для всех получателей
+  const recipientMapping = {}; // originalId -> mainUserId
+  const uniqueRecipientIds = Object.keys(tempByRecipient).map(Number);
+
+  for (const recipientId of uniqueRecipientIds) {
+    const mainUserId = await getUserIdFromPage(recipientId);
+    recipientMapping[recipientId] = mainUserId;
+    log(`[groupByRecipientWithGifts] Маппинг: ${recipientId} -> ${mainUserId}`);
+  }
+
+  // Шаг 3: Перегруппировываем по mainUserId и объединяем данные
+  const finalByRecipient = {};
+
+  for (const [originalId, data] of Object.entries(tempByRecipient)) {
+    const mainId = recipientMapping[Number(originalId)];
+
+    if (!finalByRecipient[mainId]) {
+      finalByRecipient[mainId] = {
+        recipient_id: mainId,
+        amount: 0,
+        items: []
+      };
+    }
+
+    // Суммируем amount и объединяем items
+    finalByRecipient[mainId].amount += data.amount;
+    finalByRecipient[mainId].items.push(...data.items);
+  }
+
+  // Добавляем totalSum к userId
+  if (userId && finalByRecipient[userId]) {
+    finalByRecipient[userId].amount += totalSum;
+    log(`[groupByRecipientWithGifts] Добавлен totalSum (${totalSum}) к получателю ${userId}`);
+  }
+
+  // Шаг 4: Проверяем дубликаты в API и помечаем ошибки
+  for (const [recipientId, data] of Object.entries(finalByRecipient)) {
+    for (const item of data.items) {
+      // Проверка 1: custom без выбранного ID
+      if (item.is_custom && item.category && item.gift_id === 'custom') {
+        item.error = 'not_selected_custom';
+        error(`[groupByRecipientWithGifts] Найден custom без ID для recipient ${recipientId}:`, item);
         continue;
       }
 
-      // Все остальные операции - в coupon (дублируем quantity раз)
-      if (!category) {
-        const quantity = Number(entryData.quantity) || 1;
-        const couponItem = {
-          form: formId || '',
-          title
-        };
+      // Проверка 2: для купонов с remove: true проверяем существование в info_
+      if (item.remove === true && item.type === 'coupon') {
+        if (!item.gift_id) {
+          item.error = 'not_selected_custom';
+          error(`[groupByRecipientWithGifts] Купон без gift_id для recipient ${recipientId}:`, item);
+          continue;
+        }
 
-        // Добавляем в массив quantity раз
-        for (let i = 0; i < quantity; i++) {
-          byRecipient[recipientId].coupon.push({ ...couponItem });
+        const couponExists = await checkIfCouponExists(Number(recipientId), item.gift_id);
+        if (!couponExists) {
+          item.error = 'coupon_not_exists';
+          warn(`[groupByRecipientWithGifts] Купон с system_id ${item.gift_id} не найден у recipient ${recipientId}`);
+        }
+        continue; // Для купонов другие проверки не нужны
+      }
+
+      // Проверка 3: gift_id существует в библиотеке (только для подарков/оформления)
+      if (item.category && item.gift_id && item.gift_id !== 'custom') {
+        const inLibrary = await checkIfItemInLibrary(item.category, item.gift_id);
+        if (!inLibrary) {
+          item.error = 'not_in_library';
+          warn(`[groupByRecipientWithGifts] ID ${item.gift_id} не найден в библиотеке ${item.category} для recipient ${recipientId}`);
+          continue; // Пропускаем проверку дубликатов если элемента нет в библиотеке
+        }
+
+        // Проверка 4: дубликаты в API пользователя
+        const exists = await checkIfItemExists(Number(recipientId), item.category, item.gift_id);
+        if (exists) {
+          item.error = 'already_exists';
+          warn(`[groupByRecipientWithGifts] Дубликат ${item.category}/${item.gift_id} для recipient ${recipientId}`);
         }
       }
     }
   }
 
-  // Добавляем totalSum к amount получателя с USER_ID
-  if (userId && byRecipient[userId]) {
-    byRecipient[userId].amount += totalSum;
-    log('[groupByRecipientWithGifts] Добавлен totalSum (' + totalSum + ') к получателю ' + userId);
-  }
-
-  // Удаляем получателей из byRecipient, у которых всё пусто
-  for (const recipientId of Object.keys(byRecipient)) {
-    const recipient = byRecipient[recipientId];
-    const isEmpty =
-      recipient.amount === 0 &&
-      recipient.gift.length === 0 &&
-      recipient.icon.length === 0 &&
-      recipient.badge.length === 0 &&
-      recipient.back.length === 0 &&
-      recipient.coupon.length === 0;
-
-    if (isEmpty) {
-      delete byRecipient[recipientId];
-    }
-  }
-
-  log('[groupByRecipientWithGifts] Результат группировки:', {
-    byRecipient,
-    customByRecipient
+  // Шаг 5: Конвертируем в массив и фильтруем пустые
+  const result = Object.values(finalByRecipient).filter(recipient => {
+    return recipient.amount !== 0 || recipient.items.length > 0;
   });
 
-  return { byRecipient, customByRecipient };
+  log('[groupByRecipientWithGifts] Финальный результат:', result);
+  return result;
+}
+
+// Экспортируем функции в window для использования вне модулей
+if (typeof window !== 'undefined') {
+  window.groupOperationsByRecipient = groupOperationsByRecipient;
+  window.groupByRecipientWithGifts = groupByRecipientWithGifts;
 }

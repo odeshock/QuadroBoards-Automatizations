@@ -45,27 +45,13 @@
     const item = {
       id: id,
       content: contentEl ? contentEl.innerHTML.trim() : '',
-      title: descEl ? descEl.textContent.trim() : ''
+      t: descEl ? descEl.textContent.trim() : '' // title -> t
     };
 
-    // Проверяем классы
-    if (article.classList.contains('hidden')) {
-      item.hidden = true;
-    } else {
-      item.hidden = false;
-    }
-
-    if (article.classList.contains('custom')) {
-      item.custom = true;
-    } else {
-      item.custom = false;
-    }
-
-    if (article.classList.contains('system')) {
-      item.system = true;
-    } else {
-      item.system = false;
-    }
+    // Проверяем классы (сохраняем как 1/0)
+    item.h = article.classList.contains('hidden') ? 1 : 0;  // hidden -> h
+    item.c = article.classList.contains('custom') ? 1 : 0;  // custom -> c
+    item.s = article.classList.contains('system') ? 1 : 0;  // system -> s
 
     return item;
   }
@@ -90,14 +76,14 @@
     const item = {
       id: id,
       content: contentEl ? contentEl.innerHTML.trim() : '',
-      title: descEl ? descEl.textContent.trim() : ''
+      t: descEl ? descEl.textContent.trim() : '' // title -> t
     };
 
     // Дополнительные поля для купонов (могут отсутствовать)
     if (titleEl) {
       const titleText = titleEl.textContent.trim();
       if (titleText) {
-        item.system_title = titleText;
+        item.s_t = titleText; // system_title -> s_t
       }
     }
 
@@ -111,7 +97,7 @@
     if (formEl) {
       const formText = formEl.textContent.trim();
       if (formText) {
-        item.form = formText;
+        item.f = formText; // form -> f
       }
     }
 
@@ -120,12 +106,12 @@
       if (val) {
         const numVal = Number(val);
         if (!isNaN(numVal)) {
-          item.value = numVal;
+          item.v = numVal; // value -> v
         }
       }
     }
 
-    // У купонов НЕТ полей hidden и custom
+    // У купонов НЕТ полей hidden, custom, system
 
     return item;
   }
@@ -258,25 +244,32 @@
   }
 
   /**
-   * Сохраняет данные библиотеки в API
+   * Сохраняет данные библиотеки в API (в отдельные ключи)
    */
   async function saveLibraryToAPI(data) {
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       throw new Error('FMVbank.storageSet не найден');
     }
 
-    const saveData = {
-      ...data,
-      last_timestamp: Math.floor(Date.now() / 1000)
-    };
+    const timestamp = Math.floor(Date.now() / 1000);
 
-    console.log('[button_load_library] Сохраняю данные в API:', saveData);
+    // Сохраняем каждую категорию в отдельный ключ
+    const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
-    // Сохраняем с userId=1 и api_key_label='library_skin_'
-    const result = await window.FMVbank.storageSet(saveData, 1, 'library_skin_');
+    for (const category of categories) {
+      const saveData = {
+        items: data[category] || [],
+        last_timestamp: timestamp
+      };
 
-    if (!result) {
-      throw new Error('Не удалось сохранить данные в API');
+      console.log(`[button_load_library] Сохраняю ${category}:`, saveData);
+
+      // Сохраняем с userId=1 и api_key_label='library_<category>_'
+      const result = await window.FMVbank.storageSet(saveData, 1, `library_${category}_`);
+
+      if (!result) {
+        throw new Error(`Не удалось сохранить данные для ${category} в API`);
+      }
     }
 
     return true;

@@ -2024,27 +2024,13 @@ async function collectSkinSets() {
     const item = {
       id: id,
       content: contentEl ? contentEl.innerHTML.trim() : '',
-      title: descEl ? descEl.textContent.trim() : ''
+      t: descEl ? descEl.textContent.trim() : '' // title -> t
     };
 
-    // Проверяем классы
-    if (article.classList.contains('hidden')) {
-      item.hidden = true;
-    } else {
-      item.hidden = false;
-    }
-
-    if (article.classList.contains('custom')) {
-      item.custom = true;
-    } else {
-      item.custom = false;
-    }
-
-    if (article.classList.contains('system')) {
-      item.system = true;
-    } else {
-      item.system = false;
-    }
+    // Проверяем классы (сохраняем как 1/0)
+    item.h = article.classList.contains('hidden') ? 1 : 0;  // hidden -> h
+    item.c = article.classList.contains('custom') ? 1 : 0;  // custom -> c
+    item.s = article.classList.contains('system') ? 1 : 0;  // system -> s
 
     return item;
   }
@@ -2069,14 +2055,14 @@ async function collectSkinSets() {
     const item = {
       id: id,
       content: contentEl ? contentEl.innerHTML.trim() : '',
-      title: descEl ? descEl.textContent.trim() : ''
+      t: descEl ? descEl.textContent.trim() : '' // title -> t
     };
 
     // Дополнительные поля для купонов (могут отсутствовать)
     if (titleEl) {
       const titleText = titleEl.textContent.trim();
       if (titleText) {
-        item.system_title = titleText;
+        item.s_t = titleText; // system_title -> s_t
       }
     }
 
@@ -2090,7 +2076,7 @@ async function collectSkinSets() {
     if (formEl) {
       const formText = formEl.textContent.trim();
       if (formText) {
-        item.form = formText;
+        item.f = formText; // form -> f
       }
     }
 
@@ -2099,12 +2085,12 @@ async function collectSkinSets() {
       if (val) {
         const numVal = Number(val);
         if (!isNaN(numVal)) {
-          item.value = numVal;
+          item.v = numVal; // value -> v
         }
       }
     }
 
-    // У купонов НЕТ полей hidden и custom
+    // У купонов НЕТ полей hidden, custom, system
 
     return item;
   }
@@ -2237,25 +2223,32 @@ async function collectSkinSets() {
   }
 
   /**
-   * Сохраняет данные библиотеки в API
+   * Сохраняет данные библиотеки в API (в отдельные ключи)
    */
   async function saveLibraryToAPI(data) {
     if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       throw new Error('FMVbank.storageSet не найден');
     }
 
-    const saveData = {
-      ...data,
-      last_timestamp: Math.floor(Date.now() / 1000)
-    };
+    const timestamp = Math.floor(Date.now() / 1000);
 
-    console.log('[button_load_library] Сохраняю данные в API:', saveData);
+    // Сохраняем каждую категорию в отдельный ключ
+    const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
 
-    // Сохраняем с userId=1 и api_key_label='library_skin_'
-    const result = await window.FMVbank.storageSet(saveData, 1, 'library_skin_');
+    for (const category of categories) {
+      const saveData = {
+        items: data[category] || [],
+        last_timestamp: timestamp
+      };
 
-    if (!result) {
-      throw new Error('Не удалось сохранить данные в API');
+      console.log(`[button_load_library] Сохраняю ${category}:`, saveData);
+
+      // Сохраняем с userId=1 и api_key_label='library_<category>_'
+      const result = await window.FMVbank.storageSet(saveData, 1, `library_${category}_`);
+
+      if (!result) {
+        throw new Error(`Не удалось сохранить данные для ${category} в API`);
+      }
     }
 
     return true;
@@ -3510,7 +3503,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
 // fetch_libraries.js — Загрузка библиотек (плашки, иконки, фон, подарки, купоны)
 
 /**
- * Загружает все библиотеки из API (library_skin_1)
+ * Загружает все библиотеки из API (library_icon_1, library_plashka_1, и т.д.)
  * @returns {Promise<Object>} { plashka: [], icon: [], back: [], gift: [], coupon: [] }
  */
 async function fetchAllLibraries() {
@@ -3528,75 +3521,70 @@ async function fetchAllLibraries() {
     };
   }
 
-  try {
-    // Загружаем библиотеку из API (userId=1, api_key_label='library_skin_')
-    const libraryData = await window.FMVbank.storageGet(1, 'library_skin_');
-    console.log('[fetchAllLibraries] Данные из API:', libraryData);
-
-    if (!libraryData || typeof libraryData !== 'object') {
-      console.warn('[fetchAllLibraries] Нет данных в library_skin_1');
-      return {
-        plashka: [],
-        icon: [],
-        back: [],
-        gift: [],
-        coupon: []
-      };
-    }
-
-    // Конвертируем данные из API в формат для панелей
-    // Формат API: { id, content, title, hidden, custom, ... }
-    // Формат панели: { id, html } где html = <div class="item" data-id="..." title="...">content</div>
-
-    const convertToLibraryFormat = (items, isHidden = false) => {
-      return (items || [])
-        .filter(item => isHidden ? item.hidden === true : item.hidden !== true) // фильтруем по hidden
-        .map(item => ({
-          id: item.id,
-          html: `<div class="item" data-id="${escapeAttr(item.id)}" title="${escapeAttr(item.title || '')}">${item.content || ''}</div>`
-        }));
-    };
-
-    const convertCouponsToLibraryFormat = (items) => {
-      return (items || []).map(item => {
-        const titleAttr = item.title ? ` title="${escapeAttr(item.title)}"` : '';
-        const systemTitleAttr = item.system_title ? ` data-coupon-title="${escapeAttr(item.system_title)}"` : '';
-        const typeAttr = item.type ? ` data-coupon-type="${escapeAttr(item.type)}"` : '';
-        const formAttr = item.form ? ` data-coupon-form="${escapeAttr(item.form)}"` : '';
-        const valueAttr = item.value !== undefined ? ` data-coupon-value="${escapeAttr(String(item.value))}"` : '';
-
-        return {
-          id: item.id,
-          html: `<div class="item" data-id="${escapeAttr(item.id)}"${titleAttr}${systemTitleAttr}${typeAttr}${formAttr}${valueAttr}>${item.content || ''}</div>`
-        };
-      });
-    };
-
-    function escapeAttr(str) {
-      return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    return {
-      plashka: convertToLibraryFormat(libraryData.plashka),
-      icon: convertToLibraryFormat(libraryData.icon),
-      back: convertToLibraryFormat(libraryData.background),
-      gift: convertToLibraryFormat(libraryData.gift),
-      coupon: convertCouponsToLibraryFormat(libraryData.coupon)
-    };
-
-  } catch (error) {
-    console.error('[fetchAllLibraries] Ошибка загрузки библиотек:', error);
-    return {
-      plashka: [],
-      icon: [],
-      back: [],
-      gift: [],
-      coupon: []
-    };
+  function escapeAttr(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
+
+  const result = {
+    plashka: [],
+    icon: [],
+    back: [],
+    gift: [],
+    coupon: []
+  };
+
+  const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
+
+  for (const category of categories) {
+    try {
+      // Загружаем каждую категорию из отдельного ключа
+      const data = await window.FMVbank.storageGet(1, `library_${category}_`);
+
+      if (!data || !data.items || !Array.isArray(data.items)) {
+        console.warn(`[fetchAllLibraries] library_${category}_1 не найдена или пуста`);
+        continue;
+      }
+
+      // Конвертируем данные из API в формат для панелей
+      // Формат API: { id, content, t, h, c, s } где t=title, h=hidden, c=custom, s=system (значения 1/0)
+      // Формат панели: { id, html } где html = <div class="item" data-id="..." title="...">content</div>
+
+      if (category === 'coupon') {
+        // Купоны: {id, content, t, s_t, type, f, v}
+        result.coupon = data.items.map(item => {
+          const titleAttr = item.t ? ` title="${escapeAttr(item.t)}"` : '';
+          const systemTitleAttr = item.s_t ? ` data-coupon-title="${escapeAttr(item.s_t)}"` : '';
+          const typeAttr = item.type ? ` data-coupon-type="${escapeAttr(item.type)}"` : '';
+          const formAttr = item.f ? ` data-coupon-form="${escapeAttr(item.f)}"` : '';
+          const valueAttr = item.v !== undefined ? ` data-coupon-value="${escapeAttr(String(item.v))}"` : '';
+
+          return {
+            id: item.id,
+            html: `<div class="item" data-id="${escapeAttr(item.id)}"${titleAttr}${systemTitleAttr}${typeAttr}${formAttr}${valueAttr}>${item.content || ''}</div>`
+          };
+        });
+      } else {
+        // Обычные скины: {id, content, t, h, c, s}
+        const items = data.items
+          .filter(item => item.h !== 1) // Фильтруем hidden
+          .map(item => ({
+            id: item.id,
+            html: `<div class="item" data-id="${escapeAttr(item.id)}" title="${escapeAttr(item.t || '')}">${item.content || ''}</div>`
+          }));
+
+        // Сопоставляем категории с ключами результата
+        const targetKey = category === 'background' ? 'back' : category;
+        result[targetKey] = items;
+      }
+    } catch (error) {
+      console.error(`[fetchAllLibraries] Ошибка загрузки ${category}:`, error);
+    }
+  }
+
+  return result;
 }
 
 // Экспортируем в window

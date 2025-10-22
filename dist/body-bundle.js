@@ -7051,14 +7051,15 @@ async function collectChronoByUser(opts = {}) {
   'use strict';
 
   // Проверяем наличие нужных полей
-  if (!checkChronoFields(['GroupID', 'AmsForumID', 'ForumInfo'])) {
-    console.warn('[button_update_chrono_api] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ForumInfo');
+  if (!checkChronoFields(['GroupID', 'AmsForumID', 'ChronoTopicID', 'ForumInfo'])) {
+    console.warn('[button_update_chrono_api] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ChronoTopicID, ForumInfo');
     return;
   }
 
   // Если всё ок — продолжаем
   const GID = (window.CHRONO_CHECK.GroupID).map(Number);
   const FID = (window.CHRONO_CHECK.AmsForumID).map(String);
+  const TID = String(window.CHRONO_CHECK.ChronoTopicID).trim();
   const SECTIONS = window.CHRONO_CHECK.ForumInfo;
 
   if (!window.FMV) window.FMV = {};
@@ -7220,6 +7221,7 @@ async function collectChronoByUser(opts = {}) {
   createForumButton({
     allowedGroups: GID,
     allowedForums: FID,
+    topicId: TID,
     label: 'Сохранить хронологию в API',
     order: 5,
     showStatus: true,

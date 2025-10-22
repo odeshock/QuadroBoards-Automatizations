@@ -88,14 +88,14 @@
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }
         lastBlobUrl = URL.createObjectURL(blob);
 
-        setStatus('Готово');
+        setStatus('✓ Готово', 'green');
         setDetails(`Строк: ${rows.length}\nИсточник: ${FMV.escapeHtml(OPEN_URL)}\nФайл: ${FMV.escapeHtml(filename)}`);
         setLink(lastBlobUrl, 'Скачать');
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
         api?.setLink?.('', '');
       }

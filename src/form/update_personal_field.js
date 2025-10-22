@@ -21,7 +21,7 @@
         document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
         document.querySelector('a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch { }
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       const userId = idMatch ? idMatch[1] : '';
@@ -48,20 +48,20 @@
 
         // статусы
         switch (res?.status) {
-          case 'updated':  setStatus('✔ обновлено', 'green'); break;
+          case 'updated': setStatus('✔ обновлено', 'green'); break;
           case 'nochange': setStatus('ℹ изменений нет', 'red'); break;
-          case 'error':    setStatus('✖ ошибка', 'red'); break;
-          default:         setStatus('❔ неизвестный результат', '#b80');
+          case 'error': setStatus('✖ ошибка', 'red'); break;
+          default: setStatus('❔ неизвестный результат', '#b80');
         }
 
         // детали
         const lines = [];
         if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
-        if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
+        if (res?.httpStatus) lines.push('HTTP: ' + res.httpStatus);
         lines.push('Поле: ' + (res?.fieldId ?? fieldId));
         lines.push('Пользователь: ' + (res?.userId ?? userId));
         lines.push('Значение (template→arg2): ' + fieldValue);
-        if (res?.details)       lines.push('Details: ' + res.details);
+        if (res?.details) lines.push('Details: ' + res.details);
         setDetails(lines.join('\n') || 'Нет дополнительных данных');
       } catch (err) {
         setStatus('✖ сеть/транспорт', 'red');

@@ -216,10 +216,10 @@
         }
 
         // Если сам вызов отработал — это «Готово», даже если были частичные "нет доступа"/"не упоминается"
-        setStatus('Готово');
+        setStatus('✓ Готово', 'green');
         setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет «проблемных» юзеров
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(e?.message || String(e));
       }
     }

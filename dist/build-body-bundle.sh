@@ -48,7 +48,13 @@ done
 
 echo "" >> dist/body-bundle.js
 echo "/* Forms */" >> dist/body-bundle.js
-cat src/form/*.js >> dist/body-bundle.js
+# Загружаем все файлы из form кроме update_personal_field.js
+for file in src/form/*.js; do
+  filename=$(basename "$file")
+  if [ "$filename" != "update_personal_field.js" ]; then
+    cat "$file" >> dist/body-bundle.js
+  fi
+done
 
 echo "" >> dist/body-bundle.js
 echo "/* Profile */" >> dist/body-bundle.js
@@ -84,7 +90,7 @@ echo "/* Crhono buttons */" >> dist/body-bundle.js
 cat src/chrono/button_update_total.js >> dist/body-bundle.js
 cat src/chrono/button_total_to_excel.js >> dist/body-bundle.js
 cat src/chrono/button_update_per_user.js >> dist/body-bundle.js
-cat src/chrono/button_update_personal_page.js >> dist/body-bundle.js
+# cat src/chrono/button_update_personal_page.js >> dist/body-bundle.js
 cat src/chrono/button_update_chrono_api.js >> dist/body-bundle.js
 
 echo "" >> dist/body-bundle.js

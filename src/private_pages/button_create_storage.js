@@ -286,7 +286,7 @@
         // 1.1. Проверяем comment_id
         if (storage.commentId) {
           // comment_id уже указан
-          setStatus('✓ Уже указано');
+          setStatus('✓ Уже указано', 'green');
           setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
           if (setLink) {
             const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
@@ -309,7 +309,7 @@
       const pageCheck = await checkPersonalPage(userId);
 
       if (!pageCheck.valid) {
-        setStatus('✖ Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(pageCheck.error);
         return;
       }
@@ -323,7 +323,7 @@
       await saveCommentId(userId, commentId, storage.data);
 
       // 6. Успех
-      setStatus('✓ Готово');
+      setStatus('✓ Готово', 'green');
       setDetails(`Хранилище создано (comment_id: ${commentId})`);
       if (setLink) {
         const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${commentId}`;
@@ -331,7 +331,7 @@
       }
 
     } catch (error) {
-      setStatus('✖ Ошибка');
+      setStatus('✖ Ошибка', 'red');
       setDetails(error?.message || String(error));
       console.error('[button_create_storage] Ошибка:', error);
     }

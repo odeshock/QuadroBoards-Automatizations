@@ -308,7 +308,7 @@
           const total = Object.values(libraryData).reduce((sum, arr) => sum + arr.length, 0);
 
           if (total === 0) {
-            setStatus('Готово');
+            setStatus('✓ Готово', 'green');
             setDetails('Не найдено элементов в постах библиотеки');
             return;
           }
@@ -318,14 +318,14 @@
           // Сохраняем в API
           await saveLibraryToAPI(libraryData);
 
-          setStatus('Готово');
+          setStatus('✓ Готово', 'green');
           const details = Object.entries(libraryData)
             .map(([key, arr]) => `${key}: ${arr.length} шт.`)
             .join('<br>');
           setDetails(`Загружено элементов:<br>${details}<br>Всего: ${total}`);
 
         } catch (error) {
-          setStatus('Ошибка');
+          setStatus('✖ Ошибка', 'red');
           setDetails(error?.message || String(error));
           console.error('[button_load_library] Ошибка:', error);
         }

@@ -1985,7 +1985,7 @@ async function collectSkinSets() {
         // 1.1. Проверяем comment_id
         if (storage.commentId) {
           // comment_id уже указан
-          setStatus('✓ Уже указано');
+          setStatus('✓ Уже указано', 'green');
           setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
           if (setLink) {
             const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
@@ -2008,7 +2008,7 @@ async function collectSkinSets() {
       const pageCheck = await checkPersonalPage(userId);
 
       if (!pageCheck.valid) {
-        setStatus('✖ Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(pageCheck.error);
         return;
       }
@@ -2022,7 +2022,7 @@ async function collectSkinSets() {
       await saveCommentId(userId, commentId, storage.data);
 
       // 6. Успех
-      setStatus('✓ Готово');
+      setStatus('✓ Готово', 'green');
       setDetails(`Хранилище создано (comment_id: ${commentId})`);
       if (setLink) {
         const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${commentId}`;
@@ -2030,7 +2030,7 @@ async function collectSkinSets() {
       }
 
     } catch (error) {
-      setStatus('✖ Ошибка');
+      setStatus('✖ Ошибка', 'red');
       setDetails(error?.message || String(error));
       console.error('[button_create_storage] Ошибка:', error);
     }
@@ -2388,7 +2388,7 @@ async function collectSkinSets() {
           const total = Object.values(libraryData).reduce((sum, arr) => sum + arr.length, 0);
 
           if (total === 0) {
-            setStatus('Готово');
+            setStatus('✓ Готово', 'green');
             setDetails('Не найдено элементов в постах библиотеки');
             return;
           }
@@ -2398,14 +2398,14 @@ async function collectSkinSets() {
           // Сохраняем в API
           await saveLibraryToAPI(libraryData);
 
-          setStatus('Готово');
+          setStatus('✓ Готово', 'green');
           const details = Object.entries(libraryData)
             .map(([key, arr]) => `${key}: ${arr.length} шт.`)
             .join('<br>');
           setDetails(`Загружено элементов:<br>${details}<br>Всего: ${total}`);
 
         } catch (error) {
-          setStatus('Ошибка');
+          setStatus('✖ Ошибка', 'red');
           setDetails(error?.message || String(error));
           console.error('[button_load_library] Ошибка:', error);
         }
@@ -3561,79 +3561,6 @@ async function FMVeditTextareaOnly(name, newHtml) {
         setStatus('✖ сеть/транспорт', 'red');
         setDetails((err && err.message) ? err.message : String(err));
         console.error('[button_update_money_field]', err);
-      }
-    }
-  });
-})();
-// button_update_personal_field.init.js
-(() => {
-  'use strict';
-
-  // выносим всю механику в универсальную кнопку
-  createForumButton({
-    // передаём правила доступа параметрами (ничего не объединяем внутри)
-    allowedGroups: (window.PROFILE_CHECK && window.PROFILE_CHECK?.GroupID) || [],
-    allowedForums: (window.PROFILE_CHECK && window.PROFILE_CHECK?.ForumID) || [],
-    label: 'Установить плашку',
-    order: 2, // при необходимости расстановки — можно менять
-
-    async onClick({ setStatus, setDetails }) {
-      // 1) Контекст: arg1 из заголовка темы, userId/arg2 из ссылки на профиль
-      const nameSpan = document.querySelector('#pun-main h1 span');
-      const arg1 = nameSpan ? nameSpan.textContent.trim().toLowerCase() : '';
-      if (!arg1) { setStatus('✖ не найдено имя темы (arg1)', 'red'); setDetails('Ожидался #pun-main h1 span'); return; }
-
-      let profLink =
-        document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
-        document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
-        document.querySelector('a[href*="profile.php?id="]');
-      if (!profLink) {
-        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
-      }
-      const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
-      const userId = idMatch ? idMatch[1] : '';
-      const arg2 = userId ? `usr${userId}` : '';
-      if (!userId) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
-
-      // 2) Поле и значение: берём из PROFILE_CHECK и подставляем ID → arg2
-      const fieldId = window.PROFILE_CHECK?.PPageFieldID;
-      const rawTemplate = window.PROFILE_CHECK?.PPageFieldTemplate;
-      const fieldValue = String(rawTemplate).replace(/\bID\b/g, arg2);
-
-      if (typeof window.FMVreplaceFieldData !== 'function') {
-        setStatus('✖ функция не найдена', 'red');
-        setDetails('Ожидалась window.FMVreplaceFieldData(userId, fieldId, value)');
-        return;
-      }
-
-      // 3) Вызов обновления
-      setStatus('Обновляю…', '#555');
-      setDetails('');
-      try {
-        // контракт: FMVreplaceFieldData(userId, fieldId, value)
-        const res = await window.FMVreplaceFieldData(userId, fieldId, fieldValue);
-
-        // статусы
-        switch (res?.status) {
-          case 'updated':  setStatus('✔ обновлено', 'green'); break;
-          case 'nochange': setStatus('ℹ изменений нет', 'red'); break;
-          case 'error':    setStatus('✖ ошибка', 'red'); break;
-          default:         setStatus('❔ неизвестный результат', '#b80');
-        }
-
-        // детали
-        const lines = [];
-        if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
-        if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
-        lines.push('Поле: ' + (res?.fieldId ?? fieldId));
-        lines.push('Пользователь: ' + (res?.userId ?? userId));
-        lines.push('Значение (template→arg2): ' + fieldValue);
-        if (res?.details)       lines.push('Details: ' + res.details);
-        setDetails(lines.join('\n') || 'Нет дополнительных данных');
-      } catch (err) {
-        setStatus('✖ сеть/транспорт', 'red');
-        setDetails((err && err.message) ? err.message : String(err));
-        console.error('[button_update_personal_field]', err);
       }
     }
   });
@@ -6498,7 +6425,7 @@ async function collectChronoByUser(opts = {}) {
         setDetails(lines.join('<br>'));
 
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
         api?.setLinkVisible?.(false);
         api?.setLink?.('', '');
@@ -6673,14 +6600,14 @@ async function collectChronoByUser(opts = {}) {
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }
         lastBlobUrl = URL.createObjectURL(blob);
 
-        setStatus('Готово');
+        setStatus('✓ Готово', 'green');
         setDetails(`Строк: ${rows.length}\nИсточник: ${FMV.escapeHtml(OPEN_URL)}\nФайл: ${FMV.escapeHtml(filename)}`);
         setLink(lastBlobUrl, 'Скачать');
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
         api?.setLink?.('', '');
       }
@@ -6939,236 +6866,9 @@ async function collectChronoByUser(opts = {}) {
         if (error) lines.push(error);
         setDetails(lines.join('<br>'));
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(e?.message || String(e));
         setLink('', ''); setLinkVis?.(false);
-      }
-    }
-  });
-})();
-// update_personal (1).js
-// Делает точечный апдейт персональной страницы usr{ID}_chrono,
-// используя collectChronoByUser и общий билдер FMV.buildChronoHtml.
-// Плюс — массовое обновление поверх этого же вызова.
-
-// === КНОПКА: массовое обновление персоналок (обёртка над runBulkChronoUpdate) ===
-(() => {
-  'use strict';
-
-  // Проверяем наличие нужных полей
-  if (!checkChronoFields(['GroupID', 'AmsForumID', 'ForumInfo'])) {
-    console.warn('[button_update_personal_page] Требуются CHRONO_CHECK.GroupID[], AmsForumID[], ForumInfo');
-    return;
-  }
-
-  // Если всё ок — продолжаем
-  const GID        = (window.CHRONO_CHECK.GroupID).map(Number);
-  const FID        = (window.CHRONO_CHECK.AmsForumID).map(String);
-  const SECTIONS   = window.CHRONO_CHECK.ForumInfo;
-
-  if (!window.FMV) window.FMV = {};
-
-  /** ============================
-   *  Валидации окружения
-   *  ============================ */
-  function requireFn(name) {
-    const fn = getByPath(name);
-    if (typeof fn !== "function") {
-      throw new Error(`${name} не найден — подключите соответствующий скрипт`);
-    }
-    return fn;
-  }
-  function getByPath(path) {
-    return path.split(".").reduce((o,k)=>o && o[k], window);
-  }
-
-  /** ============================
-   *  Точечный апдейт одного пользователя
-   *  ============================ */
-  /**
-  * @param {string|number} userId
-  * @param {Object} [opts]
-  * @param {Array}  [opts.sections]   список секций (если у вас есть CHRONO_CHECK.ForumInfo, можно оставить пустым)
-  * @returns {Promise<{id:string,status:string, page?:string}>}
-  */
-  async function updateChronoForUser(userId, opts = {}) {
-    const FMVeditPersonalPage = requireFn("FMVeditPersonalPage");
-    const collectChronoByUser = requireFn("collectChronoByUser");
-    const buildChronoHtml     = requireFn("FMV.buildChronoHtml");
-
-    const id = String(userId);
-    const pageName = `usr${id}_chrono`;
-
-    // Источник секций (не обязательно)
-    const sectionsArg = opts.sections;
-
-    // 1) Собираем хронологию по пользователям
-    let byUser;
-    try {
-      byUser = await collectChronoByUser({ sections: sectionsArg });
-    } catch (e) {
-      return { id, status: `ошибка collectChronoByUser: ${e?.message || e}` };
-    }
-
-    // 2) Берём только нужного юзера
-    const data = byUser?.[id];
-    if (!data) {
-      return { id, status: "нет данных (пользователь не найден в хроно-коллекции)" };
-    }
-
-    // 3) Строим HTML через общий билдер
-    let html;
-    try {
-      html = buildChronoHtml(data, { titlePrefix: "Хронология" });
-    } catch (e) {
-      return { id, status: `ошибка buildChronoHtml: ${e?.message || e}` };
-    }
-
-    // 4) Сохраняем личную страницу
-    let res;
-    try {
-      res = await FMVeditPersonalPage(pageName, { content: html });
-    } catch (e) {
-      return { id, status: `ошибка сохранения: ${e?.message || e}` };
-    }
-
-    const saved = normalizeSaveStatus(res);
-    return { id, status: saved, page: pageName };
-  };
-
-  /** ============================
-   *  Массовое обновление
-   *  ============================ */
-  /**
-  * @param {Object} [opts]
-  * @param {Array<string|number>} [opts.ids] — явный список id; если не задан, будет вызван FMV.fetchUsers()
-  * @param {number} [opts.delayMs=200] — пауза между сохранениями
-  * @param {Array} [opts.sections]
-  * @returns {Promise<Array<{id:string,status:string,page?:string}>>}
-  */
-  async function runBulkChronoUpdate(opts = {}) {
-    const delayMs = Number.isFinite(opts.delayMs) ? opts.delayMs : 200;
-
-    // Источник пользователей
-    let users;
-    if (Array.isArray(opts.ids) && opts.ids.length) {
-      users = opts.ids.map(x => ({ id: String(x) }));
-    } else {
-      // Пробуем взять из FMV.fetchUsers()
-      const fetchUsers = getByPath("FMV.fetchUsers");
-      if (typeof fetchUsers !== "function") {
-        throw new Error("Не заданы ids и отсутствует FMV.fetchUsers()");
-      }
-      const arr = await fetchUsers();
-      users = Array.isArray(arr) ? arr : [];
-    }
-
-    const results = [];
-    for (const u of users) {
-      const r = await updateChronoForUser(u.id, {
-        sections: opts.sections
-      });
-      results.push(r);
-      if (delayMs) await FMV.sleep(delayMs);
-    }
-    try { console.table(results.map(x => ({ id: x.id, status: x.status }))); } catch {}
-    return results;
-  };
-
-  /** ============================
-   *  Вспомогательные
-   *  ============================ */
-  function normalizeSaveStatus(res) {
-    // Набор типичных статусов, подстройтесь под ваш FMVeditPersonalPage.
-    const s = (res && (res.status || res.result || res.ok)) ?? "unknown";
-    if (s === true || s === "ok" || s === "saved" || s === "success") return "обновлено";
-    if (s === "forbidden" || s === "noaccess") return "нет доступа";
-    if (s === "notfound") return "страница не найдена";
-    return String(s);
-  }
-
-  // Хелперы ссылок/экрановки — совместимы с другими кнопками
-  if (typeof window.userLinkHtml !== 'function') {
-    window.userLinkHtml = (id, name) =>
-      `${FMV.escapeHtml(String(name || id))}`;
-  }
-
-  // Получаем карту имен для красивых ссылок
-  async function getUserNameMap(explicitIds) {
-    // 1) если есть FMV.fetchUsers(), возьмём оттуда
-    const fetchUsers = (window.FMV && typeof FMV.fetchUsers === 'function') ? FMV.fetchUsers : null;
-    let list = [];
-    if (Array.isArray(explicitIds) && explicitIds.length) {
-      list = explicitIds.map(x => ({ id: String(x) }));
-    } else if (fetchUsers) {
-      try {
-        const arr = await fetchUsers();
-        list = Array.isArray(arr) ? arr : [];
-      } catch { /* no-op */ }
-    }
-    const map = new Map();
-    for (const u of list) {
-      if (!u) continue;
-      const id = String(u.id ?? '');
-      const nm = String(u.name ?? '').trim();
-      if (id) map.set(id, nm || id);
-    }
-    return map;
-  }
-
-  function normalizeInfoStatus(status) {
-    const s = String(status || '').toLowerCase();
-    // маппим внутренние формулировки на требуемые пользователем
-    if (s.includes('нет доступа')) return 'нет доступа';
-    if (s.includes('нет данных') || s.includes('не найден')) return 'пользователь не упоминается в хронологии';
-    return ''; // не интересует для "Показать детали"
-  }
-
-  createForumButton({
-    allowedGroups: GID,
-    allowedForums: FID,
-    label: 'обновить личные страницы',
-    order: 4,
-    showStatus: true,
-    showDetails: true,
-    showLink: false,
-
-    async onClick(api) {
-      const setStatus  = api?.setStatus  || (()=>{});
-      const setDetails = api?.setDetails || (()=>{});
-
-      setDetails('');
-      try {
-        // Этап 1: сбор подготовительных данных/сечений
-        setStatus('Собираю…');
-
-        const explicitIds = Array.isArray(window.CHRONO_CHECK?.UserIDs) ? window.CHRONO_CHECK.UserIDs : undefined;
-        const nameMap = await getUserNameMap(explicitIds);
-
-        // Этап 2: массовое обновление
-        setStatus('Обновляю…');
-
-        const results = await runBulkChronoUpdate({
-          ids: explicitIds,
-          sections: SECTIONS
-        }); // вернёт [{ id, status, page? }] — см. реализацию в update_personal
-
-        // Пост-обработка результатов
-        const lines = [];
-        for (const r of (results || [])) {
-          const info = normalizeInfoStatus(r?.status);
-          if (!info) continue; // нас интересуют только 2 типа
-          const id = String(r?.id || '');
-          const name = nameMap.get(id) || id;
-          lines.push(`${userLinkHtml(id, name)} — ${FMV.escapeHtml(info)}`);
-        }
-
-        // Если сам вызов отработал — это «Готово», даже если были частичные "нет доступа"/"не упоминается"
-        setStatus('Готово');
-        setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет «проблемных» юзеров
-      } catch (e) {
-        setStatus('Ошибка');
-        setDetails(e?.message || String(e));
       }
     }
   });
@@ -7391,10 +7091,10 @@ async function collectChronoByUser(opts = {}) {
         }
 
         // Если сам вызов отработал — это «Готово»
-        setStatus('Готово');
+        setStatus('✓ Готово', 'green');
         setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет проблемных юзеров
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(e?.message || String(e));
       }
     }

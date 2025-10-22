@@ -78,7 +78,7 @@
         setDetails(lines.join('<br>'));
 
       } catch (e) {
-        setStatus('Ошибка');
+        setStatus('✖ Ошибка', 'red');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
         api?.setLinkVisible?.(false);
         api?.setLink?.('', '');

@@ -4787,7 +4787,10 @@ function applyImagePicker(image_set, fieldSuffix, opts = {}) {
 // ];
 
 (async () => {
-  const { icons, plashki, backs } = await collectSkinSets();
+  const result = await collectSkinSets();
+  const icons = result?.icons || [];
+  const plashki = result?.plashki || [];
+  const backs = result?.backs || [];
 
   // Плашка
   if (window.SKIN?.PlashkaFieldID) {

@@ -28,10 +28,10 @@
   }
 
   /**
-   * Проверяет наличие comment_id в skin_<userId>
-   * @returns {Promise<{exists: boolean, commentId: number|null}>}
+   * Проверяет наличие skin_<userId> и comment_id
+   * @returns {Promise<{skinExists: boolean, commentId: number|null, data: object|null, error: boolean}>}
    */
-  async function checkCommentId(userId) {
+  async function checkStorage(userId) {
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
       throw new Error('FMVbank.storageGet не найден');
     }
@@ -39,17 +39,60 @@
     try {
       const data = await window.FMVbank.storageGet(userId, 'skin_');
 
-      // Если data существует и comment_id указан
-      if (data && typeof data === 'object' && data.comment_id) {
-        return { exists: true, commentId: data.comment_id };
+      // Если data существует
+      if (data && typeof data === 'object') {
+        return {
+          skinExists: true,
+          commentId: data.comment_id || null,
+          data: data,
+          error: false
+        };
       }
 
-      // comment_id отсутствует или пустой
-      return { exists: false, commentId: null };
+      // Данных нет
+      return { skinExists: false, commentId: null, data: null, error: false };
     } catch (error) {
-      // Ошибка 404 или другая ошибка - считаем что данных нет
-      console.log('[button_create_storage] Данные не найдены или ошибка:', error);
-      return { exists: false, commentId: null };
+      // Ошибка (404 или другая)
+      console.log('[button_create_storage] Ошибка при проверке skin_:', error);
+      return { skinExists: false, commentId: null, data: null, error: true };
+    }
+  }
+
+  /**
+   * Проверяет персональную страницу /pages/usrN
+   * @returns {Promise<{valid: boolean, error: string|null, hasMainUser: boolean}>}
+   */
+  async function checkPersonalPage(userId) {
+    try {
+      const pageUrl = `/pages/usr${userId}`;
+      const response = await fetch(pageUrl);
+
+      if (!response.ok) {
+        return { valid: false, error: `HTTP ${response.status}`, hasMainUser: false };
+      }
+
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Проверка 1: Страница не создана
+      const infoDiv = doc.querySelector('.info .container');
+      if (infoDiv && /неверная или устаревшая/i.test(infoDiv.textContent)) {
+        return { valid: false, error: 'Необходимо создать персональную страницу', hasMainUser: false };
+      }
+
+      // Проверка 2: Используется основной профиль
+      const modalScript = doc.querySelector('.modal_script[data-main-user_id]');
+      const mainUserId = modalScript?.getAttribute('data-main-user_id');
+
+      if (mainUserId && mainUserId.trim()) {
+        return { valid: false, error: 'Используется хранилище основного профиля', hasMainUser: true };
+      }
+
+      // Всё ок
+      return { valid: true, error: null, hasMainUser: false };
+    } catch (error) {
+      return { valid: false, error: `Ошибка загрузки страницы: ${error.message}`, hasMainUser: false };
     }
   }
 
@@ -200,28 +243,21 @@
 
   /**
    * Сохраняет comment_id в skin_<userId>
+   * @param {object|null} existingData - Существующие данные из GET (если были)
    */
-  async function saveCommentId(userId, commentId) {
-    if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function' || typeof window.FMVbank.storageSet !== 'function') {
+  async function saveCommentId(userId, commentId, existingData = null) {
+    if (!window.FMVbank || typeof window.FMVbank.storageSet !== 'function') {
       throw new Error('FMVbank не найден');
     }
 
-    // Делаем GET сначала
-    let currentData;
-    try {
-      currentData = await window.FMVbank.storageGet(userId, 'skin_');
-    } catch (error) {
-      console.log('[button_create_storage] Данные не найдены, создаём новый объект');
-      currentData = {};
-    }
+    // Используем существующие данные или создаём новый объект
+    const baseData = existingData && typeof existingData === 'object' ? existingData : {};
 
-    // Обновляем ТОЛЬКО comment_id и last_timestamp, всё остальное НЕ ТРОГАЕМ!
-    const baseData = currentData && typeof currentData === 'object' ? currentData : {};
-
+    // Обновляем comment_id и last_timestamp
     baseData.comment_id = commentId;
     baseData.last_timestamp = Math.floor(Date.now() / 1000);
 
-    // Сохраняем (все остальные поля остаются как есть из GET)
+    // Сохраняем (все остальные поля остаются как есть из existingData)
     const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
     if (!result) {
       throw new Error('Не удалось сохранить данные в API');
@@ -234,33 +270,68 @@
   /**
    * Основная логика кнопки
    */
-  async function createStorage(userId, setStatus, setDetails) {
+  async function createStorage(userId, setStatus, setDetails, setLink) {
     try {
       setStatus('Проверяю...');
       setDetails('');
+      if (setLink) setLink('');
 
-      // 1. Проверяем наличие comment_id
-      const check = await checkCommentId(userId);
+      const siteUrl = window.SITE_URL || window.location.origin;
 
-      if (check.exists) {
-        setStatus('Готово');
-        setDetails('Хранилище уже установлено (comment_id: ' + check.commentId + ')');
+      // 1. Проверяем наличие skin_<userId>
+      const storage = await checkStorage(userId);
+
+      // Если НЕ ошибка и skin_ существует
+      if (!storage.error && storage.skinExists) {
+        // 1.1. Проверяем comment_id
+        if (storage.commentId) {
+          // comment_id уже указан
+          setStatus('✓ Уже указано');
+          setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
+          if (setLink) {
+            const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
+            setLink(commentUrl);
+          }
+          return;
+        }
+
+        // 1.2. comment_id не указан - продолжаем с существующими данными
+        console.log('[button_create_storage] skin_ существует, но comment_id не указан');
+      }
+
+      // 2. Если ошибка ИЛИ skin_ не существует - проверяем персональную страницу
+      if (storage.error || !storage.skinExists) {
+        console.log('[button_create_storage] skin_ не найден или ошибка, проверяем /pages/usr' + userId);
+      }
+
+      // 3. Проверяем персональную страницу
+      setStatus('Проверяю страницу...');
+      const pageCheck = await checkPersonalPage(userId);
+
+      if (!pageCheck.valid) {
+        setStatus('✖ Ошибка');
+        setDetails(pageCheck.error);
         return;
       }
 
-      // 2. Создаём комментарий
+      // 4. Создаём комментарий
       setStatus('Создаю комментарий...');
       const commentId = await createCommentInLog(userId);
 
-      // 3. Сохраняем comment_id в API
+      // 5. Сохраняем comment_id в API (с существующими данными если были)
       setStatus('Сохраняю...');
-      await saveCommentId(userId, commentId);
+      await saveCommentId(userId, commentId, storage.data);
 
-      // 4. Успех
-      setStatus('Готово');
-      setDetails('Хранилище создано, comment_id: ' + commentId);
+      // 6. Успех
+      setStatus('✓ Готово');
+      setDetails(`Хранилище создано (comment_id: ${commentId})`);
+      if (setLink) {
+        const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${commentId}`;
+        setLink(commentUrl);
+      }
+
     } catch (error) {
-      setStatus('Ошибка');
+      setStatus('✖ Ошибка');
       setDetails(error?.message || String(error));
       console.error('[button_create_storage] Ошибка:', error);
     }
@@ -275,16 +346,17 @@
       order: 4.5, // Под кнопкой "Создать страницу" (обычно order=4)
       showStatus: true,
       showDetails: true,
-      showLink: false,
+      showLink: true,
 
       async onClick(api) {
         const setStatus = api?.setStatus || (() => { });
         const setDetails = api?.setDetails || (() => { });
+        const setLink = api?.setLink || (() => { });
 
         // Находим контейнер с кнопкой
         const container = document.querySelector('div.post.topicpost');
         if (!container) {
-          setStatus('Ошибка');
+          setStatus('✖ Ошибка');
           setDetails('Не найден контейнер div.post.topicpost');
           return;
         }
@@ -292,7 +364,7 @@
         // Извлекаем userId из профиля
         const userId = getUserIdFromProfile(container);
         if (!userId) {
-          setStatus('Ошибка');
+          setStatus('✖ Ошибка');
           setDetails('Не удалось определить ID пользователя');
           return;
         }
@@ -300,7 +372,7 @@
         console.log('[button_create_storage] userId:', userId);
 
         // Запускаем создание хранилища
-        await createStorage(userId, setStatus, setDetails);
+        await createStorage(userId, setStatus, setDetails, setLink);
       }
     });
   } else {

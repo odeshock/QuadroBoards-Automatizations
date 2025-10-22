@@ -19,33 +19,51 @@
 // ];
 
 (async () => {
+  console.log('[skin_data] Начало загрузки данных скинов');
+  console.log('[skin_data] window.SKIN:', window.SKIN);
+
   const result = await collectSkinSets();
+  console.log('[skin_data] collectSkinSets вернул:', result);
+
   const icons = result?.icons || [];
   const plashki = result?.plashki || [];
   const backs = result?.backs || [];
 
+  console.log('[skin_data] icons:', icons.length, 'plashki:', plashki.length, 'backs:', backs.length);
+
   // Плашка
   if (window.SKIN?.PlashkaFieldID) {
+    console.log('[skin_data] Применяем плашку, fieldID:', window.SKIN.PlashkaFieldID);
     applyImagePicker(plashki, SKIN.PlashkaFieldID, {
       btnWidth: 229,
       btnHeight: 42,
       modalLinkMode: true,
     });
+  } else {
+    console.log('[skin_data] PlashkaFieldID не найден');
   }
 
   // Фон
   if (window.SKIN?.BackFieldID) {
+    console.log('[skin_data] Применяем фон, fieldID:', window.SKIN.BackFieldID);
     applyImagePicker(backs, SKIN.BackFieldID, {
       btnWidth: 229,
       btnHeight: 42,
       modalLinkMode: true,
     });
+  } else {
+    console.log('[skin_data] BackFieldID не найден');
   }
 
   // Иконка
   if (window.SKIN?.IconFieldID) {
+    console.log('[skin_data] Применяем иконку, fieldID:', window.SKIN.IconFieldID);
     applyImagePicker(icons, SKIN.IconFieldID, {
       btnWidth: 44,
     });
+  } else {
+    console.log('[skin_data] IconFieldID не найден');
   }
+
+  console.log('[skin_data] Завершено');
 })();

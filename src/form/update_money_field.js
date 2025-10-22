@@ -22,10 +22,49 @@
       if (!idMatch) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
       const userId = idMatch[1];
 
-      // 2) Поле и значение (как в исходнике: берём шаблон «как есть»)
+      // 2) Проверяем персональную страницу /pages/usrN
       const fieldId = window.PROFILE_CHECK?.MoneyFieldID;
       const rawTemplate = window.PROFILE_CHECK?.MoneyFieldTemplate;
-      const fieldValue = String(rawTemplate);
+      let fieldValue;
+
+      try {
+        const pageUrl = `/pages/usr${userId}`;
+        const response = await fetch(pageUrl);
+        if (!response.ok) {
+          setStatus('✖ ошибка загрузки страницы', 'red');
+          setDetails(`Не удалось загрузить ${pageUrl}: HTTP ${response.status}`);
+          return;
+        }
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // Проверяем наличие ошибки "неверная или устаревшая"
+        const infoDiv = doc.querySelector('.info .container');
+        if (infoDiv && /неверная или устаревшая/i.test(infoDiv.textContent)) {
+          setStatus('✖ страница не создана', 'red');
+          setDetails('Необходимо создать персональную страницу');
+          return;
+        }
+
+        // Проверяем наличие modal_script с data-main-user_id
+        const modalScript = doc.querySelector('.modal_script[data-main-user_id]');
+        const mainUserId = modalScript?.getAttribute('data-main-user_id');
+
+        if (mainUserId && mainUserId.trim()) {
+          // Используем <!-- main: usrK -->
+          fieldValue = `<!-- main: usr${mainUserId.trim()} -->`;
+        } else {
+          // Используем шаблонное значение
+          fieldValue = String(rawTemplate);
+        }
+      } catch (err) {
+        setStatus('✖ ошибка проверки страницы', 'red');
+        setDetails(`Ошибка при загрузке /pages/usr${userId}: ${err.message}`);
+        console.error('[button_update_money_field]', err);
+        return;
+      }
 
       if (typeof window.FMVreplaceFieldData !== 'function') {
         setStatus('✖ функция обновления не найдена', 'red');

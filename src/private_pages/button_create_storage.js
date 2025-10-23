@@ -86,13 +86,13 @@
       // Проверка 1: Страница не создана
       const infoDiv = doc.querySelector('.info .container');
       if (infoDiv && /неверная или устаревшая/i.test(infoDiv.textContent)) {
-        return { valid: false, error: 'Сначала создайте персональную страницу', isTwink: false };
+        return { valid: false, error: 'Необходимо создать и заполнить персональную страницу по шаблону.', isTwink: false };
       }
 
       // Проверка 2: Есть ли .modal_script
       const modalScript = doc.querySelector('.modal_script');
       if (!modalScript) {
-        return { valid: false, error: 'Ошибка в заполнении персональной страницы', isTwink: false };
+        return { valid: false, error: 'Необходимо создать и заполнить персональную страницу по шаблону.', isTwink: false };
       }
 
       // Проверка 3: Это твинк (есть data-main-user_id)?

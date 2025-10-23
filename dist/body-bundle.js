@@ -3540,16 +3540,16 @@ async function FMVeditTextareaOnly(name, newHtml) {
         // Проверка 1: Страница не создана
         const infoDiv = doc.querySelector('.info .container');
         if (infoDiv && /неверная или устаревшая/i.test(infoDiv.textContent)) {
-          setStatus('✖ страница не создана', 'red');
-          setDetails('Необходимо создать персональную страницу');
+          setStatus('✖ отсутствует персональная страница', 'red');
+          setDetails('Необходимо создать и заполнить персональную страницу по шаблону.');
           return;
         }
 
         // Проверка 2: Есть ли .modal_script
         const modalScript = doc.querySelector('.modal_script');
         if (!modalScript) {
-          setStatus('✖ ошибка в заполнении страницы', 'red');
-          setDetails('На персональной странице отсутствует .modal_script');
+          setStatus('✖ отсутствует персональная страница', 'red');
+          setDetails('Необходимо создать и заполнить персональную страницу по шаблону.');
           return;
         }
 

@@ -16,9 +16,11 @@
 
   const LIBRARY_FORUM_ID = [window.SKIN.LibraryForumID];
   const GID = window.SKIN.GroupID || [];
+  const TID = String(window.SKIN.LibraryFieldID).trim();
 
   console.log('[button_load_library] LIBRARY_FORUM_ID:', LIBRARY_FORUM_ID);
   console.log('[button_load_library] GID:', GID);
+  console.log('[button_load_library] TID (LibraryFieldID):', TID);
 
   // ID постов библиотеки
   const LIBRARY_POSTS = {
@@ -281,12 +283,14 @@
     console.log('[button_load_library] Создаём кнопку с параметрами:', {
       allowedGroups: GID,
       allowedForums: LIBRARY_FORUM_ID,
+      topicId: TID,
       label: 'Подгрузить библиотеку'
     });
 
     window.createForumButton({
       allowedGroups: GID,
       allowedForums: LIBRARY_FORUM_ID,
+      topicId: TID,
       label: 'Подгрузить библиотеку',
       order: 1,
       showStatus: true,

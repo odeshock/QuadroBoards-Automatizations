@@ -57,11 +57,28 @@
         // Проверка 3: Проверяем data-main-user_id
         const mainUserId = modalScript.getAttribute('data-main-user_id');
 
-        if (mainUserId && mainUserId.trim()) {
-          // Используем <!-- main: usrK -->
-          fieldValue = `<!-- main: usr${mainUserId.trim()} -->`;
+        // Если атрибут есть
+        if (mainUserId !== null) {
+          const trimmed = mainUserId.trim();
+
+          // Если пустой или шаблонное значение "УБРАТЬ ЕСЛИ НЕ НУЖНО"
+          if (!trimmed || trimmed === 'УБРАТЬ ЕСЛИ НЕ НУЖНО') {
+            setStatus('✖ отсутствует персональная страница', 'red');
+            setDetails('Необходимо создать и заполнить персональную страницу по шаблону.');
+            return;
+          }
+
+          // Если содержит число (это твинк) - используем <!-- main: usrK -->
+          if (/^\d+$/.test(trimmed)) {
+            fieldValue = `<!-- main: usr${trimmed} -->`;
+          } else {
+            // Иначе - некорректное значение
+            setStatus('✖ отсутствует персональная страница', 'red');
+            setDetails('Необходимо создать и заполнить персональную страницу по шаблону.');
+            return;
+          }
         } else {
-          // Используем шаблонное значение
+          // Атрибута нет - это основной персонаж, используем шаблонное значение
           fieldValue = String(rawTemplate);
         }
       } catch (err) {

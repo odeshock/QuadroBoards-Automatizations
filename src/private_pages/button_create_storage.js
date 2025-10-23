@@ -95,13 +95,28 @@
         return { valid: false, error: 'Необходимо создать и заполнить персональную страницу по шаблону.', isTwink: false };
       }
 
-      // Проверка 3: Это твинк (есть data-main-user_id)?
+      // Проверка 3: Проверяем data-main-user_id
       const mainUserId = modalScript.getAttribute('data-main-user_id');
-      if (mainUserId && mainUserId.trim()) {
-        return { valid: false, error: 'Это твинк, ему не нужно отдельное хранилище', isTwink: true };
+
+      // Если атрибут есть
+      if (mainUserId !== null) {
+        const trimmed = mainUserId.trim();
+
+        // Если пустой или шаблонное значение "УБРАТЬ ЕСЛИ НЕ НУЖНО"
+        if (!trimmed || trimmed === 'УБРАТЬ ЕСЛИ НЕ НУЖНО') {
+          return { valid: false, error: 'Необходимо создать и заполнить персональную страницу по шаблону.', isTwink: false };
+        }
+
+        // Если содержит число (это твинк)
+        if (/^\d+$/.test(trimmed)) {
+          return { valid: false, error: 'Это твинк, ему не нужно отдельное хранилище', isTwink: true };
+        }
+
+        // Иначе - некорректное значение
+        return { valid: false, error: 'Необходимо создать и заполнить персональную страницу по шаблону.', isTwink: false };
       }
 
-      // Всё ок - это основной персонаж без data-main-user_id
+      // Атрибута нет - это основной персонаж, всё ок
       return { valid: true, error: null, isTwink: false };
     } catch (error) {
       return { valid: false, error: `Ошибка загрузки страницы: ${error.message}`, isTwink: false };

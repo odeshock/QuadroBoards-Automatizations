@@ -1252,7 +1252,7 @@ async function collectSkinSets() {
   console.log('[collect_skins_api] Скрипт загружен');
 
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
-  const DEBUG = true;
+  const DEBUG = false;
 
   const log = (...a) => DEBUG && console.log('[collect_skins_api]', ...a);
 

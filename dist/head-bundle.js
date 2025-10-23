@@ -2309,6 +2309,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const USER_ID = () => 1; // всегда 1 в запросах
   let ticket = false;
 
+  // Флаг отладки - установите в true для вывода логов
+  const DEBUG = false;
+
+  // Функция логирования с проверкой DEBUG
+  const log = (...args) => {
+    if (DEBUG) console.log('[FMVbank]', ...args);
+  };
+
   // utils
   const enc = (o) => new URLSearchParams(o);
   const parseStorage = (json, key) => {
@@ -2391,17 +2399,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function storageSet(valueObj, NEEDED_USER_ID = 1, api_key_label = "fmv_bank_info_") {
-    console.log('[FMVbank] 🔵 storageSet вызван: NEEDED_USER_ID=', NEEDED_USER_ID, 'api_key_label=', api_key_label);
-    console.log('[FMVbank] 🔵 Итоговый API_KEY будет:', api_key_label + NEEDED_USER_ID);
+    log('🔵 storageSet вызван: NEEDED_USER_ID=', NEEDED_USER_ID, 'api_key_label=', api_key_label);
+    log('🔵 Итоговый API_KEY будет:', api_key_label + NEEDED_USER_ID);
 
     if (!valueObj || typeof valueObj !== "object" || Array.isArray(valueObj)) {
-      console.log("[FMVbank] storageSet: ожидался объект JSON");
+      log("storageSet: ожидался объект JSON");
       return false;
     }
     const stringValue = JSON.stringify(valueObj);
-    console.log('[FMVbank] 🔵 Отправляю в storage.set, длина данных:', stringValue.length);
+    log('🔵 Отправляю в storage.set, длина данных:', stringValue.length);
     await callStorage("storage.set", { value: stringValue }, NEEDED_USER_ID, api_key_label);
-    console.log('[FMVbank] 🔵 storage.set завершён успешно');
+    log('🔵 storage.set завершён успешно');
     return true;
   }
 

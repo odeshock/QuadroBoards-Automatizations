@@ -4,6 +4,14 @@
 (() => {
   'use strict';
 
+  // Флаг отладки - установите в true для вывода логов
+  const DEBUG = false;
+
+  // Функция логирования с проверкой DEBUG
+  const log = (...args) => {
+    if (DEBUG) console.log('[button_create_storage]', ...args);
+  };
+
   // Проверяем наличие нужных полей
   if (!window.PROFILE_CHECK || !window.PROFILE_CHECK.GroupID || !window.SKIN || !window.PROFILE_CHECK.ForumID || !window.SKIN.LogFieldID) {
     console.warn('[button_create_storage] Требуется window.PROFILE_CHECK с GroupID, ForumID и window.SKIN с LogFieldID');
@@ -53,7 +61,7 @@
       return { skinExists: false, commentId: null, data: null, error: false };
     } catch (error) {
       // Ошибка (404 или другая)
-      console.log('[button_create_storage] Ошибка при проверке skin_:', error);
+      log('Ошибка при проверке skin_:', error);
       return { skinExists: false, commentId: null, data: null, error: true };
     }
   }
@@ -108,7 +116,7 @@
       const topicUrl = '/viewtopic.php?id=' + LOG_FIELD_ID;
       const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
 
-      console.log('[button_create_storage] Создаём iframe для топика:', topicUrl);
+      log('Создаём iframe для топика:', topicUrl);
 
       // Создаём iframe
       const iframe = document.createElement('iframe');
@@ -128,7 +136,7 @@
       // Ждём загрузки iframe
       iframe.onload = function() {
         onloadCount++;
-        console.log('[button_create_storage] onload событие #' + onloadCount);
+        log('onload событие #' + onloadCount);
 
         // Первая загрузка - форма ответа
         if (onloadCount === 1) {
@@ -146,10 +154,10 @@
 
             // Вставляем текст
             textarea.value = profileUrl;
-            console.log('[button_create_storage] Текст вставлен в textarea:', profileUrl);
+            log('Текст вставлен в textarea:', profileUrl);
 
             // Отправляем форму
-            console.log('[button_create_storage] Нажимаю кнопку отправки');
+            log('Нажимаю кнопку отправки');
             submitButton.click();
 
           } catch (error) {
@@ -162,7 +170,7 @@
 
         // Вторая загрузка - страница после редиректа
         if (onloadCount === 2) {
-          console.log('[button_create_storage] Вторая загрузка - пытаемся извлечь comment_id');
+          log('Вторая загрузка - пытаемся извлечь comment_id');
 
           try {
             const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
@@ -170,18 +178,18 @@
             // Пытаемся найти созданный комментарий по классу
             // В rusff комментарии имеют id вида "p<comment_id>"
             const posts = iframeDoc.querySelectorAll('div.post[id^="p"]');
-            console.log('[button_create_storage] Найдено постов с id:', posts.length);
+            log('Найдено постов с id:', posts.length);
 
             if (posts.length > 0) {
               // Берем последний пост (свежесозданный)
               const lastPost = posts[posts.length - 1];
               const postId = lastPost.id; // Например "p12345"
-              console.log('[button_create_storage] ID последнего поста:', postId);
+              log('ID последнего поста:', postId);
 
               const match = postId.match(/^p(\d+)$/);
               if (match) {
                 const commentId = Number(match[1]);
-                console.log('[button_create_storage] ✅ Извлечён comment_id:', commentId);
+                log('✅ Извлечён comment_id:', commentId);
 
                 clearTimeout(timeout);
                 iframe.remove();
@@ -193,13 +201,13 @@
             // Если не нашли по div.post, пробуем через URL (может быть доступен)
             try {
               const currentUrl = iframe.contentWindow.location.href;
-              console.log('[button_create_storage] URL после редиректа:', currentUrl);
+              log('URL после редиректа:', currentUrl);
 
               // Ищем pid в параметрах
               const pidMatch = currentUrl.match(/[?&]pid=(\d+)/);
               if (pidMatch) {
                 const commentId = Number(pidMatch[1]);
-                console.log('[button_create_storage] ✅ Извлечён comment_id из URL:', commentId);
+                log('✅ Извлечён comment_id из URL:', commentId);
 
                 clearTimeout(timeout);
                 iframe.remove();
@@ -211,7 +219,7 @@
               const anchorMatch = currentUrl.match(/#p(\d+)/);
               if (anchorMatch) {
                 const commentId = Number(anchorMatch[1]);
-                console.log('[button_create_storage] ✅ Извлечён comment_id из якоря:', commentId);
+                log('✅ Извлечён comment_id из якоря:', commentId);
 
                 clearTimeout(timeout);
                 iframe.remove();
@@ -219,7 +227,7 @@
                 return;
               }
             } catch (urlError) {
-              console.log('[button_create_storage] Не удалось прочитать URL (CORS):', urlError.message);
+              log('Не удалось прочитать URL (CORS):', urlError.message);
             }
 
             // Не нашли comment_id
@@ -267,7 +275,7 @@
       throw new Error('Не удалось сохранить данные в API');
     }
 
-    console.log('[button_create_storage] comment_id сохранён в API');
+    log('comment_id сохранён в API');
     return true;
   }
 
@@ -363,7 +371,7 @@
           return;
         }
 
-        console.log('[button_create_storage] userId:', userId);
+        log('userId:', userId);
 
         // Запускаем создание хранилища
         await createStorage(userId, setStatus, setDetails, setLink);

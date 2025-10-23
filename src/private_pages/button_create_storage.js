@@ -311,7 +311,12 @@
       const pageCheck = await checkPersonalPage(userId);
 
       if (!pageCheck.valid) {
-        setStatus('✖ ошибка', 'red');
+        // Проверяем, это твинк или отсутствует страница
+        if (pageCheck.isTwink) {
+          setStatus('✖ ошибка', 'red');
+        } else {
+          setStatus('✖ отсутствует персональная страница', 'red');
+        }
         setDetails(pageCheck.error);
         return;
       }

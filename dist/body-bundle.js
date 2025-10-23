@@ -3537,7 +3537,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
 
-        // Проверяем наличие ошибки "неверная или устаревшая"
+        // Проверка 1: Страница не создана
         const infoDiv = doc.querySelector('.info .container');
         if (infoDiv && /неверная или устаревшая/i.test(infoDiv.textContent)) {
           setStatus('✖ страница не создана', 'red');
@@ -3545,9 +3545,16 @@ async function FMVeditTextareaOnly(name, newHtml) {
           return;
         }
 
-        // Проверяем наличие modal_script с data-main-user_id
-        const modalScript = doc.querySelector('.modal_script[data-main-user_id]');
-        const mainUserId = modalScript?.getAttribute('data-main-user_id');
+        // Проверка 2: Есть ли .modal_script
+        const modalScript = doc.querySelector('.modal_script');
+        if (!modalScript) {
+          setStatus('✖ ошибка в заполнении страницы', 'red');
+          setDetails('На персональной странице отсутствует .modal_script');
+          return;
+        }
+
+        // Проверка 3: Проверяем data-main-user_id
+        const mainUserId = modalScript.getAttribute('data-main-user_id');
 
         if (mainUserId && mainUserId.trim()) {
           // Используем <!-- main: usrK -->

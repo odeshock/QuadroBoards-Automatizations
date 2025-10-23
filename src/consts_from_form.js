@@ -78,7 +78,7 @@ var PROFILE_CHECK = { // для работы проверки анкет
   GroupUserID: GROUP_IDS.User, // ID группы 'Пользователь'
   GroupPlayerID: GROUP_IDS.Player, // ID группы ''Игрок'
   ForumID: FORUMS_IDS.NewForm,  // в каких форумах работает вставка с кнопками
-  PPageTemplate: `<div class="character"><div class="modal_script" data-id="N">
+  PPageTemplate: `<div class="character"><div class="modal_script" data-id="N" data-main-user_id="УБРАТЬ ЕСЛИ НЕ НУЖНО">>
 
 <div class="chrono_info"></div>
 

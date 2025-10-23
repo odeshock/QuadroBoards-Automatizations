@@ -7,12 +7,12 @@
   /* ===== Система логирования ===== */
   const DEBUG = true; // false чтобы отключить все log()
 
-  const log = DEBUG ? console.log.bind(console) : () => {};
-  const warn = DEBUG ? console.warn.bind(console) : () => {};
-  const error = DEBUG ? console.error.bind(console) : () => {};
-  const table = DEBUG ? console.table.bind(console) : () => {};
-  const groupCollapsed = DEBUG ? console.groupCollapsed.bind(console) : () => {};
-  const groupEnd = DEBUG ? console.groupEnd.bind(console) : () => {};
+  const log = DEBUG ? console.log.bind(console) : () => { };
+  const warn = DEBUG ? console.warn.bind(console) : () => { };
+  const error = DEBUG ? console.error.bind(console) : () => { };
+  const table = DEBUG ? console.table.bind(console) : () => { };
+  const groupCollapsed = DEBUG ? console.groupCollapsed.bind(console) : () => { };
+  const groupEnd = DEBUG ? console.groupEnd.bind(console) : () => { };
 
   /* ---------- tiny utils ---------- */
   /**
@@ -412,15 +412,17 @@
 
     // --- money: одна строка — получаем СТРОКУ через код 2 (или фолбэк)
     const moneyStr = await (async () => {
+      const moneyFieldId = window.PROFILE_FIELDS?.MoneyID;
       const api = window.MainUsrFieldResolver?.getFieldValue;
       if (api) {
-        try { return await api({ doc, fieldId: 6 }); } // pa-fld6
+        try { return await api({ doc, fieldId: moneyFieldId }); }
         catch (e) { warn("[fetchProfileInfo] getFieldValue error:", e); }
       }
       // фолбэк, если код 2 недоступен
-      const strong = txt("li#pa-fld6 strong");
+      const selector = `li#pa-fld${moneyFieldId}`;
+      const strong = txt(`${selector} strong`);
       if (strong) return strong;
-      const raw = txt("li#pa-fld6");
+      const raw = txt(selector);
       return raw ? raw.split(":").slice(-1)[0].trim() : "";
     })();
 

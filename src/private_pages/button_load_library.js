@@ -4,8 +4,16 @@
 (() => {
   'use strict';
 
-  console.log('[button_load_library] Скрипт загружен');
-  console.log('[button_load_library] window.SKIN:', window.SKIN);
+  // Флаг отладки - установите в true для вывода логов
+  const DEBUG = false;
+
+  // Функция логирования с проверкой DEBUG
+  const log = (...args) => {
+    if (DEBUG) console.log('[button_load_library]', ...args);
+  };
+
+  log('Скрипт загружен');
+  log('window.SKIN:', window.SKIN);
 
   // Проверяем наличие нужных полей
   if (!window.SKIN || !window.SKIN.LibraryFieldID) {
@@ -18,9 +26,9 @@
   const GID = window.SKIN.GroupID || [];
   const TID = String(window.SKIN.LibraryFieldID).trim();
 
-  console.log('[button_load_library] LIBRARY_FORUM_ID:', LIBRARY_FORUM_ID);
-  console.log('[button_load_library] GID:', GID);
-  console.log('[button_load_library] TID (LibraryFieldID):', TID);
+  log('LIBRARY_FORUM_ID:', LIBRARY_FORUM_ID);
+  log('GID:', GID);
+  log('TID (LibraryFieldID):', TID);
 
   // ID постов библиотеки
   const LIBRARY_POSTS = {
@@ -163,7 +171,7 @@
   async function loadLibraryPost(postId, isCoupon = false) {
     try {
       const url = `/viewtopic.php?pid=${postId}#p${postId}`;
-      console.log(`[button_load_library] Загружаю URL: ${url}`);
+      log(`Загружаю URL: ${url}`);
 
       const html = await smartFetchHtml(url);
       const parser = new DOMParser();
@@ -176,11 +184,11 @@
         return [];
       }
 
-      console.log(`[button_load_library] Найден #p${postId}-content`);
+      log(`Найден #p${postId}-content`);
 
       // Ищем script[type="text/html"] внутри поста
       const scripts = [...postContent.querySelectorAll('script[type="text/html"]')];
-      console.log(`[button_load_library] Найдено script[type="text/html"]: ${scripts.length}`);
+      log(`Найдено script[type="text/html"]: ${scripts.length}`);
 
       if (!scripts.length) {
         console.warn(`[button_load_library] Нет script[type="text/html"] в посте ${postId}`);
@@ -196,7 +204,7 @@
 
       // Ищем article.card внутри #grid
       const articles = innerDoc.querySelectorAll('#grid article.card');
-      console.log(`[button_load_library] Найдено article.card: ${articles.length}`);
+      log(`Найдено article.card: ${articles.length}`);
 
       const items = [];
 
@@ -228,17 +236,17 @@
 
     for (const [category, postIds] of Object.entries(LIBRARY_POSTS)) {
       if (!Array.isArray(postIds) || postIds.length === 0) {
-        console.log(`[button_load_library] Нет постов для категории ${category}`);
+        log(`Нет постов для категории ${category}`);
         continue;
       }
 
       const isCoupon = category === 'coupon';
 
       for (const postId of postIds) {
-        console.log(`[button_load_library] Загружаю пост ${postId} для ${category}...`);
+        log(`Загружаю пост ${postId} для ${category}...`);
         const items = await loadLibraryPost(postId, isCoupon);
         result[category].push(...items);
-        console.log(`[button_load_library] Загружено ${items.length} элементов из поста ${postId}`);
+        log(`Загружено ${items.length} элементов из поста ${postId}`);
       }
     }
 
@@ -264,7 +272,7 @@
         last_timestamp: timestamp
       };
 
-      console.log(`[button_load_library] Сохраняю ${category}:`, saveData);
+      log(`Сохраняю ${category}:`, saveData);
 
       // Сохраняем с userId=1 и api_key_label='library_<category>_'
       const result = await window.FMVbank.storageSet(saveData, 1, `library_${category}_`);
@@ -278,9 +286,9 @@
   }
 
   // Создаём кнопку
-  console.log('[button_load_library] Проверяем createForumButton:', typeof window.createForumButton);
+  log('Проверяем createForumButton:', typeof window.createForumButton);
   if (typeof window.createForumButton === 'function') {
-    console.log('[button_load_library] Создаём кнопку с параметрами:', {
+    log('Создаём кнопку с параметрами:', {
       allowedGroups: GID,
       allowedForums: LIBRARY_FORUM_ID,
       topicId: TID,
@@ -335,10 +343,10 @@
         }
       }
     });
-    console.log('[button_load_library] Кнопка создана');
+    log('Кнопка создана');
   } else {
     console.warn('[button_load_library] createForumButton не найдена');
   }
 
-  console.log('[button_load_library] Инициализация завершена');
+  log('Инициализация завершена');
 })();

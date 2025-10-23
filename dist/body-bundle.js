@@ -769,10 +769,11 @@ $(function() {
 
     let chrono = {};
     let comment_id = null;
+    let last_timestamp = null;
 
     if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
       console.error('[admin_bridge_json] FMVbank.storageGet не найден');
-      return { data, chrono, comment_id };
+      return { data, chrono, comment_id, last_timestamp };
     }
 
     // Функция для получения текущей даты в МСК (yyyy-mm-dd)
@@ -797,12 +798,13 @@ $(function() {
 
       if (!response || typeof response !== 'object') {
         console.warn('[admin_bridge_json] Нет данных в API для userId=' + userId);
-        return { data, chrono, comment_id };
+        return { data, chrono, comment_id, last_timestamp };
       }
 
-      // Извлекаем chrono и comment_id
+      // Извлекаем chrono, comment_id и last_timestamp
       chrono = response.chrono || {};
       comment_id = response.comment_id || null;
+      last_timestamp = response.last_timestamp || null;
 
       // Обрабатываем категории скинов
       const categories = ['icon', 'plashka', 'background', 'gift', 'coupon'];
@@ -828,7 +830,7 @@ $(function() {
       console.error('[admin_bridge_json] Ошибка загрузки данных:', err);
     }
 
-    return { data, chrono, comment_id };
+    return { data, chrono, comment_id, last_timestamp };
   }
 
   /**
@@ -838,9 +840,10 @@ $(function() {
    *
    * @param {number} userId
    * @param {object} skinData - { icon: [], plashka: [], ... } данные из панели
+   * @param {number|null} initialTimestamp - last_timestamp из первоначальной загрузки
    * @returns {Promise<boolean>}
    */
-  async function saveAllDataToAPI(userId, skinData) {
+  async function saveAllDataToAPI(userId, skinData, initialTimestamp = null) {
     console.log('[admin_bridge_json] 🔥 СОХРАНЕНИЕ ДЛЯ userId:', userId);
     console.log('[admin_bridge_json] 🔥 skinData:', JSON.parse(JSON.stringify(skinData)));
 
@@ -874,6 +877,18 @@ $(function() {
       const baseData = currentData && typeof currentData === 'object' ? currentData : {};
 
       console.log('[admin_bridge_json] 📥 Текущие данные из API:', JSON.parse(JSON.stringify(baseData)));
+
+      // ШАГ 1.5: Проверяем last_timestamp
+      if (initialTimestamp !== null) {
+        const currentTimestamp = baseData.last_timestamp || null;
+        console.log('[admin_bridge_json] 🕐 Проверка timestamp: initial=' + initialTimestamp + ', current=' + currentTimestamp);
+
+        if (currentTimestamp !== null && currentTimestamp !== initialTimestamp) {
+          alert('К сожалению, за время работы на странице данные для этого пользователя были изменены. Пожалуйста, откройте новую вкладку и заполните обновления снова.');
+          console.error('[admin_bridge_json] ❌ Конфликт: данные были изменены другим пользователем');
+          return false;
+        }
+      }
 
       // ПРОВЕРКА: comment_id должен быть указан (берём из текущих данных API)
       const commentId = baseData.comment_id;
@@ -1072,7 +1087,7 @@ $(function() {
     }
 
     // Загружаем данные из API (фильтруем истекшие купоны)
-    const { data, chrono, comment_id } = await loadAllDataFromAPI(targetUserId, libraryIds);
+    const { data, chrono, comment_id, last_timestamp } = await loadAllDataFromAPI(targetUserId, libraryIds);
 
     /**
      * Функция сохранения
@@ -1080,7 +1095,7 @@ $(function() {
      * @returns {Promise<object>} { ok, status }
      */
     async function save(skinData) {
-      const success = await saveAllDataToAPI(targetUserId, skinData);
+      const success = await saveAllDataToAPI(targetUserId, skinData, last_timestamp);
       return {
         ok: success,
         status: success ? 'успешно' : 'ошибка сохранения'

@@ -40,7 +40,7 @@ import {
 export const MIN_PERSONAL_POST_SYMBOLS = 0;
 
 // Минимальное количество символов для учёта сюжетного поста
-export const MIN_PLOT_POST_SYMBOLS = 50;
+export const MIN_PLOT_POST_SYMBOLS = 0;
 
 // ============================================================================
 // ДОХОДЫ

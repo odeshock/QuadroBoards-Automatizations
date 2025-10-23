@@ -1521,7 +1521,7 @@ async function collectSkinSets() {
   // ==== настройки ====
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const CHRONO_TARGET_SEL = '.chrono_info';
-  const DEBUG = true;
+  const DEBUG = false;
   const API_KEY_LABEL = 'chrono_'; // Используем ключ chrono_ для хронологии
 
   // ====================

@@ -1117,6 +1117,14 @@ $(function() {
 })();
 // get_skin_api.js — Загрузка данных скинов из API вместо страниц
 
+// Флаг отладки - установите в true для вывода логов
+const DEBUG = false;
+
+// Функция логирования с проверкой DEBUG
+const log = (...args) => {
+  if (DEBUG) console.log('[get_skin_api]', ...args);
+};
+
 function isProfileFieldsPage() {
   try {
     const u = new URL(location.href);
@@ -1140,7 +1148,7 @@ async function getUserIdFromPage(profileId) {
     const pageUrl = `/pages/usr${profileId}`;
     const response = await fetch(pageUrl);
     if (!response.ok) {
-      console.error(`[get_skin_api] Не удалось загрузить ${pageUrl}`);
+      console.error('[get_skin_api] Не удалось загрузить', pageUrl);
       return Number(profileId);
     }
 
@@ -1150,13 +1158,13 @@ async function getUserIdFromPage(profileId) {
 
     const modalScript = doc.querySelector('.modal_script');
     if (!modalScript) {
-      console.warn(`[get_skin_api] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+      log(`.modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
       return Number(profileId);
     }
 
     const mainUserId = modalScript.getAttribute('data-main-user_id');
     if (mainUserId && mainUserId.trim()) {
-      console.log(`[get_skin_api] Найден data-main-user_id=${mainUserId}`);
+      log(`Найден data-main-user_id=${mainUserId}`);
       return Number(mainUserId.trim());
     }
 
@@ -1172,7 +1180,7 @@ async function getUserIdFromPage(profileId) {
  * Загружает данные из API для всех категорий
  */
 async function loadSkinsFromAPI(userId) {
-  console.log('[get_skin_api] Загружаю данные из API для userId:', userId);
+  log('Загружаю данные из API для userId:', userId);
 
   if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
     console.error('[get_skin_api] FMVbank.storageGet не найден');
@@ -1188,10 +1196,10 @@ async function loadSkinsFromAPI(userId) {
   try {
     // Загружаем единый объект skin_<userId>
     const response = await window.FMVbank.storageGet(userId, 'skin_');
-    console.log('[get_skin_api] skin_ ответ:', response);
+    log('skin_ ответ:', response);
 
     if (!response || typeof response !== 'object') {
-      console.warn('[get_skin_api] Нет данных в skin_ для userId:', userId);
+      log('Нет данных в skin_ для userId:', userId);
       return result;
     }
 
@@ -1207,9 +1215,9 @@ async function loadSkinsFromAPI(userId) {
       if (Array.isArray(items)) {
         // Конвертируем каждый item в HTML
         result[resultKey] = items.map(item => item.content || '').filter(Boolean);
-        console.log(`[get_skin_api] ${resultKey} загружено ${items.length} элементов`);
+        log(`${resultKey} загружено ${items.length} элементов`);
       } else {
-        console.log(`[get_skin_api] ${resultKey} отсутствует или не массив`);
+        log(`${resultKey} отсутствует или не массив`);
       }
     }
 
@@ -1217,7 +1225,7 @@ async function loadSkinsFromAPI(userId) {
     console.error('[get_skin_api] Ошибка загрузки данных:', e);
   }
 
-  console.log('[get_skin_api] Результат:', result);
+  log('Результат:', result);
   return result;
 }
 
@@ -1226,24 +1234,24 @@ async function loadSkinsFromAPI(userId) {
  * { icons: string[], plashki: string[], backs: string[] }
  */
 async function collectSkinSets() {
-  console.log('[get_skin_api] collectSkinSets вызван');
+  log('collectSkinSets вызван');
 
   if (!isProfileFieldsPage()) {
-    console.log('[get_skin_api] Не страница fields');
+    log('Не страница fields');
     return { icons: [], plashki: [], backs: [] };
   }
 
   const profileId = getProfileId();
-  console.log('[get_skin_api] profileId:', profileId);
+  log('profileId:', profileId);
 
   // Получаем целевой userId с учётом data-main-user_id (async!)
   const userId = await getUserIdFromPage(profileId);
-  console.log('[get_skin_api] Целевой userId:', userId);
+  log('Целевой userId:', userId);
 
   // Загружаем из API
   const result = await loadSkinsFromAPI(userId);
 
-  console.log('[get_skin_api] Данные загружены:', result);
+  log('Данные загружены:', result);
   return result;
 }
 // collect_skins_api.js — Загрузка и отображение скинов из API на страницах персонажей

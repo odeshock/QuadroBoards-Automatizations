@@ -1,12 +1,14 @@
 // collect_skins_api.js — Загрузка и отображение скинов из API на страницах персонажей
 
 (function () {
-  console.log('[collect_skins_api] Скрипт загружен');
+
 
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
   const DEBUG = false;
 
   const log = (...a) => DEBUG && console.log('[collect_skins_api]', ...a);
+
+  log('[collect_skins_api] Скрипт загружен');
 
   // Селекторы для вставки данных
   const SECTION_SELECTORS = {

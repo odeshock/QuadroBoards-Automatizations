@@ -83,7 +83,21 @@ var PROFILE_CHECK = { // для работы проверки анкет
   GroupUserID: GROUP_IDS.User, // ID группы 'Пользователь'
   GroupPlayerID: GROUP_IDS.Player, // ID группы ''Игрок'
   ForumID: FORUMS_IDS.NewForm,  // в каких форумах работает вставка с кнопками
-  PPageTemplate: '<div class="character">шаблон</div>', // шаблон персональной страницы
+  PPageTemplate: `<div class="character"><div class="modal_script" data-id="N">
+
+<div class="chrono_info"></div>
+
+<div class="_gift"></div>
+
+<div class="_plashka"></div>
+
+<div class="_icon"></div>
+
+<div class="_background"></div>
+
+<div class="_coupon"></div>
+
+</div></div>`, // шаблон персональной страницы
   PPageGroupID: [GROUP_IDS.Admin, GROUP_IDS.Moderator, GROUP_IDS.User, GROUP_IDS.Player], // каким группам видна персональная страница
   PPageFieldID: PROFILE_FIELDS.PlashkaID, // поле с плашкой
   PPageFieldTemplate: PROFILE_FIELDS.PlashkaTemplate, // шаблон для плашки

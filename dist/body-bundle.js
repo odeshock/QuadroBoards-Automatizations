@@ -3290,19 +3290,19 @@ async function FMVeditTextareaOnly(name, newHtml) {
       if (!arg1) { setStatus('✖ нет имени темы', 'red'); setDetails('Ожидался #pun-main h1 span'); return; }
 
       // --- арг2: usr{id} из ссылки профиля
-      let profLink =
-        document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
-        document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
-        document.querySelector('a[href*="profile.php?id="]');
+      let profLink = document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch { }
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       if (!idMatch) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
-      const arg2 = `usr${idMatch[1]}`;
+      const userId = idMatch[1];
+      const arg2 = `usr${userId}`;
 
       // --- остальные аргументы из PROFILE_CHECK
-      const arg3 = window.PROFILE_CHECK?.PPageTemplate;
+      // Заменяем N в data-id="N" на userId
+      const rawTemplate = window.PROFILE_CHECK?.PPageTemplate || '';
+      const arg3 = rawTemplate.replace(/data-id="N"/g, `data-id="${userId}"`);
       const arg4 = '';
       const arg5 = window.PROFILE_CHECK?.PPageGroupID;
       const arg6 = '0';
@@ -3323,19 +3323,19 @@ async function FMVeditTextareaOnly(name, newHtml) {
 
         switch (res?.status) {
           case 'created': setStatus('✔ создано', 'green'); break;
-          case 'exists':  setStatus('ℹ уже существует', 'red'); break;
-          case 'error':   setStatus('✖ ошибка', 'red'); break;
-          default:        setStatus('❔ не удалось подтвердить', '#b80');
+          case 'exists': setStatus('ℹ уже существует', 'red'); break;
+          case 'error': setStatus('✖ ошибка', 'red'); break;
+          default: setStatus('❔ не удалось подтвердить', '#b80');
         }
 
         if (res?.url) setLink(res.url, 'Открыть страницу');
 
         const lines = [];
         if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
-        if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
-        if (res?.title)         lines.push('Пользователь: ' + res.title);
-        if (res?.name)          lines.push('Адресное имя: ' + res.name);
-        if (res?.details)       lines.push('Details: ' + res.details);
+        if (res?.httpStatus) lines.push('HTTP: ' + res.httpStatus);
+        if (res?.title) lines.push('Пользователь: ' + res.title);
+        if (res?.name) lines.push('Адресное имя: ' + res.name);
+        if (res?.details) lines.push('Details: ' + res.details);
         setDetails(lines.join('\n') || 'Нет дополнительных данных');
 
       } catch (err) {
@@ -3472,11 +3472,9 @@ async function FMVeditTextareaOnly(name, newHtml) {
     async onClick({ setStatus, setDetails }) {
       // 1) Контекст: userId (для кого обновляем поле)
       let profLink =
-        document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]') ||
-        document.querySelector('.topic .post .post-links a[href*="profile.php?id="]') ||
-        document.querySelector('a[href*="profile.php?id="]');
+        document.querySelector('.topic .post-links .profile a[href*="profile.php?id="]');
       if (!profLink) {
-        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch {}
+        try { await FMV.waitForSelector('a[href*="profile.php?id="]', 3000); profLink = document.querySelector('a[href*="profile.php?id="]'); } catch { }
       }
       const idMatch = profLink?.href?.match(/profile\.php\?id=(\d+)/i);
       if (!idMatch) { setStatus('✖ не найден userId', 'red'); setDetails('Не удалось извлечь profile.php?id=...'); return; }
@@ -3541,20 +3539,20 @@ async function FMVeditTextareaOnly(name, newHtml) {
 
         // статусы
         switch (res?.status) {
-          case 'updated':  setStatus('✔ обновлено', 'green'); break;
+          case 'updated': setStatus('✔ обновлено', 'green'); break;
           case 'nochange': setStatus('ℹ изменений нет', 'red'); break;
-          case 'error':    setStatus('✖ ошибка', 'red'); break;
-          default:         setStatus('❔ не удалось подтвердить', '#b80');
+          case 'error': setStatus('✖ ошибка', 'red'); break;
+          default: setStatus('❔ не удалось подтвердить', '#b80');
         }
 
         // детали
         const lines = [];
         if (res?.serverMessage) lines.push('Сообщение сервера: ' + res.serverMessage);
-        if (res?.httpStatus)    lines.push('HTTP: ' + res.httpStatus);
+        if (res?.httpStatus) lines.push('HTTP: ' + res.httpStatus);
         lines.push('Поле: ' + (res?.fieldId ?? fieldId));
         lines.push('Пользователь: ' + (res?.userId ?? userId));
         lines.push('Значение: ' + fieldValue);
-        if (res?.details)       lines.push('Details: ' + res.details);
+        if (res?.details) lines.push('Details: ' + res.details);
         setDetails(lines.join('\n'));
 
       } catch (err) {

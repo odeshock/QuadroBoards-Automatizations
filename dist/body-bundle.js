@@ -3611,7 +3611,15 @@ async function FMVeditTextareaOnly(name, newHtml) {
  * @returns {Promise<Object>} { plashka: [], icon: [], back: [], gift: [], coupon: [] }
  */
 async function fetchAllLibraries() {
-  console.log('[fetchAllLibraries] Загружаю библиотеки из API');
+  // Флаг отладки - установите в true для вывода логов
+  const DEBUG = false;
+
+  // Функция логирования с проверкой DEBUG
+  const log = (...args) => {
+    if (DEBUG) console.log('[fetchAllLibraries]', ...args);
+  };
+
+  log('Загружаю библиотеки из API');
 
   // Проверка наличия FMVbank
   if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
@@ -3648,7 +3656,7 @@ async function fetchAllLibraries() {
       const data = await window.FMVbank.storageGet(1, `library_${category}_`);
 
       if (!data || !data.items || !Array.isArray(data.items)) {
-        console.warn(`[fetchAllLibraries] library_${category}_1 не найдена или пуста`);
+        log(`library_${category}_1 не найдена или пуста`);
         continue;
       }
 

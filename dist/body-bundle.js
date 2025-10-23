@@ -1786,7 +1786,7 @@ async function collectSkinSets() {
 
   /**
    * Проверяет персональную страницу /pages/usrN
-   * @returns {Promise<{valid: boolean, error: string|null, hasMainUser: boolean}>}
+   * @returns {Promise<{valid: boolean, error: string|null, isTwink: boolean}>}
    */
   async function checkPersonalPage(userId) {
     try {
@@ -1794,7 +1794,7 @@ async function collectSkinSets() {
       const response = await fetch(pageUrl);
 
       if (!response.ok) {
-        return { valid: false, error: `HTTP ${response.status}`, hasMainUser: false };
+        return { valid: false, error: `HTTP ${response.status}`, isTwink: false };
       }
 
       const html = await response.text();
@@ -1804,21 +1804,25 @@ async function collectSkinSets() {
       // Проверка 1: Страница не создана
       const infoDiv = doc.querySelector('.info .container');
       if (infoDiv && /неверная или устаревшая/i.test(infoDiv.textContent)) {
-        return { valid: false, error: 'Необходимо создать персональную страницу', hasMainUser: false };
+        return { valid: false, error: 'Сначала создайте персональную страницу', isTwink: false };
       }
 
-      // Проверка 2: Используется основной профиль
-      const modalScript = doc.querySelector('.modal_script[data-main-user_id]');
-      const mainUserId = modalScript?.getAttribute('data-main-user_id');
+      // Проверка 2: Есть ли .modal_script
+      const modalScript = doc.querySelector('.modal_script');
+      if (!modalScript) {
+        return { valid: false, error: 'Ошибка в заполнении персональной страницы', isTwink: false };
+      }
 
+      // Проверка 3: Это твинк (есть data-main-user_id)?
+      const mainUserId = modalScript.getAttribute('data-main-user_id');
       if (mainUserId && mainUserId.trim()) {
-        return { valid: false, error: 'Используется хранилище основного профиля', hasMainUser: true };
+        return { valid: false, error: 'Это твинк, ему не нужно отдельное хранилище', isTwink: true };
       }
 
-      // Всё ок
-      return { valid: true, error: null, hasMainUser: false };
+      // Всё ок - это основной персонаж без data-main-user_id
+      return { valid: true, error: null, isTwink: false };
     } catch (error) {
-      return { valid: false, error: `Ошибка загрузки страницы: ${error.message}`, hasMainUser: false };
+      return { valid: false, error: `Ошибка загрузки страницы: ${error.message}`, isTwink: false };
     }
   }
 
@@ -2007,30 +2011,20 @@ async function collectSkinSets() {
       // 1. Проверяем наличие skin_<userId>
       const storage = await checkStorage(userId);
 
-      // Если НЕ ошибка и skin_ существует
-      if (!storage.error && storage.skinExists) {
-        // 1.1. Проверяем comment_id
-        if (storage.commentId) {
-          // comment_id уже указан
-          setStatus('✓ уже указано', 'green');
-          setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
-          if (setLink) {
-            const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
-            setLink(commentUrl);
-          }
-          return;
+      // 1.1. Если skin_ существует И comment_id указан → уже создано
+      if (!storage.error && storage.skinExists && storage.commentId) {
+        setStatus('✓ уже указано', 'green');
+        setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
+        if (setLink) {
+          const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
+          setLink(commentUrl);
         }
-
-        // 1.2. comment_id не указан - продолжаем с существующими данными
-        console.log('[button_create_storage] skin_ существует, но comment_id не указан');
+        return;
       }
 
-      // 2. Если ошибка ИЛИ skin_ не существует - проверяем персональную страницу
-      if (storage.error || !storage.skinExists) {
-        console.log('[button_create_storage] skin_ не найден или ошибка, проверяем /pages/usr' + userId);
-      }
-
-      // 3. Проверяем персональную страницу
+      // 2. Проверяем персональную страницу (всегда если дошли сюда)
+      // - Если skin_ существует но comment_id не указан → проверяем
+      // - Если skin_ не существует → проверяем
       setStatus('Проверяю страницу...');
       const pageCheck = await checkPersonalPage(userId);
 

@@ -3,7 +3,7 @@
   'use strict';
 
   /* =============== система логирования =============== */
-  const DEBUG = true; // false чтобы отключить все log()
+  const DEBUG = false; // false чтобы отключить все log()
 
   window.BankMessagesLog = DEBUG ? console.log.bind(console) : () => {};
   window.BankMessagesWarn = DEBUG ? console.warn.bind(console) : () => {};

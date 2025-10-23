@@ -1516,7 +1516,7 @@ async function collectSkinSets() {
   log('Скрипт инициализирован');
 })();
 (function () {
-  console.log('[collect_api] Скрипт загружен');
+
 
   // ==== настройки ====
   const CHARACTER_SELECTOR = '.modal_script[data-id]';
@@ -1527,6 +1527,8 @@ async function collectSkinSets() {
   // ====================
 
   const log = (...a) => DEBUG && console.log('[collect_api]', ...a);
+
+  log('[collect_api] Скрипт загружен');
 
   // Проверка наличия FMVbank
   function requireFMVbank() {

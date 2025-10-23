@@ -223,16 +223,7 @@
 
       console.log('[admin_bridge_json] 💾 Финальный объект для сохранения:', JSON.parse(JSON.stringify(baseData)));
 
-      // ШАГ 5: Сохраняем весь объект
-      const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
-      if (!result) {
-        console.error('[admin_bridge_json] ❌ Не удалось сохранить данные');
-        return false;
-      }
-
-      console.log('[admin_bridge_json] ✅ Данные успешно сохранены в API');
-
-      // ШАГ 6: Обновляем комментарий на форуме
+      // ШАГ 5: СНАЧАЛА обновляем комментарий на форуме
       console.log('[admin_bridge_json] 📝 Обновляю комментарий #' + commentId);
       const commentUpdated = await updateCommentWithSkins(commentId, userId, baseData);
       if (!commentUpdated) {
@@ -241,6 +232,15 @@
       }
 
       console.log('[admin_bridge_json] ✅ Комментарий успешно обновлён');
+
+      // ШАГ 6: ПОТОМ сохраняем в API
+      const result = await window.FMVbank.storageSet(baseData, userId, 'skin_');
+      if (!result) {
+        console.error('[admin_bridge_json] ❌ Не удалось сохранить данные в API');
+        return false;
+      }
+
+      console.log('[admin_bridge_json] ✅ Данные успешно сохранены в API');
       return true;
     } catch (err) {
       console.error('[admin_bridge_json] Ошибка сохранения:', err);
@@ -277,7 +277,7 @@
 
         // Ссылка на профиль + JSON
         const profileUrl = window.SITE_URL + '/profile.php?id=' + userId;
-        const commentData = profileUrl + '\n' + commentJson;
+        const commentData = profileUrl + '\n[media="лог"]' + commentJson + "[/media]";
 
         const editUrl = '/edit.php?id=' + commentId;
 
@@ -298,7 +298,7 @@
         // Счетчик загрузок
         let onloadCount = 0;
 
-        iframe.onload = function() {
+        iframe.onload = function () {
           onloadCount++;
           console.log('[admin_bridge_json] iframe onload #' + onloadCount);
 
@@ -341,7 +341,7 @@
           }
         };
 
-        iframe.onerror = function() {
+        iframe.onerror = function () {
           clearTimeout(timeout);
           iframe.remove();
           reject(new Error('Не удалось загрузить страницу редактирования'));

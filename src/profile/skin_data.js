@@ -19,51 +19,59 @@
 // ];
 
 (async () => {
-  console.log('[skin_data] Начало загрузки данных скинов');
-  console.log('[skin_data] window.SKIN:', window.SKIN);
+  // Флаг отладки - установите в true для вывода логов
+  const DEBUG = false;
+
+  // Функция логирования с проверкой DEBUG
+  const log = (...args) => {
+    if (DEBUG) console.log('[skin_data]', ...args);
+  };
+
+  log('Начало загрузки данных скинов');
+  log('window.SKIN:', window.SKIN);
 
   const result = await collectSkinSets();
-  console.log('[skin_data] collectSkinSets вернул:', result);
+  log('collectSkinSets вернул:', result);
 
   const icons = result?.icons || [];
   const plashki = result?.plashki || [];
   const backs = result?.backs || [];
 
-  console.log('[skin_data] icons:', icons.length, 'plashki:', plashki.length, 'backs:', backs.length);
+  log('icons:', icons.length, 'plashki:', plashki.length, 'backs:', backs.length);
 
   // Плашка
   if (window.SKIN?.PlashkaFieldID) {
-    console.log('[skin_data] Применяем плашку, fieldID:', window.SKIN.PlashkaFieldID);
+    log('Применяем плашку, fieldID:', window.SKIN.PlashkaFieldID);
     applyImagePicker(plashki, SKIN.PlashkaFieldID, {
       btnWidth: 229,
       btnHeight: 42,
       modalLinkMode: true,
     });
   } else {
-    console.log('[skin_data] PlashkaFieldID не найден');
+    log('PlashkaFieldID не найден');
   }
 
   // Фон
   if (window.SKIN?.BackFieldID) {
-    console.log('[skin_data] Применяем фон, fieldID:', window.SKIN.BackFieldID);
+    log('Применяем фон, fieldID:', window.SKIN.BackFieldID);
     applyImagePicker(backs, SKIN.BackFieldID, {
       btnWidth: 229,
       btnHeight: 42,
       modalLinkMode: true,
     });
   } else {
-    console.log('[skin_data] BackFieldID не найден');
+    log('BackFieldID не найден');
   }
 
   // Иконка
   if (window.SKIN?.IconFieldID) {
-    console.log('[skin_data] Применяем иконку, fieldID:', window.SKIN.IconFieldID);
+    log('Применяем иконку, fieldID:', window.SKIN.IconFieldID);
     applyImagePicker(icons, SKIN.IconFieldID, {
       btnWidth: 44,
     });
   } else {
-    console.log('[skin_data] IconFieldID не найден');
+    log('IconFieldID не найден');
   }
 
-  console.log('[skin_data] Завершено');
+  log('Завершено');
 })();

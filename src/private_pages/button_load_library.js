@@ -58,10 +58,8 @@
       t: descEl ? descEl.textContent.trim() : '' // title -> t
     };
 
-    // Проверяем классы (сохраняем как 1/0)
+    // Проверяем класс hidden (сохраняем как 1/0)
     item.h = article.classList.contains('hidden') ? 1 : 0;  // hidden -> h
-    item.c = article.classList.contains('custom') ? 1 : 0;  // custom -> c
-    item.s = article.classList.contains('system') ? 1 : 0;  // system -> s
 
     return item;
   }

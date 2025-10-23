@@ -2165,10 +2165,8 @@ async function collectSkinSets() {
       t: descEl ? descEl.textContent.trim() : '' // title -> t
     };
 
-    // Проверяем классы (сохраняем как 1/0)
+    // Проверяем класс hidden (сохраняем как 1/0)
     item.h = article.classList.contains('hidden') ? 1 : 0;  // hidden -> h
-    item.c = article.classList.contains('custom') ? 1 : 0;  // custom -> c
-    item.s = article.classList.contains('system') ? 1 : 0;  // system -> s
 
     return item;
   }
@@ -3661,11 +3659,15 @@ async function fetchAllLibraries() {
       }
 
       // Конвертируем данные из API в формат для панелей
-      // Формат API: { id, content, t, h, c, s } где t=title, h=hidden, c=custom, s=system (значения 1/0)
+      // Формат API: { id, content, t, h } где t=title, h=hidden (значения 1/0)
       // Формат панели: { id, html } где html = <div class="item" data-id="..." title="...">content</div>
+
+      // Проверяем права доступа
+      const isAdmin = window.IS_ADMIN === true || window.IS_ADMIN_TO_EDIT === true;
 
       if (category === 'coupon') {
         // Купоны: {id, content, t, s_t, type, f, v}
+        // У купонов НЕТ поля h, показываем все
         result.coupon = data.items.map(item => {
           const titleAttr = item.t ? ` title="${escapeAttr(item.t)}"` : '';
           const systemTitleAttr = item.s_t ? ` data-coupon-title="${escapeAttr(item.s_t)}"` : '';
@@ -3679,13 +3681,14 @@ async function fetchAllLibraries() {
           };
         });
       } else {
-        // Обычные скины: {id, content, t, h, c, s}
-        const items = data.items
-          .filter(item => item.h !== 1) // Фильтруем hidden
-          .map(item => ({
-            id: item.id,
-            html: `<div class="item" data-id="${escapeAttr(item.id)}" title="${escapeAttr(item.t || '')}">${item.content || ''}</div>`
-          }));
+        // Обычные скины: {id, content, t, h}
+        // Фильтруем по h только если не админ
+        const filteredItems = isAdmin ? data.items : data.items.filter(item => item.h !== 1);
+
+        const items = filteredItems.map(item => ({
+          id: item.id,
+          html: `<div class="item" data-id="${escapeAttr(item.id)}" title="${escapeAttr(item.t || '')}">${item.content || ''}</div>`
+        }));
 
         // Сопоставляем категории с ключами результата
         const targetKey = category === 'background' ? 'back' : category;

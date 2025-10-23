@@ -19,7 +19,7 @@
           !fromStr ? 'PROFILE_CHECK.GroupUserID' : null,
           !toStr   ? 'PROFILE_CHECK.GroupPlayerID' : null
         ].filter(Boolean).join(', ');
-        setStatus('✖ Замена не выполнена', 'red');
+        setStatus('✖ замена не выполнена', 'red');
         setDetails(
           'Не удалось запустить изменение группы: ' +
           (missing
@@ -67,15 +67,15 @@
 
         switch (res?.status) {
           case 'updated':
-            setStatus('✔ Группа изменена', 'green');
+            setStatus('✓ группа изменена', 'green');
             break;
 
           case 'nochange':
-            setStatus('ℹ Изменений нет — пользователь уже в целевой группе', '#555');
+            setStatus('ℹ изменений нет — пользователь уже в целевой группе', 'green');
             break;
 
           case 'skipped':
-            setStatus('✖ Исходная группа не совпадает', 'red');
+            setStatus('✖ исходная группа не совпадает', 'red');
             setDetails(
               `Исходное значение группы — ${currentVal || 'не определено'}.\n` +
               'Либо вы пытаетесь поправить не тот профиль, либо выполните замену вручную ' +
@@ -84,12 +84,12 @@
             return;
 
           case 'uncertain':
-            setStatus('❔ Не удалось подтвердить результат', '#b80');
+            setStatus('❔ не удалось подтвердить результат', '#b80');
             break;
 
           case 'error':
           default:
-            setStatus('✖ Ошибка при сохранении', 'red');
+            setStatus('✖ ошибка при сохранении', 'red');
         }
 
         // Доп. сведения — в «детали»
@@ -103,7 +103,7 @@
         setDetails(lines.join('\n') || 'Нет дополнительных данных');
 
       } catch (err) {
-        setStatus('✖ Сеть/транспорт', 'red');
+        setStatus('✖ сеть/транспорт', 'red');
         setDetails((err && err.message) ? err.message : String(err));
         console.error('[button_update_group]', err);
       }

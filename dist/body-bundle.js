@@ -1985,7 +1985,7 @@ async function collectSkinSets() {
         // 1.1. Проверяем comment_id
         if (storage.commentId) {
           // comment_id уже указан
-          setStatus('✓ Уже указано', 'green');
+          setStatus('✓ уже указано', 'green');
           setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
           if (setLink) {
             const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
@@ -2008,7 +2008,7 @@ async function collectSkinSets() {
       const pageCheck = await checkPersonalPage(userId);
 
       if (!pageCheck.valid) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(pageCheck.error);
         return;
       }
@@ -2022,7 +2022,7 @@ async function collectSkinSets() {
       await saveCommentId(userId, commentId, storage.data);
 
       // 6. Успех
-      setStatus('✓ Готово', 'green');
+      setStatus('✓ готово', 'green');
       setDetails(`Хранилище создано (comment_id: ${commentId})`);
       if (setLink) {
         const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${commentId}`;
@@ -2030,7 +2030,7 @@ async function collectSkinSets() {
       }
 
     } catch (error) {
-      setStatus('✖ Ошибка', 'red');
+      setStatus('✖ ошибка', 'red');
       setDetails(error?.message || String(error));
       console.error('[button_create_storage] Ошибка:', error);
     }
@@ -2055,7 +2055,7 @@ async function collectSkinSets() {
         // Находим контейнер с кнопкой
         const container = document.querySelector('div.post.topicpost');
         if (!container) {
-          setStatus('✖ Ошибка');
+          setStatus('✖ ошибка', 'red');
           setDetails('Не найден контейнер div.post.topicpost');
           return;
         }
@@ -2063,7 +2063,7 @@ async function collectSkinSets() {
         // Извлекаем userId из профиля
         const userId = getUserIdFromProfile(container);
         if (!userId) {
-          setStatus('✖ Ошибка');
+          setStatus('✖ ошибка', 'red');
           setDetails('Не удалось определить ID пользователя');
           return;
         }
@@ -2388,7 +2388,7 @@ async function collectSkinSets() {
           const total = Object.values(libraryData).reduce((sum, arr) => sum + arr.length, 0);
 
           if (total === 0) {
-            setStatus('✓ Готово', 'green');
+            setStatus('✓ готово', 'green');
             setDetails('Не найдено элементов в постах библиотеки');
             return;
           }
@@ -2398,14 +2398,14 @@ async function collectSkinSets() {
           // Сохраняем в API
           await saveLibraryToAPI(libraryData);
 
-          setStatus('✓ Готово', 'green');
+          setStatus('✓ готово', 'green');
           const details = Object.entries(libraryData)
             .map(([key, arr]) => `${key}: ${arr.length} шт.`)
             .join('<br>');
           setDetails(`Загружено элементов:<br>${details}<br>Всего: ${total}`);
 
         } catch (error) {
-          setStatus('✖ Ошибка', 'red');
+          setStatus('✖ ошибка', 'red');
           setDetails(error?.message || String(error));
           console.error('[button_load_library] Ошибка:', error);
         }
@@ -3322,8 +3322,8 @@ async function FMVeditTextareaOnly(name, newHtml) {
         const res = await window.FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6);
 
         switch (res?.status) {
-          case 'created': setStatus('✔ создано', 'green'); break;
-          case 'exists': setStatus('ℹ уже существует', 'red'); break;
+          case 'created': setStatus('✓ создано', 'green'); break;
+          case 'exists': setStatus('ℹ уже существует', 'green'); break;
           case 'error': setStatus('✖ ошибка', 'red'); break;
           default: setStatus('❔ не удалось подтвердить', '#b80');
         }
@@ -3367,7 +3367,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
           !fromStr ? 'PROFILE_CHECK.GroupUserID' : null,
           !toStr   ? 'PROFILE_CHECK.GroupPlayerID' : null
         ].filter(Boolean).join(', ');
-        setStatus('✖ Замена не выполнена', 'red');
+        setStatus('✖ замена не выполнена', 'red');
         setDetails(
           'Не удалось запустить изменение группы: ' +
           (missing
@@ -3415,15 +3415,15 @@ async function FMVeditTextareaOnly(name, newHtml) {
 
         switch (res?.status) {
           case 'updated':
-            setStatus('✔ Группа изменена', 'green');
+            setStatus('✓ группа изменена', 'green');
             break;
 
           case 'nochange':
-            setStatus('ℹ Изменений нет — пользователь уже в целевой группе', '#555');
+            setStatus('ℹ изменений нет — пользователь уже в целевой группе', 'green');
             break;
 
           case 'skipped':
-            setStatus('✖ Исходная группа не совпадает', 'red');
+            setStatus('✖ исходная группа не совпадает', 'red');
             setDetails(
               `Исходное значение группы — ${currentVal || 'не определено'}.\n` +
               'Либо вы пытаетесь поправить не тот профиль, либо выполните замену вручную ' +
@@ -3432,12 +3432,12 @@ async function FMVeditTextareaOnly(name, newHtml) {
             return;
 
           case 'uncertain':
-            setStatus('❔ Не удалось подтвердить результат', '#b80');
+            setStatus('❔ не удалось подтвердить результат', '#b80');
             break;
 
           case 'error':
           default:
-            setStatus('✖ Ошибка при сохранении', 'red');
+            setStatus('✖ ошибка при сохранении', 'red');
         }
 
         // Доп. сведения — в «детали»
@@ -3451,7 +3451,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
         setDetails(lines.join('\n') || 'Нет дополнительных данных');
 
       } catch (err) {
-        setStatus('✖ Сеть/транспорт', 'red');
+        setStatus('✖ сеть/транспорт', 'red');
         setDetails((err && err.message) ? err.message : String(err));
         console.error('[button_update_group]', err);
       }
@@ -3539,8 +3539,8 @@ async function FMVeditTextareaOnly(name, newHtml) {
 
         // статусы
         switch (res?.status) {
-          case 'updated': setStatus('✔ обновлено', 'green'); break;
-          case 'nochange': setStatus('ℹ изменений нет', 'red'); break;
+          case 'updated': setStatus('✓ обновлено', 'green'); break;
+          case 'nochange': setStatus('ℹ изменений нет', 'green'); break;
           case 'error': setStatus('✖ ошибка', 'red'); break;
           default: setStatus('❔ не удалось подтвердить', '#b80');
         }
@@ -6423,7 +6423,7 @@ async function collectChronoByUser(opts = {}) {
         setDetails(lines.join('<br>'));
 
       } catch (e) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
         api?.setLinkVisible?.(false);
         api?.setLink?.('', '');
@@ -6598,14 +6598,14 @@ async function collectChronoByUser(opts = {}) {
         if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch {} }
         lastBlobUrl = URL.createObjectURL(blob);
 
-        setStatus('✓ Готово', 'green');
+        setStatus('✓ готово', 'green');
         setDetails(`Строк: ${rows.length}\nИсточник: ${FMV.escapeHtml(OPEN_URL)}\nФайл: ${FMV.escapeHtml(filename)}`);
         setLink(lastBlobUrl, 'Скачать');
         const a = api?.wrap?.querySelector('a.fmv-action-link');
         if (a) a.setAttribute('download', filename);
 
       } catch (e) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(FMV.escapeHtmlShort(e?.message || String(e)));
         api?.setLink?.('', '');
       }
@@ -6864,7 +6864,7 @@ async function collectChronoByUser(opts = {}) {
         if (error) lines.push(error);
         setDetails(lines.join('<br>'));
       } catch (e) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(e?.message || String(e));
         setLink('', ''); setLinkVis?.(false);
       }
@@ -7089,10 +7089,10 @@ async function collectChronoByUser(opts = {}) {
         }
 
         // Если сам вызов отработал — это «Готово»
-        setStatus('✓ Готово', 'green');
+        setStatus('✓ готово', 'green');
         setDetails(lines.length ? lines.join('<br>') : ''); // пусто — если нет проблемных юзеров
       } catch (e) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(e?.message || String(e));
       }
     }

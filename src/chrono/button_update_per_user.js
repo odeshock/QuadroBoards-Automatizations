@@ -146,7 +146,7 @@
         if (error) lines.push(error);
         setDetails(lines.join('<br>'));
       } catch (e) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(e?.message || String(e));
         setLink('', ''); setLinkVis?.(false);
       }

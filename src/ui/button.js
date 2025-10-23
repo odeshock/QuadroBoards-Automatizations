@@ -255,7 +255,7 @@
           wrap
         });
       } catch (err) {
-        if (showStatus) setStatus('✖ Ошибка', 'red');
+        if (showStatus) setStatus('✖ ошибка', 'red');
         if (showDetails) setDetails((err && err.message) ? err.message : String(err));
         console.error('[createForumButton]', err);
       }

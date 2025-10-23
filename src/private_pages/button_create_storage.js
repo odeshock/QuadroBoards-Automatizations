@@ -286,7 +286,7 @@
         // 1.1. Проверяем comment_id
         if (storage.commentId) {
           // comment_id уже указан
-          setStatus('✓ Уже указано', 'green');
+          setStatus('✓ уже указано', 'green');
           setDetails(`Хранилище уже создано (comment_id: ${storage.commentId})`);
           if (setLink) {
             const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${storage.commentId}`;
@@ -309,7 +309,7 @@
       const pageCheck = await checkPersonalPage(userId);
 
       if (!pageCheck.valid) {
-        setStatus('✖ Ошибка', 'red');
+        setStatus('✖ ошибка', 'red');
         setDetails(pageCheck.error);
         return;
       }
@@ -323,7 +323,7 @@
       await saveCommentId(userId, commentId, storage.data);
 
       // 6. Успех
-      setStatus('✓ Готово', 'green');
+      setStatus('✓ готово', 'green');
       setDetails(`Хранилище создано (comment_id: ${commentId})`);
       if (setLink) {
         const commentUrl = `${siteUrl}/viewtopic.php?id=${LOG_FIELD_ID}#p${commentId}`;
@@ -331,7 +331,7 @@
       }
 
     } catch (error) {
-      setStatus('✖ Ошибка', 'red');
+      setStatus('✖ ошибка', 'red');
       setDetails(error?.message || String(error));
       console.error('[button_create_storage] Ошибка:', error);
     }
@@ -356,7 +356,7 @@
         // Находим контейнер с кнопкой
         const container = document.querySelector('div.post.topicpost');
         if (!container) {
-          setStatus('✖ Ошибка');
+          setStatus('✖ ошибка', 'red');
           setDetails('Не найден контейнер div.post.topicpost');
           return;
         }
@@ -364,7 +364,7 @@
         // Извлекаем userId из профиля
         const userId = getUserIdFromProfile(container);
         if (!userId) {
-          setStatus('✖ Ошибка');
+          setStatus('✖ ошибка', 'red');
           setDetails('Не удалось определить ID пользователя');
           return;
         }

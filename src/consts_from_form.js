@@ -13,6 +13,7 @@ var GROUP_IDS = {
   Player: 5,
   Listener: -1,
   Ads: -2,
+  FantasticCreature: -3,
 };
 
 var PROFILE_FIELDS = { // дополнительные поля профиля 

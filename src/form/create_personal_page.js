@@ -47,8 +47,8 @@
         const res = await window.FMVcreatePersonalPage(arg1, arg2, arg3, arg4, arg5, arg6);
 
         switch (res?.status) {
-          case 'created': setStatus('✔ создано', 'green'); break;
-          case 'exists': setStatus('ℹ уже существует', 'red'); break;
+          case 'created': setStatus('✓ создано', 'green'); break;
+          case 'exists': setStatus('ℹ уже существует', 'green'); break;
           case 'error': setStatus('✖ ошибка', 'red'); break;
           default: setStatus('❔ не удалось подтвердить', '#b80');
         }

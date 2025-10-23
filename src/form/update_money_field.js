@@ -79,8 +79,8 @@
 
         // статусы
         switch (res?.status) {
-          case 'updated': setStatus('✔ обновлено', 'green'); break;
-          case 'nochange': setStatus('ℹ изменений нет', 'red'); break;
+          case 'updated': setStatus('✓ обновлено', 'green'); break;
+          case 'nochange': setStatus('ℹ изменений нет', 'green'); break;
           case 'error': setStatus('✖ ошибка', 'red'); break;
           default: setStatus('❔ не удалось подтвердить', '#b80');
         }

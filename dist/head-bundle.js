@@ -19,6 +19,7 @@ var GROUP_IDS = {
   Player: 5,
   Listener: -1,
   Ads: -2,
+  FantasticCreature: -3,
 };
 
 var PROFILE_FIELDS = { // дополнительные поля профиля 
@@ -2269,7 +2270,7 @@ async function ensureAllowed(group_ids) {
           wrap
         });
       } catch (err) {
-        if (showStatus) setStatus('✖ Ошибка', 'red');
+        if (showStatus) setStatus('✖ ошибка', 'red');
         if (showDetails) setDetails((err && err.message) ? err.message : String(err));
         console.error('[createForumButton]', err);
       }

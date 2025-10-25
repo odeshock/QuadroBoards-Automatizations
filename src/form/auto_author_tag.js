@@ -165,7 +165,7 @@
 
     // Проверка 2: crumbs содержит форум из EPS_FORUM_INFO
     log('EPS_FORUM_INFO:', window.EPS_FORUM_INFO);
-    if (window.EPS_FORUM_INFO) {
+    if (window.EPS_FORUM_INFO && Array.isArray(window.EPS_FORUM_INFO)) {
       const crumbsContainer = document.querySelector('.container.crumbs');
       if (crumbsContainer) {
         const forumLinks = Array.from(crumbsContainer.querySelectorAll('a[href*="/viewforum.php?id="]'));
@@ -175,9 +175,14 @@
         }).filter(Boolean);
 
         log('Forum IDs из crumbs:', forumIds);
-        log('Сравниваем с EPS_FORUM_INFO:', window.EPS_FORUM_INFO);
 
-        if (forumIds.some(id => id === window.EPS_FORUM_INFO)) {
+        // EPS_FORUM_INFO это массив объектов вида [{id: 4, type: 'personal', ...}, ...]
+        // Извлекаем только id
+        const epsForumIds = window.EPS_FORUM_INFO.map(item => Number(item.id)).filter(id => !isNaN(id));
+        log('EPS Forum IDs (только id):', epsForumIds);
+
+        // Проверяем, есть ли пересечение
+        if (forumIds.some(id => epsForumIds.includes(id))) {
           log('✅ Метка будет добавлена: форум из EPS_FORUM_INFO');
           return { shouldAdd: true, authorId: userId };
         }

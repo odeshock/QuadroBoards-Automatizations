@@ -22,7 +22,7 @@ var GROUP_IDS = {
   FantasticCreature: -3,
 };
 
-var GameMasters = [2];
+var GAME_MASTERS = [2];
 
 var PROFILE_FIELDS = { // дополнительные поля профиля 
   MoneyID: 6,

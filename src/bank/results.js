@@ -2052,7 +2052,7 @@ export function renderLog(log) {
     const totalText = document.createElement('div');
     totalText.className = 'summary-total';
     const totalColor = totalSum >= 0 ? '#22c55e' : '#ef4444';
-    const totalPrefix = totalSum >= 0 ? '+' : '−';
+    const totalPrefix = totalSum >= 0 ? '+' : '-';
     totalText.innerHTML = `<strong>ИТОГО:</strong> <span style="color: ${totalColor}">${totalPrefix}${formatNumber(Math.abs(totalSum))}</span>`;
     summaryPanel.appendChild(totalText);
 
@@ -2066,7 +2066,7 @@ export function renderLog(log) {
     const balanceText = document.createElement('div');
     balanceText.className = 'summary-balance';
     balanceText.style.marginTop = '8px';
-    const operationSign = totalSum >= 0 ? '+' : '−';
+    const operationSign = totalSum >= 0 ? '+' : '-';
     balanceText.innerHTML = `<strong>ВАШ СЧЁТ:</strong> ${formatNumber(currentBank)} ${operationSign} ${formatNumber(Math.abs(totalSum))} = <span style="color: ${balanceColor};">${formatNumber(finalBalance)}</span>`;
     summaryPanel.appendChild(balanceText);
 

@@ -3412,6 +3412,14 @@ async function FMVeditTextareaOnly(name, newHtml) {
   const isGameMaster = Array.isArray(window.GAME_MASTERS) && window.GAME_MASTERS.includes(userId);
   log('Является GM:', isGameMaster);
 
+  // Проверяем, является ли текущий пользователь админом
+  const isAdmin = window.GroupID === window.GROUP_IDS?.Admin;
+  log('Является Admin:', isAdmin);
+
+  // Показываем UI (плашку/селектор) только для GM или админов
+  const showUI = isGameMaster || isAdmin;
+  log('Показывать UI:', showUI);
+
   // Регулярное выражение для поиска метки автора
   const authorTagRegex = /^\[FMVauthor\]usr(\d+);?\[\/FMVauthor\]\s*/i;
 
@@ -3436,7 +3444,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
     return `[FMVauthor]usr${userId};[/FMVauthor]${text}`;
   }
 
-  // CSS для плашки и GM-селектора
+  // CSS для плашки и GM-селектора (в стиле episodes/ui.js)
   let cssInjected = false;
   function injectCSS() {
     if (cssInjected) return;
@@ -3455,52 +3463,84 @@ async function FMVeditTextareaOnly(name, newHtml) {
       }
       .fmvauthor-gm-selector {
         margin-bottom: 12px;
-        padding: 12px;
-        background-color: #fef3c7;
-        border: 1px solid #fbbf24;
-        border-radius: 6px;
       }
       .fmvauthor-gm-selector label {
         display: block;
         font-weight: 600;
         margin-bottom: 6px;
         font-size: 14px;
-        color: #92400e;
+        color: #2d2a26;
+      }
+      .fmvauthor-gm-selector .combo {
+        position: relative;
       }
       .fmvauthor-gm-selector input {
         width: 100%;
         padding: 8px 10px;
-        border: 1px solid #d97706;
-        border-radius: 4px;
+        border: 1px solid #d8d1c3;
+        border-radius: 8px;
+        background: #efe9dc;
+        color: #2d2a26;
         font-size: 14px;
       }
       .fmvauthor-gm-selector .hint {
         margin-top: 4px;
-        font-size: 12px;
-        color: #92400e;
+        font-size: 12.5px;
+        color: #6b6359;
       }
       .fmvauthor-gm-selector .autocomplete-list {
         position: absolute;
-        z-index: 1000;
-        background: white;
-        border: 1px solid #d97706;
-        border-radius: 4px;
-        margin-top: 2px;
-        max-height: 200px;
-        overflow-y: auto;
+        z-index: 50;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d8d1c3;
+        border-radius: 8px;
+        margin-top: 4px;
+        max-height: 240px;
+        overflow: auto;
         display: none;
       }
       .fmvauthor-gm-selector .autocomplete-list.show {
         display: block;
       }
       .fmvauthor-gm-selector .autocomplete-item {
-        padding: 8px 12px;
+        padding: 0.45em 0.65em;
         cursor: pointer;
         font-size: 14px;
       }
       .fmvauthor-gm-selector .autocomplete-item:hover,
       .fmvauthor-gm-selector .autocomplete-item.active {
-        background-color: #fef3c7;
+        background-color: #f0efe9;
+      }
+      .fmvauthor-gm-selector .autocomplete-item .muted {
+        color: #6b6359;
+      }
+      .fmvauthor-gm-selector .chip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0.45em 0.6em;
+        background: #fff;
+        border: 1px solid #d8d1c3;
+        border-radius: 8px;
+        margin: 0.35em 0;
+        font-size: 14px;
+      }
+      .fmvauthor-gm-selector .chip .name {
+        font-weight: 600;
+      }
+      .fmvauthor-gm-selector .chip .x {
+        border: 0;
+        background: none;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        color: #8b8378;
+        margin-left: auto;
+      }
+      .fmvauthor-gm-selector .chip .x:hover {
+        color: #2d2a26;
       }
     `;
     document.head.appendChild(style);
@@ -3536,6 +3576,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
   // ===== UI для GM: селектор автора =====
   let gmSelector = null;
   let gmSelectedUserId = null;
+  let gmSelectedUserName = null;
   let gmKnownUsers = [];
 
   function createGMSelector(initialAuthorId = null) {
@@ -3554,6 +3595,10 @@ async function FMVeditTextareaOnly(name, newHtml) {
     label.textContent = 'Автор поста: *';
     label.setAttribute('for', 'fmvauthor-gm-input');
 
+    // Combo wrapper
+    const combo = document.createElement('div');
+    combo.className = 'combo';
+
     // Input для автокомплита
     const input = document.createElement('input');
     input.type = 'text';
@@ -3561,18 +3606,25 @@ async function FMVeditTextareaOnly(name, newHtml) {
     input.placeholder = 'Наберите имя пользователя...';
     input.autocomplete = 'off';
 
+    // Autocomplete list
+    const autocompleteList = document.createElement('div');
+    autocompleteList.className = 'autocomplete-list';
+
+    combo.appendChild(input);
+    combo.appendChild(autocompleteList);
+
+    // Chip для выбранного пользователя
+    const chipContainer = document.createElement('div');
+    chipContainer.className = 'chip-container';
+
     // Hint
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = 'Обязательное поле. Начните вводить имя или user ID.';
 
-    // Autocomplete list
-    const autocompleteList = document.createElement('div');
-    autocompleteList.className = 'autocomplete-list';
-
     gmSelector.appendChild(label);
-    gmSelector.appendChild(input);
-    gmSelector.appendChild(autocompleteList);
+    gmSelector.appendChild(combo);
+    gmSelector.appendChild(chipContainer);
     gmSelector.appendChild(hint);
 
     // Вставляем перед textarea
@@ -3582,21 +3634,57 @@ async function FMVeditTextareaOnly(name, newHtml) {
     if (initialAuthorId) {
       gmSelectedUserId = initialAuthorId;
       const user = gmKnownUsers.find(u => u.id === Number(initialAuthorId));
-      if (user) {
-        input.value = user.name;
-      } else {
-        input.value = `user${initialAuthorId}`;
-      }
+      gmSelectedUserName = user ? user.name : `user${initialAuthorId}`;
+
+      renderChip(chipContainer, combo);
       log('GM selector создан с начальным значением usr' + initialAuthorId);
     } else {
       log('GM selector создан без начального значения');
     }
 
     // Автокомплит
-    setupGMAutocomplete(input, autocompleteList);
+    setupGMAutocomplete(input, autocompleteList, chipContainer, combo);
   }
 
-  function setupGMAutocomplete(input, listElement) {
+  function renderChip(chipContainer, combo) {
+    chipContainer.innerHTML = '';
+
+    if (!gmSelectedUserId) {
+      // Показываем input
+      combo.style.display = 'block';
+      return;
+    }
+
+    // Скрываем input
+    combo.style.display = 'none';
+
+    // Создаём chip
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = gmSelectedUserName || `user${gmSelectedUserId}`;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'x';
+    removeBtn.textContent = '×';
+    removeBtn.setAttribute('aria-label', 'Удалить');
+
+    removeBtn.addEventListener('click', () => {
+      gmSelectedUserId = null;
+      gmSelectedUserName = null;
+      renderChip(chipContainer, combo);
+      log('Выбранный пользователь удалён');
+    });
+
+    chip.appendChild(name);
+    chip.appendChild(removeBtn);
+    chipContainer.appendChild(chip);
+  }
+
+  function setupGMAutocomplete(input, listElement, chipContainer, combo) {
     let activeIndex = -1;
 
     function renderAutocomplete(query) {
@@ -3621,7 +3709,13 @@ async function FMVeditTextareaOnly(name, newHtml) {
       filtered.forEach((user, idx) => {
         const item = document.createElement('div');
         item.className = 'autocomplete-item';
-        item.textContent = `${user.name} (${user.code})`;
+        item.textContent = `${user.name} `;
+
+        const muted = document.createElement('span');
+        muted.className = 'muted';
+        muted.textContent = `(${user.code})`;
+        item.appendChild(muted);
+
         item.dataset.userId = user.id;
         item.dataset.index = idx;
 
@@ -3637,14 +3731,15 @@ async function FMVeditTextareaOnly(name, newHtml) {
     }
 
     function selectUser(user) {
-      input.value = user.name;
       gmSelectedUserId = user.id;
+      gmSelectedUserName = user.name;
+      input.value = '';
       listElement.classList.remove('show');
+      renderChip(chipContainer, combo);
       log('GM выбрал usr' + user.id, user.name);
     }
 
     input.addEventListener('input', () => {
-      gmSelectedUserId = null; // Сбрасываем выбор при изменении
       renderAutocomplete(input.value);
     });
 
@@ -3706,7 +3801,7 @@ async function FMVeditTextareaOnly(name, newHtml) {
     const extracted = extractAuthorTag(currentText);
 
     if (isGameMaster) {
-      // Режим GM: показываем селектор
+      // Режим GM: показываем селектор (всегда)
       if (extracted) {
         log('GM режим: найдена метка автора:', extracted.authorId);
         originalAuthorId = extracted.authorId;
@@ -3718,16 +3813,23 @@ async function FMVeditTextareaOnly(name, newHtml) {
         createGMSelector(null);
       }
     } else {
-      // Обычный режим: показываем плашку
+      // Обычный режим: показываем плашку только если showUI = true
       if (extracted) {
         log('Найдена метка автора:', extracted.authorId);
         originalAuthorId = extracted.authorId;
         textarea.value = extracted.cleanText;
-        createAuthorBadge(extracted.authorId);
+
+        if (showUI) {
+          createAuthorBadge(extracted.authorId);
+        } else {
+          log('UI скрыт (не GM и не Admin)');
+        }
       } else {
         log('Метка автора не найдена');
         originalAuthorId = null;
-        removeAuthorBadge();
+        if (showUI) {
+          removeAuthorBadge();
+        }
       }
     }
   }
@@ -3749,8 +3851,8 @@ async function FMVeditTextareaOnly(name, newHtml) {
             input.value = user ? user.name : `user${extracted.authorId}`;
           }
         }
-      } else {
-        // В обычном режиме показываем плашку
+      } else if (showUI) {
+        // В обычном режиме показываем плашку только если showUI = true
         createAuthorBadge(extracted.authorId);
       }
     }

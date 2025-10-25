@@ -29,6 +29,42 @@
 
   log('Не редактирование первого поста');
 
+  // 3. Проверяем, что это нужный форум
+  let isTargetForum = false;
+
+  // Проверка 3.1: title начинается с "гринготтс" или "реклама"
+  const title = (document.querySelector('head title')?.textContent || '').toLowerCase().trim();
+  if (title.startsWith('гринготтс') || title.startsWith('реклама')) {
+    log('Форум определён через title:', title);
+    isTargetForum = true;
+  }
+
+  // Проверка 3.2: crumbs содержит форум из EPS_FORUM_INFO
+  if (!isTargetForum && window.EPS_FORUM_INFO && Array.isArray(window.EPS_FORUM_INFO)) {
+    const crumbsContainer = document.querySelector('.container.crumbs');
+    if (crumbsContainer) {
+      const forumLinks = Array.from(crumbsContainer.querySelectorAll('a[href*="/viewforum.php?id="]'));
+      const forumIds = forumLinks.map(link => {
+        const match = link.getAttribute('href')?.match(/viewforum\.php\?id=(\d+)/);
+        return match ? Number(match[1]) : null;
+      }).filter(Boolean);
+
+      const epsForumIds = window.EPS_FORUM_INFO.map(item => Number(item.id)).filter(id => !isNaN(id));
+
+      if (forumIds.some(id => epsForumIds.includes(id))) {
+        log('Форум найден в EPS_FORUM_INFO');
+        isTargetForum = true;
+      }
+    }
+  }
+
+  if (!isTargetForum) {
+    log('Не целевой форум - скрипт не активен');
+    return;
+  }
+
+  log('Целевой форум подтверждён');
+
   // Получаем userId
   const userId = window.UserID;
   if (!userId) {

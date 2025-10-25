@@ -137,27 +137,34 @@
   // Проверяем условия для автоматического добавления метки при submit
   // Возвращает { shouldAdd: boolean, authorId: string|null }
   function shouldAddTagOnSubmit() {
+    log('=== Проверка условий для добавления метки ===');
+
     // Если метка была при загрузке - всегда добавляем её исходное значение
+    log('originalAuthorId:', originalAuthorId);
     if (originalAuthorId !== null) {
-      log('Метка будет добавлена: была при загрузке, usr' + originalAuthorId);
+      log('✅ Метка будет добавлена: была при загрузке, usr' + originalAuthorId);
       return { shouldAdd: true, authorId: originalAuthorId };
     }
 
     // Проверяем URL - не добавляем на страницах редактирования
-    if (/\/edit\.php\?id=/i.test(window.location.href)) {
-      log('Страница редактирования - метка НЕ будет добавлена');
+    const currentUrl = window.location.href;
+    log('Текущий URL:', currentUrl);
+    if (/\/edit\.php\?id=/i.test(currentUrl)) {
+      log('❌ Страница редактирования - метка НЕ будет добавлена');
       return { shouldAdd: false, authorId: null };
     }
 
     // Проверяем форум (Гринготтс/Реклама/EPS)
     // Проверка 1: title начинается с "гринготтс" или "реклама"
     const title = (document.querySelector('head title')?.textContent || '').toLowerCase().trim();
+    log('Title страницы:', title);
     if (title.startsWith('гринготтс') || title.startsWith('реклама')) {
-      log('Метка будет добавлена: форум определён через title:', title);
+      log('✅ Метка будет добавлена: форум определён через title');
       return { shouldAdd: true, authorId: userId };
     }
 
     // Проверка 2: crumbs содержит форум из EPS_FORUM_INFO
+    log('EPS_FORUM_INFO:', window.EPS_FORUM_INFO);
     if (window.EPS_FORUM_INFO) {
       const crumbsContainer = document.querySelector('.container.crumbs');
       if (crumbsContainer) {
@@ -167,14 +174,17 @@
           return match ? Number(match[1]) : null;
         }).filter(Boolean);
 
+        log('Forum IDs из crumbs:', forumIds);
+        log('Сравниваем с EPS_FORUM_INFO:', window.EPS_FORUM_INFO);
+
         if (forumIds.some(id => id === window.EPS_FORUM_INFO)) {
-          log('Метка будет добавлена: форум из EPS_FORUM_INFO');
+          log('✅ Метка будет добавлена: форум из EPS_FORUM_INFO');
           return { shouldAdd: true, authorId: userId };
         }
       }
     }
 
-    log('Условия не выполнены - метка НЕ будет добавлена');
+    log('❌ Условия не выполнены - метка НЕ будет добавлена');
     return { shouldAdd: false, authorId: null };
   }
 

@@ -51,7 +51,7 @@
     if (authorTagRegex.test(text)) {
       return text;
     }
-    return `[FMVauthor]usr${userId};[/FMVauthor]\n${text}`;
+    return `[FMVauthor]usr${userId};[/FMVauthor]${text}`;
   }
 
   // CSS для плашки
@@ -87,7 +87,7 @@
 
     authorBadge = document.createElement('div');
     authorBadge.className = 'fmvauthor-badge';
-    authorBadge.textContent = `Автор комментария: usr${authorId}`;
+    authorBadge.textContent = `Автор комментария: user${authorId}`;
 
     // Вставляем перед textarea
     textarea.parentNode.insertBefore(authorBadge, textarea);

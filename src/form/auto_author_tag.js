@@ -21,6 +21,14 @@
 
   log('Textarea найден');
 
+  // 2. Проверяем, не редактируем ли мы первый пост темы
+  if (document.querySelector('input[type="checkbox"][name="firstpost"]')) {
+    log('Найден firstpost checkbox - это редактирование первого поста, выходим');
+    return;
+  }
+
+  log('Не редактирование первого поста');
+
   // Получаем userId
   const userId = window.UserID;
   if (!userId) {

@@ -190,13 +190,20 @@
 
   // Находим форму и кнопку отправки
   const form = textarea.closest('form');
+  log('Форма найдена:', !!form);
+
+  if (!form) {
+    console.warn('[auto_author_tag] Форма не найдена - submit handler не будет установлен');
+  }
+
   const submitButton = form?.querySelector('input[type="submit"][name="submit"]');
+  log('Кнопка submit найдена:', !!submitButton);
 
   if (!submitButton) {
-    console.warn('[auto_author_tag] Кнопка отправки не найдена');
+    console.warn('[auto_author_tag] Кнопка отправки не найдена - submit handler не будет установлен');
     // Не выходим - парсинг и плашка всё равно работают
   } else {
-    log('Кнопка отправки найдена');
+    log('Кнопка отправки найдена, устанавливаем submit handler');
 
     // Перехватываем отправку формы (используем jQuery если доступен, иначе vanilla JS)
     if (typeof $ !== 'undefined' && $(form).length) {

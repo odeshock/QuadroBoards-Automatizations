@@ -37,9 +37,9 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   const baseKeywords = String(keywords ?? '').trim();
   const finalKeywords = baseKeywords
     ? `usr${authorUserId} AND ${baseKeywords}`
-    : '';
+    : `usr${authorUserId}`;  // ИСПРАВЛЕНО: всегда добавляем usrN, даже без доп. keywords
 
-  log('Ключевые слова для поиска:', finalKeywords || '(пусто)');
+  log('Ключевые слова для поиска:', finalKeywords);
 
   const titlePrefix = String(title_prefix || '').trim().toLocaleLowerCase('ru');
   const lastSources = Array.isArray(last_src) ? last_src : [last_src].filter(Boolean);

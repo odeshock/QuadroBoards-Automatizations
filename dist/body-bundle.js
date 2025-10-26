@@ -4507,17 +4507,19 @@ window.fetchAllLibraries = fetchAllLibraries;
   .ufo-lib,.ufo-selected{border:1px dashed #c9c9d9;border-radius:8px;background:#fafafd;padding:8px;overflow:auto}
   .ufo-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
   .ufo-lib .ufo-card{margin:0}
-  .ufo-card{display:grid;grid-template-columns: 1fr;
+  .ufo-card{display:grid;grid-template-columns:auto 1fr auto auto;grid-template-rows:auto auto;grid-template-areas:"id full date actions" "id title title actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
+  .ufo-idtag{grid-area:id;font-size:11px;opacity:.7;align-self:start}
+  .ufo-actions{grid-area:actions;display:flex;align-items:center;gap:6px}
+  .ufo-btn{border:1px solid #d7d7e0;background:#f3f3f7;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.15;display:inline-flex;align-items:center}
+  .ufo-btn:hover{background:#ececf4}
+  .ufo-card.disabled{opacity:.4;pointer-events:none}
+  .ufo-selected .ufo-card {grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
     grid-template-areas:
         "id"
         "full"
-        "actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
-  .ufo-idtag{grid-area:id;font-size:11px;opacity:.7;align-self:start}
-  .ufo-actions{grid-area:actions;display:flex;align-items:center;gap:6px;justify-content:flex-end;}
-  .ufo-btn{border:1px solid #d7d7e0;background:#f3f3f7;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.15;display:inline-flex;align-items:center}
-  .ufo-btn:hover{background:#ececf4}
-  .ufo-card.disabled{opacity:.4;pointer-events:none}
+        "actions";}
+  .ufo-selected .ufo-actions{justify-content: flex-end;}
   .ufo-full{grid-area:full;box-sizing:border-box;margin:0;padding:0;border:0;background:transparent;overflow:hidden}
   .ufo-full .item{position:relative;margin:0}
   .ufo-full .item .modal-link{display:block}

@@ -15,6 +15,15 @@
 const DEBUG = false;
 const log = (...a) => DEBUG && console.log('[loader]', ...a);
 
+// Показываем контент после загрузки DOM
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.classList.add('styles-loaded');
+  });
+} else {
+  document.body.classList.add('styles-loaded');
+}
+
 const ALLOWED_PARENTS = [
   "https://testfmvoice.rusff.me",      // тест
   "https://followmyvoice.rusff.me/"    // прод

@@ -5,6 +5,47 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Доходы / Расходы — форма по пунктам (статическая разметка)</title>
+
+  <!-- Критичные inline-стили для предотвращения FOUC (Flash of Unstyled Content) -->
+  <style>
+    /* Скрываем весь контент до загрузки стилей, кроме прелоадера */
+    .bank_html {
+      visibility: hidden;
+    }
+
+    /* Базовые стили для прелоадера, чтобы он отображался сразу */
+    #preloader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      visibility: visible;
+    }
+
+    .preloader-content {
+      text-align: center;
+      color: #f0e68c;
+    }
+
+    .preloader-text {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 18px;
+      margin-top: 20px;
+      color: #f0e68c;
+    }
+
+    /* Показываем контент после загрузки */
+    body.styles-loaded .bank_html {
+      visibility: visible;
+    }
+  </style>
+
   <link rel="stylesheet" href="./style.css">
 </head>
 

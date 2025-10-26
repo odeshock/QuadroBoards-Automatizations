@@ -3476,29 +3476,29 @@ window.fetchUserCoupons = fetchUserCoupons;
 
 /* MODULE 11.1: bank/parent/messages-utils.js */
 /* =============== MESSAGES UTILS MODULE =============== */
-(function() {
+(function () {
   'use strict';
 
   /* =============== система логирования =============== */
-  const DEBUG = false; // false чтобы отключить все log()
+  const DEBUG = true; // false чтобы отключить все log()
 
-  window.BankMessagesLog = DEBUG ? console.log.bind(console) : () => {};
-  window.BankMessagesWarn = DEBUG ? console.warn.bind(console) : () => {};
-  window.BankMessagesError = DEBUG ? console.error.bind(console) : () => {};
+  window.BankMessagesLog = DEBUG ? console.log.bind(console) : () => { };
+  window.BankMessagesWarn = DEBUG ? console.warn.bind(console) : () => { };
+  window.BankMessagesError = DEBUG ? console.error.bind(console) : () => { };
 
   /* =============== базовые утилиты: delay + timeout + retry =============== */
   window.BankPreScrapeBarrier = Promise.resolve(true);
 
   window.BankDelay = (ms) => new Promise(r => setTimeout(r, ms));
 
-  window.BankWithTimeout = async function(promise, ms, label = "request") {
+  window.BankWithTimeout = async function (promise, ms, label = "request") {
     let to;
     const t = new Promise((_, rej) => { to = setTimeout(() => rej(new Error(`${label} timeout after ${ms} ms`)), ms); });
     try { return await Promise.race([promise, t]); }
     finally { clearTimeout(to); }
   };
 
-  window.BankRetry = async function(fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeoutMs = 15000 } = {}, label = "request") {
+  window.BankRetry = async function (fn, { retries = 3, baseDelay = 600, maxDelay = 6000, timeoutMs = 15000 } = {}, label = "request") {
     let lastErr;
     window.BankMessagesLog("🟦 [STEP] " + label + " start");
     for (let i = 0; i < retries; i++) {
@@ -3528,19 +3528,19 @@ window.fetchUserCoupons = fetchUserCoupons;
   window.SEND_BASE_GAP_MS = 900;
   window.SEND_JITTER_MS = 500;
 
-  window.BankHumanPause = function(base, jitter, reason = "pause") {
+  window.BankHumanPause = function (base, jitter, reason = "pause") {
     const gap = base + Math.floor(Math.random() * jitter);
     window.BankMessagesLog("🟨 [WAIT] " + reason + ": " + gap + "ms");
     return window.BankDelay(gap);
   };
 
   /* =============== сервис: дата, готовность iframe =============== */
-  window.BankGetToday = function() {
+  window.BankGetToday = function () {
     const d = new Date();
     return [d.getFullYear(), d.getMonth() + 1, d.getDate()];
   };
 
-  window.BankWaitForIframeReady = function(origin) {
+  window.BankWaitForIframeReady = function (origin) {
     return new Promise((resolve) => {
       function onMsg(e) {
         if (e.origin !== origin) return;

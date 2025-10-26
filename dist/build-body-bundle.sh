@@ -24,6 +24,10 @@ for file in src/ui/*.js; do
   fi
 done
 
+# Load scrape_posts_by_author_tag.js
+echo "" >> dist/body-bundle.js
+cat src/episodes/scrape_posts_by_author_tag.js >> dist/body-bundle.js
+
 echo "" >> dist/body-bundle.js
 echo "/* Private Pages */" >> dist/body-bundle.js
 # Загружаем JSON-версии для API
@@ -99,8 +103,6 @@ echo "/* Episodes */" >> dist/body-bundle.js
 cat src/episodes/ui.js >> dist/body-bundle.js
 # Load tags_visibility.js
 cat src/episodes/tags_visibility.js >> dist/body-bundle.js
-# Load scrape_posts_by_author_tag.js
-cat src/episodes/scrape_posts_by_author_tag.js >> dist/body-bundle.js
 
 echo "✅ body-bundle.js created!"
 ls -lh dist/body-bundle.js

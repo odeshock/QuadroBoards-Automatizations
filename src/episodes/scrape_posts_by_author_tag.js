@@ -16,13 +16,20 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   delayMs = 300,
   keywords = '',
   comments_only = false,
-  min_symbols_num = -1
+  min_symbols_num = -1,
 } = {}) {
+  const debug = true;
+
+  const log = (...args) => {
+    if (debug) console.log('[scrapePostsByAuthorTag]', ...args);
+  };
 
   if (!authorUserId) throw new Error('authorUserId обязателен');
   if (!forums || (Array.isArray(forums) && forums.length === 0)) {
     throw new Error('forums обязателен');
   }
+
+  log('Начало работы с параметрами:', { authorUserId, forums, stopOnNthPost, last_src, title_prefix, maxPages, delayMs, keywords, comments_only, min_symbols_num });
 
   const forumsStr = Array.isArray(forums) ? forums.join(',') : String(forums);
 
@@ -31,6 +38,8 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   const finalKeywords = baseKeywords
     ? `usr${authorUserId} AND ${baseKeywords}`
     : '';
+
+  log('Ключевые слова для поиска:', finalKeywords || '(пусто)');
 
   const titlePrefix = String(title_prefix || '').trim().toLocaleLowerCase('ru');
   const lastSources = Array.isArray(last_src) ? last_src : [last_src].filter(Boolean);
@@ -78,7 +87,9 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
       ['p', String(page)]
     ].filter(([k, v]) => v !== '').map(([k, v]) => `${k}=${v}`).join('&');
 
-    return new URL(`/search.php?${params}`, location.origin).toString();
+    const url = new URL(`/search.php?${params}`, location.origin).toString();
+    log(`Построен URL для страницы ${page}:`, url);
+    return url;
   }
 
   async function fetchDoc(url) {
@@ -209,21 +220,34 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
 
   function filterPosts(doc) {
     const allPosts = [...doc.querySelectorAll('.post')].map(parsePost);
+    log(`Найдено постов на странице: ${allPosts.length}`);
 
     // Фильтр по title_prefix
     let filtered = allPosts.filter(p => !titlePrefix || p.title.startsWith(titlePrefix));
+    if (titlePrefix) {
+      log(`После фильтра по title_prefix="${titlePrefix}": ${filtered.length} постов`);
+    }
 
     // Фильтр по seenSources
+    const beforeSeenFilter = filtered.length;
     filtered = filtered.filter(p => !seenSources.has(p.src));
+    if (beforeSeenFilter !== filtered.length) {
+      log(`Отфильтровано уже виденных постов: ${beforeSeenFilter - filtered.length}`);
+    }
 
     // Фильтр по min_symbols_num
     if (min_symbols_num > 0) {
+      const beforeSymbolsFilter = filtered.length;
       filtered = filtered.filter(p => p.symbols_num >= min_symbols_num);
+      if (beforeSymbolsFilter !== filtered.length) {
+        log(`Отфильтровано постов по min_symbols_num=${min_symbols_num}: ${beforeSymbolsFilter - filtered.length}`);
+      }
     }
 
     // Фильтр comments_only (НЕ используем scrapeTopicFirstPostLinks)
     // Просто пропускаем эту логику, т.к. мы ищем по тегу, а не по автору
 
+    log(`Финальное количество постов после всех фильтров: ${filtered.length}`);
     return filtered;
   }
 
@@ -232,43 +256,59 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   let lastHash = null;
   let sameHashCount = 0;
 
+  log('Начинаем основной цикл поиска постов');
+
   for (let page = 1; page <= maxPages; page++) {
+    log(`\n--- Обработка страницы ${page} ---`);
     const doc = await fetchDoc(buildSearchUrl(page));
 
     if (isNoResults(doc)) {
+      log('Получена страница "ничего не найдено", завершаем поиск');
       break;
     }
 
     const currentPage = Number(doc.querySelector('div.linkst div.pagelink strong')?.textContent || page);
+    log(`Текущая страница по DOM: ${currentPage}`);
     if (currentPage === 1 && page !== 1) {
+      log('Вернулись на первую страницу, закончились страницы');
       break; // Закончились страницы
     }
 
     const posts = filterPosts(doc);
 
     if (!posts.length) {
+      log('Постов после фильтрации нет');
       const currentHash = hashPosts(allResults.map(p => p.src));
       if (currentHash === lastHash) {
         sameHashCount++;
-        if (sameHashCount >= 3) break;
+        log(`Хеш повторяется (${sameHashCount}/3)`);
+        if (sameHashCount >= 3) {
+          log('Хеш повторился 3 раза, завершаем поиск');
+          break;
+        }
       } else {
         lastHash = currentHash;
         sameHashCount = 0;
       }
     } else {
+      log(`Добавляем ${posts.length} постов к результатам`);
       allResults.push(...posts);
       posts.forEach(p => seenSources.add(p.src));
       sameHashCount = 0;
+      log(`Всего собрано постов: ${allResults.length}`);
     }
 
     if (stopOnNthPost && allResults.length >= stopOnNthPost) {
+      log(`Достигнут лимит stopOnNthPost=${stopOnNthPost}, завершаем поиск`);
       break;
     }
 
     if (page < maxPages) {
+      log(`Ожидание ${delayMs}ms перед следующей страницей`);
       await (window.FMV?.sleep?.(delayMs) ?? new Promise(r => setTimeout(r, delayMs)));
     }
   }
 
+  log(`\n✅ Поиск завершен. Всего найдено постов: ${allResults.length}`);
   return allResults;
 };

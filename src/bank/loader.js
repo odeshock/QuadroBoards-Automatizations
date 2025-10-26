@@ -12,7 +12,8 @@
  * - Управляет прелоадером (минимум 5 секунд)
  */
 
-console.log("✅ loader.js загружен");
+const DEBUG = false;
+const log = (...a) => DEBUG && console.log('[loader]', ...a);
 
 const ALLOWED_PARENTS = [
   "https://testfmvoice.rusff.me",      // тест
@@ -23,6 +24,7 @@ const ALLOWED_PARENTS = [
   let ack = false,
     tries = 0,
     appLoaded = false,
+    preloaderHidden = false,
     startTime = Date.now(),
     MIN_PRELOAD_TIME = 5_000; // 5 секунд
 
@@ -34,12 +36,16 @@ const ALLOWED_PARENTS = [
       return;
     }
     document.getElementById("preloader")?.style.setProperty("display", "none");
-    console.log("✨ Прелоадер убран через", Math.round(elapsed / 1000), "сек");
+    if (!preloaderHidden) {
+      preloaderHidden = true;
+      console.log("✨ Прелоадер убран через", Math.round(elapsed / 1000), "сек");
+    }
   }
 
   function sendReady() {
     if (ack || tries >= 100) return;
     tries++;
+    log('Отправка IFRAME_READY, попытка', tries);
     for (const origin of ALLOWED_PARENTS) {
       try { window.parent.postMessage({ type: "IFRAME_READY" }, origin); } catch { }
     }
@@ -53,7 +59,7 @@ const ALLOWED_PARENTS = [
 
     if (d.type === "IFRAME_ACK") {
       ack = true;
-      console.log("[iframe] ACK от", e.origin);
+      log("ACK от", e.origin);
 
       if (!window.__APP_LOADED__) {
         window.__APP_LOADED__ = true;
@@ -64,11 +70,11 @@ const ALLOWED_PARENTS = [
         script.src = 'https://odeshock.github.io/QuadroBoards-Automatizations/src/bank/app.js?v=' + Date.now();
         script.onload = () => {
           appLoaded = true;
-          console.log("✅ app.js загружен");
+          log("app.js загружен");
           hidePreloader();
         };
         script.onerror = (err) => {
-          console.error("❌ Ошибка загрузки app.js", err);
+          log("Ошибка загрузки app.js", err);
         };
         document.head.appendChild(script);
       }
@@ -107,7 +113,7 @@ const ALLOWED_PARENTS = [
 
     if (d.type === "PERSONAL_DISCOUNTS") {
       window.PERSONAL_DISCOUNTS = d.coupons_data || [];
-      console.log("Loaded coupons", window.PERSONAL_DISCOUNTS);
+      log("Loaded coupons", window.PERSONAL_DISCOUNTS);
     }
 
     if (d.type === "PERSONAL_POSTS") window.PERSONAL_POSTS = d.posts || [];
@@ -120,7 +126,7 @@ const ALLOWED_PARENTS = [
     if (d.type === "BANNER_RENO_FLAG") window.BANNER_RENO_FLAG = !!d.banner_reno_flag;
 
     if (d.type === "COMMENT_INFO") {
-      console.log("✅ [LOADER] Получен COMMENT_INFO:", d);
+      log("Получен COMMENT_INFO:", d);
       window.NEW_COMMENT_TIMESTAMP = d.NEW_COMMENT_TIMESTAMP;
       window.NEW_COMMENT_ID = d.NEW_COMMENT_ID;
       window.NEW_CURRENT_BANK = d.NEW_CURRENT_BANK;
@@ -128,9 +134,9 @@ const ALLOWED_PARENTS = [
     }
 
     if (d.type === "BACKUP_DATA") {
-      console.log("✅ [LOADER] Получен BACKUP_DATA:", d);
+      log("Получен BACKUP_DATA:", d);
       window.BACKUP_DATA = d.BACKUP_DATA;
-      console.log("✅ [LOADER] window.BACKUP_DATA установлен:", window.BACKUP_DATA);
+      log("window.BACKUP_DATA установлен:", window.BACKUP_DATA);
     }
 
     // Проверяем, все ли критические данные загружены

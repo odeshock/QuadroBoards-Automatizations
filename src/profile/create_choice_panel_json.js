@@ -2,7 +2,7 @@
 // createChoicePanelJSON({ title, targetClass, library, ...opts })
 // Возвращает { getData(), init(jsonArray) }
 
-(function(){
+(function () {
   'use strict';
 
 
@@ -17,9 +17,14 @@
   .ufo-lib,.ufo-selected{border:1px dashed #c9c9d9;border-radius:8px;background:#fafafd;padding:8px;overflow:auto}
   .ufo-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
   .ufo-lib .ufo-card{margin:0}
-  .ufo-card{display:grid;grid-template-columns:auto 1fr auto auto;grid-template-rows:auto auto;grid-template-areas:"id full date actions" "id title title actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
+  .ufo-card{display:grid;grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+        "id"
+        "full"
+        "actions";gap:8px;background:#fff;border:1px solid #e7e7ef;border-radius:8px;padding:8px;margin:6px 0;max-width:100%;position:relative;overflow:hidden}
   .ufo-idtag{grid-area:id;font-size:11px;opacity:.7;align-self:start}
-  .ufo-actions{grid-area:actions;display:flex;align-items:center;gap:6px}
+  .ufo-actions{grid-area:actions;display:flex;align-items:center;gap:6px;justify-content:flex-end;}
   .ufo-btn{border:1px solid #d7d7e0;background:#f3f3f7;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.15;display:inline-flex;align-items:center}
   .ufo-btn:hover{background:#ececf4}
   .ufo-card.disabled{opacity:.4;pointer-events:none}
@@ -35,16 +40,16 @@
   .ufo-date-edit input{border:none;background:transparent;font-size:13px;width:100%;font-family:inherit}
   .ufo-date-edit input:focus{outline:none}
   `;
-  (function injectCSS(){
+  (function injectCSS() {
     if (window.__ufoCSS) return;
     window.__ufoCSS = true;
-    const s=document.createElement('style'); s.textContent=baseCSS; document.head.appendChild(s);
-    if (typeof GM_addStyle==='function') GM_addStyle(baseCSS);
+    const s = document.createElement('style'); s.textContent = baseCSS; document.head.appendChild(s);
+    if (typeof GM_addStyle === 'function') GM_addStyle(baseCSS);
   })();
 
-  const mkBtn = (txt, onClick) => { const b=document.createElement('button'); b.type='button'; b.className='ufo-btn'; b.textContent=txt; b.addEventListener('click', onClick); return b; };
+  const mkBtn = (txt, onClick) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ufo-btn'; b.textContent = txt; b.addEventListener('click', onClick); return b; };
 
-  function computeTwoRowMaxSelected(container){
+  function computeTwoRowMaxSelected(container) {
     const first = container.querySelector('.ufo-card');
     if (!first) { container.style.maxHeight = ''; return; }
     const style = getComputedStyle(first);
@@ -57,10 +62,10 @@
     const max = Math.round(h * 2 + (mt + mb) * 3 + pt + pb);
     container.style.maxHeight = max + 'px';
   }
-  function firstVisibleCard(container){ const cards = [...container.querySelectorAll('.ufo-card')]; return cards.find(c => getComputedStyle(c).display !== 'none') || null; }
-  function computeTwoRowMaxLib(container){ const card = firstVisibleCard(container); if (!card) { container.style.maxHeight=''; return; } const ch = card.getBoundingClientRect().height; const cs = getComputedStyle(container); const rowGap = parseFloat(cs.rowGap) || 0; const pt = parseFloat(cs.paddingTop) || 0; const pb = parseFloat(cs.paddingBottom) || 0; const max = Math.round(ch * 2 + rowGap + pt + pb); container.style.maxHeight = max + 'px'; }
+  function firstVisibleCard(container) { const cards = [...container.querySelectorAll('.ufo-card')]; return cards.find(c => getComputedStyle(c).display !== 'none') || null; }
+  function computeTwoRowMaxLib(container) { const card = firstVisibleCard(container); if (!card) { container.style.maxHeight = ''; return; } const ch = card.getBoundingClientRect().height; const cs = getComputedStyle(container); const rowGap = parseFloat(cs.rowGap) || 0; const pt = parseFloat(cs.paddingTop) || 0; const pb = parseFloat(cs.paddingBottom) || 0; const max = Math.round(ch * 2 + rowGap + pt + pb); container.style.maxHeight = max + 'px'; }
 
-  function createChoicePanelJSON(userOpts){
+  function createChoicePanelJSON(userOpts) {
     const opts = Object.assign({
       title: 'Библиотека и выбранные',
       targetClass: '_section',
@@ -76,7 +81,7 @@
     }, userOpts || {});
     if (!Array.isArray(opts.library)) opts.library = [];
 
-    const uid = 'ufo_' + (opts.targetClass || 'section').replace(/\W+/g,'_') + '_' + Math.random().toString(36).slice(2,7);
+    const uid = 'ufo_' + (opts.targetClass || 'section').replace(/\W+/g, '_') + '_' + Math.random().toString(36).slice(2, 7);
 
     // Массив выбранных элементов (внутреннее состояние)
     // Каждый элемент: { id, title, content, expired_date?, ...data-attrs }
@@ -84,16 +89,16 @@
 
     const details = document.createElement('details'); details.className = 'ufo-panel'; details.open = !!opts.startOpen;
     const summary = document.createElement('summary'); summary.textContent = opts.title || 'Панель';
-    const wrap = document.createElement('div'); wrap.className='ufo-wrap';
+    const wrap = document.createElement('div'); wrap.className = 'ufo-wrap';
 
-    const libCol = document.createElement('div'); libCol.className='ufo-col';
-    const hLib = document.createElement('h4'); hLib.textContent='Библиотека';
-    const search = document.createElement('input'); search.type='text'; search.placeholder = opts.searchPlaceholder || 'поиск по id'; search.className='ufo-search'; hLib.appendChild(search);
-    const libBox = document.createElement('div'); libBox.className='ufo-lib'; libBox.id = uid+'-lib';
+    const libCol = document.createElement('div'); libCol.className = 'ufo-col';
+    const hLib = document.createElement('h4'); hLib.textContent = 'Библиотека';
+    const search = document.createElement('input'); search.type = 'text'; search.placeholder = opts.searchPlaceholder || 'поиск по id'; search.className = 'ufo-search'; hLib.appendChild(search);
+    const libBox = document.createElement('div'); libBox.className = 'ufo-lib'; libBox.id = uid + '-lib';
     libCol.append(hLib, libBox);
 
-    const selCol = document.createElement('div'); selCol.className='ufo-col'; selCol.innerHTML = '<h4>Выбранные (сверху — новее)</h4>';
-    const selBox = document.createElement('div'); selBox.className='ufo-selected'; selBox.id = uid+'-selected';
+    const selCol = document.createElement('div'); selCol.className = 'ufo-col'; selCol.innerHTML = '<h4>Выбранные (сверху — новее)</h4>';
+    const selBox = document.createElement('div'); selBox.className = 'ufo-selected'; selBox.id = uid + '-selected';
     selCol.appendChild(selBox);
 
     wrap.append(libCol, selCol); details.append(summary, wrap);
@@ -102,13 +107,13 @@
       opts.mountEl.appendChild(details);
     }
 
-    function renderLibItem(item){
-      const card=document.createElement('div'); card.className='ufo-card'; card.dataset.id=item.id;
-      const id=document.createElement('div'); id.className='ufo-idtag'; id.textContent='#'+item.id;
-      const full=document.createElement('div'); full.className='ufo-full';
-      const tmp=document.createElement('div'); tmp.innerHTML=item.html.trim(); full.appendChild(tmp.firstElementChild);
-      const actions=document.createElement('div'); actions.className='ufo-actions';
-      actions.appendChild(mkBtn('Добавить ↑', (e)=>{e.preventDefault(); e.stopPropagation(); addItemFromLibrary(item); }));
+    function renderLibItem(item) {
+      const card = document.createElement('div'); card.className = 'ufo-card'; card.dataset.id = item.id;
+      const id = document.createElement('div'); id.className = 'ufo-idtag'; id.textContent = '#' + item.id;
+      const full = document.createElement('div'); full.className = 'ufo-full';
+      const tmp = document.createElement('div'); tmp.innerHTML = item.html.trim(); full.appendChild(tmp.firstElementChild);
+      const actions = document.createElement('div'); actions.className = 'ufo-actions';
+      actions.appendChild(mkBtn('Добавить ↑', (e) => { e.preventDefault(); e.stopPropagation(); addItemFromLibrary(item); }));
       card.append(id, full, actions); return card;
     }
     opts.library.forEach(x => libBox.appendChild(renderLibItem(x)));

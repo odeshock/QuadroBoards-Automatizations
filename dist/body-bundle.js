@@ -1003,8 +1003,8 @@ $(function() {
         // Таймаут на случай зависания
         const timeout = setTimeout(() => {
           iframe.remove();
-          reject(new Error('Таймаут обновления комментария (10 секунд)'));
-        }, 10000);
+          reject(new Error('Таймаут обновления комментария (20 секунд)'));
+        }, 20000);
 
         // Счетчик загрузок
         let onloadCount = 0;

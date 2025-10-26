@@ -3153,12 +3153,13 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   keywords = '',
   comments_only = false,
   min_symbols_num = -1,
-  authorLogin = '',
-  debug = false
+  authorLogin = ''
 } = {}) {
 
+  const DEBUG = true;
+
   const log = (...args) => {
-    if (debug) console.log('[scrapePostsByAuthorTag]', ...args);
+    if (DEBUG) console.log('[scrapePostsByAuthorTag]', ...args);
   };
 
   if (!authorUserId) throw new Error('authorUserId обязателен');

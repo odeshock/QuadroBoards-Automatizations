@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  // === 15s барьер перед ЛЮБЫМ вызовом scrapePosts ===
+  // === 15s барьер перед ЛЮБЫМ вызовом scrapePostsByAuthorTag ===
   window.BankPreScrapeBarrier = (async () => {
     // window.BankMessagesLog("🟨 [WAIT] pre-scrape barrier: 5000ms");
     // await window.BankDelay(5000);
@@ -133,13 +133,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 3) BANNER_MAYAK_FLAG
       const coms_banner_mayak = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
           keywords: window.BankLabel.banner_mayak.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 800, maxDelay: 7000, timeoutMs: 15000 },
-        "scrapePosts(banner_mayak)"
+        "scrapePostsByAuthorTag(banner_mayak)"
       );
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.banner_mayak,
@@ -149,13 +149,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 4) BANNER_RENO_FLAG
       const coms_banner_reno = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
           keywords: window.BankLabel.banner_reno.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 800, maxDelay: 7000, timeoutMs: 15000 },
-        "scrapePosts(banner_reno)"
+        "scrapePostsByAuthorTag(banner_reno)"
       );
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.banner_reno,
@@ -165,13 +165,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 5) ADS_POSTS (seed -> sendPosts)
       const ads_seed = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
           keywords: window.BankLabel.ads.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
-        "scrapePosts(ads_seed)"
+        "scrapePostsByAuthorTag(ads_seed)"
       );
       window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
         await window.BankSendPosts(iframeWindow, {
@@ -187,13 +187,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 6) FIRST_POST_FLAG
       const first_post_coms = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
           keywords: window.BankLabel.first_post.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 15000 },
-        "scrapePosts(first_post)"
+        "scrapePostsByAuthorTag(first_post)"
       );
       window.BankQueueMessage(iframeReadyP, () => ({
         type: window.BankPostMessagesType.first_post,
@@ -203,13 +203,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 7) PERSONAL_POSTS
       const personal_seed = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
           keywords: window.BankLabel.personal_posts.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
-        "scrapePosts(personal_seed)"
+        "scrapePostsByAuthorTag(personal_seed)"
       );
       window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
         await window.BankSendPosts(iframeWindow, {
@@ -224,13 +224,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 8) PLOT_POSTS
       const plot_seed = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 10,
           keywords: window.BankLabel.plot_posts.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
-        "scrapePosts(plot_seed)"
+        "scrapePostsByAuthorTag(plot_seed)"
       );
       window.BankQueueJob(iframeReadyP, async (iframeWindow) => {
         await window.BankSendPosts(iframeWindow, {

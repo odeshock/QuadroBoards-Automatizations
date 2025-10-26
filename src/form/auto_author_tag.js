@@ -5,7 +5,7 @@
   'use strict';
 
   // Флаг отладки - установите в true для вывода логов
-  const DEBUG = true;
+  const DEBUG = false;
 
   // Функция логирования с проверкой DEBUG
   const log = (...args) => {
@@ -286,7 +286,7 @@
     // Hint
     const hint = document.createElement('div');
     hint.className = 'hint';
-    hint.textContent = 'Обязательное поле. Начните вводить имя или user ID.';
+    hint.textContent = 'Необходимо для автоматического подсчета постов. Начните вводить имя или user ID.';
 
     gmSelector.appendChild(label);
     gmSelector.appendChild(combo);

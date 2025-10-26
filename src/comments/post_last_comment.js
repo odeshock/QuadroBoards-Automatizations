@@ -37,7 +37,7 @@
   async function ensureScrapePosts(timeoutMs = 8000, intervalMs = 250) {
     const started = Date.now();
     while (Date.now() - started <= timeoutMs) {
-      if (typeof window.scrapePosts === 'function') return true;
+      if (typeof window.scrapePostsByAuthorTag === 'function') return true;
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
     return false;
@@ -88,7 +88,7 @@
       return;
     }
 
-    if (!window.UserLogin) {
+    if (!window.UserID) {
       setEmpty(anchor, 'нет данных пользователя');
       return;
     }
@@ -99,7 +99,7 @@
     ];
 
     try {
-      const posts = await window.scrapePosts(window.UserLogin, forums, {
+      const posts = await window.scrapePostsByAuthorTag(window.UserID, forums, {
         stopOnNthPost: 1,
         comments_only: true
       });
@@ -114,7 +114,7 @@
         setEmpty(anchor);
       }
     } catch (error) {
-      console.error('[post_last_comment] scrapePosts failed', error);
+      console.error('[post_last_comment] scrapePostsByAuthorTag failed', error);
       setEmpty(anchor, 'ошибка поиска');
     }
   });

@@ -34,9 +34,9 @@
 
       window.BankMessagesLog("🟦 [STEP] scrape new posts for " + type + " (filter used_posts: " + used_posts.length + ")");
       const new_posts_raw = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, forums, { last_src: used_posts, comments_only: true, title_prefix }),
+        () => window.scrapePostsByAuthorTag(window.UserID, forums, { last_src: used_posts, comments_only: true, title_prefix }),
         { retries: 4, baseDelay: 800, maxDelay: 8000, timeoutMs: 18000 },
-        "scrapePosts(" + type + ")"
+        "scrapePostsByAuthorTag(" + type + ")"
       );
 
       const new_posts = Array.isArray(new_posts_raw)
@@ -58,20 +58,20 @@
   window.BankGetLastValue = async function(default_value, { label, is_month = false }) {
     try {
       const seed = await window.BankRetry(
-        () => window.scrapePosts(window.UserLogin, window.BankForums.bank, {
+        () => window.scrapePostsByAuthorTag(window.UserID, window.BankForums.bank, {
           title_prefix: window.BankPrefix.bank,
           stopOnNthPost: 1,
           keywords: label.split(" ").join(" AND "),
         }),
         { retries: 3, baseDelay: 900, maxDelay: 8000, timeoutMs: 18000 },
-        "scrapePosts(personal_seed)"
+        "scrapePostsByAuthorTag(personal_seed)"
       );
 
-      const _origScrapePosts = window.scrapePosts?.bind(window);
-      if (typeof _origScrapePosts === "function") {
-        window.scrapePosts = async (...args) => {
+      const _origScrapeFunc = window.scrapePostsByAuthorTag?.bind(window);
+      if (typeof _origScrapeFunc === "function") {
+        window.scrapePostsByAuthorTag = async (...args) => {
           await (window.preScrapeBarrier ?? window.BankPreScrapeBarrier ?? Promise.resolve());
-          return _origScrapePosts(...args);
+          return _origScrapeFunc(...args);
         };
       }
 

@@ -88,15 +88,19 @@
       return;
     }
 
-    if (!window.UserID) {
-      setEmpty(anchor, 'нет данных пользователя');
+    // Извлекаем ID из URL профиля
+    const match = location.search.match(/[?&]id=(\d+)/);
+    const profileUserId = match ? parseInt(match[1], 10) : null;
+
+    if (!profileUserId) {
+      setEmpty(anchor, 'нет ID пользователя в URL');
       return;
     }
 
     const forums = window.FORUMS_IDS?.Bank || [0];
 
     try {
-      const posts = await window.scrapePostsByAuthorTag(window.UserID, forums, {
+      const posts = await window.scrapePostsByAuthorTag(profileUserId, forums, {
         title_prefix: 'Гринготтс',
         stopOnNthPost: 1,
         keywords: 'ИТОГО'

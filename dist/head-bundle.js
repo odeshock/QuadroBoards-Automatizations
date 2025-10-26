@@ -3140,6 +3140,8 @@ window.fetchUserCoupons = fetchUserCoupons;
  * @param {number} authorUserId - ID пользователя для поиска через usrN в ключевых словах
  * @param {number[]|string} forums - ID форумов (массив или строка через запятую)
  * @param {Object} options - Опции поиска (аналогично scrapePostsByAuthorTag)
+ * @param {string} [options.authorLogin=''] - Логин автора для дополнительной фильтрации (параметр author=)
+ * @param {boolean} [options.debug=false] - Включить debug-логи
  * @returns {Promise<Array>} Массив постов
  */
 window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
@@ -3151,8 +3153,9 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   keywords = '',
   comments_only = false,
   min_symbols_num = -1,
+  authorLogin = '',
+  debug = false
 } = {}) {
-  const debug = false;
 
   const log = (...args) => {
     if (debug) console.log('[scrapePostsByAuthorTag]', ...args);
@@ -3163,7 +3166,7 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
     throw new Error('forums обязателен');
   }
 
-  log('Начало работы с параметрами:', { authorUserId, forums, stopOnNthPost, last_src, title_prefix, maxPages, delayMs, keywords, comments_only, min_symbols_num });
+  log('Начало работы с параметрами:', { authorUserId, forums, stopOnNthPost, last_src, title_prefix, maxPages, delayMs, keywords, comments_only, min_symbols_num, authorLogin, debug });
 
   const forumsStr = Array.isArray(forums) ? forums.join(',') : String(forums);
 
@@ -3174,6 +3177,9 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
     : `usr${authorUserId}`;  // ИСПРАВЛЕНО: всегда добавляем usrN, даже без доп. keywords
 
   log('Ключевые слова для поиска:', finalKeywords);
+  if (authorLogin) {
+    log('Дополнительная фильтрация по логину автора:', authorLogin);
+  }
 
   const titlePrefix = String(title_prefix || '').trim().toLocaleLowerCase('ru');
   const lastSources = Array.isArray(last_src) ? last_src : [last_src].filter(Boolean);
@@ -3208,10 +3214,12 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   }
 
   function buildSearchUrl(page) {
+    const authorParam = String(authorLogin || '').trim();
+
     const params = [
       ['action', 'search'],
       ['keywords', finalKeywords ? encodeForSearch(finalKeywords) : ''],
-      ['author', ''], // НЕ передаем автора
+      ['author', authorParam ? encodeForSearch(authorParam) : ''],
       ['forums', forumsStr],
       ['search_in', '0'],
       ['sort_by', '0'],

@@ -43,11 +43,14 @@ const comparator = (a, b) => {
  * Приоритет: data-main-user_id > N из URL
  */
 async function getUserIdFromPage(profileId) {
+  const DEBUG = false;
+  const log = (...a) => DEBUG && console.log('[fetchUserCoupons]', ...a);
+
   try {
     const pageUrl = `/pages/usr${profileId}`;
     const response = await fetch(pageUrl);
     if (!response.ok) {
-      console.error(`[fetchUserCoupons] Не удалось загрузить ${pageUrl}`);
+      log(`Не удалось загрузить ${pageUrl}`);
       return Number(profileId);
     }
 
@@ -57,20 +60,20 @@ async function getUserIdFromPage(profileId) {
 
     const modalScript = doc.querySelector('.modal_script');
     if (!modalScript) {
-      console.warn(`[fetchUserCoupons] .modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
+      log(`.modal_script не найден в ${pageUrl}, используем profileId=${profileId}`);
       return Number(profileId);
     }
 
     const mainUserId = modalScript.getAttribute('data-main-user_id');
     if (mainUserId && mainUserId.trim()) {
-      console.log(`[fetchUserCoupons] Найден data-main-user_id=${mainUserId}`);
+      log(`Найден data-main-user_id=${mainUserId}`);
       return Number(mainUserId.trim());
     }
 
     // Если data-main-user_id не указан, используем profileId
     return Number(profileId);
   } catch (err) {
-    console.error('[fetchUserCoupons] Ошибка загрузки страницы:', err);
+    log('Ошибка загрузки страницы:', err);
     return Number(profileId);
   }
 }
@@ -82,20 +85,23 @@ async function getUserIdFromPage(profileId) {
  * @returns {Promise<Array<{system_id: string, type: string, form: string, value: number, title: string, html: string, expiresAt?: string}>>}
  */
 async function fetchUserCoupons() {
+  const DEBUG = false;
+  const log = (...a) => DEBUG && console.log('[fetchUserCoupons]', ...a);
+
   // Получаем ID пользователя
   const profileId = window.UserID;
   if (!profileId) {
-    console.warn('[fetchUserCoupons] window.UserID не определён');
+    log('window.UserID не определён');
     return [];
   }
 
   // Получаем целевой userId с учётом data-main-user_id (async!)
   const userId = await getUserIdFromPage(profileId);
-  console.log('[fetchUserCoupons] Целевой userId:', userId);
+  log('Целевой userId:', userId);
 
   // Проверяем доступность API
   if (!window.FMVbank || typeof window.FMVbank.storageGet !== 'function') {
-    console.error('[fetchUserCoupons] FMVbank.storageGet не найден');
+    log('FMVbank.storageGet не найден');
     return [];
   }
 
@@ -119,33 +125,33 @@ async function fetchUserCoupons() {
   let response;
   try {
     response = await window.FMVbank.storageGet(userId, 'skin_');
-    console.log('[fetchUserCoupons] API ответ:', response);
+    log('API ответ:', response);
   } catch (error) {
-    console.error('[fetchUserCoupons] Ошибка загрузки из API:', error);
+    log('Ошибка загрузки из API:', error);
     return [];
   }
 
   // Новый формат: { chrono: {}, gift: [], coupon: [], icon: [], plashka: [], background: [], comment_id: null, last_timestamp: ... }
   if (!response || typeof response !== 'object') {
-    console.warn('[fetchUserCoupons] Неверный формат ответа API');
+    log('Неверный формат ответа API');
     return [];
   }
 
   // Извлекаем купоны из объекта
   const couponData = response.coupon || [];
   if (!Array.isArray(couponData)) {
-    console.warn('[fetchUserCoupons] response.coupon не является массивом');
+    log('response.coupon не является массивом');
     return [];
   }
 
-  console.log('[fetchUserCoupons] Купоны из API:', couponData);
+  log('Купоны из API:', couponData);
 
   const coupons = [];
 
   couponData.forEach(item => {
     // Пропускаем невидимые элементы
     if (item.is_visible === false) {
-      console.log(`[fetchUserCoupons] Пропущен невидимый купон id=${item.id}`);
+      log(`Пропущен невидимый купон id=${item.id}`);
       return;
     }
 
@@ -161,7 +167,7 @@ async function fetchUserCoupons() {
     if (expiresAt) {
       // Сравниваем даты как строки (yyyy-mm-dd формат позволяет это)
       if (expiresAt < today) {
-        console.log(`[fetchUserCoupons] Пропущен купон "${title}" (истёк: ${expiresAt} < ${today})`);
+        log(`Пропущен купон "${title}" (истёк: ${expiresAt} < ${today})`);
         return; // Пропускаем истекший купон
       }
     }
@@ -200,7 +206,7 @@ async function fetchUserCoupons() {
     coupons.push(coupon);
   });
 
-  console.log(`[fetchUserCoupons] Загружено купонов: ${coupons.length}`);
+  log(`Загружено купонов: ${coupons.length}`);
   const update_data = coupons.sort(comparator);
   update_data.forEach((item, index) => {
     item.id = String(index + 1);

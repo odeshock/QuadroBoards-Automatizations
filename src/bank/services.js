@@ -2,6 +2,9 @@
 // services.js — Бизнес-логика: данные, расчёты, утилиты
 // ============================================================================
 
+const DEBUG = false;
+const log = (...a) => DEBUG && console.log('[services]', ...a);
+
 import { counterPrefixMap } from './config.js';
 import {
   REGEX,
@@ -884,7 +887,7 @@ export function updateAutoDiscounts() {
   // Используем frozenDiscounts если он установлен (режим backup), иначе autoDiscounts
   const discountsToApply = frozenDiscounts !== null ? frozenDiscounts : autoDiscounts;
 
-  console.log(`🔍 Применяем скидки из ${frozenDiscounts !== null ? 'замороженного списка' : 'текущих правил'} (${discountsToApply.length} правил)`);
+  log(`Применяем скидки из ${frozenDiscounts !== null ? 'замороженного списка' : 'текущих правил'} (${discountsToApply.length} правил)`);
 
   // Разделяем правила на конкретные формы и "все расходы"
   const specificFormRules = discountsToApply.filter(rule => {
@@ -904,16 +907,16 @@ export function updateAutoDiscounts() {
   // Сначала применяем скидки на конкретные формы
   const allRulesToApply = [...specificFormRules, ...allFormsRules];
 
-  console.log(`📋 Порядок применения скидок:`);
+  log(`Порядок применения скидок:`);
   allRulesToApply.forEach((rule, index) => {
-    console.log(`  ${index + 1}. "${rule.title}" (forms: ${rule.forms === 'all' ? 'all' : 'specific'})`);
+    log(`  ${index + 1}. "${rule.title}" (forms: ${rule.forms === 'all' ? 'all' : 'specific'})`);
   });
 
   // Проходим по всем правилам скидок в правильном порядке
   allRulesToApply.forEach(rule => {
     let { id, title, forms, type, discountValue, condition, startDate, expiresAt } = rule;
 
-    console.log(`📊 Применяем скидку: "${title}" (forms: ${forms === 'all' ? 'all' : forms.join(', ')}), накоплено: ${accumulatedDiscounts}`);
+    log(`Применяем скидку: "${title}" (forms: ${forms === 'all' ? 'all' : forms.join(', ')}), накоплено: ${accumulatedDiscounts}`);
 
     // Для процентной скидки ограничиваем значение до 100
     if (type === 'percent' && discountValue > 100) {

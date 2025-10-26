@@ -23,13 +23,13 @@
   .ufo-btn{border:1px solid #d7d7e0;background:#f3f3f7;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.15;display:inline-flex;align-items:center}
   .ufo-btn:hover{background:#ececf4}
   .ufo-card.disabled{opacity:.4;pointer-events:none}
-  .ufo-selected .ufo-card {grid-template-columns: 1fr;
+  .ufo-lib .ufo-card {grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
     grid-template-areas:
         "id"
         "full"
         "actions";}
-  .ufo-selected .ufo-actions{justify-content: flex-end;}
+  .ufo-lib .ufo-actions{justify-content: flex-end;}
   .ufo-full{grid-area:full;box-sizing:border-box;margin:0;padding:0;border:0;background:transparent;overflow:hidden}
   .ufo-full .item{position:relative;margin:0}
   .ufo-full .item .modal-link{display:block}

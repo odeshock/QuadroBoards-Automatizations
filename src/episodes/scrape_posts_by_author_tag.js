@@ -18,7 +18,7 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
   comments_only = false,
   min_symbols_num = -1,
 } = {}) {
-  const debug = true;
+  const debug = false;
 
   const log = (...args) => {
     if (debug) console.log('[scrapePostsByAuthorTag]', ...args);

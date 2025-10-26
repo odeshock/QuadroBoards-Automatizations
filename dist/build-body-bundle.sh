@@ -24,10 +24,6 @@ for file in src/ui/*.js; do
   fi
 done
 
-# Load scrape_posts_by_author_tag.js
-echo "" >> dist/body-bundle.js
-cat src/episodes/scrape_posts_by_author_tag.js >> dist/body-bundle.js
-
 echo "" >> dist/body-bundle.js
 echo "/* Private Pages */" >> dist/body-bundle.js
 # Загружаем JSON-версии для API

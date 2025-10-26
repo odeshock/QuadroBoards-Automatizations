@@ -74,6 +74,10 @@ echo "/* MODULE 11.2: bank/parent/messages-config.js */" >> dist/head-bundle.js
 cat src/bank/parent/messages-config.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js
 
+echo "/* MODULE 11.25: episodes/scrape_posts_by_author_tag.js (needed by bank) */" >> dist/head-bundle.js
+cat src/episodes/scrape_posts_by_author_tag.js >> dist/head-bundle.js
+echo "" >> dist/head-bundle.js
+
 echo "/* MODULE 11.3: bank/parent/messages-queue.js */" >> dist/head-bundle.js
 cat src/bank/parent/messages-queue.js >> dist/head-bundle.js
 echo "" >> dist/head-bundle.js

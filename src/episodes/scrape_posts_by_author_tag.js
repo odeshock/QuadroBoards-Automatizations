@@ -7,7 +7,6 @@
  * @param {number[]|string} forums - ID форумов (массив или строка через запятую)
  * @param {Object} options - Опции поиска (аналогично scrapePostsByAuthorTag)
  * @param {string} [options.authorLogin=''] - Логин автора для дополнительной фильтрации (параметр author=)
- * @param {boolean} [options.debug=false] - Включить debug-логи
  * @returns {Promise<Array>} Массив постов
  */
 window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
@@ -33,7 +32,7 @@ window.scrapePostsByAuthorTag = async function (authorUserId, forums, {
     throw new Error('forums обязателен');
   }
 
-  log('Начало работы с параметрами:', { authorUserId, forums, stopOnNthPost, last_src, title_prefix, maxPages, delayMs, keywords, comments_only, min_symbols_num, authorLogin, debug });
+  log('Начало работы с параметрами:', { authorUserId, forums, stopOnNthPost, last_src, title_prefix, maxPages, delayMs, keywords, comments_only, min_symbols_num, authorLogin });
 
   const forumsStr = Array.isArray(forums) ? forums.join(',') : String(forums);
 

@@ -52,7 +52,10 @@
       const nodes = findTargets(n);
       log(`Обработка поля ${n}, найдено узлов:`, nodes.length);
       nodes.forEach(target => {
-        if (!target || target.dataset.htmlRendered === '1') return;
+        if (!target || target.dataset.htmlRendered === '1') {
+          log(`Поле ${n}, узел пропущен (уже обработан или пустой)`);
+          return;
+        }
 
         const htmlNow = (target.innerHTML || '').trim();
         const textNow = (target.textContent || '').trim();
@@ -74,6 +77,12 @@
           removeExtraBreaks(target);
           log(`Поле ${n}, после removeExtraBreaks:`, target.innerHTML);
           target.dataset.htmlRendered = '1';
+          log(`Поле ${n}, финальный HTML (помечено как обработано):`, target.innerHTML);
+
+          // Проверяем через секунду, не изменилось ли
+          setTimeout(() => {
+            log(`Поле ${n}, через 1 секунду:`, target.innerHTML);
+          }, 1000);
         } else {
           // Если ничего не изменилось, всё равно помечаем как обработанное
           log(`Поле ${n}, ничего не изменилось`);

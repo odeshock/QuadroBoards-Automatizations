@@ -3967,18 +3967,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const textNow = (target.textContent || '').trim();
         if (!htmlNow && !textNow) return;
 
-        const alreadyHtml = looksLikeHtml(htmlNow) && !htmlNow.includes('&lt;') && !htmlNow.includes('&gt;');
-
-        if (alreadyHtml) {
-          removeExtraBreaks(target);
-          target.dataset.htmlRendered = '1';
-          return;
-        }
-
+        // Сначала декодируем HTML-сущности
         const decoded = decodeEntities(htmlNow || textNow);
+
+        // Проверяем, изменилось ли содержимое или есть ли HTML-теги
         if (decoded !== htmlNow || looksLikeHtml(decoded)) {
           target.innerHTML = decoded;
           removeExtraBreaks(target);
+          target.dataset.htmlRendered = '1';
+        } else {
+          // Если ничего не изменилось, всё равно помечаем как обработанное
           target.dataset.htmlRendered = '1';
         }
       });

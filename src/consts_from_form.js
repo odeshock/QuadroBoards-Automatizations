@@ -33,7 +33,6 @@ var FIELDS_WITH_HTML = [
   PROFILE_FIELDS.PlashkaID,
   PROFILE_FIELDS.BackgroundID,
   PROFILE_FIELDS.IconID,
-  PROFILE_FIELDS.PersonalRankID,
 ]; // поля, для которых нужен рендеринг HTML
 
 var EPS_FORUM_INFO = [ // информация по форумам с эпизодами

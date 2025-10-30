@@ -70,7 +70,9 @@
         if (decoded !== htmlNow || looksLikeHtml(decoded)) {
           log(`Поле ${n}, применяем изменения`);
           target.innerHTML = decoded;
+          log(`Поле ${n}, после установки innerHTML:`, target.innerHTML);
           removeExtraBreaks(target);
+          log(`Поле ${n}, после removeExtraBreaks:`, target.innerHTML);
           target.dataset.htmlRendered = '1';
         } else {
           // Если ничего не изменилось, всё равно помечаем как обработанное

@@ -58,9 +58,6 @@ async function fetchAllLibraries() {
       // Формат API: { id, content, t, h } где t=title, h=hidden (значения 1/0)
       // Формат панели: { id, html } где html = <div class="item" data-id="..." title="...">content</div>
 
-      // Проверяем права доступа
-      const isAdmin = window.IS_ADMIN === true || window.IS_ADMIN_TO_EDIT === true;
-
       if (category === 'coupon') {
         // Купоны: {id, content, t, s_t, type, f, v}
         // У купонов НЕТ поля h, показываем все
@@ -78,10 +75,8 @@ async function fetchAllLibraries() {
         });
       } else {
         // Обычные скины: {id, content, t, h}
-        // Фильтруем по h только если не админ
-        const filteredItems = isAdmin ? data.items : data.items.filter(item => item.h !== 1);
-
-        const items = filteredItems.map(item => ({
+        // В библиотеке показываем ВСЕ элементы, включая скрытые (h=1)
+        const items = data.items.map(item => ({
           id: item.id,
           html: `<div class="item" data-id="${escapeAttr(item.id)}" title="${escapeAttr(item.t || '')}">${item.content || ''}</div>`
         }));

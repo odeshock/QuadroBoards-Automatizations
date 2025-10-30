@@ -1,5 +1,5 @@
 (function () {
-  const DEBUG = true;
+  const DEBUG = false;
   const log = (...a) => DEBUG && console.log('[profile_fields_as_html]', ...a);
 
   // === ПУБЛИЧНАЯ ФУНКЦИЯ ==========================================

@@ -31,12 +31,15 @@ var PROFILE_FIELDS = { // дополнительные поля профиля
   BackgroundID: 4,
   PlashkaID: 3,
   PlashkaTemplate: `<a id="ID" class="modal-link" data-reveal-id="character">личная страница</a>`,
+  PersonalRankID: 7, // личное звание
+  PostsID: 8,
 };
 
 var FIELDS_WITH_HTML = [
   PROFILE_FIELDS.PlashkaID,
   PROFILE_FIELDS.BackgroundID,
-  PROFILE_FIELDS.IconID
+  PROFILE_FIELDS.IconID,
+  PROFILE_FIELDS.PersonalRankID,
 ]; // поля, для которых нужен рендеринг HTML
 
 var EPS_FORUM_INFO = [ // информация по форумам с эпизодами
